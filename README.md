@@ -33,7 +33,7 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
    pip install -r requirements.txt
    ```
 
-### Running s Simulation
+### Running a sample simulation
 
 1. Navigate to the project directory **tbsim\src**.
 2. Run the main script:
