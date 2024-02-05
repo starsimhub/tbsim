@@ -26,7 +26,7 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/MEnriquez-IDM/TBSim.git
+   git clone https://github.com/amath-idm/TBSim.git
    ```
 2. Install the required packages:
    ```bash
@@ -56,15 +56,13 @@ Contributions to the TBSim project are welcome! Please read `CONTRIBUTING.md` fo
 
 - **Minerva Enriquez** - *Initial work* - [MEnriquez-IDM](https://github.com/MEnriquez-IDM)
 
-See also the list of [contributors -tbd](https://github.com/MEnriquez-IDM/TBSim/contributors) who participated in this project.
+See also the list of [contributors -tbd](https://github.com/amath-idm/TBSim/contributors) who participated in this project.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+This project is licensed under the MIT License - see the [LICENSE.md](https://github.com/amath-idm/tbsim/blob/main/LICENSE) file for details.
 
 ## Acknowledgments
 
-- Hat tip to anyone whose code was used
-- Inspiration
-- etc
+- TBD
 
