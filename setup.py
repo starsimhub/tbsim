@@ -28,7 +28,7 @@ CLASSIFIERS = [
 setup(
     name="tbsim",
     version=version,
-    author="Robyn Stuart, Cliff Kerr, Romesh Abeysuriya, Paula Sanz-Leon, Jamie Cohen, and Daniel Klein on behalf of the tbsim Collective",
+    author="Minerva Enriquez, Robyn Stuart, Cliff Kerr, Romesh Abeysuriya, Paula Sanz-Leon, Jamie Cohen, and Daniel Klein on behalf of the tbsim Collective",
     description="tbsim",
     long_description=long_description,
     long_description_content_type="text/x-rst",
