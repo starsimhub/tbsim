@@ -1,0 +1,29 @@
+name: Python unit tests
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Clone and install dependencies from another repository
+      run: |
+        git clone https://github.com/starsimhub/starsim.git
+        cd starsim
+        pip install -e .
+        pip list
+    - name: Install dependencies
+      run: |
+        ls -l
+        python -m pip install --upgrade pip
+        pip install -e .
+    - name: Run tests
+      run: |
+        python -m unittest discover -s tests
