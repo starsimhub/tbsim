@@ -1,4 +1,4 @@
-# Tuberculosis Modeling using StarSim (TBSim)
+# Tuberculosis Modeling using starsim (TBSim)
 
 This repository contains the implementation of a new Tuberculosis (TB) Model using the StarSim package. The model aims to simulate the dynamics of TB spread and treatment efficacy under various scenarios.
 
@@ -66,3 +66,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](https://gi
 
 - TBD
 
+## References
+
+[Epidemiological benefits of more-effective tuberculosis vaccines, drugs, and diagnostics](https://www.pnas.org/doi/abs/10.1073/pnas.0901720106?url_ver=Z39.88-2003&rfr_id=ori%3Arid%3Acrossref.org&rfr_dat=cr_pub++0pubmed)
