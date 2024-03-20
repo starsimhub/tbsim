@@ -7,3 +7,5 @@ seaborn
 numba
 networkx
 starsim
+wheel
+setuptools
