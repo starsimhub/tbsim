@@ -39,4 +39,4 @@ jobs:
       - name: Run unit tests
         run: |
           cd tbsim
-          python -m unittest discover -s tests
+          python -m unittest discover -s tbsim/tests
