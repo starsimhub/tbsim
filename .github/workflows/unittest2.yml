@@ -28,13 +28,11 @@ jobs:
       # Step 2.1: Checkout the running repository (tbsim)
       - name: Checkout tbsim repository
         uses: actions/checkout@v3
-        with:
-          path: 'tbsim'
       
       # Step 2.2: Install tbsim
       - name: Install tbsim
         run: |
-          cd tbsim
+          ls -l
           pip install -e .
 
       # Step 3: Run unit tests for tbsim
