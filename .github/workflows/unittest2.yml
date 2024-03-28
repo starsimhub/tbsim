@@ -40,5 +40,6 @@ jobs:
       # Step 3: Run unit tests for tbsim
       - name: Run unit tests
         run: |
-          cd tbsim 
+          ls -l
+          cd tests 
           python test_tbsim.py
