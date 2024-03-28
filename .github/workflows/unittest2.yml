@@ -1,8 +1,10 @@
-name: Install Dependencies and Run Tests Workflow
-
+name: TBsim Unit Tests
 # Trigger the workflow on push to the main branch
 on:
   push:
+    branches:
+      - main
+  pull_request:
     branches:
       - main
 
@@ -38,5 +40,5 @@ jobs:
       # Step 3: Run unit tests for tbsim
       - name: Run unit tests
         run: |
-          cd tbsim
-          python -m unittest discover -s tbsim/tests
+          cd tbsim 
+          python test_tbsim.py
