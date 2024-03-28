@@ -40,4 +40,4 @@ jobs:
         run: |
           ls -l
           cd tests 
-          python test_tbsim.py
+          python test_basics.py
