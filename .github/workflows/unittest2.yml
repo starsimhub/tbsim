@@ -18,6 +18,7 @@ jobs:
         run: |
           cd starsim
           pip install -e .
+          pip freeze
       
       # Step 2.1: Checkout the running repository (tbsim)
       - name: Checkout tbsim repository
@@ -28,11 +29,11 @@ jobs:
         run: |
           ls -l
           pip install -e .
+          pip freeze          
 
       # Step 3: Run unit tests for tbsim
       - name: Run unit tests
         working-directory: ./tests
         run: |
           ls -l
-          pip freeze
           python -m unittest discover .
