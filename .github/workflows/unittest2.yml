@@ -1,12 +1,6 @@
 name: TBsim Unit Tests
 # Trigger the workflow on push to the main branch
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+on: [push, pull_request]
 
 jobs:
   build-and-test:
@@ -37,7 +31,8 @@ jobs:
 
       # Step 3: Run unit tests for tbsim
       - name: Run unit tests
+        working-directory: ./tests
         run: |
           ls -l
-          cd tests 
-          python test_basics.py
+          pip freeze
+          python -m unittest discover .
