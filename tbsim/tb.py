@@ -5,39 +5,89 @@ import starsim as ss
 
 __all__ = ['TB']
 
-class TB(ss.Infection):
-    """
-    Tuberculosis (TB) disease model
-    """
-    def __init__(self, params=None, param_dists=None, *args, **kwargs):
-        # Initialize the parent class        
-        super().__init__(params, **kwargs) 
-
-        # States
-        self.add_states(
-            # Initialize the states for TB
-            ss.State('susceptibleTB', bool, True),  # Susceptible to TB
-            ss.State('latent_slow', bool, True),  # Latent TB, slow progression
-            ss.State('latent_fast', bool, False),  # Latent TB, fast progression
-            ss.State('active_pre_symptomatic', bool, False), # Active TB, pre-symptomatic
-            ss.State('smear_positive', bool, False), # Active TB, smear positive
-            ss.State('smear_negative', bool, True), # Active TB, smear negative
-            ss.State('extra_pulmonary', bool, True), # Active TB, extra-pulmonary
-            ss.State('dead', bool, False),
-            ss.State('recovered', bool, False),)  # Timestep of state changes
+class TB(ss.SIR):
+    def __init__(self, pars=None, par_dists=None, *args, **kwargs):
         
-        # Duration of each state
-        self.add_states(
-            ss.State('dur_latent_slow', float, ss.INT_NAN),
-            ss.State('dur_latent_fast', float, ss.INT_NAN),
-            ss.State('dur_active_pre_symptomatic', float, ss.INT_NAN),
-            ss.State('dur_smear_positive', float, ss.INT_NAN),
-            ss.State('dur_smear_negative', float, ss.INT_NAN),
-            ss.State('dur_extra_pulmonary', float, ss.INT_NAN),
-            
+        """Add TB parameters and states to the  TB model"""
+        pars = ss.omergeleft(pars,
+            init_prev = 0.01,   # Initial prevalence - TODO: Check if there is one
+            beta = 0.5,         # Transmission rate  - TODO: Check if there is one
         )
-        self.add_states(            
-            # Timestep of state changes
+      
+        """
+        DISEASE PROGRESSION: 
+        Rates can be interpreted as mean time to transition between states
+        For example, for TB Fast Progression( tb_LF_2_act_pre_sym), 1 / (6e-3) = 166.67 days  ~ 5.5 months ~ 0.5 years
+        """
+        # Natural history according with Stewart slides (EMOD TB model):
+        pars = ss.omergeleft(pars,
+            # tb_susceptible_2_exposed = 0,    # May be used for susceptibles that migrate to a different zone
+            tb_exposed_2_LF = 0.1,             # Exposed to Latent Fast 
+            tb_exposed_2_LS = 0.9,             # Exposed to Latent Slow
+            tb_LF_2_act_pre_sym = 6e-3,         # Latent Fast to Active Pre-Symptomatic     
+            tb_LS_2_act_pre_sym = 3e-5,         # Latent Slow to Active Pre-Symptomatic
+            
+            tb_act_pre_sym_2_SmP= 0.65,         # Active Presymptomatic to Smear Positive Pulmonary TB    
+            tb_act_pre_sym_2_SmN= 0.25,         # Active Presymptomatic to Smear Negative Pulmonary TB
+            tb_act_pre_sym_2_ExPTB = 0.1,       # Active Presymptomatic to Extra-Pulmonary TB
+                                                # TODO: Check if these values are not contradicting 
+            tb_SP_2_LS = 0,                     # Smear Positive to Recovered
+            tb_SN_2_LS = 0,                     # Smear Negative to Recovered
+            ExPTB_2_LS = 0,                     # Extra-Pulmonary TB to Recovered   
+
+            tb_SP_2_recovered = 2.4e-4,     # Smear Positive to Recovered
+            tb_SN_2_recovered = 2.4e-4,     # Smear Negative to Recovered
+            ExPTB_2_recovered = 2.4e-4,           # Extra-Pulmonary TB to Recovered   
+            
+            tb_SP_2_dead = 4.5e-4,          # Smear Positive Pulmonary TB to Dead
+            tb_SN_2_dead = 0.3,             # Smear Negative Pulmonary TB to Dead
+            tb_ExPTB_2_dead = 0.15,         # Extra-Pulmonary TB to Dead
+
+            # Additional parameters:
+            tb_latent_cure = 0.0,               
+            tb_active_cure = 2.4e-4,            
+            tb_presymptomatic_cure_rate = 0.0,  
+            tb_presymptomatic_rate = 3e-2,      
+            tb_inactivation = 0.0,
+            tb_active_period_distribution = ss.random, 
+        )
+        
+        
+        """
+        INFECTIOUSNESS:
+        On a scale where 0 represents no infectiousness and 1 represents the highest level of infectiousness typically observed in TB cases
+        """
+        
+        # Infectiousness of each state < MOCK VALUES, actual ones to be determined. Also if they will be
+        # relative or absolute values. Arrays are used to represent the range of values.
+        pars = ss.omergeleft(pars,
+            tb_latent_slow_infectiousness = 0.0,
+            tb_latent_fast_infectiousness = 0.0,
+            tb_active_presymptomatic_infectiousness = [0.5,0.75],
+            tb_smear_positive_infectiousness = 1.0,
+            tb_smear_negative_infectiousness = [0.25, 0.50],
+            tb_extra_pulmonary_infectiousness = [0.0, 0.1],
+        )
+               
+        
+        super().__init__(pars=pars, par_dists=par_dists, *args, **kwargs)
+        
+        self.add_states(
+            # Initialize states specific to TB:
+            ## Susceptible                              # Existent state part of People
+            ## Dead                                     # Existent state part of People 
+            ss.State('exposed', bool, False),           # Exposed to TB
+            ss.State('latent_slow', bool, True),        # Latent TB, slow progression
+            ss.State('latent_fast', bool, False),       # Latent TB, fast progression
+            ss.State('active_pre_symp', bool, False),   # Active TB, pre-symptomatic
+            ss.State('smear_positive', bool, False),    # Active TB, smear positive
+            ss.State('smear_negative', bool, True),     # Active TB, smear negative
+            ss.State('extra_pulmonary', bool, True),    # Active TB, extra-pulmonary
+            ss.State('recovered', bool, False),         
+        )
+        
+        self.add_states(
+            # Timestep of state changes          
             ss.State('ti_exposed', int, ss.INT_NAN),
             ss.State('ti_latent_slow', int, ss.INT_NAN),
             ss.State('ti_latent_fast', int, ss.INT_NAN),
@@ -46,80 +96,31 @@ class TB(ss.Infection):
             ss.State('ti_smear_negative', int, ss.INT_NAN),
             ss.State('ti_extra_pulmonary', int, ss.INT_NAN),
             )   
-        
-        
-        
-        # Parameters
-        # placeholder PARAMETERS *** add here  ***
-        params = ss.omergeleft(params,{
-            'dur_latent_fast': 1,  # Duration from exposure to latent fast
-            'dur_latent_slow': 10,  # Duration from latent fast to latent slow
-            'prob_progression_fast': 0.1,  # Probability of fast progression
-            'prob_progression_slow': 0.01,  # Probability of slow progression to active TB
-            'treatment_success_rate': 0.85,  # Treatment success probability
-        })
-        
-        param_networks = ss.omergeleft(params, {
-            'nn_zone' : 1,   # Zone of residence, this could be 1-> Rural 2-> 'urban' 
-            'nn_quality_of_care' : 1,  # Quality of care, this could be 1-> 'low' 2-> 'high'
-        })
-        
-        # super().__init__(pars=params, par_dists=param_dists, *args, **kwargs)
-        
-        
-        # Options:  # 1. Set default parameters according to: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4395246/ 
-        # the ones below were extracted from emod
-        default_pars = dict(
-            tb_latent_cure_rate = 0.0005479,    
-            tb_acute_duration_in_months = 2.9,
-            tb_inactivation_rate = 0.00041096,  
-            
-            tb_presymptomatic_rate = 0.0274,
-            tb_presymptomatic_cure_rate = 0.0274,
-            
-            #  Disease progression            
-            tb_fast_progressor_rate = 0.0411,   
-            tb_slow_progressor_rate = 2.05E-06, 
-            tb_fast_progressor_fraction_adult = 1.0,
-            tb_fast_progressor_fraction_child = 1.0,
-            
-            tb_active_mortality_rate = 0.0,   
-            tb_active_cure_rate = 0.0,
-            tb_active_period_distribution = ss.distributions.random, # Distribution of active period (lognormal)
-            tb_active_presymptomatic_infectivity_multiplier = 0.0274,
-            tb_active_period_std_dev = 1.0,
-            
-            tb_extrapulmonary_fraction_adult = 0.0,
-            tb_extrapulmonary_fraction_child = 0.0,
-            tb_extrapulmonary_mortality_multiplier = 0.4,   
-            
-            
-            tb_smear_positive_fraction_adult = 1.0,
-            tb_smear_positive_fraction_child = 1.0,
-            
-            tb_smear_negative_infectivity_multiplier = 0.0,
-            tb_smear_negative_mortality_multiplier = 0.0,  
-        )
-        self.pars = ss.omerge(default_pars, self.pars) # NB: regular omerge rather than omergeleft
-
         return
-
          
     # region Properties
         # TODO: Implement the properties for the model here
+        @property
+        def infectious(self):
+            """
+            Property that represents the infectious state of the TB disease.
+
+            This property returns a boolean value indicating whether the disease is in the infectious state.
+            The disease is considered infectious if it is either in the 'infected' or 'exposed' state.
+
+            Returns:
+                bool: True if the disease is in the 'infected' or 'exposed' state, False otherwise.
+            """
+            return self.infected | self.exposed
     #endregion
-               
-    # region -------------- INITIALIZATION METHODS -----------
-    
-    def initialize(self, sim):
-        super().initialize(sim)
-        # self.set_immunity(sim)
-        return
-    
+
     def init_results(self, sim):
-        """ Initialize results """
+        """
+        Initialize results
+        """
         super().init_results(sim)
-        return
+        self.results += ss.Result(self.name, 'tb_deaths', sim.npts, dtype=int)
+        return  
 
     def set_initial_states(self, sim):
         """
@@ -129,44 +130,56 @@ class TB(ss.Infection):
         taken place by the time this method is called.
         """
 
+        
         eligible_uids = ss.true((sim.people.age >= self.pars['init_prev']['age_range'][0]) & (sim.people.age <= self.pars['init_prev']['age_range'][1]))
         initial_cases = self.pars['seed_infections'].filter(eligible_uids)
         self.set_prognoses(sim, initial_cases)
-        return
-    
-    # endregion    
-        
-
-      
-    def make_new_cases(self, sim):
-        """
-        Add new cases of the disease
-        """
-        
-        # TODO: Implement the logic for adding new cases here
-        pass
-
-    
-    def set_prognoses(self, sim, uids, from_uids):
-        """
-        Set prognoses for the disease
-        """
-        # TODO: Implement the logic for setting prognoses here
-        return
-    
-    
-    
-        # region  --------- UPDATE METHODS -----------
+        return   
     
     def update_pre(self, sim):
-        """ Carry out autonomous updates at the start of the timestep (prior to transmission)  """
-        # TODO: Implement the logic for updating the model states here
-        print("UPDATING BEFORE", "="*20 )
-        pass
-    
-    def update_results(self, sim):
-        """ Update results """
-        super().update_results(sim)
-        print("UPDATING RESULTS", "="*20 )
+        # Make all the updates from the SIR model 
+        n_deaths = super().update_pre(sim)
+
+        # Additional updates: progress exposed -> infected
+        infected = ss.true(self.exposed & (self.ti_infected <= sim.year))
+        self.exposed[infected] = False
+        self.infected[infected] = True
+
+        return n_deaths
+
+    def update_death(self, sim, uids):
+        super().update_death(sim, uids)
+        self.exposed[uids] = False
         return
-    # endregion 
+
+    def set_prognoses(self, sim, uids, from_uids):
+        # Carry out state changes associated with infection
+        self.susceptible[uids] = False
+        self.exposed[uids] = True
+        self.ti_exposed[uids] = sim.year
+
+        # Calculate and schedule future outcomes
+        dur_exp = self.pars['dur_exp'].TB(uids)
+        self.ti_infected[uids] = sim.year + dur_exp
+        dur_inf = self.pars['dur_inf'].TB(uids)
+        will_die = self.pars['p_death'].TB(uids)        
+        self.ti_recovered[uids[~will_die]] = sim.year + dur_inf[~will_die]
+        self.ti_dead[uids[will_die]] = sim.year + dur_inf[will_die]
+
+        # Update result count of new infections 
+        self.results['new_infections'][sim.ti] += len(uids)
+        return
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
