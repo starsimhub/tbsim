@@ -2,16 +2,20 @@ import numpy as np
 import sciris as sc
 from sciris import randround as rr # Since used frequently
 import starsim as ss
+from starsim.diseases.sir import SIR
 
 __all__ = ['TB']
 
-class TB(ss.SIR):
+class TB(SIR):
     def __init__(self, pars=None, par_dists=None, *args, **kwargs):
         
         """Add TB parameters and states to the  TB model"""
         pars = ss.omergeleft(pars,
             init_prev = 0.01,   # Initial prevalence - TODO: Check if there is one
             beta = 0.5,         # Transmission rate  - TODO: Check if there is one
+            min_age = 0,        # Minimum age for TB infection
+            max_age = 100,      # Maximum age for TB infection
+            seed_infections = [0, 1, 15, 20] # Seed infections - 
         )
       
         """
@@ -50,8 +54,25 @@ class TB(ss.SIR):
             tb_presymptomatic_rate = 3e-2,      
             tb_inactivation = 0.0,
             tb_active_period_distribution = ss.random, 
+            
+            ## Durations of states
+            dur_latent_slow = 0.1,
+            dur_latent_fast = 0.9,
+            dur_active_pre_symptomatic = 1,
+            dur_smear_positive = 0.65,
+            dur_smear_negative = 0.25,
+            dur_extra_pulmonary = 0.1,
         )
         
+        par_dists = ss.omergeleft(par_dists,
+            ## Durations of states
+            dur_latent_slow = ss.lognorm_ex,
+            dur_latent_fast = ss.lognorm_ex,
+            dur_active_pre_symptomatic = ss.lognorm_ex,
+            dur_smear_positive = ss.lognorm_ex,
+            dur_smear_negative = ss.lognorm_ex,
+            dur_extra_pulmonary = ss.lognorm_ex,
+            )
         
         """
         INFECTIOUSNESS:
@@ -63,10 +84,10 @@ class TB(ss.SIR):
         pars = ss.omergeleft(pars,
             tb_latent_slow_infectiousness = 0.0,
             tb_latent_fast_infectiousness = 0.0,
-            tb_active_presymptomatic_infectiousness = [0.5,0.75],
+            tb_active_presymptomatic_infectiousness = 0.625,  #[0.5,0.75],
             tb_smear_positive_infectiousness = 1.0,
-            tb_smear_negative_infectiousness = [0.25, 0.50],
-            tb_extra_pulmonary_infectiousness = [0.0, 0.1],
+            tb_smear_negative_infectiousness =  0.3625,  # [0.25, 0.50],
+            tb_extra_pulmonary_infectiousness = .05,  #[0.0, 0.1],
         )
                
         
@@ -84,9 +105,9 @@ class TB(ss.SIR):
             ss.State('smear_negative', bool, True),     # Active TB, smear negative
             ss.State('extra_pulmonary', bool, True),    # Active TB, extra-pulmonary
             ss.State('recovered', bool, False),         
-        )
-        
-        self.add_states(
+
+
+
             # Timestep of state changes          
             ss.State('ti_exposed', int, ss.INT_NAN),
             ss.State('ti_latent_slow', int, ss.INT_NAN),
@@ -119,7 +140,7 @@ class TB(ss.SIR):
         Initialize results
         """
         super().init_results(sim)
-        self.results += ss.Result(self.name, 'tb_deaths', sim.npts, dtype=int)
+        # self.results += ss.Result(self.name, 'tb_deaths', sim.npts, dtype=int)
         return  
 
     def set_initial_states(self, sim):
@@ -131,9 +152,11 @@ class TB(ss.SIR):
         """
 
         
-        eligible_uids = ss.true((sim.people.age >= self.pars['init_prev']['age_range'][0]) & (sim.people.age <= self.pars['init_prev']['age_range'][1]))
-        initial_cases = self.pars['seed_infections'].filter(eligible_uids)
-        self.set_prognoses(sim, initial_cases)
+        # eligible_uids = ss.true((sim.people.age >= self.pars['init_prev']['age_range'][0]) & (sim.people.age <= self.pars['init_prev']['age_range'][1]))
+        eligible_uids = ss.true((sim.people.age >= self.pars['min_age']) & (sim.people.age <= self.pars['max_age']))
+        # initial_cases = self.pars['seed_infections'].filter(eligible_uids)
+        self.set_prognoses(sim, eligible_uids)
+        # self.set_prognoses(sim, initial_cases)
         return   
     
     def update_pre(self, sim):
@@ -152,17 +175,33 @@ class TB(ss.SIR):
         self.exposed[uids] = False
         return
 
-    def set_prognoses(self, sim, uids, from_uids):
+    def set_prognoses(self, sim, uids, from_uids=None):
         # Carry out state changes associated with infection
         self.susceptible[uids] = False
         self.exposed[uids] = True
         self.ti_exposed[uids] = sim.year
 
         # Calculate and schedule future outcomes
-        dur_exp = self.pars['dur_exp'].TB(uids)
-        self.ti_infected[uids] = sim.year + dur_exp
-        dur_inf = self.pars['dur_inf'].TB(uids)
-        will_die = self.pars['p_death'].TB(uids)        
+        # dur_exp = self.pars['dur_exp'].rvs(uids)
+        dur_latent_slow = self.pars['dur_latent_slow'].rvs(uids)
+        dur_latent_fast = self.pars['dur_latent_fast'].rvs(uids)
+        dur_presymptomatic = self.pars['dur_active_pre_symptomatic'].rvs(uids)
+        dur_smear_positive = self.pars['dur_smear_positive'].rvs(uids)
+        dur_smear_negative = self.pars['dur_smear_negative'].rvs(uids)
+        dur_extra_pulmonary = self.pars['dur_extra_pulmonary'].rvs(uids)
+        
+        # self.ti_infected[uids] = sim.year + dur_exp
+        self.ti_latent_slow[uids] = sim.year + dur_latent_slow
+        self.ti_latent_fast[uids] = sim.year + dur_latent_fast
+        self.ti_active_pre_symptomatic[uids] = sim.year + dur_presymptomatic
+        self.ti_smear_positive[uids] = sim.year + dur_smear_positive
+        self.ti_smear_negative[uids] = sim.year + dur_smear_negative
+        self.ti_extra_pulmonary[uids] = sim.year + dur_extra_pulmonary
+                
+        
+        
+        dur_inf = self.pars['dur_inf'].rvs(uids)
+        will_die = self.pars['p_death'].rvs(uids)        
         self.ti_recovered[uids[~will_die]] = sim.year + dur_inf[~will_die]
         self.ti_dead[uids[will_die]] = sim.year + dur_inf[will_die]
 
