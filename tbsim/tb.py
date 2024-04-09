@@ -30,12 +30,12 @@ class TB(SIR):
             dur_presym_to_symp_smpos = ss.expon(scale=1/3e-2),     # Pre-Symptomatic to Symptomatic for smpos (days)
             dur_presym_to_symp_smneg = ss.expon(scale=1/3e-2),     # Pre-Symptomatic to Symptomatic for smneg (days)
             
-            p_ExPTB = 0.1,
-            p_smear_positive = 0.65 / (0.65+0.25), # Amongst those without extrapulminary TB
+            p_exptb = 0.1,
+            p_smpos = 0.65 / (0.65+0.25), # Amongst those without extrapulminary TB
 
-            dur_SP_to_dead = ss.expon(scale=1/4.5e-4), # Smear Positive Pulmonary TB to Dead (days)
-            dur_SN_to_dead = ss.expon(scale=1/(0.3 * 4.5e-4)),    # Smear Negative Pulmonary TB to Dead (days)
-            dur_ExPTB_to_dead = ss.expon(scale=1/(0.15 * 4.5e-4)),# Extra-Pulmonary TB to Dead (days)
+            dur_smpos_to_dead = ss.expon(scale=1/4.5e-4), # Smear Positive Pulmonary TB to Dead (days)
+            dur_smneg_to_dead = ss.expon(scale=1/(0.3 * 4.5e-4)),    # Smear Negative Pulmonary TB to Dead (days)
+            dur_exptb_to_dead = ss.expon(scale=1/(0.15 * 4.5e-4)),# Extra-Pulmonary TB to Dead (days)
 
             # TODO: VALUES and list sources
             rel_trans_smpos = 1.0,
@@ -63,16 +63,13 @@ class TB(SIR):
             ss.State('ti_active_exptb', int, ss.INT_NAN),
             ss.State('ti_active_smneg', int, ss.INT_NAN),
             ss.State('ti_active_smpos', int, ss.INT_NAN),
-            ss.State('tx_smpos', int, ss.INT_NAN),
-            ss.State('tx_smneg', int, ss.INT_NAN),
-            ss.State('ti_exptb', int, ss.INT_NAN),
             )
 
         # Convert the scalar numbers to a Bernoulli distribution
         self.pars.p_latent_fast = ss.bernoulli(self.pars.p_latent_fast)
         self.pars.init_prev = ss.bernoulli(self.pars.init_prev)
-        self.pars.p_ExPTB = ss.bernoulli(self.pars.p_ExPTB)
-        self.pars.p_smear_positive = ss.bernoulli(self.pars.p_smear_positive)
+        self.pars.p_exptb = ss.bernoulli(self.pars.p_exptb)
+        self.pars.p_smpos = ss.bernoulli(self.pars.p_smpos)
 
         return
          
@@ -154,10 +151,10 @@ class TB(SIR):
         self.ti_active_presymp[slow_uids] = sim.ti + p.dur_LS_to_act_pre_sym.rvs(slow_uids) / 365.0 / sim.dt
 
         # Determine which agents will have extrapulminary TB
-        exptb_uids, not_exptb_uids = p.p_ExPTB.filter(uids, both=True)
+        exptb_uids, not_exptb_uids = p.p_exptb.filter(uids, both=True)
 
         # Of those not going exptb, choose smear positive or smear negative
-        smpos_uids, smneg_uids = p.p_smear_positive.filter(not_exptb_uids, both=True)
+        smpos_uids, smneg_uids = p.p_smpos.filter(not_exptb_uids, both=True)
 
         # Determine time index to become active
         self.ti_active_exptb[exptb_uids] = self.ti_active_presymp[exptb_uids] + p.dur_presym_to_symp_exptb.rvs(exptb_uids) / 365.0 / sim.dt
@@ -170,9 +167,9 @@ class TB(SIR):
         #self.ti_recovered[uids[~will_die]] = sim.year + dur_inf[~will_die]
 
         # Determine time index of death
-        self.ti_dead[smpos_uids] = self.ti_active_smpos[smpos_uids] + p.dur_SP_to_dead.rvs(smpos_uids) / 365 / sim.dt
-        self.ti_dead[smneg_uids] = self.ti_active_smneg[smneg_uids] + p.dur_SN_to_dead.rvs(smneg_uids) / 365 / sim.dt
-        self.ti_dead[exptb_uids] = self.ti_active_exptb[exptb_uids] + p.dur_ExPTB_to_dead.rvs(exptb_uids) / 365 / sim.dt
+        self.ti_dead[smpos_uids] = self.ti_active_smpos[smpos_uids] + p.dur_smpos_to_dead.rvs(smpos_uids) / 365 / sim.dt
+        self.ti_dead[smneg_uids] = self.ti_active_smneg[smneg_uids] + p.dur_smneg_to_dead.rvs(smneg_uids) / 365 / sim.dt
+        self.ti_dead[exptb_uids] = self.ti_active_exptb[exptb_uids] + p.dur_exptb_to_dead.rvs(exptb_uids) / 365 / sim.dt
 
         # Update result count of new infections 
         self.results['new_infections'][sim.ti] += len(uids)

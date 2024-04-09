@@ -2,11 +2,11 @@ import tbsim as mtb
 import starsim as ss
 import matplotlib.pyplot as plt
 
-n_agents = 100
+n_agents = 1_000
 pop = ss.People(n_agents=n_agents)
 
 tb_pars = dict(
-    beta = 0.01, 
+    beta = 0.001, 
     init_prev = 0.25,
 )
 tb = mtb.TB(tb_pars)
@@ -17,9 +17,9 @@ net_pars = dict(
 net = ss.RandomNet(net_pars)
 
 sim_pars = dict(
-    dt = 1/365,
+    dt = 7/365,
     start = 1990,
-    end = 1995,
+    end = 2000,
 )
 
 # TODO: Add demographics
