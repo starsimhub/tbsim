@@ -15,37 +15,32 @@ class TB(SIR):
             beta = 0.5,         # Transmission rate  - TODO: Check if there is one
             min_age = 0,        # Minimum age for TB infection
             max_age = 100,      # Maximum age for TB infection
-            seed_infections = [0, 1, 15, 20] # Seed infections - 
+            seed_infections = [0, 1, 15, 20] # IGNORE, THIS IS ONLY TO debug an issue
         )
       
         """
         DISEASE PROGRESSION: 
         Rates can be interpreted as mean time to transition between states
-        For example, for TB Fast Progression( tb_LF_2_act_pre_sym), 1 / (6e-3) = 166.67 days  ~ 5.5 months ~ 0.5 years
+        For example, for TB Fast Progression( tb_LF_to_act_pre_sym), 1 / (6e-3) = 166.67 days  ~ 5.5 months ~ 0.5 years
         """
         # Natural history according with Stewart slides (EMOD TB model):
         pars = ss.omergeleft(pars,
-            # tb_susceptible_2_exposed = 0,    # May be used for susceptibles that migrate to a different zone
-            tb_exposed_2_LF = 0.1,             # Exposed to Latent Fast 
-            tb_exposed_2_LS = 0.9,             # Exposed to Latent Slow
-            tb_LF_2_act_pre_sym = 6e-3,         # Latent Fast to Active Pre-Symptomatic     
-            tb_LS_2_act_pre_sym = 3e-5,         # Latent Slow to Active Pre-Symptomatic
+            # tb_susceptible_to_exposed = 0,        # May be used for susceptibles that migrate to a different zone
+            dur_tb_exposed_to_LF = 0.1,                 # Exposed to Latent Fast 
+            dur_tb_exposed_to_LS = 0.9,                 # Exposed to Latent Slow
+            dur_tb_LF_to_act_pre_sym = 6e-3,            # Latent Fast to Active Pre-Symptomatic     
+            dur_tb_LS_to_act_pre_sym = 3e-5,            # Latent Slow to Active Pre-Symptomatic
             
-            tb_act_pre_sym_2_SmP= 0.65,         # Active Presymptomatic to Smear Positive Pulmonary TB    
-            tb_act_pre_sym_2_SmN= 0.25,         # Active Presymptomatic to Smear Negative Pulmonary TB
-            tb_act_pre_sym_2_ExPTB = 0.1,       # Active Presymptomatic to Extra-Pulmonary TB
+            dur_tb_act_pre_sym_to_SmP= 0.65,        # Active Presymptomatic to Smear Positive Pulmonary TB    
+            dur_tb_act_pre_sym_to_SmN= 0.25,        # Active Presymptomatic to Smear Negative Pulmonary TB
+            dur_tb_act_pre_sym_to_ExPTB = 0.1,      # Active Presymptomatic to Extra-Pulmonary TB
                                                 # TODO: Check if these values are not contradicting 
-            tb_SP_2_LS = 0,                     # Smear Positive to Recovered
-            tb_SN_2_LS = 0,                     # Smear Negative to Recovered
-            ExPTB_2_LS = 0,                     # Extra-Pulmonary TB to Recovered   
-
-            tb_SP_2_recovered = 2.4e-4,     # Smear Positive to Recovered
-            tb_SN_2_recovered = 2.4e-4,     # Smear Negative to Recovered
-            ExPTB_2_recovered = 2.4e-4,           # Extra-Pulmonary TB to Recovered   
+            dur_tb_active_to_LS = 0,                # Smear Positive to Recovered
+            dur_tb_active_to_recovered = 2.4e-4,    # Smear Positive to Recovered
             
-            tb_SP_2_dead = 4.5e-4,          # Smear Positive Pulmonary TB to Dead
-            tb_SN_2_dead = 0.3,             # Smear Negative Pulmonary TB to Dead
-            tb_ExPTB_2_dead = 0.15,         # Extra-Pulmonary TB to Dead
+            dur_tb_SP_to_dead = 4.5e-4,             # Smear Positive Pulmonary TB to Dead
+            dur_tb_SN_to_dead = 0.3,                # Smear Negative Pulmonary TB to Dead
+            dur_tb_ExPTB_to_dead = 0.15,            # Extra-Pulmonary TB to Dead
 
             # Additional parameters:
             tb_latent_cure = 0.0,               
@@ -54,24 +49,25 @@ class TB(SIR):
             tb_presymptomatic_rate = 3e-2,      
             tb_inactivation = 0.0,
             tb_active_period_distribution = ss.random, 
-            
-            ## Durations of states
-            dur_latent_slow = 0.1,
-            dur_latent_fast = 0.9,
-            dur_active_pre_symptomatic = 1,
-            dur_smear_positive = 0.65,
-            dur_smear_negative = 0.25,
-            dur_extra_pulmonary = 0.1,
         )
         
         par_dists = ss.omergeleft(par_dists,
             ## Durations of states
-            dur_latent_slow = ss.lognorm_ex,
-            dur_latent_fast = ss.lognorm_ex,
-            dur_active_pre_symptomatic = ss.lognorm_ex,
-            dur_smear_positive = ss.lognorm_ex,
-            dur_smear_negative = ss.lognorm_ex,
-            dur_extra_pulmonary = ss.lognorm_ex,
+            dur_tb_exposed_to_LF = ss.lognorm_ex,
+            dur_tb_exposed_to_LS = ss.lognorm_ex,
+            dur_tb_LF_to_act_pre_sym = ss.lognorm_ex,
+            dur_tb_LS_to_act_pre_sym = ss.lognorm_ex,
+
+            dur_tb_act_pre_sym_to_SmP= ss.lognorm_ex,
+            dur_tb_act_pre_sym_to_SmN= ss.lognorm_ex,
+            dur_tb_act_pre_sym_to_ExPTB = ss.lognorm_ex,
+
+            dur_tb_active_to_LS = ss.lognorm_ex,
+            dur_tb_active_to_recovered = ss.lognorm_ex,
+
+            dur_tb_SP_to_dead = 4.5e-4,
+            dur_tb_SN_to_dead = 0.3,
+            dur_tb_ExPTB_to_dead = 0.15,
             )
         
         """
@@ -105,8 +101,6 @@ class TB(SIR):
             ss.State('smear_negative', bool, True),     # Active TB, smear negative
             ss.State('extra_pulmonary', bool, True),    # Active TB, extra-pulmonary
             ss.State('recovered', bool, False),         
-
-
 
             # Timestep of state changes          
             ss.State('ti_exposed', int, ss.INT_NAN),
@@ -183,16 +177,16 @@ class TB(SIR):
 
         # Calculate and schedule future outcomes
         # dur_exp = self.pars['dur_exp'].rvs(uids)
-        dur_latent_slow = self.pars['dur_latent_slow'].rvs(uids)
-        dur_latent_fast = self.pars['dur_latent_fast'].rvs(uids)
+        dur_tb_exposed_to_LF = self.pars['dur_tb_exposed_to_LF'].rvs(uids)
+        dur_tb_exposed_to_LS = self.pars['dur_tb_exposed_to_LS'].rvs(uids)
         dur_presymptomatic = self.pars['dur_active_pre_symptomatic'].rvs(uids)
         dur_smear_positive = self.pars['dur_smear_positive'].rvs(uids)
         dur_smear_negative = self.pars['dur_smear_negative'].rvs(uids)
         dur_extra_pulmonary = self.pars['dur_extra_pulmonary'].rvs(uids)
         
         # self.ti_infected[uids] = sim.year + dur_exp
-        self.ti_latent_slow[uids] = sim.year + dur_latent_slow
-        self.ti_latent_fast[uids] = sim.year + dur_latent_fast
+        self.ti_latent_slow[uids] = sim.year + dur_tb_exposed_to_LF
+        self.ti_latent_fast[uids] = sim.year + dur_tb_exposed_to_LS
         self.ti_active_pre_symptomatic[uids] = sim.year + dur_presymptomatic
         self.ti_smear_positive[uids] = sim.year + dur_smear_positive
         self.ti_smear_negative[uids] = sim.year + dur_smear_negative
