@@ -1,20 +1,31 @@
 import tbsim as mtb
 import starsim as ss
+import matplotlib.pyplot as plt
 
-n_agents = 5_000
+n_agents = 100
 pop = ss.People(n_agents=n_agents)
 
 tb_pars = dict(
-    beta = 0.1,
-    init_prev = 0.05
+    beta = 0.01, 
+    init_prev = 0.25,
 )
 tb = mtb.TB(tb_pars)
-#tb.pars['beta'] = 0.1 #{'random': [0.0008, 0.0004]}  # Specify transmissibility over the MF network
-#tb.pars['init_prev'] = 0.05
 
-net_pars = None
+net_pars = dict(
+    n_contacts=ss.poisson(lam=5)
+)
 net = ss.RandomNet(net_pars)
 
-sim = ss.Sim(people=pop, networks=net, diseases=tb)
+sim_pars = dict(
+    dt = 1/365,
+    start = 1990,
+    end = 1995,
+)
+
+# TODO: Add demographics
+
+sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=sim_pars)
+
 sim.run()
-sim.plot()
+sim.diseases['tb'].plot()
+plt.show()

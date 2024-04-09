@@ -20,10 +20,10 @@ class TestTB(unittest.TestCase):
         self.assertIsInstance(tb.ti_exposed, ss.State)
         self.assertIsInstance(tb.ti_latent_slow, ss.State)
         self.assertIsInstance(tb.ti_latent_fast, ss.State)
-        self.assertIsInstance(tb.ti_active_pre_symptomatic, ss.State)
-        self.assertIsInstance(tb.ti_smear_positive, ss.State)
-        self.assertIsInstance(tb.ti_smear_negative, ss.State)
-        self.assertIsInstance(tb.ti_extra_pulmonary, ss.State)
+        self.assertIsInstance(tb.ti_active_presymp, ss.State)
+        self.assertIsInstance(tb.tx_smpos, ss.State)
+        self.assertIsInstance(tb.tx_smneg, ss.State)
+        self.assertIsInstance(tb.ti_exptb, ss.State)
         
     def test_default_parameters(self):
         tb = tbs.TB()
