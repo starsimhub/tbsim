@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 nut_pars = dict(
     beta = 0.05, 
     init_prev = 0.001,
+    c = 1, 
+    scale = 7
     )
 nut = mtb.Nutrition(nut_pars)
 sim = ss.Sim(people=ss.People(n_agents=1000), diseases=nut)
