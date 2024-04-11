@@ -57,12 +57,12 @@ class Nutrition(NCD):
         inds = ss.true(self.normal & (self.ti_overnutrition <= sim.ti))
         if len(inds):
             self.normal[inds] = False
-            self.undernutrition[inds] = True
+            self.overnutrition[inds] = True
             
         inds = ss.true(self.normal & (self.ti_micronutrient_deficiency <= sim.ti))
         if len(inds):
             self.normal[inds] = False
-            self.undernutrition[inds] = True
+            self.micronutrient_deficiency[inds] = True
             
         return
 
