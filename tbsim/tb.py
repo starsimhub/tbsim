@@ -24,11 +24,13 @@ class TB(SIR):
         # Natural history according with Stewart slides (EMOD TB model):
         pars = ss.omergeleft(pars,
             p_latent_fast = 0.1, # Probability of latent fast as opposed to latent slow
-            dur_LF_to_act_pre_sym = ss.expon(scale=1/6e-3),  # Latent Fast to Active Pre-Symptomatic (days)
-            dur_LS_to_act_pre_sym = ss.expon(scale=1/3e-5),  # Latent Slow to Active Pre-Symptomatic (days)
-            dur_presym_to_symp_exptb = ss.expon(scale=1/3e-2),     # Pre-Symptomatic to Symptomatic for exptb (days)
-            dur_presym_to_symp_smpos = ss.expon(scale=1/3e-2),     # Pre-Symptomatic to Symptomatic for smpos (days)
-            dur_presym_to_symp_smneg = ss.expon(scale=1/3e-2),     # Pre-Symptomatic to Symptomatic for smneg (days)
+
+            rate_LF_to_act_pre_sym = 6e-3,     # Latent Fast to Active Pre-Symptomatic (per day)
+            rate_LS_to_act_pre_sym = 3e-5,     # Latent Slow to Active Pre-Symptomatic (per day)
+
+            dur_presym_to_symp_exptb = ss.expon(scale=1/3e-2),  # Pre-Symptomatic to Symptomatic for exptb (days)
+            dur_presym_to_symp_smpos = ss.expon(scale=1/3e-2),  # Pre-Symptomatic to Symptomatic for smpos (days)
+            dur_presym_to_symp_smneg = ss.expon(scale=1/3e-2),  # Pre-Symptomatic to Symptomatic for smneg (days)
             
             p_exptb = 0.1,
             p_smpos = 0.65 / (0.65+0.25), # Amongst those without extrapulminary TB
@@ -42,6 +44,7 @@ class TB(SIR):
             rel_trans_exptb = 0.05,
             rel_trans_presymp = 0.1,
             rel_trans_smneg = 0.3,
+
         )
         
         super().__init__(pars=pars, par_dists=par_dists, *args, **kwargs)
@@ -50,12 +53,20 @@ class TB(SIR):
             # Initialize states specific to TB:
             ## Susceptible                              # Existent state part of People
             ## Dead                                     # Existent state part of People 
-            ss.State('latent', bool, False),            # Latent TB, fast progression
+            ss.State('latent_fast', bool, False),       # Latent TB, fast progression
+            ss.State('latent_slow', bool, False),       # Latent TB, slow progression
             ss.State('active_presymp', bool, False),   # Active TB, pre-symptomatic
             ss.State('active_smpos', bool, False),    # Active TB, smear positive
             ss.State('active_smneg', bool, False),    # Active TB, smear negative
             ss.State('active_exptb', bool, False),   # Active TB, extra-pulmonary
             ss.State('recovered', bool, False),         
+
+            ss.State('rel_LS_prog', float, 1.0), # Multiplier on the latent-slow progression rate
+
+            # Duration of states
+            ss.State('dur_active_exptb', int, ss.INT_NAN),
+            ss.State('dur_active_smneg', int, ss.INT_NAN),
+            ss.State('dur_active_smpos', int, ss.INT_NAN),
 
             # Timestep of state changes          
             ss.State('ti_latent', int, ss.INT_NAN),
@@ -63,7 +74,11 @@ class TB(SIR):
             ss.State('ti_active_exptb', int, ss.INT_NAN),
             ss.State('ti_active_smneg', int, ss.INT_NAN),
             ss.State('ti_active_smpos', int, ss.INT_NAN),
+
             )
+
+        self.pars.LS_to_active = ss.bernoulli(p=LS_to_act_pre_sym_prob),
+        self.pars.LF_to_active = ss.bernoulli(p=0), # TODO
 
         # Convert the scalar numbers to a Bernoulli distribution
         self.pars.p_latent_fast = ss.bernoulli(self.pars.p_latent_fast)
@@ -72,7 +87,12 @@ class TB(SIR):
         self.pars.p_smpos = ss.bernoulli(self.pars.p_smpos)
 
         return
-         
+
+    def LS_to_act_pre_sym_rate(self, sim, uids):
+        rate = self.pars.rate_LS_to_act_pre_sym * 365.0 * self.rel_LS_prog[uids]
+        prob = rate * sim.dt # Could do 1-exp(rate * sim.dt)
+        return prob
+
     # TODO: Implement the properties for the model here
     @property
     def infectious(self):
@@ -85,6 +105,46 @@ class TB(SIR):
     def update_pre(self, sim):
         # Make all the updates from the SIR model 
         super().update_pre(sim)
+        p = self.pars
+        
+        # Assess progress from latent slow
+        slow_uids = ss.true(self.latent_slow)
+        inds_slow = self.pars.LS_to_active.filter(slow_uids)
+        self.latent_slow[inds_slow] = False
+        self.active_presymp[inds_slow] = True
+        self.ti_active_presymp[slow_uids] = sim.ti
+        self.rel_trans[slow_uids] = self.pars.rel_trans_presymp
+
+        # Assess progress from latent fast
+        fast_uids = ss.true(self.latent_fast)
+        inds_fast = self.pars.LF_to_active.filter(slow_uids)
+        self.latent_fast[inds_fast] = False
+        self.active_presymp[inds_fast] = True
+        self.ti_active_presymp[fast_uids] = sim.ti
+        self.rel_trans[slow_uids] = self.pars.rel_trans_presymp
+
+        new_presymp_uids = np.concatentate([inds_slow, inds_fast])
+        # Presymp to ExpTB
+        exptb_uids = ss.true(self.dur_active_exptb[new_presymp_uids] != ss.INT_NAN)
+        self.ti_active_exptb[exptb_uids] = self.ti_active_presymp[exptb_uids] + self.dur_active_exptb[exptb_uids]
+
+        # Presymp to SmPos
+        smpos_uids = ss.true(self.dur_active_smpos[new_presymp_uids] != ss.INT_NAN)
+        self.ti_active_smpos[smpos_uids] = self.ti_active_presymp[smpos_uids] + self.dur_active_smpos[smpos_uids]
+
+        # Presymp to SmNeg
+        smneg_uids = ss.true(self.dur_active_smneg[new_presymp_uids] != ss.INT_NAN)
+        self.ti_active_smneg[smneg_uids] = self.ti_active_presymp[smneg_uids] + self.dur_active_smneg[smneg_uids]
+
+
+        ##### dur_inf = self.pars['dur_inf'].rvs(uids) # TODO: Duration of infection?
+        ##### will_die = self.pars['p_death'].rvs(uids) # TODO: Probability of death?
+        #self.ti_recovered[uids[~will_die]] = sim.year + dur_inf[~will_die]
+
+        # Determine time index of death
+        self.ti_dead[smpos_uids] = self.ti_active_smpos[smpos_uids] + p.dur_smpos_to_dead.rvs(smpos_uids) / 365 / sim.dt
+        self.ti_dead[smneg_uids] = self.ti_active_smneg[smneg_uids] + p.dur_smneg_to_dead.rvs(smneg_uids) / 365 / sim.dt
+        self.ti_dead[exptb_uids] = self.ti_active_exptb[exptb_uids] + p.dur_exptb_to_dead.rvs(exptb_uids) / 365 / sim.dt
 
         # Latent --> active pre-symptomatic
         inds = ss.true(self.latent & (self.ti_active_presymp <= sim.ti))
@@ -143,12 +203,8 @@ class TB(SIR):
 
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
-        self.latent[fast_uids] = True
-        self.latent[slow_uids] = True
-
-        # Determine time index to become active pre-symptomatic
-        self.ti_active_presymp[fast_uids] = sim.ti + p.dur_LF_to_act_pre_sym.rvs(fast_uids) / 365.0 / sim.dt
-        self.ti_active_presymp[slow_uids] = sim.ti + p.dur_LS_to_act_pre_sym.rvs(slow_uids) / 365.0 / sim.dt
+        self.latent_fast[fast_uids] = True
+        self.latent_slow[slow_uids] = True
 
         # Determine which agents will have extrapulminary TB
         exptb_uids, not_exptb_uids = p.p_exptb.filter(uids, both=True)
@@ -157,19 +213,9 @@ class TB(SIR):
         smpos_uids, smneg_uids = p.p_smpos.filter(not_exptb_uids, both=True)
 
         # Determine time index to become active
-        self.ti_active_exptb[exptb_uids] = self.ti_active_presymp[exptb_uids] + p.dur_presym_to_symp_exptb.rvs(exptb_uids) / 365.0 / sim.dt
-        self.ti_active_smpos[smpos_uids] = self.ti_active_presymp[smpos_uids] + p.dur_presym_to_symp_smpos.rvs(smpos_uids) / 365.0 / sim.dt
-        self.ti_active_smneg[smneg_uids] = self.ti_active_presymp[smneg_uids] + p.dur_presym_to_symp_smneg.rvs(smneg_uids) / 365.0 / sim.dt
-
-
-        ##### dur_inf = self.pars['dur_inf'].rvs(uids) # TODO: Duration of infection?
-        ##### will_die = self.pars['p_death'].rvs(uids) # TODO: Probability of death?
-        #self.ti_recovered[uids[~will_die]] = sim.year + dur_inf[~will_die]
-
-        # Determine time index of death
-        self.ti_dead[smpos_uids] = self.ti_active_smpos[smpos_uids] + p.dur_smpos_to_dead.rvs(smpos_uids) / 365 / sim.dt
-        self.ti_dead[smneg_uids] = self.ti_active_smneg[smneg_uids] + p.dur_smneg_to_dead.rvs(smneg_uids) / 365 / sim.dt
-        self.ti_dead[exptb_uids] = self.ti_active_exptb[exptb_uids] + p.dur_exptb_to_dead.rvs(exptb_uids) / 365 / sim.dt
+        self.dur_active_exptb[exptb_uids] = p.dur_presym_to_symp_exptb.rvs(exptb_uids) / 365.0 / sim.dt
+        self.dur_active_smpos[smpos_uids] = p.dur_presym_to_symp_smpos.rvs(smpos_uids) / 365.0 / sim.dt
+        self.dur_active_smneg[smneg_uids] = p.dur_presym_to_symp_smneg.rvs(smneg_uids) / 365.0 / sim.dt
 
         # Update result count of new infections 
         self.results['new_infections'][sim.ti] += len(uids)
