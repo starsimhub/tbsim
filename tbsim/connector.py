@@ -7,7 +7,7 @@ import starsim as ss
 from tbsim import TB, Nutrition
 import sciris as sc
 
-__all__ = ['tb_nutrition_connector']
+__all__ = ['TB_Nutrition_Connector']
 
 class TB_Nutrition_Connector(ss.Connector):
     """ Connect TB to Nutrition """
