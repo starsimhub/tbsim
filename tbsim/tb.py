@@ -5,7 +5,20 @@ import starsim as ss
 from starsim.diseases.sir import SIR
 import matplotlib.pyplot as plt
 
+from enum import Enum
+
 __all__ = ['TB']
+
+class TBState(Enum):
+    NONE            = ss.INT_NAN, # No TB
+    LATENT_FAST     = 0,    # Latent TB, fast progression
+    LATENT_SLOW     = 1,    # Latent TB, slow progression
+    ACTIVE_PRESYMP  = 2,    # Active TB, pre-symptomatic
+    ACTIVE_SMPOS    = 3,    # Active TB, smear positive
+    ACTIVE_SMNEG    = 4,    # Active TB, smear negative
+    ACTIVE_EXPTB    = 5,    # Active TB, extra-pulmonary
+    #RECOVERED,     = 6     # Recovered
+
 
 class TB(SIR):
     def __init__(self, pars=None, par_dists=None, *args, **kwargs):
@@ -53,20 +66,24 @@ class TB(SIR):
             # Initialize states specific to TB:
             ## Susceptible                              # Existent state part of People
             ## Dead                                     # Existent state part of People 
-            ss.State('latent_fast', bool, False),       # Latent TB, fast progression
-            ss.State('latent_slow', bool, False),       # Latent TB, slow progression
-            ss.State('active_presymp', bool, False),   # Active TB, pre-symptomatic
-            ss.State('active_smpos', bool, False),    # Active TB, smear positive
-            ss.State('active_smneg', bool, False),    # Active TB, smear negative
-            ss.State('active_exptb', bool, False),   # Active TB, extra-pulmonary
-            ss.State('recovered', bool, False),         
+            ss.State('state', TBState, TBState.NONE),       # Latent TB, fast progression
+            #ss.State('latent_fast', bool, False),       # Latent TB, fast progression
+            #ss.State('latent_slow', bool, False),       # Latent TB, slow progression
+            #ss.State('active_presymp', bool, False),   # Active TB, pre-symptomatic
+            #ss.State('active_smpos', bool, False),    # Active TB, smear positive
+            #ss.State('active_smneg', bool, False),    # Active TB, smear negative
+            #ss.State('active_exptb', bool, False),   # Active TB, extra-pulmonary
+            #ss.State('recovered', bool, False),         
 
             ss.State('rel_LS_prog', float, 1.0), # Multiplier on the latent-slow progression rate
 
-            # Duration of states
-            ss.State('dur_active_exptb', int, ss.INT_NAN),
-            ss.State('dur_active_smneg', int, ss.INT_NAN),
-            ss.State('dur_active_smpos', int, ss.INT_NAN),
+            # CDF samples for transition from latent slow to active pre-symptomatic
+            ss.State('ppf_LS_to_presymp', int, ss.INT_NAN),
+
+            # Duration of active states
+            ss.State('dur_presymp_to_exptb', int, ss.INT_NAN),
+            ss.State('dur_presymp_to_smneg', int, ss.INT_NAN),
+            ss.State('dur_presymp_to_smpos', int, ss.INT_NAN),
 
             # Timestep of state changes          
             ss.State('ti_latent', int, ss.INT_NAN),
@@ -74,11 +91,7 @@ class TB(SIR):
             ss.State('ti_active_exptb', int, ss.INT_NAN),
             ss.State('ti_active_smneg', int, ss.INT_NAN),
             ss.State('ti_active_smpos', int, ss.INT_NAN),
-
             )
-
-        self.pars.LS_to_active = ss.bernoulli(p=LS_to_act_pre_sym_prob),
-        self.pars.LF_to_active = ss.bernoulli(p=0), # TODO
 
         # Convert the scalar numbers to a Bernoulli distribution
         self.pars.p_latent_fast = ss.bernoulli(self.pars.p_latent_fast)
@@ -100,7 +113,8 @@ class TB(SIR):
         Infectious if in any of the active states
         """
         #return self.infected | self.exposed
-        return self.ti_active_presymp | self.ti_active_exptb | self.ti_active_smneg | self.ti_active_smpos
+        #return self.ti_active_presymp | self.ti_active_exptb | self.ti_active_smneg | self.ti_active_smpos
+        return self.state in [TBState.ACTIVE_PRESYMP, TBState.ACTIVE_SMPOS, TBState.ACTIVE_SMNEG, TBState.ACTIVE_EXPTB]
 
     def update_pre(self, sim):
         # Make all the updates from the SIR model 
