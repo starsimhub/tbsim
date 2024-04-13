@@ -1,4 +1,5 @@
 import tbsim as mtb
+#from .connector import TB_Nutrition_Connector
 import starsim as ss
 import matplotlib.pyplot as plt
 
@@ -49,11 +50,17 @@ def make_tb_nut():
     # Initialize a random network
     net = ss.RandomNet(net_pars)
 
-    # TODO: Add demographics
+    # Add demographics
     dems = [
         ss.Pregnancy(pars=dict(fertility_rate=15)), # Per 1,000 people
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people
     ]
+
+    # Connector
+    cn_pars = dict(
+        rel_LS_prog_risk = 2.0,
+    )
+    cn = mtb.TB_Nutrition_Connector(cn_pars)
 
     # -------- simulation -------
     # define simulation parameters
@@ -63,7 +70,7 @@ def make_tb_nut():
         end = 2000,
         )
     # initialize the simulation
-    sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems)
+    sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
 
     return sim
 
