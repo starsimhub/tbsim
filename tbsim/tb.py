@@ -126,15 +126,20 @@ class TB(SIR):
         self.active_state[smneg_uids] = TBS.ACTIVE_SMNEG
 
         # Determine duration of presymp (before symp)
-        self.dur_presymp[exptb_uids] = p.dur_presym.rvs(exptb_uids) / 365 / sim.dt
-        #self.dur_presymp_to_exptb[exptb_uids] = p.dur_presym_to_exptb.rvs(exptb_uids) / 365 / sim.dt
-        #self.dur_presymp_to_smpos[smpos_uids] = p.dur_presym_to_smpos.rvs(smpos_uids) / 365 / sim.dt
-        #self.dur_presymp_to_smneg[smneg_uids] = p.dur_presym_to_smneg.rvs(smneg_uids) / 365 / sim.dt
+        self.dur_presymp[uids] = p.dur_presym.rvs(uids) / 365 / sim.dt
 
         # Determine duration of symp (before death)
         self.dur_symp_to_dead[exptb_uids] = p.dur_exptb_to_dead.rvs(exptb_uids) / 365 / sim.dt
         self.dur_symp_to_dead[smpos_uids] = p.dur_smpos_to_dead.rvs(smpos_uids) / 365 / sim.dt
         self.dur_symp_to_dead[smneg_uids] = p.dur_smneg_to_dead.rvs(smneg_uids) / 365 / sim.dt
+
+        # Set ti of presymp
+        slow_uids = ss.true(self.state[uids] == TBS.LATENT_SLOW)
+        rate = self.rel_LS_prog[slow_uids] * self.pars.rate_LS_to_presym
+        self.ti_presymp[slow_uids] = sim.ti - np.log(1 - self.ppf_LS_to_presymp[slow_uids])/rate  / 365 / sim.dt
+
+        fast_uids = ss.true(self.state[uids] == TBS.LATENT_FAST)
+        self.ti_presymp[fast_uids] = sim.ti + self.dur_LF_to_presymp[fast_uids]
 
         self.set_ti(sim, uids)
 
@@ -143,14 +148,7 @@ class TB(SIR):
         return
 
     def set_ti(self, sim, uids):
-        # Set ti of presymp
-        slow_uids = ss.true(self.state[uids] == TBS.LATENT_SLOW)
-        rate = self.rel_LS_prog[slow_uids] * self.pars.rate_LS_to_presym
-        # TODO: FACTOR IN ti_latent here:
-        self.ti_presymp[slow_uids] = sim.ti - np.log(1 - self.ppf_LS_to_presymp[slow_uids])/rate  / 365 / sim.dt
-
-        fast_uids = ss.true(self.state[uids] == TBS.LATENT_FAST)
-        self.ti_presymp[fast_uids] = sim.ti + self.dur_LF_to_presymp[fast_uids]
+        # uses self.ti_presymp
 
         # Set ti of active
         self.ti_active[uids] = self.ti_presymp[uids] + self.dur_presymp[uids]
