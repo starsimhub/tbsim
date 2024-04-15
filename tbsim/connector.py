@@ -20,10 +20,15 @@ class TB_Nutrition_Connector(ss.Connector):
         return
 
     def update(self, sim):
-        """ Specify how HIV increases NG rel_sus and rel_trans """
-        sim.people.tb.rel_LS_prog[sim.people.nutrition.undernourished] = self.pars.rel_LS_prog_risk
+        """ Specify how nutrition increases the latent slow progression risk """
+        # Newly undernourished
+        new_cases = ss.true(sim.diseases['nutrition'].ti_undernourished == sim.ti)
+        if len(new_cases) > 0:
+            #sim.people.tb.rel_LS_prog[~sim.people.nutrition.undernourished] = 1.0
+            sim.people.tb.rel_LS_prog[new_cases] = self.pars.rel_LS_prog_risk
 
-        slow_uids = ss.true(sim.people.tb.state == TBS.LATENT_SLOW)
-        if len(slow_uids) > 0:
-            sim.diseases['tb'].set_ti(sim, sim.people.alive) # Recalculate with modified LS rate
+            # Because undernourished while in latent slow
+            slow_uids = ss.true(sim.people.tb.state[new_cases] == TBS.LATENT_SLOW)
+            if len(slow_uids) > 0:
+                sim.diseases['tb'].set_ti(sim, slow_uids) # Recalculate with modified LS rate
         return

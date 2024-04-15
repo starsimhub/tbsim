@@ -98,27 +98,6 @@ class TB(SIR):
         """
         return self.state in [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]
 
-    def update_pre(self, sim):
-        # Make all the updates from the SIR model 
-        super().update_pre(sim)
-        p = self.pars
-
-        # Latent --> active pre-symptomatic
-        inds = ss.true((self.state == TBS.LATENT_SLOW or self.state == TBS.LATENT_FAST) & (self.ti_presymp <= sim.ti))
-        if len(inds):
-            self.state[inds] = TBS.ACTIVE_PRESYMP
-            self.rel_trans[inds] = self.pars.rel_trans_presymp
-        
-        # Pre symp --> Active
-        inds = ss.true(self.state == TBS.ACTIVE_PRESYMP & (self.ti_active <= sim.ti))
-        if len(inds):
-            self.state[inds] = self.active_state
-            self.rel_trans[self.active_state[inds] == TBS.ACTIVE_EXPTB] = self.pars.rel_trans_exptb
-            self.rel_trans[self.active_state[inds] == TBS.ACTIVE_SMPOS] = self.pars.rel_trans_smpos
-            self.rel_trans[self.active_state[inds] == TBS.ACTIVE_SMNEG] = self.pars.rel_trans_smneg
-
-        return
-
     def set_prognoses(self, sim, uids, from_uids=None):
         # Carry out state changes associated with infection
         self.susceptible[uids] = False
@@ -130,8 +109,8 @@ class TB(SIR):
 
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
-        self.state[fast_uids] = TBS.LATENT_FAST
         self.state[slow_uids] = TBS.LATENT_SLOW
+        self.state[fast_uids] = TBS.LATENT_FAST
 
         # Determine time index to become active pre-symptomatic
         self.ppf_LS_to_presymp[slow_uids] = p.ppf_LS_to_presymp.rvs(slow_uids)
@@ -184,6 +163,28 @@ class TB(SIR):
         self.ti_dead[smpos_uids] = self.ti_active[smpos_uids] + self.dur_symp_to_dead[smpos_uids]
         self.ti_dead[smneg_uids] = self.ti_active[smneg_uids] + self.dur_symp_to_dead[smneg_uids]
 
+    def update_pre(self, sim):
+        # Make all the updates from the SIR model 
+        super().update_pre(sim)
+        p = self.pars
+
+        # Latent --> active pre-symptomatic
+        inds = ss.true(np.logical_or(self.state==TBS.LATENT_SLOW, self.state==TBS.LATENT_FAST) & (self.ti_presymp <= sim.ti))
+        if len(inds):
+            self.state[inds] = TBS.ACTIVE_PRESYMP
+            self.rel_trans[inds] = self.pars.rel_trans_presymp
+        
+        # Pre symp --> Active
+        inds = ss.true( (self.state == TBS.ACTIVE_PRESYMP) & (self.ti_active <= sim.ti))
+        if len(inds):
+            self.state[inds] = self.active_state
+            self.rel_trans[self.active_state[inds] == TBS.ACTIVE_EXPTB] = self.pars.rel_trans_exptb
+            self.rel_trans[self.active_state[inds] == TBS.ACTIVE_SMPOS] = self.pars.rel_trans_smpos
+            self.rel_trans[self.active_state[inds] == TBS.ACTIVE_SMNEG] = self.pars.rel_trans_smneg
+
+        return
+
+
     def update_death(self, sim, uids):
         if len(uids) == 0:
             return # Nothing to do
@@ -210,9 +211,9 @@ class TB(SIR):
         res.n_latent_slow[ti] = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti] = np.count_nonzero(self.state == TBS.LATENT_FAST)
         res.n_active_presymp[ti] = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
-        res.n_active_smpos[ti] = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
-        res.n_active_smneg[ti] = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS)
-        res.n_active_exptb[ti] = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
+        res.n_active_smpos[ti] = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
+        res.n_active_smneg[ti] = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
+        res.n_active_exptb[ti] = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
 
         return
 
