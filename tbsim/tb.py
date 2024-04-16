@@ -2,7 +2,7 @@ import numpy as np
 import sciris as sc
 from sciris import randround as rr # Since used frequently
 import starsim as ss
-from starsim.diseases.sir import SIR
+#from starsim.diseases.sir import SIR
 import matplotlib.pyplot as plt
 
 #from enum import Enum
@@ -17,8 +17,9 @@ class TBS(): # Enum
     ACTIVE_SMPOS    = 3    # Active TB, smear positive
     ACTIVE_SMNEG    = 4    # Active TB, smear negative
     ACTIVE_EXPTB    = 5    # Active TB, extra-pulmonary
+    DEAD            = 6    # TB death
 
-class TB(SIR):
+class TB(ss.Infection):
     def __init__(self, pars=None, par_dists=None, *args, **kwargs):
         
         """Add TB parameters and states to the TB model"""
@@ -80,6 +81,7 @@ class TB(SIR):
             ss.State('ti_latent', int, ss.INT_NAN),
             ss.State('ti_presymp', int, ss.INT_NAN),
             ss.State('ti_active', int, ss.INT_NAN),
+            ss.State('ti_dead', int, ss.INT_NAN),
             )
 
         # Convert the scalar numbers to a Bernoulli distribution
@@ -101,6 +103,8 @@ class TB(SIR):
     def set_prognoses(self, sim, uids, from_uids=None):
         # Carry out state changes associated with infection
         self.susceptible[uids] = False
+        self.infected[uids] = True # Not needed, but useful for reporting
+        self.ti_infected[uids] = sim.ti # Not needed, but useful for reporting
         self.ti_latent[uids] = sim.ti
 
         p = self.pars
@@ -134,11 +138,8 @@ class TB(SIR):
         self.dur_symp_to_dead[smneg_uids] = p.dur_smneg_to_dead.rvs(smneg_uids) / 365 / sim.dt
 
         # Set ti of presymp
-        slow_uids = ss.true(self.state[uids] == TBS.LATENT_SLOW)
         rate = self.rel_LS_prog[slow_uids] * self.pars.rate_LS_to_presym
         self.ti_presymp[slow_uids] = sim.ti - np.log(1 - self.ppf_LS_to_presymp[slow_uids])/rate  / 365 / sim.dt
-
-        fast_uids = ss.true(self.state[uids] == TBS.LATENT_FAST)
         self.ti_presymp[fast_uids] = sim.ti + self.dur_LF_to_presymp[fast_uids]
 
         self.set_ti(sim, uids)
@@ -160,6 +161,7 @@ class TB(SIR):
         self.ti_dead[exptb_uids] = self.ti_active[exptb_uids] + self.dur_symp_to_dead[exptb_uids]
         self.ti_dead[smpos_uids] = self.ti_active[smpos_uids] + self.dur_symp_to_dead[smpos_uids]
         self.ti_dead[smneg_uids] = self.ti_active[smneg_uids] + self.dur_symp_to_dead[smneg_uids]
+        return
 
     def update_pre(self, sim):
         # Make all the updates from the SIR model 
@@ -175,10 +177,17 @@ class TB(SIR):
         # Pre symp --> Active
         inds = ss.true( (self.state == TBS.ACTIVE_PRESYMP) & (self.ti_active <= sim.ti))
         if len(inds):
-            self.state[inds] = self.active_state
+            self.state[inds] = self.active_state[inds]
             self.rel_trans[self.active_state[inds] == TBS.ACTIVE_EXPTB] = self.pars.rel_trans_exptb
             self.rel_trans[self.active_state[inds] == TBS.ACTIVE_SMPOS] = self.pars.rel_trans_smpos
             self.rel_trans[self.active_state[inds] == TBS.ACTIVE_SMNEG] = self.pars.rel_trans_smneg
+
+        # Trigger deaths
+        deaths = ss.true( (self.state != TBS.DEAD) & (self.ti_dead <= sim.ti) )
+        if len(deaths):
+            sim.people.request_death(deaths)
+            self.state[deaths] = TBS.DEAD
+        self.results['new_deaths'][sim.ti] = len(deaths)
 
         return
 
@@ -190,7 +199,8 @@ class TB(SIR):
         super().update_death(sim, uids)
         # Make sure these agents do not transmit or get infected after death
         self.susceptible[uids] = False
-        self.state[uids] = TBS.NONE
+        self.infected[uids] = False
+        #self.state[uids] = TBS.NONE
         self.rel_trans[uids] = 0
         return
 
@@ -199,6 +209,7 @@ class TB(SIR):
         super().init_results(sim)
         for rkey in ['latent_slow', 'latent_fast', 'active_presymp', 'active_smpos', 'active_smneg', 'active_exptb']:
             self.results += ss.Result(self.name, f'n_{rkey}', sim.npts, dtype=int)
+        self.results += ss.Result(self.name, 'new_deaths', sim.npts, dtype=int)
         return
 
     def update_results(self, sim):
@@ -212,7 +223,11 @@ class TB(SIR):
         res.n_active_smpos[ti] = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
         res.n_active_smneg[ti] = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
         res.n_active_exptb[ti] = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
+        return
 
+    def finalize_results(self, sim):
+        super().finalize_results(sim)
+        self.results['cum_deaths'] = np.cumsum(self.results['new_deaths'])
         return
 
     def plot(self):
