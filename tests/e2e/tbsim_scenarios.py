@@ -11,6 +11,8 @@ import os
 import argparse
 import sciris as sc
 import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib.dates as mdates
 
 # Suppress warning from seaborn
 import warnings
@@ -18,19 +20,19 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 x_latent_slow = [2, 3] + [1]
+DT = 7.0/365.0
 
 debug = True
 default_n_agents = [10_000, 1000][debug]
-default_n_rand_seeds = [50, 5][debug]
+default_n_rand_seeds = [20, 1][debug]
 
 figdir = os.path.join(os.getcwd(), 'figs', 'TB')
 sc.path(figdir).mkdir(parents=True, exist_ok=True)
-#channels = ['Births', 'Maternal Deaths'] # Set to None for all channels
 
-#ss.options(_centralized = False)
+ss.options(verbose = DT / 10) # Print updates every ~10 years when dt=/365
 
 
-def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=0):
+def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     # --------- People ----------
     pop = ss.People(n_agents=n_agents)
 
@@ -73,7 +75,7 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=0):
     # -------- simulation -------
     # define simulation parameters
     sim_pars = dict(
-        dt = 7/365,
+        dt = DT,
         start = 1980,
         end = 2020,
         )
@@ -117,6 +119,22 @@ def run_scenarios(n_agents=default_n_agents, n_seeds=default_n_rand_seeds):
     return df
 
 
+def plot_scenarios(df):
+    g = sns.relplot(kind='line', data=df, x='year', y='Deaths', hue='xLS', 
+                palette='Set1', estimator=None, units='rand_seed', lw=0.5)
+    g.set_titles(col_template='{col_name}', row_template='{row_name}')
+    #g.figure.suptitle('MultiRNG' if ms else 'SingleRNG')
+    #g.figure.subplots_adjust(top=0.88)
+    g.set_xlabels('Date')
+    for ax in g.axes.flat:
+        locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+    g.figure.savefig(os.path.join(figdir, f'result.png'), bbox_inches='tight', dpi=300)
+    plt.close(g.figure)
+
+
 if __name__ == '__main__':
     import argparse
 
@@ -135,57 +153,5 @@ if __name__ == '__main__':
 
     print(df)
 
-    #plot_scenarios(df, figdir, channels, var1='cov', var2='channel')
-    #plt.show()
-    import seaborn as sns
-    g = sns.relplot(kind='line', data=df, x='year', y='Deaths', hue='xLS', 
-                palette='Set1', estimator=None, units='rand_seed', lw=0.5)
-    g.set_titles(col_template='{col_name}', row_template='{row_name}')
-    #g.figure.suptitle('MultiRNG' if ms else 'SingleRNG')
-    g.figure.subplots_adjust(top=0.88)
-    g.set_xlabels('Date')
-    #fix_dates(g)
-    g.figure.savefig(os.path.join(figdir, f'result.png'), bbox_inches='tight', dpi=300)
-    plt.close(g.figure)
-
+    plot_scenarios(df)
     print('Done')
-
-
-'''
-class PPH_Intv(ss.Intervention):
-
-    def __init__(self, year: np.array, coverage: np.array, **kwargs):
-        self.requires = PPH
-        self.year = sc.promotetoarray(year)
-        self.coverage = sc.promotetoarray(coverage)
-
-        super().__init__(**kwargs)
-
-        self.p_pphintv = ss.bernoulli(p=lambda self, sim, uids: np.interp(sim.year, self.year, self.coverage))
-        self.eff_pphintv = ss.bernoulli(p=PPH_INTV_EFFICACY)
-        return
-
-    def initialize(self, sim):
-        super().initialize(sim)
-        self.results += ss.Result(self.name, 'n_pphintv', sim.npts, dtype=int)
-        self.results += ss.Result(self.name, 'n_mothers_saved', sim.npts, dtype=int)
-        self.initialized = True
-        return
-
-    def apply(self, sim):
-        if sim.year < self.year[0]:
-            return
-
-        pph = sim.demographics['pph']
-        maternal_deaths = ss.true(pph.ti_dead <= sim.ti)
-        receive_pphintv = self.p_pphintv.filter(maternal_deaths)
-        pph_deaths_averted = self.eff_pphintv.filter(receive_pphintv)
-        pph.ti_dead[pph_deaths_averted] = ss.INT_NAN
-
-        # Add results
-        self.results['n_pphintv'][sim.ti] = len(receive_pphintv)
-        self.results['n_mothers_saved'][sim.ti] = len(pph_deaths_averted)
-
-        return len(pph_deaths_averted)
-'''
-
