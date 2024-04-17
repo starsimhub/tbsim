@@ -6,7 +6,6 @@ TB-Nutrition scenarios
 import starsim as ss
 import tbsim as mtb
 import pandas as pd
-import numpy as np
 import os
 import argparse
 import sciris as sc

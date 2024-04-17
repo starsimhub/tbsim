@@ -1,5 +1,4 @@
 import tbsim as mtb
-#from .connector import TB_Nutrition_Connector
 import starsim as ss
 import matplotlib.pyplot as plt
 
@@ -60,6 +59,7 @@ def make_tb():
         )
     # initialize the simulation
     sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=sim_pars, demographics=dems)
+    sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
     return sim
 
@@ -122,15 +122,14 @@ def make_tb_nut():
 
 
 if __name__ == '__main__':
-    if False:
-        sim_n = make_nutrition()
-        sim_n.run()
-        sim_n.plot()
-        
-        sim_tb = make_tb()
-        sim_tb.run()
-        sim_tb.diseases['tb'].plot()
-        sim_tb.plot()
+    sim_n = make_nutrition()
+    sim_n.run()
+    sim_n.plot()
+    
+    sim_tb = make_tb()
+    sim_tb.run()
+    sim_tb.diseases['tb'].plot()
+    sim_tb.plot()
 
     sim_tbn = make_tb_nut()
     sim_tbn.run()
