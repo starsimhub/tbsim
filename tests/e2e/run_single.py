@@ -116,6 +116,7 @@ def make_tb_nut():
         )
     # initialize the simulation
     sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
+    sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
     return sim
 

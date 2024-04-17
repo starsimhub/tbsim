@@ -37,7 +37,6 @@ class TB(ss.Infection):
             p_latent_fast = 0.1, # Probability of latent fast as opposed to latent slow
 
             rate_LS_to_presym = 3e-5,                   # Latent Slow to Active Pre-Symptomatic (per day)
-            ppf_LS_to_presymp = ss.random(),            # To draw cumulative value for inverse cum transform
             dur_LF_to_presymp = ss.expon(scale=1/6e-3), # Latent Fast to Active Pre-Symptomatic (per day)
 
             dur_presym = ss.expon(scale=1/3e-2),  # Pre-symptomatic to symptomatic (days)
@@ -68,7 +67,7 @@ class TB(ss.Infection):
             ss.State('rel_LS_prog', float, 1.0), # Multiplier on the latent-slow progression rate
 
             # CDF samples for transition from latent slow to active pre-symptomatic
-            ss.State('ppf_LS_to_presymp', float, 0),
+            ss.State('ppf_LS_to_presymp', float, ss.random()),
 
             # Timestep of state changes          
             ss.State('ti_latent', int, ss.INT_NAN),
@@ -113,7 +112,7 @@ class TB(ss.Infection):
         self.state[fast_uids] = TBS.LATENT_FAST
 
         # Determine time index to become active pre-symptomatic
-        self.ppf_LS_to_presymp[slow_uids] = p.ppf_LS_to_presymp.rvs(slow_uids)
+        #self.ppf_LS_to_presymp[slow_uids] = p.ppf_LS_to_presymp.rvs(slow_uids)
 
         # Determine which agents will have extrapulminary TB
         exptb_uids, not_exptb_uids = p.p_exptb.filter(uids, both=True)
