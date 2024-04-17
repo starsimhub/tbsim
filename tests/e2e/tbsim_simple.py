@@ -40,7 +40,7 @@ def make_tb():
     # Network parameters
     net_pars = dict(
         n_contacts=ss.poisson(lam=5),
-        dur=0,
+        dur = 0, # End after one timestep
         )
     # Initialize a random network
     net = ss.RandomNet(net_pars)
@@ -66,7 +66,10 @@ def make_tb():
 def make_tb_nut():
     # --------- People ----------
     n_agents = 10000
-    pop = ss.People(n_agents=n_agents)
+    extra_states = [
+        ss.State('SES', int, ss.bernoulli(p=0.3)), # ~30% get 0, ~70% get 1
+    ]
+    pop = ss.People(n_agents=n_agents, extra_states=extra_states)
 
     # ------- TB disease --------
     # Disease parameters

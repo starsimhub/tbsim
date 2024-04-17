@@ -40,5 +40,4 @@ class TB_Nutrition_Connector(ss.Connector):
 
                 tb.ti_presymp[slow_uids] = -1/(k*r) * np.log( np.exp(-r*t_latent) - np.exp(-r*t_now) + np.exp(-k*r*t_now) - R) / sim.dt
 
-                tb.set_ti(sim, slow_uids)
         return
