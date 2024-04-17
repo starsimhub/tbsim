@@ -5,6 +5,8 @@ Plotting scripts
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.dates as mdates
+import sciris as sc
+import tbsim.config as cfg
 
 def plot_scenarios(df):
     g = sns.relplot(kind='line', data=df, x='year', y='Deaths', hue='xLS', 
@@ -18,6 +20,6 @@ def plot_scenarios(df):
         formatter = mdates.ConciseDateFormatter(locator)
         ax.xaxis.set_major_locator(locator)
         ax.xaxis.set_major_formatter(formatter)
-    g.figure.savefig(os.path.join(figdir, f'result.png'), bbox_inches='tight', dpi=300)
+    sc.savefig(f"result_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
     plt.close(g.figure)
     return

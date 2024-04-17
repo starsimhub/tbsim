@@ -9,6 +9,7 @@ import pandas as pd
 import os
 import argparse
 import sciris as sc
+import tbsim.config as cfg
 
 # Suppress warning from seaborn
 import warnings
@@ -20,10 +21,6 @@ x_latent_slow = [2, 3] + [1]
 debug = True
 default_n_agents = [10_000, 1000][debug]
 default_n_rand_seeds = [20, 2][debug]
-
-figdir = os.path.join(os.getcwd(), 'figs', 'TB')
-sc.path(figdir).mkdir(parents=True, exist_ok=True)
-
 
 def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     # --------- People ----------
@@ -108,7 +105,7 @@ def run_scenarios(n_agents=default_n_agents, n_seeds=default_n_rand_seeds):
     print('Timings:', times)
 
     df = pd.concat(results)
-    df.to_csv(os.path.join(figdir, 'result.csv'))
+    df.to_csv(os.path.join(cfg.RESULTS_DIRECTORY, f"result_{cfg.FILE_POSTFIX}.csv"))
     return df
 
 
@@ -130,6 +127,6 @@ if __name__ == '__main__':
         df = run_scenarios(n_agents=args.n, n_seeds=args.s)
 
     print(df)
-
     mtb.plot_scenarios(df)
+    print(f"Results directory {cfg.RESULTS_DIRECTORY} \nThis run: {cfg.FILE_POSTFIX}")
     print('Done')
