@@ -20,16 +20,13 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 x_latent_slow = [2, 3] + [1]
-DT = 7.0/365.0
 
 debug = True
 default_n_agents = [10_000, 1000][debug]
-default_n_rand_seeds = [20, 1][debug]
+default_n_rand_seeds = [20, 2][debug]
 
 figdir = os.path.join(os.getcwd(), 'figs', 'TB')
 sc.path(figdir).mkdir(parents=True, exist_ok=True)
-
-ss.options(verbose = DT / 10) # Print updates every ~10 years when dt=/365
 
 
 def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
@@ -75,13 +72,13 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     # -------- simulation -------
     # define simulation parameters
     sim_pars = dict(
-        dt = DT,
+        dt = 7/365,
         start = 1980,
         end = 2020,
         )
     # initialize the simulation
     sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
-    #sim.initialize()
+    sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
     sim.run()
 
     df = pd.DataFrame( {
