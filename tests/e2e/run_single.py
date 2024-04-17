@@ -67,7 +67,7 @@ def make_tb_nut():
     # --------- People ----------
     n_agents = 10000
     extra_states = [
-        ss.State('SES', int, ss.bernoulli(p=0.3)), # ~30% get 0, ~70% get 1
+        ss.State('SES', int, ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (TODO)
     ]
     pop = ss.People(n_agents=n_agents, extra_states=extra_states)
 
