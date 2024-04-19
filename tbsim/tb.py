@@ -95,9 +95,11 @@ class TB(ss.Infection):
         """
         Infectious if in any of the active states
         """
-        return self.state in [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]
+        return (self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)
 
     def set_prognoses(self, sim, uids, from_uids=None):
+        super().set_prognoses(sim, uids, from_uids)
+
         # Carry out state changes upon new infection
         self.susceptible[uids] = False
         self.infected[uids] = True # Not needed, but useful for reporting

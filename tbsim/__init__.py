@@ -3,3 +3,5 @@ from .nutrition import *
 from .connector import *
 from .plotting import *
 from .config import *
+from .network import *
+from .harlem import *

@@ -1,0 +1,125 @@
+import starsim as ss
+import tbsim as mtb
+import networkx as nx
+import pandas as pd
+import numpy as np
+
+__all__ = ['Harlem', 'HouseHold', 'StudyArm']
+
+
+from enum import IntEnum, auto
+
+'''
+class MacroNutrition(IntEnum):
+    STANDARD_OR_ABOVE = auto()
+    SLIGHTLY_BELOW_STANDARD = auto()
+    MARGINAL = auto()
+    UNSATISFACTORY = auto()
+'''
+
+class StudyArm(IntEnum):
+    CONTROL = auto()
+    VITAMIN = auto()
+
+
+class Harlem():
+    def __init__(self, n_hhs=194):
+        self.n_hhs = n_hhs
+
+        self.hhdat = pd.DataFrame({
+            'size': np.arange(1,10),
+            'p': np.array([3, 17, 24, 20, 13, 9, 7, 4, 3]) / 100
+        })
+
+        macro = mtb.MacroNutrients
+        self.macrodat = pd.DataFrame({
+            'habit': [ macro.STANDARD_OR_ABOVE, macro.SLIGHTLY_BELOW_STANDARD, macro.MARGINAL, macro.UNSATISFACTORY ],
+            'p_control': [21.1, 28.9, 38.9, 11.1],
+            'p_vitamin': [29.2, 30.3, 28.1, 12.4], # TODO: time variantion, these from 1942
+        })
+        self.macrodat['p_control'] /= self.macrodat['p_control'].sum()
+        self.macrodat['p_vitamin'] /= self.macrodat['p_vitamin'].sum()
+
+        self.armdat = pd.DataFrame({
+            'arm': [StudyArm.CONTROL, StudyArm.VITAMIN],
+            'p': [0.5, 0.5]
+        })
+        self.armdat['p'] /= self.armdat['p'].sum()
+
+        self.hhs = self.make_hhs()
+        self.n_agents = np.sum([hh.n for hh in self.hhs]) # Hopefully about 579
+        return
+
+    def make_hhs(self):
+        hh_sizes = np.random.choice(a=self.hhdat['size'].values, p=self.hhdat['p'].values, size=self.n_hhs)
+        #foodhabits = np.random.choice(a=self.fhdat['habit'].values, p=self.fhdat['p'].values, size=self.n_hhs)
+        arm = np.random.choice(a=self.armdat['arm'].values, p=self.armdat['p'].values, size=self.n_hhs)
+
+        idx = 0
+        hhs = []
+        for hhid, (size, arm) in enumerate(zip(hh_sizes, arm)):
+            uids = np.arange(idx, idx+size)
+            if arm == StudyArm.CONTROL:
+                p = self.macrodat['p_control'].values
+            else:
+                p = self.macrodat['p_vitamin'].values
+            macro = np.random.choice(a=self.macrodat['habit'].values, p=p)
+            hh = HouseHold(hhid, uids, mtb.MacroNutrients(macro), StudyArm(arm))
+            hhs.append(hh)
+            idx += size
+
+        return hhs
+
+    def people(self):
+        extra_states = [
+            ss.State('hhid', int, ss.INT_NAN),
+            ss.State('arm', int, ss.INT_NAN),
+        ]
+        pop = ss.People(n_agents = self.n_agents, extra_states=extra_states)
+        return pop
+
+    def net(self):
+        net = mtb.HarlemNet(self.hhs)
+        return net
+
+    def set_states(self, sim):
+        pop = sim.people
+        nut = sim.diseases['nutrition']
+        for hh in self.hhs:
+            for uid in hh.uids:
+                pop.hhid[uid] = hh.hhid
+                pop.arm[uid] = hh.arm
+                nut.macro[uid] = hh.macro
+                nut.micro[uid] = mtb.MicroNutrients.DEFICIENT if hh.macro == mtb.MacroNutrients.UNSATISFACTORY else mtb.MicroNutrients.NORMAL
+
+    def choose_seed_infections(self, sim, p_hh):
+        tb = sim.diseases['tb']
+        hh_has_seed = np.random.binomial(p=p_hh, n=1, size=len(self.hhs))
+        seed_uids = []
+        for hh, seed in zip(self.hhs, hh_has_seed):
+            if not seed:
+                continue
+            seed_uid = np.random.choice(hh.uids)
+            seed_uids.append(seed_uid)
+        return np.array(seed_uids)
+
+
+
+class HouseHold():
+    def __init__(self, hhid, uids, macro_nutrition, study_arm):
+        self.hhid = hhid
+        self.uids = uids
+        self.n = len(uids)
+        self.macro = macro_nutrition
+        self.arm = study_arm
+        return
+
+    def contacts(self):
+        g = nx.complete_graph(self.uids)
+        p1s = []
+        p2s = []
+        for edge in g.edges():
+            p1, p2 = edge
+            p1s.append(p1)
+            p2s.append(p2)
+        return p1s, p2s
