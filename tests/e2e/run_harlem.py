@@ -69,7 +69,7 @@ def run_harlem(rand_seed=0):
     # Add demographics
     dems = [
         ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
-        #ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
+        ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
     ]
 
     # -------- Connector -------

@@ -46,8 +46,8 @@ class HarlemNet(ss.Network):
         p2s = []
         for mother_uid in deliveries:
             infant_uid = mn.loc[(mn['p1'] == mother_uid) & (mn['dur'] >= 0)]['p2'].values[0] # No twins!
-            hhid = ppl.hhid[mother_uid]
-            ppl.hhid[infant_uid] = hhid
+            ppl.hhid[infant_uid] = ppl.hhid[mother_uid]
+            ppl.arm[infant_uid] = ppl.arm[mother_uid]
 
             for contact in hn.find_contacts(mother_uid):
                 p1s.append(contact)
