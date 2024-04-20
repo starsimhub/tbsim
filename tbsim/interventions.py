@@ -2,8 +2,6 @@
 Define Nutrition intervention
 """
 
-# WORK IN PROGRESS, CODE NOT FUNCTIONAL YET
-
 import numpy as np
 import starsim as ss
 from tbsim import TB, Nutrition, MicroNutrients, MacroNutrients, StudyArm

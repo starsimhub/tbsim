@@ -5,7 +5,7 @@ import numpy as np
 
 def make_harlem():
 
-    np.random.seed(0)
+    np.random.seed(0) # TODO
 
     # --------- Harlem ----------
     harlem = mtb.Harlem()
@@ -27,21 +27,18 @@ def make_harlem():
     # ------- TB disease --------
     # Disease parameters
     tb_pars = dict(
-        beta = dict(harlem=10, random=0.0),
+        beta = dict(harlem=0.1, random=0.001),
         init_prev = 0, # Infections seeded by Harlem class
         rel_trans_smpos     = 1.0,
         rel_trans_smneg     = 0.3,
         rel_trans_exptb     = 0.05,
-        rel_trans_presymp   = 0.25, # 0.1?
+        rel_trans_presymp   = 0.10,
     )
     # Initialize
     tb = mtb.TB(tb_pars)
 
     # ---------- Nutrition --------
-    # TODO: Link to Harlem.FoodHabits
-    nut_pars = dict(
-    #    init_prev = 0.001,
-        )
+    nut_pars = dict()
     nut = mtb.Nutrition(nut_pars)
 
     # Add demographics
@@ -50,20 +47,31 @@ def make_harlem():
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people
     ]
 
-    # Connector
+    # -------- Connector -------
     cn_pars = dict()
     cn = mtb.TB_Nutrition_Connector(cn_pars)
 
-    # -------- simulation -------
+    # -------- Interventions -------
+    vs = mtb.VitaminSupplementation(year=[1942, 1943], rate=[2.0, 0.25])
+    m = mtb.MacroNutrients
+    lsff0 = mtb.LargeScaleFoodFortification(year=[1942, 1944], rate=[1.25, 0], from_state=m.UNSATISFACTORY, to_state=m.MARGINAL)
+    lsff1 = mtb.LargeScaleFoodFortification(year=[1942, 1944], rate=[1.75, 0], from_state=m.MARGINAL, to_state=m.SLIGHTLY_BELOW_STANDARD)
+    lsff2 = mtb.LargeScaleFoodFortification(year=[1942, 1944], rate=[1.75, 0], from_state=m.SLIGHTLY_BELOW_STANDARD, to_state=m.STANDARD_OR_ABOVE)
+    intvs = [vs, lsff0, lsff1, lsff2]
+
+    # -------- Analyzer -------
+    az = mtb.HarlemAnalyzer()
+
+    # -------- Simulation -------
     # define simulation parameters
     sim_pars = dict(
         dt = 7/365,
-        start = 1932, # 10y burn-in
+        start = 1940, # 2y burn-in
         #start = 1942,
         end = 1947,
         )
     # initialize the simulation
-    sim = ss.Sim(people=pop, networks=[harlemnet, randnet], diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
+    sim = ss.Sim(people=pop, networks=[harlemnet, randnet], diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=intvs, analyzers=az)
     sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
     sim.initialize()
@@ -79,7 +87,9 @@ if __name__ == '__main__':
     sim = make_harlem()
     sim.run()
     sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
-    sim.diseases['tb'].plot()
+    #sim.diseases['tb'].plot()
     sim.plot()
+
+    sim.analyzers['harlemanalyzer'].plot()
 
     plt.show()
