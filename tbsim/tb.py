@@ -183,7 +183,7 @@ class TB(ss.Infection):
             self.ti_cure[cure_uids] = sim.ti + dur_active[~will_die]
 
         # Active --> Susceptible
-        uids = ss.true( (self.state in [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]) & (self.ti_cure <= sim.ti))
+        uids = ss.true( (self.ti_cure <= sim.ti) & ((self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)))
         if len(uids):
             # Set state and reset timers
             self.state[uids] = TBS.NONE

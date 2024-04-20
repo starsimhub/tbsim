@@ -1,21 +1,21 @@
-import tbsim as mtb
 import starsim as ss
-import matplotlib.pyplot as plt
+import tbsim as mtb
 import numpy as np
-import sciris as sc
 import pandas as pd
-import os 
+import sciris as sc
 import tbsim.config as cfg
+import matplotlib.pyplot as plt
 import datetime as dt
 import seaborn as sns
 import matplotlib.dates as mdates
+import os 
 
 import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False
-default_n_rand_seeds = [50, 1][debug]
+default_n_rand_seeds = [250, 1][debug]
 
 def compute_rel_LS_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
@@ -46,13 +46,13 @@ def run_harlem(rand_seed=0):
     )
     # Initialize a random network
     randnet = ss.RandomNet(randnet_pars)
-    matnet = None #ss.MaternalNet() # To track newborn --> household
-    nets = [harlemnet, randnet]# , matnet]
+    matnet = ss.MaternalNet() # To track newborn --> household
+    nets = [harlemnet, randnet, matnet]
 
     # ------- TB disease --------
     # Disease parameters
     tb_pars = dict(
-        beta = dict(harlem=0.03, random=0.003),#, maternal=0.0),
+        beta = dict(harlem=0.03, random=0.003, maternal=0.0),
         init_prev = 0, # Infections seeded by Harlem class
         rel_trans_smpos     = 1.0,
         rel_trans_smneg     = 0.3,
@@ -68,8 +68,8 @@ def run_harlem(rand_seed=0):
 
     # Add demographics
     dems = [
-        ss.Pregnancy(pars=dict(fertility_rate=15)), # Per 1,000 people
-        ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people
+        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
+        #ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
     ]
 
     # -------- Connector -------
@@ -80,7 +80,7 @@ def run_harlem(rand_seed=0):
     cn = mtb.TB_Nutrition_Connector(cn_pars)
 
     # -------- Interventions -------
-    vs = mtb.VitaminSupplementation(year=[1942, 1943], rate=[10.0, 0.25]) # Need coverage, V1 vs V2
+    vs = mtb.VitaminSupplementation(year=[1942, 1943], rate=[10.0, 3.0]) # Need coverage, V1 vs V2
     m = mtb.MacroNutrients
     lsff0 = mtb.LargeScaleFoodFortification(year=[1942, 1944], rate=[1.25, 0], from_state=m.UNSATISFACTORY, to_state=m.MARGINAL)
     lsff1 = mtb.LargeScaleFoodFortification(year=[1942, 1944], rate=[1.75, 0], from_state=m.MARGINAL, to_state=m.SLIGHTLY_BELOW_STANDARD)

@@ -32,8 +32,29 @@ class HarlemNet(ss.Network):
     def update(self, ppl):
         super().update(ppl)
 
-        # TODO: Link new births
-        #preg = self.sim.demographics['pregnancy']
-        #deliveries = preg.pregnant & (preg.ti_delivery <= self.sim.ti)
+        preg = self.sim.demographics['pregnancy']
+        #deliveries = ss.true(preg.pregnant & (preg.ti_delivery <= self.sim.ti))
+        deliveries = ss.true(preg.ti_delivery == self.sim.ti)
+
+        if len(deliveries) == 0:
+            return
+
+        mn = self.sim.networks['maternalnet'].to_df()
+        hn = self.sim.networks['harlemnet']
+
+        p1s = []
+        p2s = []
+        for mother_uid in deliveries:
+            infant_uid = mn.loc[(mn['p1'] == mother_uid) & (mn['dur'] >= 0)]['p2'].values[0] # No twins!
+            hhid = ppl.hhid[mother_uid]
+            ppl.hhid[infant_uid] = hhid
+
+            for contact in hn.find_contacts(mother_uid):
+                p1s.append(contact)
+                p2s.append(infant_uid)
+
+        hn.contacts.p1 = np.concatenate([hn.contacts.p1, p1s]).astype(ss.dtypes.int)
+        hn.contacts.p2 = np.concatenate([hn.contacts.p2, p2s]).astype(ss.dtypes.int)
+        hn.contacts.beta = np.concatenate([hn.contacts.beta, np.ones_like(p1s)]).astype(ss.dtypes.float)
 
         return

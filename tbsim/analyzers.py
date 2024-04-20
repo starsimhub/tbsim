@@ -38,7 +38,7 @@ class HarlemAnalyzer(ss.Analyzer):
             n_people = np.count_nonzero(ppl)
             new_infections = np.count_nonzero(tb.ti_infected[ppl] == sim.ti)
             n_infected = np.count_nonzero(tb.infected[ppl])
-            n_died = np.count_nonzero( (tb.ti_dead[ppl] == sim.ti) ) # (tb.state[ppl] != TBS.DEAD) & 
+            n_died = np.count_nonzero( (tb.ti_dead[(sim.people.arm==arm)] == sim.ti) )
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
             n_deficient = np.count_nonzero(nut.micro[ppl] == MicroNutrients.DEFICIENT)
             rel_LS_mean = tb.rel_LS_prog[ppl & tb.infected].mean()
@@ -49,8 +49,12 @@ class HarlemAnalyzer(ss.Analyzer):
     def finalize(self, sim):
         super().finalize(sim)
         self.df = pd.DataFrame(self.data, columns = ['year', 'arm', 'n_people', 'new_infections', 'n_infected', 'n_died', 'n_latent_slow', 'n_deficient', 'rel_LS_mean'])
+
         self.df['cum_infections'] = self.df.groupby(['arm'])['new_infections'].cumsum()
         self.df.drop('new_infections', axis=1, inplace=True)
+
+        self.df['cum_died'] = self.df.groupby(['arm'])['n_died'].cumsum()
+        self.df.drop('n_died', axis=1, inplace=True)
         return
 
     def plot(self):
