@@ -54,12 +54,14 @@ def run_harlem(rand_seed=0):
     tb_pars = dict(
         beta = dict(harlem=0.03, random=0.003, maternal=0.0),
         init_prev = 0, # Infections seeded by Harlem class
+        rate_LS_to_presym = 3e-5 / 2, # Slow down LS-->Presym as this is now the rate for healthy individuals
+
+        # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
         rel_trans_smneg     = 0.3,
         rel_trans_exptb     = 0.05,
         rel_trans_presymp   = 0.10,
     )
-    # Initialize
     tb = mtb.TB(tb_pars)
 
     # ---------- Nutrition --------
