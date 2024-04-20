@@ -16,6 +16,7 @@ class TB_Nutrition_Connector(ss.Connector):
         self.requires = [TB, Nutrition]
         self.pars = ss.omerge({
             'rel_LS_prog_func': self.compute_rel_LS_prog,
+            'relsus_microdeficient': 5,
         }, self.pars)
         return
 
@@ -30,24 +31,40 @@ class TB_Nutrition_Connector(ss.Connector):
     def compute_rel_LS_prog(macro, micro):
         assert len(macro) == len(micro), 'Length of macro and micro must match.'
         ret = np.ones_like(macro)
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 1.5
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 2.0
-        ret[macro == MacroNutrients.UNSATISFACTORY] = 3.0
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 1.25
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 2.5
+        ret[macro == MacroNutrients.UNSATISFACTORY] = 4.0
         return ret
 
     def update(self, sim):
-        """ Specify how nutrition increases the latent slow progression risk """
-        # Newly undernourished
+        """ Specify how nutrition and TB interact """
         nut = sim.diseases['nutrition']
         tb = sim.diseases['tb']
-        change_uids = ss.true( (nut.ti_macro == sim.ti) | (nut.ti_micro == sim.ti) )
-        if len(change_uids) > 0:
+
+        # Let's set rel_sus!
+        tb.rel_sus[nut.micro == MicroNutrients.DEFICIENT] = self.pars.relsus_microdeficient
+        tb.rel_sus[nut.micro == MicroNutrients.NORMAL] = 1
+
+
+        change_macro_uids = ss.true(nut.ti_macro == sim.ti)
+        change_micro_uids = ss.true(nut.ti_micro == sim.ti)
+        if len(change_macro_uids) > 0 or len(change_micro_uids) > 0:
+            change_uids = np.unique(np.concatenate([change_macro_uids, change_micro_uids]))
             k_old = tb.rel_LS_prog[change_uids] #self.pars.rel_LS_prog_risk(nut.macro[change_uids], nut.micro[change_uids])
-            k_new = self.pars.rel_LS_prog_func(nut.new_macro_state[change_uids], nut.new_micro_state[change_uids])
+
+            mac = nut.macro[change_uids]
+            mac[change_macro_uids] = nut.new_macro_state[change_macro_uids]
+
+            mic = nut.micro[change_uids]
+            mic[change_micro_uids] = nut.new_micro_state[change_micro_uids]
+
+            k_new = self.pars.rel_LS_prog_func(mac, mic)
             diff = k_old != k_new
 
             if not diff.any():
                 return
+
+            tb.rel_LS_prog[change_uids] = k_new # Update rel_LS_prog
 
             # Check for rate change while in latent slow
             slow_change = diff & (sim.people.tb.state[change_uids] == TBS.LATENT_SLOW)

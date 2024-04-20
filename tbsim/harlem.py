@@ -9,14 +9,6 @@ __all__ = ['Harlem', 'HouseHold', 'StudyArm']
 
 from enum import IntEnum, auto
 
-'''
-class MacroNutrition(IntEnum):
-    STANDARD_OR_ABOVE = auto()
-    SLIGHTLY_BELOW_STANDARD = auto()
-    MARGINAL = auto()
-    UNSATISFACTORY = auto()
-'''
-
 class StudyArm(IntEnum):
     CONTROL = auto()
     VITAMIN = auto()
@@ -106,7 +98,7 @@ class Harlem():
         # Set relative LS progression after changing macro and micro states
         c = sim.connectors['tb_nutrition_connector']
         tb = sim.diseases['tb']
-        tb.rel_LS_prog = c.pars.rel_LS_prog_func(nut.macro, nut.micro)
+        tb.rel_LS_prog[sim.people.uid] = c.pars.rel_LS_prog_func(nut.macro, nut.micro)
         return
 
     def choose_seed_infections(self, sim, p_hh):

@@ -11,9 +11,11 @@ class HarlemNet(ss.Network):
 
         self.hhs = hhs
         self.pars = ss.omerge(dict(), pars)
+        #self.sim = None
         return
 
     def initialize(self, sim):
+        self.sim = sim # for births
         for hh in self.hhs:
             p1s, p2s = hh.contacts()
 
@@ -24,5 +26,14 @@ class HarlemNet(ss.Network):
         self.contacts.p1 = self.contacts.p1.astype(ss.dtypes.int)
         self.contacts.p2 = self.contacts.p2.astype(ss.dtypes.int)
         self.contacts.beta = self.contacts.beta.astype(ss.dtypes.float)
+
+        return
+
+    def update(self, ppl):
+        super().update(ppl)
+
+        # TODO: Link new births
+        #preg = self.sim.demographics['pregnancy']
+        #deliveries = preg.pregnant & (preg.ti_delivery <= self.sim.ti)
 
         return

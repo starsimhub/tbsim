@@ -15,6 +15,15 @@ warnings.filterwarnings("ignore", "use_inf_as_na")
 debug = False
 default_n_rand_seeds = [100, 1][debug]
 
+def compute_rel_LS_prog(macro, micro):
+    assert len(macro) == len(micro), 'Length of macro and micro must match.'
+    ret = np.ones_like(macro)
+    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 1.0
+    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 10.0
+    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 20.0
+    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 20.0
+    return ret
+
 def run_harlem(rand_seed=0):
 
     np.random.seed(rand_seed)
@@ -35,11 +44,13 @@ def run_harlem(rand_seed=0):
     )
     # Initialize a random network
     randnet = ss.RandomNet(randnet_pars)
+    matnet = None #ss.MaternalNet() # To track newborn --> household
+    nets = [harlemnet, randnet]# , matnet]
 
     # ------- TB disease --------
     # Disease parameters
     tb_pars = dict(
-        beta = dict(harlem=0.1, random=0.001),
+        beta = dict(harlem=0.03, random=0.003),#, maternal=0.0),
         init_prev = 0, # Infections seeded by Harlem class
         rel_trans_smpos     = 1.0,
         rel_trans_smneg     = 0.3,
@@ -60,11 +71,14 @@ def run_harlem(rand_seed=0):
     ]
 
     # -------- Connector -------
-    cn_pars = dict()
+    cn_pars = dict(
+        rel_LS_prog_func=compute_rel_LS_prog,
+        relsus_microdeficient=5 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
+    )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
 
     # -------- Interventions -------
-    vs = mtb.VitaminSupplementation(year=[1942, 1943], rate=[2.0, 0.25])
+    vs = mtb.VitaminSupplementation(year=[1942, 1943], rate=[10.0, 0.25]) # Need coverage, V1 vs V2
     m = mtb.MacroNutrients
     lsff0 = mtb.LargeScaleFoodFortification(year=[1942, 1944], rate=[1.25, 0], from_state=m.UNSATISFACTORY, to_state=m.MARGINAL)
     lsff1 = mtb.LargeScaleFoodFortification(year=[1942, 1944], rate=[1.75, 0], from_state=m.MARGINAL, to_state=m.SLIGHTLY_BELOW_STANDARD)
@@ -78,13 +92,13 @@ def run_harlem(rand_seed=0):
     # define simulation parameters
     sim_pars = dict(
         dt = 7/365,
-        start = 1940, # 2y burn-in
+        start = 1935, # Start early to burn-in
         #start = 1942,
         end = 1947,
         rand_seed = rand_seed,
         )
     # initialize the simulation
-    sim = ss.Sim(people=pop, networks=[harlemnet, randnet], diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=intvs, analyzers=az)
+    sim = ss.Sim(people=pop, networks=nets, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=intvs, analyzers=az)
     sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
     sim.initialize()
@@ -96,17 +110,6 @@ def run_harlem(rand_seed=0):
     sim.run() # Actually run the sim
 
     df = sim.analyzers['harlemanalyzer'].df
-
-    '''
-    df = pd.DataFrame( {
-        'year': sim.yearvec,
-        #'pph.mother_died.cumsum': sim.results.pph.mother_died.cumsum(),
-        'Births': sim.results.pph.births.cumsum(),
-        'Deaths': sim.results.deaths.cumulative,
-        'Maternal Deaths': sim.results.pph.maternal_deaths.cumsum(),
-        'Infant Deaths': sim.results.pph.infant_deaths.cumsum(),
-    })
-    '''
     df['rand_seed'] = rand_seed
 
     print(f'Finishing sim with rand_seed={rand_seed} ')
@@ -122,7 +125,7 @@ def run_sims(n_seeds=default_n_rand_seeds):
     T = sc.tic()
     results += sc.parallelize(run_harlem, iterkwargs=cfgs, die=False, serial=debug)
 
-    print('Timings:', sc.toc(T, output=True))
+    print(f'That took: {sc.toc(T, output=True):.1f}s')
 
     df = pd.concat(results)
     df.to_csv(os.path.join(cfg.RESULTS_DIRECTORY, f"result_{cfg.FILE_POSTFIX}.csv"))
@@ -142,7 +145,7 @@ def plot(df):
     df['date'] = pd.to_datetime(365 * (df['year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
 
     d = pd.melt(df.drop(['rand_seed', 'year'], axis=1), id_vars=['date', 'arm'], var_name='channel', value_name='Value')
-    g = sns.relplot(data=d, kind='line', x='date', hue='arm', col='channel', y='Value', palette='Set1', facet_kws={'sharey':False}, col_wrap=4)
+    g = sns.relplot(data=d, kind='line', x='date', hue='arm', col='channel', y='Value', palette='Set1', facet_kws={'sharey':False}, col_wrap=3, errorbar='sd', lw=2)
 
     g.set_titles(col_template='{col_name}', row_template='{row_name}')
     g.set_xlabels('Date')
@@ -157,12 +160,15 @@ def plot(df):
 
 if __name__ == '__main__':
     df = run_sims()
+
+    '''
     if debug:
         sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
         sim.diseases['tb'].plot()
         sim.plot()
         sim.analyzers['harlemanalyzer'].plot()
         plt.show()
+    '''
 
     plot(df)
 
