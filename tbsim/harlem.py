@@ -23,8 +23,18 @@ class StudyArm(IntEnum):
 
 
 class Harlem():
-    def __init__(self, n_hhs=194):
-        self.n_hhs = n_hhs
+    def __init__(self, pars=None):#p_microdeficient_given_macro, n_hhs=194):
+
+        self.pars = dict(
+            p_microdeficient_given_macro = { # Guess values, not from data
+                mtb.MacroNutrients.UNSATISFACTORY: 1.0,
+                mtb.MacroNutrients.MARGINAL: 0.75,
+                mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD: 0.25,
+                mtb.MacroNutrients.STANDARD_OR_ABOVE: 0.0,
+            },
+            n_hhs = 194,
+        )
+        self.pars = ss.omerge(self.pars, pars)
 
         self.hhdat = pd.DataFrame({
             'size': np.arange(1,10),
@@ -34,8 +44,9 @@ class Harlem():
         macro = mtb.MacroNutrients
         self.macrodat = pd.DataFrame({
             'habit': [ macro.STANDARD_OR_ABOVE, macro.SLIGHTLY_BELOW_STANDARD, macro.MARGINAL, macro.UNSATISFACTORY ],
+            # These are the 1942 levels
             'p_control': [21.1, 28.9, 38.9, 11.1],
-            'p_vitamin': [29.2, 30.3, 28.1, 12.4], # TODO: time variantion, these from 1942
+            'p_vitamin': [29.2, 30.3, 28.1, 12.4],
         })
         self.macrodat['p_control'] /= self.macrodat['p_control'].sum()
         self.macrodat['p_vitamin'] /= self.macrodat['p_vitamin'].sum()
@@ -51,9 +62,8 @@ class Harlem():
         return
 
     def make_hhs(self):
-        hh_sizes = np.random.choice(a=self.hhdat['size'].values, p=self.hhdat['p'].values, size=self.n_hhs)
-        #foodhabits = np.random.choice(a=self.fhdat['habit'].values, p=self.fhdat['p'].values, size=self.n_hhs)
-        arm = np.random.choice(a=self.armdat['arm'].values, p=self.armdat['p'].values, size=self.n_hhs)
+        hh_sizes = np.random.choice(a=self.hhdat['size'].values, p=self.hhdat['p'].values, size=self.pars.n_hhs)
+        arm = np.random.choice(a=self.armdat['arm'].values, p=self.armdat['p'].values, size=self.pars.n_hhs)
 
         idx = 0
         hhs = []
@@ -86,11 +96,18 @@ class Harlem():
         pop = sim.people
         nut = sim.diseases['nutrition']
         for hh in self.hhs:
+            p_deficient = self.pars.p_microdeficient_given_macro[hh.macro]
             for uid in hh.uids:
                 pop.hhid[uid] = hh.hhid
                 pop.arm[uid] = hh.arm
                 nut.macro[uid] = hh.macro
-                nut.micro[uid] = mtb.MicroNutrients.DEFICIENT if hh.macro == mtb.MacroNutrients.UNSATISFACTORY else mtb.MicroNutrients.NORMAL
+                nut.micro[uid] = mtb.MicroNutrients.DEFICIENT if np.random.rand() < p_deficient else mtb.MicroNutrients.NORMAL
+        
+        # Set relative LS progression after changing macro and micro states
+        c = sim.connectors['tb_nutrition_connector']
+        tb = sim.diseases['tb']
+        tb.rel_LS_prog = c.pars.rel_LS_prog_func(nut.macro, nut.micro)
+        return
 
     def choose_seed_infections(self, sim, p_hh):
         tb = sim.diseases['tb']

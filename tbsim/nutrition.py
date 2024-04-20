@@ -66,20 +66,15 @@ class Nutrition(ss.Disease):
         return initial_risk
 
     def update_pre(self, sim):
-        # Make all the updates from the NCD model 
-        # Add nutrition dynamics here
-        return
-    
-    def make_new_cases(self, sim):
         new_macro = ss.true(self.ti_macro == sim.ti)
         if len(new_macro) > 0:
-            self.macro[new_macro] = self.new_macro_state
-        super().set_prognoses(sim, new_macro) # Logging
+            self.macro[new_macro] = self.new_macro_state[new_macro]
+        #super().set_prognoses(sim, new_macro) # Logging
 
         new_micro = ss.true(self.ti_micro == sim.ti)
         if len(new_micro) > 0:
-            self.micro[new_micro] = self.new_micro_state
-        super().set_prognoses(sim, new_micro) # Logging
+            self.micro[new_micro] = self.new_micro_state[new_micro]
+        #super().set_prognoses(sim, new_micro) # Logging
        
         return new_macro, new_micro
 
