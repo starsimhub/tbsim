@@ -45,7 +45,6 @@ class TB_Nutrition_Connector(ss.Connector):
         tb.rel_sus[nut.micro == MicroNutrients.DEFICIENT] = self.pars.relsus_microdeficient
         tb.rel_sus[nut.micro == MicroNutrients.NORMAL] = 1
 
-
         change_macro_uids = ss.true(nut.ti_macro == sim.ti)
         change_micro_uids = ss.true(nut.ti_micro == sim.ti)
         if len(change_macro_uids) > 0 or len(change_micro_uids) > 0:

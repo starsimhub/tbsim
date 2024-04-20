@@ -113,7 +113,6 @@ class Harlem():
         return np.array(seed_uids)
 
 
-
 class HouseHold():
     def __init__(self, hhid, uids, macro_nutrition, study_arm):
         self.hhid = hhid

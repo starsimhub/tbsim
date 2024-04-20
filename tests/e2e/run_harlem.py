@@ -7,13 +7,15 @@ import pandas as pd
 import os 
 import tbsim.config as cfg
 import datetime as dt
+import seaborn as sns
+import matplotlib.dates as mdates
 
 import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False
-default_n_rand_seeds = [100, 1][debug]
+default_n_rand_seeds = [50, 1][debug]
 
 def compute_rel_LS_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
@@ -133,19 +135,13 @@ def run_sims(n_seeds=default_n_rand_seeds):
     return df
 
 def plot(df):
-
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    import matplotlib.dates as mdates
-    import sciris as sc
-    import tbsim.config as cfg
-
     first_year = int(df['year'].iloc[0])
     assert df['year'].iloc[0] == first_year
     df['date'] = pd.to_datetime(365 * (df['year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
 
     d = pd.melt(df.drop(['rand_seed', 'year'], axis=1), id_vars=['date', 'arm'], var_name='channel', value_name='Value')
-    g = sns.relplot(data=d, kind='line', x='date', hue='arm', col='channel', y='Value', palette='Set1', facet_kws={'sharey':False}, col_wrap=3, errorbar='sd', lw=2)
+    g = sns.relplot(data=d, kind='line', x='date', hue='arm', col='channel', y='Value', palette='Set1',
+        facet_kws={'sharey':False}, col_wrap=3, lw=2, errorbar='sd')
 
     g.set_titles(col_template='{col_name}', row_template='{row_name}')
     g.set_xlabels('Date')
