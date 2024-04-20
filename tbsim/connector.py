@@ -13,6 +13,7 @@ class TB_Nutrition_Connector(ss.Connector):
 
     def __init__(self, pars=None):
         super().__init__(pars=pars, label='TB-Nutrition', diseases=[TB, Nutrition])
+        self.requires = [TB, Nutrition]
         self.pars = ss.omerge({
             'rel_LS_prog_func': self.compute_rel_LS_prog,
         }, self.pars)
@@ -41,8 +42,6 @@ class TB_Nutrition_Connector(ss.Connector):
         tb = sim.diseases['tb']
         change_uids = ss.true( (nut.ti_macro == sim.ti) | (nut.ti_micro == sim.ti) )
         if len(change_uids) > 0:
-            #sim.people.tb.rel_LS_prog[~sim.people.nutrition.undernourished] = 1.0
-
             k_old = tb.rel_LS_prog[change_uids] #self.pars.rel_LS_prog_risk(nut.macro[change_uids], nut.micro[change_uids])
             k_new = self.pars.rel_LS_prog_func(nut.new_macro_state[change_uids], nut.new_micro_state[change_uids])
             diff = k_old != k_new
@@ -56,7 +55,6 @@ class TB_Nutrition_Connector(ss.Connector):
             if len(slow_change_uids) > 0:
                 # New time of switching from LS to presymp:
                 R = tb.ppf_LS_to_presymp[slow_change_uids]
-                #k = self.pars.rel_LS_prog_risk
                 r = tb.pars.rate_LS_to_presym * 365 # Converting days to years
                 t_latent = tb.ti_latent[slow_change_uids]*sim.dt
                 t_now = sim.ti*sim.dt # Time of switching from health to undernourished

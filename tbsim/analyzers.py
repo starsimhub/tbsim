@@ -40,7 +40,7 @@ class HarlemAnalyzer(ss.Analyzer):
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
             n_deficient = np.count_nonzero(nut.micro[ppl] == MicroNutrients.DEFICIENT)
 
-            self.data.append([sim.year, StudyArm(arm), n_people, new_infections, n_latent_slow, n_deficient])
+            self.data.append([sim.year, arm.name, n_people, new_infections, n_latent_slow, n_deficient])
         return
 
     def finalize(self, sim):
@@ -54,6 +54,6 @@ class HarlemAnalyzer(ss.Analyzer):
         import seaborn as sns
 
         d = pd.melt(self.df, id_vars=['year', 'arm'], var_name='channel', value_name='Value')
-        g = sns.relplot(data=d, kind='line', x='year', hue='arm', col='channel', y='Value', palette='Set1')
+        g = sns.relplot(data=d, kind='line', x='year', hue='arm', col='channel', y='Value', palette='Set1', facet_kws={'sharey':False})
 
         return

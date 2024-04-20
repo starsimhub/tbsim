@@ -2,10 +2,22 @@ import tbsim as mtb
 import starsim as ss
 import matplotlib.pyplot as plt
 import numpy as np
+import sciris as sc
+import pandas as pd
+import os 
+import tbsim.config as cfg
+import datetime as dt
 
-def make_harlem():
+import warnings
+warnings.filterwarnings("ignore", "is_categorical_dtype")
+warnings.filterwarnings("ignore", "use_inf_as_na")
 
-    np.random.seed(0) # TODO
+debug = False
+default_n_rand_seeds = [100, 1][debug]
+
+def run_harlem(rand_seed=0):
+
+    np.random.seed(rand_seed)
 
     # --------- Harlem ----------
     harlem = mtb.Harlem()
@@ -69,6 +81,7 @@ def make_harlem():
         start = 1940, # 2y burn-in
         #start = 1942,
         end = 1947,
+        rand_seed = rand_seed,
         )
     # initialize the simulation
     sim = ss.Sim(people=pop, networks=[harlemnet, randnet], diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=intvs, analyzers=az)
@@ -80,16 +93,78 @@ def make_harlem():
     seed_uids = harlem.choose_seed_infections(sim, p_hh=0.835) #83% or 84%
     tb.set_prognoses(sim, seed_uids)
 
-    return sim
+    sim.run() # Actually run the sim
 
+    df = sim.analyzers['harlemanalyzer'].df
+
+    '''
+    df = pd.DataFrame( {
+        'year': sim.yearvec,
+        #'pph.mother_died.cumsum': sim.results.pph.mother_died.cumsum(),
+        'Births': sim.results.pph.births.cumsum(),
+        'Deaths': sim.results.deaths.cumulative,
+        'Maternal Deaths': sim.results.pph.maternal_deaths.cumsum(),
+        'Infant Deaths': sim.results.pph.infant_deaths.cumsum(),
+    })
+    '''
+    df['rand_seed'] = rand_seed
+
+    print(f'Finishing sim with rand_seed={rand_seed} ')
+
+    return df
+
+
+def run_sims(n_seeds=default_n_rand_seeds):
+    results = []
+    cfgs = []
+    for rs in range(n_seeds):
+        cfgs.append({'rand_seed':rs})
+    T = sc.tic()
+    results += sc.parallelize(run_harlem, iterkwargs=cfgs, die=False, serial=debug)
+
+    print('Timings:', sc.toc(T, output=True))
+
+    df = pd.concat(results)
+    df.to_csv(os.path.join(cfg.RESULTS_DIRECTORY, f"result_{cfg.FILE_POSTFIX}.csv"))
+
+    return df
+
+def plot(df):
+
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import matplotlib.dates as mdates
+    import sciris as sc
+    import tbsim.config as cfg
+
+    first_year = int(df['year'].iloc[0])
+    assert df['year'].iloc[0] == first_year
+    df['date'] = pd.to_datetime(365 * (df['year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
+
+    d = pd.melt(df.drop(['rand_seed', 'year'], axis=1), id_vars=['date', 'arm'], var_name='channel', value_name='Value')
+    g = sns.relplot(data=d, kind='line', x='date', hue='arm', col='channel', y='Value', palette='Set1', facet_kws={'sharey':False}, col_wrap=4)
+
+    g.set_titles(col_template='{col_name}', row_template='{row_name}')
+    g.set_xlabels('Date')
+    for ax in g.axes.flat:
+        locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+    sc.savefig(f"result_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
+    plt.close(g.figure)
+    return
 
 if __name__ == '__main__':
-    sim = make_harlem()
-    sim.run()
-    sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
-    #sim.diseases['tb'].plot()
-    sim.plot()
+    df = run_sims()
+    if debug:
+        sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
+        sim.diseases['tb'].plot()
+        sim.plot()
+        sim.analyzers['harlemanalyzer'].plot()
+        plt.show()
 
-    sim.analyzers['harlemanalyzer'].plot()
+    plot(df)
 
-    plt.show()
+    print(f"Results directory {cfg.RESULTS_DIRECTORY}\nThis run: {cfg.FILE_POSTFIX}")
+    print('Done')
