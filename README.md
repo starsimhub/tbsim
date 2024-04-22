@@ -35,12 +35,12 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
 
 ### Running a sample simulation
 
-1. Navigate to the project directory **tbsim\src**.
+1. Navigate to the project directory **tests\e2e**
 2. Run the main script:
    ```bash
-   python quick_demo.py
+   python run_single.py
    ```
-3. running this script should result in a chart being displayed.
+3. running this script should result in basic charts being displayed.
 
 ## Usage _(TBD)_
 
