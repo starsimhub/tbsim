@@ -26,11 +26,22 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/amath-idm/TBSim.git
+   git clone https://github.com/starsimhub/tbsim.git 
+   cd tbsim
    ```
 2. Install the required packages:
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
+   ```
+
+### Starsim:
+The steps described below will allow you to use the latest unreleased features of starsim, it needs to be run after tbsim has been installed to allow for the package to be updated:
+1. Clone and install starsim:
+   ```bash
+   git clone https://github.com/starsimhub/starsim.git 
+   cd starsim
+   pip install -e .
+
    ```
 
 ### Running a sample simulation
@@ -42,29 +53,28 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
    ```
 3. running this script should result in basic charts being displayed.
 
-## Usage _(TBD)_
+## Usage 
+- Usage examples are available in the **tests\e2e** folder.
 
-- Modify the `config.json` file to set different parameters for the simulation.
-- Run the `run_simulation.py` script to start the simulation.
-- Use the visualization tools in `visualization.py` to view the results.
+## Documentation: 
+_TBSim_ is based on Starsim, please refer to [Starsim documentation](https://docs.idmod.org/projects/starsim/en/latest/) for additional information.
 
-## Contributing _(TBD)_
+## Contributing
 
-Contributions to the TBSim project are welcome! Please read `CONTRIBUTING.md` for details on our code of conduct, and the process for submitting pull requests.
+Contributions to the TBSim project are welcome! Please read [CONTRIBUTING.md](https://github.com/starsimhub/starsim/blob/main/contributing.rst) for details on our code of conduct, and the process for submitting pull requests.
 
 ## Authors
 
-- **Minerva Enriquez** - *Initial work* - [MEnriquez-IDM](https://github.com/MEnriquez-IDM)
-
-See also the list of [contributors -tbd](https://github.com/amath-idm/TBSim/contributors) who participated in this project.
+-  **Daniel Klein** - [Daniel-Klein](https://github.com/daniel-klein)
+-  **Minerva Enriquez** - [MEnriquez-IDM](https://github.com/MEnriquez-IDM)
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE.md](https://github.com/amath-idm/tbsim/blob/main/LICENSE) file for details.
 
-## Acknowledgments
+## Disclaimer
+The code in this repository was developed by IDM, the Burnet Institute, and other collaborators to support our joint research on flexible agent-based modeling. We've made it publicly available under the MIT License to provide others with a better understanding of our research and an opportunity to build upon it for their own work. We make no representations that the code works as intended or that we will provide support, address issues that are found, or accept pull requests. You are welcome to create your own fork and modify the code to suit your own modeling needs as permitted under the MIT License.
 
-- TBD
 
 ## References
 
