@@ -4,8 +4,7 @@ Define non-communicable disease (Nutrition) model
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, Nutrition, TBS
-import sciris as sc
+from tbsim import TB, Nutrition, TBS, MacroNutrients, MicroNutrients
 
 __all__ = ['TB_Nutrition_Connector']
 
@@ -14,30 +13,68 @@ class TB_Nutrition_Connector(ss.Connector):
 
     def __init__(self, pars=None):
         super().__init__(pars=pars, label='TB-Nutrition', diseases=[TB, Nutrition])
+        self.requires = [TB, Nutrition]
         self.pars = ss.omerge({
-            'rel_LS_prog_risk': 2.0, # 2x the rate for those experiencing undernutrition
+            'rel_LS_prog_func': self.compute_rel_LS_prog,
+            'relsus_microdeficient': 5,
         }, self.pars)
         return
 
-    def update(self, sim):
-        """ Specify how nutrition increases the latent slow progression risk """
-        # Newly undernourished
-        new_cases = ss.true(sim.diseases['nutrition'].ti_undernourished == sim.ti)
-        if len(new_cases) > 0:
-            #sim.people.tb.rel_LS_prog[~sim.people.nutrition.undernourished] = 1.0
-            sim.people.tb.rel_LS_prog[new_cases] = self.pars.rel_LS_prog_risk
+    def initialize(self, sim):
+        tb = sim.diseases['tb']
+        nut = sim.diseases['nutrition']
+        uids = ss.true(sim.people.alive)
+        tb.rel_LS_prog[uids] = self.pars.rel_LS_prog_func(nut.macro[uids], nut.micro[uids])
+        return
 
-            # Because undernourished while in latent slow
-            slow_uids = ss.true(sim.people.tb.state[new_cases] == TBS.LATENT_SLOW)
-            if len(slow_uids) > 0:
-                tb = sim.diseases['tb']
+    @staticmethod
+    def compute_rel_LS_prog(macro, micro):
+        assert len(macro) == len(micro), 'Length of macro and micro must match.'
+        ret = np.ones_like(macro)
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 1.25
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 2.5
+        ret[macro == MacroNutrients.UNSATISFACTORY] = 4.0
+        return ret
+
+    def update(self, sim):
+        """ Specify how nutrition and TB interact """
+        nut = sim.diseases['nutrition']
+        tb = sim.diseases['tb']
+
+        # Let's set rel_sus!
+        tb.rel_sus[nut.micro == MicroNutrients.DEFICIENT] = self.pars.relsus_microdeficient
+        tb.rel_sus[nut.micro == MicroNutrients.NORMAL] = 1
+
+        change_macro_uids = ss.true(nut.ti_macro == sim.ti)
+        change_micro_uids = ss.true(nut.ti_micro == sim.ti)
+        if len(change_macro_uids) > 0 or len(change_micro_uids) > 0:
+            change_uids = np.unique(np.concatenate([change_macro_uids, change_micro_uids]))
+            k_old = tb.rel_LS_prog[change_uids] #self.pars.rel_LS_prog_risk(nut.macro[change_uids], nut.micro[change_uids])
+
+            mac = nut.macro[change_uids]
+            mac[change_macro_uids] = nut.new_macro_state[change_macro_uids]
+
+            mic = nut.micro[change_uids]
+            mic[change_micro_uids] = nut.new_micro_state[change_micro_uids]
+
+            k_new = self.pars.rel_LS_prog_func(mac, mic)
+            diff = k_old != k_new
+
+            if not diff.any():
+                return
+
+            tb.rel_LS_prog[change_uids] = k_new # Update rel_LS_prog
+
+            # Check for rate change while in latent slow
+            slow_change = diff & (sim.people.tb.state[change_uids] == TBS.LATENT_SLOW)
+            slow_change_uids = ss.true(slow_change)
+            if len(slow_change_uids) > 0:
                 # New time of switching from LS to presymp:
-                R = tb.ppf_LS_to_presymp[slow_uids]
-                k = self.pars.rel_LS_prog_risk
+                R = tb.ppf_LS_to_presymp[slow_change_uids]
                 r = tb.pars.rate_LS_to_presym * 365 # Converting days to years
-                t_latent = tb.ti_latent[slow_uids]*sim.dt
+                t_latent = tb.ti_latent[slow_change_uids]*sim.dt
                 t_now = sim.ti*sim.dt # Time of switching from health to undernourished
 
-                tb.ti_presymp[slow_uids] = -1/(k*r) * np.log( np.exp(-r*t_latent) - np.exp(-r*t_now) + np.exp(-k*r*t_now) - R) / sim.dt
+                tb.ti_presymp[slow_change_uids] = -1/(k_new[slow_change]*r) * np.log( np.exp(-k_old[slow_change]*r*t_latent) - np.exp(-k_old[slow_change]*r*t_now) + np.exp(-k_new[slow_change]*r*t_now) - R) / sim.dt
 
         return
