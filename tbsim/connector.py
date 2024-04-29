@@ -22,9 +22,9 @@ class TB_Nutrition_Connector(ss.Connector):
 
     def initialize(self, sim):
         tb = sim.diseases['tb']
-        nut = sim.diseases['nutrition']
+        nut = sim.diseases['malnutrition']
         uids = ss.true(sim.people.alive)
-        tb.rel_LS_prog[uids] = self.pars.rel_LS_prog_func(nut.macro[uids], nut.micro[uids])
+        tb.rel_LS_prog[uids] = self.pars.rel_LS_prog_func(nut.macro_state[uids], nut.micro_state[uids])
         return
 
     @staticmethod
@@ -38,12 +38,12 @@ class TB_Nutrition_Connector(ss.Connector):
 
     def update(self, sim):
         """ Specify how nutrition and TB interact """
-        nut = sim.diseases['nutrition']
+        nut = sim.diseases['malnutrition']
         tb = sim.diseases['tb']
 
         # Let's set rel_sus!
-        tb.rel_sus[nut.micro == MicroNutrients.DEFICIENT] = self.pars.relsus_microdeficient
-        tb.rel_sus[nut.micro == MicroNutrients.NORMAL] = 1
+        tb.rel_sus[nut.micro_state == MicroNutrients.DEFICIENT] = self.pars.relsus_microdeficient
+        tb.rel_sus[nut.micro_state == MicroNutrients.NORMAL] = 1
 
         change_macro_uids = ss.true(nut.ti_macro == sim.ti)
         change_micro_uids = ss.true(nut.ti_micro == sim.ti)

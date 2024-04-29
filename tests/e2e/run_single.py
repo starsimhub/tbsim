@@ -2,12 +2,12 @@ import tbsim as mtb
 import starsim as ss
 import matplotlib.pyplot as plt
 
-def make_nutrition():
-    # --------- Nutrition ----------
+def make_malnutrition():
+    # --------- Malnutrition ----------
     nut_pars = dict(
         init_prev = 0.001,
         )
-    nut = mtb.Nutrition(nut_pars)
+    nut = mtb.Malnutrition(nut_pars)
 
     n_agents = 10000
     pop = ss.People(n_agents=n_agents)
@@ -80,11 +80,11 @@ def make_tb_nut():
     # Initialize
     tb = mtb.TB(tb_pars)
 
-    # ---------- Nutrition --------
+    # ---------- Malnutrition --------
     nut_pars = dict(
         init_prev = 0.001,
         )
-    nut = mtb.Nutrition(nut_pars)
+    nut = mtb.Malnutrition(nut_pars)
 
     # -------- Network ---------
     # Network parameters
@@ -122,7 +122,7 @@ def make_tb_nut():
 
 
 if __name__ == '__main__':
-    sim_n = make_nutrition()
+    sim_n = make_malnutrition()
     sim_n.run()
     sim_n.plot()
     
@@ -130,7 +130,7 @@ if __name__ == '__main__':
     sim_tb.run()
     sim_tb.diseases['tb'].plot()
     sim_tb.plot()
-
+    
     sim_tbn = make_tb_nut()
     sim_tbn.run()
     sim_tbn.plot()
