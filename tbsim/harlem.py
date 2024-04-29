@@ -4,7 +4,7 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 
-__all__ = ['Harlem', 'HouseHold', 'StudyArm']
+__all__ = ['Harlem', 'StudyArm']
 
 
 from enum import IntEnum, auto
@@ -66,7 +66,7 @@ class Harlem():
             else:
                 p = self.macrodat['p_vitamin'].values
             macro = np.random.choice(a=self.macrodat['habit'].values, p=p)
-            hh = HouseHold(hhid, uids, mtb.MacroNutrients(macro), StudyArm(arm))
+            hh = mtb.HouseHold(hhid, uids, mtb.MacroNutrients(macro), StudyArm(arm))
             hhs.append(hh)
             idx += size
 
@@ -112,22 +112,3 @@ class Harlem():
             seed_uids.append(seed_uid)
         return np.array(seed_uids)
 
-
-class HouseHold():
-    def __init__(self, hhid, uids, macro_nutrition, study_arm):
-        self.hhid = hhid
-        self.uids = uids
-        self.n = len(uids)
-        self.macro = macro_nutrition
-        self.arm = study_arm
-        return
-
-    def contacts(self):
-        g = nx.complete_graph(self.uids)
-        p1s = []
-        p2s = []
-        for edge in g.edges():
-            p1, p2 = edge
-            p1s.append(p1)
-            p2s.append(p2)
-        return p1s, p2s
