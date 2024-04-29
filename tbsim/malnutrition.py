@@ -96,27 +96,3 @@ class Malnutrition(ss.Disease):
         self.results.prev_micro_deficient[ti] = np.count_nonzero((self.micro_state==MicroNutrients.DEFICIENT) & alive)/alive.count()
         self.results.people_alive[ti] = alive.count()/sim.pars['n_agents']
         return
-
-
-
-if __name__ == '__main__':
-    import tbsim as mtb
-    import matplotlib.pyplot as plt
-    import pandas as pd
-    
-    malnut = mtb.Malnutrition(dict(init_prev = 0.001))  
-    n_agents = 10000
-    pop = ss.People(n_agents=n_agents)
-
-    sim_pars = dict(
-        dt = 0.5,
-        start = 1990,
-        end = 2000,
-        )
-    sim = ss.Sim(people=pop, diseases=malnut, pars=sim_pars)
-    sim.run()
-    sim.plot()
-    print(sim.results[0])
-    pd.DataFrame(sim.results.malnutrition ).plot()
-   
-    plt.show()
