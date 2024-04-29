@@ -49,12 +49,12 @@ class TB_Nutrition_Connector(ss.Connector):
         change_micro_uids = ss.true(nut.ti_micro == sim.ti)
         if len(change_macro_uids) > 0 or len(change_micro_uids) > 0:
             change_uids = np.unique(np.concatenate([change_macro_uids, change_micro_uids]))
-            k_old = tb.rel_LS_prog[change_uids] #self.pars.rel_LS_prog_risk(nut.macro[change_uids], nut.micro[change_uids])
+            k_old = tb.rel_LS_prog[change_uids] #self.pars.rel_LS_prog_risk(nut.macro_state[change_uids], nut.micro_state[change_uids])
 
-            mac = nut.macro[change_uids]
+            mac = nut.macro_state[change_uids]
             mac[change_macro_uids] = nut.new_macro_state[change_macro_uids]
 
-            mic = nut.micro[change_uids]
+            mic = nut.micro_state[change_uids]
             mic[change_micro_uids] = nut.new_micro_state[change_micro_uids]
 
             k_new = self.pars.rel_LS_prog_func(mac, mic)

@@ -64,9 +64,9 @@ def run_harlem(rand_seed=0):
     )
     tb = mtb.TB(tb_pars)
 
-    # ---------- Nutrition --------
+    # ---------- Malnutrition --------
     nut_pars = dict()
-    nut = mtb.Nutrition(nut_pars)
+    nut = mtb.Malnutrition(nut_pars)
 
     # Add demographics
     dems = [
@@ -128,7 +128,7 @@ def run_sims(n_seeds=default_n_rand_seeds):
         cfgs.append({'rand_seed':rs})
     T = sc.tic()
     results += sc.parallelize(run_harlem, iterkwargs=cfgs, die=False, serial=debug)
-
+    # results = [run_harlem(0)]
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
     df = pd.concat(results)

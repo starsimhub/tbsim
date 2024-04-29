@@ -86,19 +86,19 @@ class Harlem():
 
     def set_states(self, sim):
         pop = sim.people
-        nut = sim.diseases['nutrition']
+        nut = sim.diseases['malnutrition']
         for hh in self.hhs:
             p_deficient = self.pars.p_microdeficient_given_macro[hh.macro]
             for uid in hh.uids:
                 pop.hhid[uid] = hh.hhid
                 pop.arm[uid] = hh.arm
-                nut.macro[uid] = hh.macro
-                nut.micro[uid] = mtb.MicroNutrients.DEFICIENT if np.random.rand() < p_deficient else mtb.MicroNutrients.NORMAL
+                nut.macro_state[uid] = hh.macro            # We are assuming that the macro state is the same for all members of the household
+                nut.micro_state[uid] = mtb.MicroNutrients.DEFICIENT if np.random.rand() < p_deficient else mtb.MicroNutrients.NORMAL
         
         # Set relative LS progression after changing macro and micro states
         c = sim.connectors['tb_nutrition_connector']
         tb = sim.diseases['tb']
-        tb.rel_LS_prog[sim.people.uid] = c.pars.rel_LS_prog_func(nut.macro, nut.micro)
+        tb.rel_LS_prog[sim.people.uid] = c.pars.rel_LS_prog_func(nut.macro_state, nut.micro_state)
         return
 
     def choose_seed_infections(self, sim, p_hh):
