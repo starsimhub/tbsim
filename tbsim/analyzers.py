@@ -31,7 +31,7 @@ class HarlemAnalyzer(ss.Analyzer):
         super().apply(sim)
 
         tb = sim.diseases['tb']
-        nut = sim.diseases['nutrition']
+        nut = sim.diseases['malnutrition']
         for arm in [StudyArm.CONTROL, StudyArm.VITAMIN]:
             ppl = (sim.people.arm==arm) & (sim.people.alive)
 
@@ -40,7 +40,7 @@ class HarlemAnalyzer(ss.Analyzer):
             n_infected = np.count_nonzero(tb.infected[ppl])
             n_died = np.count_nonzero( (tb.ti_dead[(sim.people.arm==arm)] == sim.ti) )
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
-            n_deficient = np.count_nonzero(nut.micro[ppl] == MicroNutrients.DEFICIENT)
+            n_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
             rel_LS_mean = tb.rel_LS_prog[ppl & tb.infected].mean()
 
             self.data.append([sim.year, arm.name, n_people, new_infections, n_infected, n_died, n_latent_slow, n_deficient, rel_LS_mean])

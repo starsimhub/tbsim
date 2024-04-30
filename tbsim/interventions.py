@@ -4,7 +4,7 @@ Define Nutrition intervention
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, Nutrition, MicroNutrients, MacroNutrients, StudyArm
+from tbsim import TB, Malnutrition, MicroNutrients, MacroNutrients, StudyArm
 import sciris as sc
 
 __all__ = ['VitaminSupplementation', 'LargeScaleFoodFortification']
@@ -12,7 +12,7 @@ __all__ = ['VitaminSupplementation', 'LargeScaleFoodFortification']
 class VitaminSupplementation(ss.Intervention):
 
     def __init__(self, year: np.array, rate: np.array, **kwargs):
-        self.requires = Nutrition
+        self.requires = Malnutrition
         self.year = sc.promotetoarray(year)
         self.rate = sc.promotetoarray(rate)
 
@@ -31,11 +31,11 @@ class VitaminSupplementation(ss.Intervention):
         if sim.year < self.year[0]:
             return
 
-        nut = sim.diseases['nutrition']
+        nut = sim.diseases['malnutrition']
         micro_deficient_uids = ss.true(
             (sim.people.arm!=StudyArm.CONTROL) & 
-            (nut.micro == MicroNutrients.DEFICIENT) & 
-            (nut.macro != MacroNutrients.UNSATISFACTORY)
+            (nut.micro_state == MicroNutrients.DEFICIENT) & 
+            (nut.macro_state != MacroNutrients.UNSATISFACTORY)
         )
         recover_uids = self.p_micro_recovery.filter(micro_deficient_uids)
 
@@ -50,7 +50,7 @@ class VitaminSupplementation(ss.Intervention):
 class LargeScaleFoodFortification(ss.Intervention):
 
     def __init__(self, year, rate, from_state, to_state, arm=None, **kwargs):
-        self.requires = Nutrition
+        self.requires = Malnutrition
         self.year = sc.promotetoarray(year)
         self.rate = sc.promotetoarray(rate)
         self.from_state = from_state
@@ -73,9 +73,9 @@ class LargeScaleFoodFortification(ss.Intervention):
         if sim.year < self.year[0]:
             return
 
-        nut = sim.diseases['nutrition']
+        nut = sim.diseases['malnutrition']
         ppl = sim.people
-        eligible = (nut.macro == self.from_state) & ppl.alive
+        eligible = (nut.macro_state == self.from_state) & ppl.alive
         if self.arm is not None:
             eligible &= ppl.arm == self.arm
         eligible_uids = ss.true(eligible)

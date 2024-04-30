@@ -22,9 +22,9 @@ class TB_Nutrition_Connector(ss.Connector):
 
     def initialize(self, sim):
         tb = sim.diseases['tb']
-        nut = sim.diseases['nutrition']
+        nut = sim.diseases['malnutrition']
         uids = ss.true(sim.people.alive)
-        tb.rel_LS_prog[uids] = self.pars.rel_LS_prog_func(nut.macro[uids], nut.micro[uids])
+        tb.rel_LS_prog[uids] = self.pars.rel_LS_prog_func(nut.macro_state[uids], nut.micro_state[uids])
         return
 
     @staticmethod
@@ -38,23 +38,23 @@ class TB_Nutrition_Connector(ss.Connector):
 
     def update(self, sim):
         """ Specify how nutrition and TB interact """
-        nut = sim.diseases['nutrition']
+        nut = sim.diseases['malnutrition']
         tb = sim.diseases['tb']
 
         # Let's set rel_sus!
-        tb.rel_sus[nut.micro == MicroNutrients.DEFICIENT] = self.pars.relsus_microdeficient
-        tb.rel_sus[nut.micro == MicroNutrients.NORMAL] = 1
+        tb.rel_sus[nut.micro_state == MicroNutrients.DEFICIENT] = self.pars.relsus_microdeficient
+        tb.rel_sus[nut.micro_state == MicroNutrients.NORMAL] = 1
 
         change_macro_uids = ss.true(nut.ti_macro == sim.ti)
         change_micro_uids = ss.true(nut.ti_micro == sim.ti)
         if len(change_macro_uids) > 0 or len(change_micro_uids) > 0:
             change_uids = np.unique(np.concatenate([change_macro_uids, change_micro_uids]))
-            k_old = tb.rel_LS_prog[change_uids] #self.pars.rel_LS_prog_risk(nut.macro[change_uids], nut.micro[change_uids])
+            k_old = tb.rel_LS_prog[change_uids] #self.pars.rel_LS_prog_risk(nut.macro_state[change_uids], nut.micro_state[change_uids])
 
-            mac = nut.macro[change_uids]
+            mac = nut.macro_state[change_uids]
             mac[change_macro_uids] = nut.new_macro_state[change_macro_uids]
 
-            mic = nut.micro[change_uids]
+            mic = nut.micro_state[change_uids]
             mic[change_micro_uids] = nut.new_micro_state[change_micro_uids]
 
             k_new = self.pars.rel_LS_prog_func(mac, mic)

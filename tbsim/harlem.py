@@ -4,7 +4,7 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 
-__all__ = ['Harlem', 'HouseHold', 'StudyArm']
+__all__ = ['Harlem', 'StudyArm']
 
 
 from enum import IntEnum, auto
@@ -66,7 +66,7 @@ class Harlem():
             else:
                 p = self.macrodat['p_vitamin'].values
             macro = np.random.choice(a=self.macrodat['habit'].values, p=p)
-            hh = HouseHold(hhid, uids, mtb.MacroNutrients(macro), StudyArm(arm))
+            hh = mtb.HouseHold(hhid, uids, mtb.MacroNutrients(macro), StudyArm(arm))
             hhs.append(hh)
             idx += size
 
@@ -86,19 +86,19 @@ class Harlem():
 
     def set_states(self, sim):
         pop = sim.people
-        nut = sim.diseases['nutrition']
+        nut = sim.diseases['malnutrition']
         for hh in self.hhs:
             p_deficient = self.pars.p_microdeficient_given_macro[hh.macro]
             for uid in hh.uids:
                 pop.hhid[uid] = hh.hhid
                 pop.arm[uid] = hh.arm
-                nut.macro[uid] = hh.macro
-                nut.micro[uid] = mtb.MicroNutrients.DEFICIENT if np.random.rand() < p_deficient else mtb.MicroNutrients.NORMAL
+                nut.macro_state[uid] = hh.macro            # We are assuming that the macro state is the same for all members of the household
+                nut.micro_state[uid] = mtb.MicroNutrients.DEFICIENT if np.random.rand() < p_deficient else mtb.MicroNutrients.NORMAL
         
         # Set relative LS progression after changing macro and micro states
         c = sim.connectors['tb_nutrition_connector']
         tb = sim.diseases['tb']
-        tb.rel_LS_prog[sim.people.uid] = c.pars.rel_LS_prog_func(nut.macro, nut.micro)
+        tb.rel_LS_prog[sim.people.uid] = c.pars.rel_LS_prog_func(nut.macro_state, nut.micro_state)
         return
 
     def choose_seed_infections(self, sim, p_hh):
@@ -112,22 +112,3 @@ class Harlem():
             seed_uids.append(seed_uid)
         return np.array(seed_uids)
 
-
-class HouseHold():
-    def __init__(self, hhid, uids, macro_nutrition, study_arm):
-        self.hhid = hhid
-        self.uids = uids
-        self.n = len(uids)
-        self.macro = macro_nutrition
-        self.arm = study_arm
-        return
-
-    def contacts(self):
-        g = nx.complete_graph(self.uids)
-        p1s = []
-        p2s = []
-        for edge in g.edges():
-            p1, p2 = edge
-            p1s.append(p1)
-            p2s.append(p2)
-        return p1s, p2s

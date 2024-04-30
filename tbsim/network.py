@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 
-__all__ = ['HarlemNet']
+__all__ = ['HarlemNet', 'HouseHold']
 
 class HarlemNet(ss.Network):
     def __init__(self, hhs, pars=None, **kwargs):
@@ -14,10 +14,13 @@ class HarlemNet(ss.Network):
         #self.sim = None
         return
 
+    """_summary_
+    
+    """
     def initialize(self, sim):
         self.sim = sim # for births
-        for hh in self.hhs:
-            p1s, p2s = hh.contacts()
+        for hh in self.hhs:                 # For each household
+            p1s, p2s = hh.contacts()        # Get all their contacts
 
             self.contacts.p1 = np.concatenate([self.contacts.p1, p1s])
             self.contacts.p2 = np.concatenate([self.contacts.p2, p2s])
@@ -28,7 +31,13 @@ class HarlemNet(ss.Network):
         self.contacts.beta = self.contacts.beta.astype(ss.dtypes.float)
 
         return
-
+    
+    """_summary_
+    Updates the network based on individuals who are delivering at the current simulation time step. 
+    For each delivering individual, it identifies their infant, sets the infant's household ID and 
+    study arm to match the mother's, and adds the infant to the mother's contacts in the 'harlemnet' network. 
+    It then updates the 'p1', 'p2', and 'beta' attributes of the 'harlemnet' network's 'contacts' object with the new contacts.
+    """
     def update(self, ppl):
         super().update(ppl)
 
@@ -58,3 +67,38 @@ class HarlemNet(ss.Network):
         hn.contacts.beta = np.concatenate([hn.contacts.beta, np.ones_like(p1s)]).astype(ss.dtypes.float)
 
         return
+    
+"""_Summary_
+The HouseHold network class.
+"""
+class HouseHold():
+    """
+    _Attributes:_
+    hhid:   Unique identifier for the household.
+    uids:   List of unique identifiers for household members.
+    n:      Number of members in the household.
+    macro:  Macro nutrition status of the household.
+    arm:    Group in the study that the household belongs to.
+    """ 
+    def __init__(self, hhid, uids, macro_nutrition, study_arm):
+        self.hhid = hhid
+        self.uids = uids
+        self.n = len(uids)
+        self.macro = macro_nutrition
+        self.arm = study_arm
+        return
+    
+    """_summary_
+    The contacts method generates a complete graph using NetworkX, 
+    representing all possible pairs of contacts within a group of individuals identified by uids. 
+    It then separates these pairs into two lists, p1s and p2s, and returns these lists.
+    """
+    def contacts(self):
+        g = nx.complete_graph(self.uids)
+        p1s = []
+        p2s = []
+        for edge in g.edges():
+            p1, p2 = edge
+            p1s.append(p1)
+            p2s.append(p2)
+        return p1s, p2s

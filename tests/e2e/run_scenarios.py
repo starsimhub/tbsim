@@ -1,5 +1,5 @@
 """
-TB-Nutrition scenarios
+TB-Malnutrition scenarios
 """
 
 # %% Imports and settings
@@ -35,11 +35,11 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     # Initialize
     tb = mtb.TB(tb_pars)
 
-    # ---------- Nutrition --------
+    # ---------- Malnutrition --------
     nut_pars = dict(
         init_prev = 0.001,
         )
-    nut = mtb.Nutrition(nut_pars)
+    nut = mtb.Malnutrition(nut_pars)
 
     # -------- Network ---------
     # Network parameters
