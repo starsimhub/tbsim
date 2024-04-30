@@ -1,10 +1,10 @@
 """
-Define Nutrition analyzers
+Define Malnutrition analyzers
 """
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, TBS, Nutrition, MicroNutrients, MacroNutrients, StudyArm
+from tbsim import TB, TBS, Malnutrition, MicroNutrients, MacroNutrients, StudyArm
 import sciris as sc
 
 import pandas as pd
@@ -14,7 +14,7 @@ __all__ = ['HarlemAnalyzer']
 class HarlemAnalyzer(ss.Analyzer):
 
     def __init__(self, **kwargs):
-        self.requires = [TB, Nutrition]
+        self.requires = [TB, Malnutrition]
         self.data = []
         self.df = None # Created on finalize
 
