@@ -1,19 +1,19 @@
 """
-Define non-communicable disease (Nutrition) model
+Define a connector between TB and Malnutrition
 """
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, Nutrition, TBS, MacroNutrients, MicroNutrients
+from tbsim import TB, Malnutrition, TBS, MacroNutrients, MicroNutrients
 
 __all__ = ['TB_Nutrition_Connector']
 
 class TB_Nutrition_Connector(ss.Connector):
-    """ Connect TB to Nutrition """
+    """ Connect TB to Malnutrition """
 
     def __init__(self, pars=None):
-        super().__init__(pars=pars, label='TB-Nutrition', diseases=[TB, Nutrition])
-        self.requires = [TB, Nutrition]
+        super().__init__(pars=pars, label='TB-Malnutrition', diseases=[TB, Malnutrition])
+        self.requires = [TB, Malnutrition]
         self.pars = ss.omerge({
             'rel_LS_prog_func': self.compute_rel_LS_prog,
             'relsus_microdeficient': 5,
@@ -37,7 +37,7 @@ class TB_Nutrition_Connector(ss.Connector):
         return ret
 
     def update(self, sim):
-        """ Specify how nutrition and TB interact """
+        """ Specify how malnutrition and TB interact """
         nut = sim.diseases['malnutrition']
         tb = sim.diseases['tb']
 

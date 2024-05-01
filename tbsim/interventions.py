@@ -1,5 +1,5 @@
 """
-Define Nutrition intervention
+Define Malnutrition intervention
 """
 
 import numpy as np
