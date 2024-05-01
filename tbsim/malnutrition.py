@@ -30,6 +30,9 @@ class Malnutrition(ss.Disease):
     
     def __init__(self, pars=None):
         # According to https://www.who.int/news-room/questions-and-answers/item/malnutrition
+        pars = ss.omergeleft(pars,
+            beta = 1.0,         # Transmission rate  - TODO: Check if there is one
+        )
         super().__init__(pars=pars)
 
         self.add_states(
