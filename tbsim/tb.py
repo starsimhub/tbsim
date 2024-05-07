@@ -198,11 +198,11 @@ class TB(ss.Infection):
             self.state[uids] = TBS.NONE
             self.susceptible[uids] = True
             self.infected[uids] = False
-            self.ti_latent[uids] = ss.INT_NAN
-            self.ti_presymp[uids] = ss.INT_NAN
-            self.ti_active[uids] = ss.INT_NAN
-            self.ti_dead[uids] = ss.INT_NAN
-            self.ti_cure[uids] = ss.INT_NAN
+            self.ti_latent[uids] = np.nan
+            self.ti_presymp[uids] = np.nan
+            self.ti_active[uids] = np.nan
+            self.ti_dead[uids] = np.nan
+            self.ti_cure[uids] = np.nan
 
         # Active --> Death
         deaths = ( (self.state != TBS.DEAD) & (self.ti_dead <= sim.ti) ).uids
