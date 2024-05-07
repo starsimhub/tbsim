@@ -26,7 +26,7 @@ class Harlem():
             },
             n_hhs = 194,
         )
-        self.pars = ss.omerge(self.pars, pars)
+        self.pars = ss.dictmergeleft(self.pars, pars)
 
         self.hhdat = pd.DataFrame({
             'size': np.arange(1,10),
@@ -74,8 +74,8 @@ class Harlem():
 
     def people(self):
         extra_states = [
-            ss.State('hhid', int, ss.INT_NAN),
-            ss.State('arm', int, ss.INT_NAN),
+             ss.FloatArr('hhid', default=np.nan),
+             ss.FloatArr('arm', default=np.nan),
         ]
         pop = ss.People(n_agents = self.n_agents, extra_states=extra_states)
         return pop
@@ -90,11 +90,12 @@ class Harlem():
         for hh in self.hhs:
             p_deficient = self.pars.p_microdeficient_given_macro[hh.macro]
             for uid in hh.uids:
-                pop.hhid[uid] = hh.hhid
-                pop.arm[uid] = hh.arm
-                nut.macro_state[uid] = hh.macro            # We are assuming that the macro state is the same for all members of the household
-                nut.micro_state[uid] = mtb.MicroNutrients.DEFICIENT if np.random.rand() < p_deficient else mtb.MicroNutrients.NORMAL
-        
+                pop.hhid[ss.uids(uid)] = hh.hhid
+                pop.arm[ss.uids(uid)] = hh.arm
+                nut.macro_state[ss.uids(uid)] = hh.macro            # We are assuming that the macro state is the same for all members of the household
+                nut.micro_state[ss.uids(uid)] = mtb.MicroNutrients.DEFICIENT if np.random.rand() < p_deficient else mtb.MicroNutrients.NORMAL
+
+                    
         # Set relative LS progression after changing macro and micro states
         c = sim.connectors['tb_nutrition_connector']
         tb = sim.diseases['tb']
