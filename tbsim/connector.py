@@ -14,7 +14,7 @@ class TB_Nutrition_Connector(ss.Connector):
     def __init__(self, pars=None):
         super().__init__(pars=pars, label='TB-Malnutrition', diseases=[TB, Malnutrition])
         self.requires = [TB, Malnutrition]
-        self.pars = ss.omerge({
+        self.pars = ss.dictmergeleft({
             'rel_LS_prog_func': self.compute_rel_LS_prog,
             'relsus_microdeficient': 5,
         }, self.pars)
@@ -23,7 +23,7 @@ class TB_Nutrition_Connector(ss.Connector):
     def initialize(self, sim):
         tb = sim.diseases['tb']
         nut = sim.diseases['malnutrition']
-        uids = ss.true(sim.people.alive)
+        uids = sim.people.alive.uids
         tb.rel_LS_prog[uids] = self.pars.rel_LS_prog_func(nut.macro_state[uids], nut.micro_state[uids])
         return
 
@@ -45,8 +45,8 @@ class TB_Nutrition_Connector(ss.Connector):
         tb.rel_sus[nut.micro_state == MicroNutrients.DEFICIENT] = self.pars.relsus_microdeficient
         tb.rel_sus[nut.micro_state == MicroNutrients.NORMAL] = 1
 
-        change_macro_uids = ss.true(nut.ti_macro == sim.ti)
-        change_micro_uids = ss.true(nut.ti_micro == sim.ti)
+        change_macro_uids = (nut.ti_macro == sim.ti).uids
+        change_micro_uids = (nut.ti_micro == sim.ti).uids
         if len(change_macro_uids) > 0 or len(change_micro_uids) > 0:
             change_uids = np.unique(np.concatenate([change_macro_uids, change_micro_uids]))
             k_old = tb.rel_LS_prog[change_uids] #self.pars.rel_LS_prog_risk(nut.macro_state[change_uids], nut.micro_state[change_uids])

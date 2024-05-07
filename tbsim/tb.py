@@ -63,12 +63,6 @@ class TB(ss.Infection):
         self.add_states(
             # Initialize states specific to TB:
             ss.FloatArr('state', default=TBS.NONE),             # One state to rule them all?
-            # ss.FloatArr('latent_slow'),
-            # ss.FloatArr('latent_fast'),
-            # ss.FloatArr('active_presym'),
-            # ss.FloatArr('active_smpos'),
-            # ss.FloatArr('active_smneg'),
-            # ss.FloatArr('active_exptb'),
             ss.FloatArr('active_state', default =TBS.NONE),     # Form of active TB (SmPos, SmNeg, or ExpTB)
             ss.FloatArr('rel_LS_prog', default=1.0),                # Multiplier on the latent-slow progression rate
             ss.FloatArr('ppf_LS_to_presymp', default= ss.random()),     # CDF samples for transition from latent slow to active pre-symptomatic
