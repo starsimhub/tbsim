@@ -10,7 +10,7 @@ class HarlemNet(ss.Network):
         super().__init__(**kwargs)
 
         self.hhs = hhs
-        self.pars = ss.omerge(dict(), pars)
+        self.pars = ss.dictmergeleft(dict(), pars)
         #self.sim = None
         return
 

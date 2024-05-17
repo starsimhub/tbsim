@@ -30,21 +30,21 @@ class Malnutrition(ss.Disease):
     
     def __init__(self, pars=None):
         # According to https://www.who.int/news-room/questions-and-answers/item/malnutrition
-        pars = ss.omergeleft(pars,
+        pars = ss.dictmergeleft(pars,
             beta = 1.0,         # Transmission rate  - TODO: Check if there is one
         )
         super().__init__(pars=pars)
 
         self.add_states(
-            ss.State('macro_state', int, MacroNutrients.STANDARD_OR_ABOVE), # To keep track of the macronutrients state
-            ss.State('micro_state', int, MicroNutrients.NORMAL),            # To keep track of the micronutrients state
+            ss.FloatArr('macro_state', default= MacroNutrients.STANDARD_OR_ABOVE), # To keep track of the macronutrients state
+            ss.FloatArr('micro_state', default=MicroNutrients.NORMAL),            # To keep track of the micronutrients state
         )
         self.add_states(
-            ss.State('ti_macro', int, ss.INT_NAN),                          # Time index of change in macronutrition
-            ss.State('new_macro_state', int, ss.INT_NAN),                   # New macro nutrition state
+            ss.FloatArr('ti_macro'),                          # Time index of change in macronutrition
+            ss.FloatArr('new_macro_state'),                   # New macro nutrition state
 
-            ss.State('ti_micro', int, ss.INT_NAN),                          # Time at which undernourished was diagnosed
-            ss.State('new_micro_state', int, ss.INT_NAN),                   # New micro nutrition state
+            ss.FloatArr('ti_micro'),                          # Time at which undernourished was diagnosed
+            ss.FloatArr('new_micro_state'),                   # New micro nutrition state
         )
         
         return
@@ -56,12 +56,13 @@ class Malnutrition(ss.Disease):
         return
     
     def update_pre(self, sim):
-        new_macro = ss.true(self.ti_macro == sim.ti)
+        # new_macro = ss.true(self.ti_macro == sim.ti)
+        new_macro = (self.ti_macro == sim.ti).uids
         if len(new_macro) > 0:
             self.macro_state[new_macro] = self.new_macro_state[new_macro]
         #super().set_prognoses(sim, new_macro) # Logging
 
-        new_micro = ss.true(self.ti_micro == sim.ti)
+        new_micro = (self.ti_micro == sim.ti).uids
         if len(new_micro) > 0:
             self.micro_state[new_micro] = self.new_micro_state[new_micro]
         #super().set_prognoses(sim, new_micro) # Logging

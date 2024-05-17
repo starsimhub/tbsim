@@ -67,7 +67,7 @@ def make_tb_nut():
     # --------- People ----------
     n_agents = 10000
     extra_states = [
-        ss.State('SES', int, ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (TODO)
+        ss.FloatArr('SES', default= ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (TODO)
     ]
     pop = ss.People(n_agents=n_agents, extra_states=extra_states)
 
@@ -124,15 +124,16 @@ def make_tb_nut():
 if __name__ == '__main__':
     sim_n = make_malnutrition()
     sim_n.run()
-    sim_n.plot()
+    mtb.plot_sim(sim_n)
+    # plt.show()
     
     sim_tb = make_tb()
     sim_tb.run()
     sim_tb.diseases['tb'].plot()
-    sim_tb.plot()
+    mtb.plot_sim(sim_tb)
+    # plt.show()
     
     sim_tbn = make_tb_nut()
     sim_tbn.run()
-    sim_tbn.plot()
-
+    mtb.plot_sim(sim_tbn)
     plt.show()
