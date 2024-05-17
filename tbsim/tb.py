@@ -20,21 +20,30 @@ class TBS(): # Enum
     DEAD            = 6.0    # TB death
     
 class TB(ss.Infection):
-    def __init__(self, pars=None, par_dists=None, *args, **kwargs):
+    def __init__(self, params=None, par_dists=None, *args, **kwargs):
+        self.params = params                    # Initialize parameters
+        self._init_sim_params_defaults()
+        self._init_params_defaults()
+        super().__init__(pars=self.params, par_dists=par_dists, *args, **kwargs)     
+        self._add_states()       
+
+        # Random number streams used in state flow
+        self.choose_cure_or_die_ti = ss.random()
+        self.will_die = ss.random()
         
-        """Add TB parameters and states to the TB model"""
-        pars = ss.dictmergeleft(pars,
+        print(f"TB model initialized with parameters: {self.params}/n" )
+        return
+
+    def _init_sim_params_defaults(self):
+        self.params = ss.dictmergeleft(self.params,
             init_prev = 0.01,   # Initial prevalence - TODO: Check if there is one
             beta = 0.25,         # Transmission rate  - TODO: Check if there is one
         )
+        return
 
-        """
-        DISEASE PROGRESSION: 
-        Rates can be interpreted as mean time to transition between states
-        For example, for TB Fast Progression( tb_LF_to_act_pre_sym), 1 / (6e-3) = 166.67 days  ~ 5.5 months ~ 0.5 years
-        """
-        # Natural history according with Stewart slides (EMOD TB model):
-        pars = ss.dictmergeleft(pars,
+    def _init_params_defaults(self):
+        # Natural history according with Stewart slides:
+        self.params = ss.dictmergeleft(self.params,
             p_latent_fast = 0.1, # Probability of latent fast as opposed to latent slow
 
             rate_LS_to_presym = 3e-5,                   # Latent Slow to Active Pre-Symptomatic (per day)
@@ -57,16 +66,26 @@ class TB(ss.Infection):
             rel_trans_exptb     = 0.05,
             rel_trans_presymp   = 0.1,
         )
-
-        super().__init__(pars=pars, par_dists=par_dists, *args, **kwargs)
-
+        # Convert the scalar numbers to a Bernoulli distribution
+        self.params.p_latent_fast = ss.bernoulli(self.params.p_latent_fast)
+        self.params.init_prev = ss.bernoulli(self.params.init_prev)
+        self.params.p_exptb = ss.bernoulli(self.params.p_exptb)
+        self.params.p_smpos = ss.bernoulli(self.params.p_smpos)
+        return
+    
+    def _add_states(self):
         self.add_states(
             # Initialize states specific to TB:
-            ss.FloatArr('state', default=TBS.NONE),             # One state to rule them all?
-            ss.FloatArr('active_state', default =TBS.NONE),     # Form of active TB (SmPos, SmNeg, or ExpTB)
+            ss.FloatArr('state', default=TBS.NONE),                 # One state to rule them all?
+            ss.FloatArr('active_tb_state', default =TBS.NONE),         # Form of active TB (SmPos, SmNeg, or ExpTB)
+        )
+        
+        self.add_states(            
             ss.FloatArr('rel_LS_prog', default=1.0),                # Multiplier on the latent-slow progression rate
-            ss.FloatArr('ppf_LS_to_presymp', default= ss.random()),     # CDF samples for transition from latent slow to active pre-symptomatic
-
+            ss.FloatArr('ppf_LS_to_presymp', default= ss.random()), # CDF samples for transition from latent slow to active pre-symptomatic
+        )
+        
+        self.add_states(
             # Timestep of state changes          
             ss.FloatArr('ti_latent'),
             ss.FloatArr('ti_presymp'),
@@ -74,27 +93,15 @@ class TB(ss.Infection):
             ss.FloatArr('ti_dead'),
             ss.FloatArr('ti_cure'),
         )
-        
-        # Convert the scalar numbers to a Bernoulli distribution
-        self.pars.p_latent_fast = ss.bernoulli(self.pars.p_latent_fast)
-        self.pars.init_prev = ss.bernoulli(self.pars.init_prev)
-        self.pars.p_exptb = ss.bernoulli(self.pars.p_exptb)
-        self.pars.p_smpos = ss.bernoulli(self.pars.p_smpos)
-
-        # Random number streams used in state flow
-        self.choose_cure_or_die_ti = ss.random()
-        self.will_die = ss.random()
-
         return
 
-    # TODO: Implement the properties for the model here
     @property
     def infectious(self):
         """
         Infectious if in any of the active states
         """
         return (self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)
-
+    
     def set_prognoses(self, sim, uids, from_uids=None):
         super().set_prognoses(sim, uids, from_uids)
 
@@ -104,7 +111,7 @@ class TB(ss.Infection):
         self.ti_infected[uids] = sim.ti # Not needed, but useful for reporting
         self.ti_latent[uids] = sim.ti
 
-        p = self.pars # Shortcut
+        p = self.params # Shortcut
 
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
@@ -116,15 +123,15 @@ class TB(ss.Infection):
 
         # Determine which agents will have extrapulminary TB
         exptb_uids, not_exptb_uids = p.p_exptb.filter(uids, both=True)
-        self.active_state[exptb_uids] = TBS.ACTIVE_EXPTB
+        self.active_tb_state[exptb_uids] = TBS.ACTIVE_EXPTB
 
         # Of those not going exptb, choose smear positive or smear negative
         smpos_uids, smneg_uids = p.p_smpos.filter(not_exptb_uids, both=True)
-        self.active_state[smpos_uids] = TBS.ACTIVE_SMPOS
-        self.active_state[smneg_uids] = TBS.ACTIVE_SMNEG
+        self.active_tb_state[smpos_uids] = TBS.ACTIVE_SMPOS
+        self.active_tb_state[smneg_uids] = TBS.ACTIVE_SMNEG
 
         # Set ti of presymp
-        rate = self.rel_LS_prog[slow_uids] * self.pars.rate_LS_to_presym
+        rate = self.rel_LS_prog[slow_uids] * self.params.rate_LS_to_presym
         self.ti_presymp[slow_uids] = sim.ti - np.log(1 - self.ppf_LS_to_presymp[slow_uids])/rate  / 365 / sim.dt
         self.ti_presymp[fast_uids] = sim.ti + p.dur_LF_to_presymp.rvs(fast_uids) / 365 / sim.dt
 
@@ -135,7 +142,7 @@ class TB(ss.Infection):
     def update_pre(self, sim):
         # Make all the updates from the SIR model 
         super().update_pre(sim)
-        p = self.pars
+        p = self.params
 
         # Latent --> active pre-symptomatic
         latents = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))  & (self.ti_presymp <= sim.ti)).uids
@@ -150,7 +157,7 @@ class TB(ss.Infection):
         # Pre symp --> Active
         presym = ((self.state == TBS.ACTIVE_PRESYMP) & (self.ti_active <= sim.ti)).uids
         if len(presym):
-            self.state[presym] = self.active_state[presym]
+            self.state[presym] = self.active_tb_state[presym]
 
             state = self.state[presym] 
             # y = presym
@@ -206,7 +213,6 @@ class TB(ss.Infection):
         self.results['new_deaths'][sim.ti] = len(deaths)
 
         return
-
 
     def update_death(self, sim, uids):
         if len(uids) == 0:
