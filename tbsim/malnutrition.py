@@ -4,6 +4,7 @@ Define non-communicable disease (Malnutrition) model
 
 import numpy as np
 import starsim as ss
+import sciris as sc
 from enum import IntEnum, auto
 
 
@@ -28,12 +29,14 @@ class Malnutrition(ss.Disease):
     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9971264/
     # https://www.espen.org/files/ESPEN-guidelines-on-definitions-and-terminology-of-clinical-nutrition.pdf 
     
-    def __init__(self, pars=None):
+    def __init__(self, pars=None, **kwargs):
         # According to https://www.who.int/news-room/questions-and-answers/item/malnutrition
-        pars = ss.dictmergeleft(pars,
+
+        super().__init__(pars, **kwargs)
+        self.default_pars(
             beta = 1.0,         # Transmission rate  - TODO: Check if there is one
         )
-        super().__init__(pars=pars)
+        self.update_pars(pars, **kwargs)
 
         self.add_states(
             ss.FloatArr('macro_state', default= MacroNutrients.STANDARD_OR_ABOVE), # To keep track of the macronutrients state
@@ -55,48 +58,49 @@ class Malnutrition(ss.Disease):
         """
         return
     
-    def update_pre(self, sim):
-        # new_macro = ss.true(self.ti_macro == sim.ti)
-        new_macro = (self.ti_macro == sim.ti).uids
+    def update_pre(self):
+        ti = self.sim.ti
+        new_macro = (self.ti_macro == ti).uids
         if len(new_macro) > 0:
             self.macro_state[new_macro] = self.new_macro_state[new_macro]
-        #super().set_prognoses(sim, new_macro) # Logging
 
-        new_micro = (self.ti_micro == sim.ti).uids
+        new_micro = (self.ti_micro == ti).uids
         if len(new_micro) > 0:
             self.micro_state[new_micro] = self.new_micro_state[new_micro]
-        #super().set_prognoses(sim, new_micro) # Logging
        
         return new_macro, new_micro
 
-    def init_results(self, sim):
+    def init_results(self):
         """
         Initialize results
         """
-        super().init_results(sim)
+        super().init_results()
+        npts = self.sim.npts
         self.results += [
-            ss.Result(self.name, 'prev_macro_standard_or_above', sim.npts, dtype=float),
-            ss.Result(self.name, 'prev_macro_slightly_below', sim.npts, dtype=float),
-            ss.Result(self.name, 'prev_macro_marginal', sim.npts, dtype=float),
-            ss.Result(self.name, 'prev_macro_unsatisfactory', sim.npts, dtype=float),
+            ss.Result(self.name, 'prev_macro_standard_or_above', npts, dtype=float),
+            ss.Result(self.name, 'prev_macro_slightly_below', npts, dtype=float),
+            ss.Result(self.name, 'prev_macro_marginal', npts, dtype=float),
+            ss.Result(self.name, 'prev_macro_unsatisfactory', npts, dtype=float),
 
-            ss.Result(self.name, 'prev_micro_normal', sim.npts, dtype=float),
-            ss.Result(self.name, 'prev_micro_deficient', sim.npts, dtype=float),
-            ss.Result(self.name, 'people_alive', sim.npts, dtype=float),
+            ss.Result(self.name, 'prev_micro_normal', npts, dtype=float),
+            ss.Result(self.name, 'prev_micro_deficient', npts, dtype=float),
+            ss.Result(self.name, 'people_alive', npts, dtype=float),
         ]
         return
 
-    def update_results(self, sim):
-        super().update_results(sim)
-        ti = sim.ti                 # Current time index (step)
-        alive = sim.people.alive    # People alive at current time index
+    def update_results(self):
+        super().update_results()
+        ti = self.sim.ti            # Current time index (step)
+        alive = self.sim.people.alive    # People alive at current time index
+        n_agents = self.sim.pars['n_agents']
+        n_alive = alive.count()
         
-        self.results.prev_macro_standard_or_above[ti] = np.count_nonzero((self.macro_state==MacroNutrients.STANDARD_OR_ABOVE) & alive)/alive.count()
-        self.results.prev_macro_slightly_below[ti] = np.count_nonzero((self.macro_state==MacroNutrients.SLIGHTLY_BELOW_STANDARD) & alive)/alive.count()
-        self.results.prev_macro_marginal[ti] = np.count_nonzero((self.macro_state==MacroNutrients.MARGINAL) & alive)/alive.count()
-        self.results.prev_macro_unsatisfactory[ti] = np.count_nonzero((self.macro_state==MacroNutrients.UNSATISFACTORY) & alive)/alive.count()
+        self.results.prev_macro_standard_or_above[ti] = np.count_nonzero((self.macro_state==MacroNutrients.STANDARD_OR_ABOVE) & alive)/n_alive
+        self.results.prev_macro_slightly_below[ti] = np.count_nonzero((self.macro_state==MacroNutrients.SLIGHTLY_BELOW_STANDARD) & alive)/n_alive
+        self.results.prev_macro_marginal[ti] = np.count_nonzero((self.macro_state==MacroNutrients.MARGINAL) & alive)/n_alive
+        self.results.prev_macro_unsatisfactory[ti] = np.count_nonzero((self.macro_state==MacroNutrients.UNSATISFACTORY) & alive)/n_alive
 
-        self.results.prev_micro_normal[ti] = np.count_nonzero((self.micro_state==MicroNutrients.NORMAL) & alive)/alive.count()
-        self.results.prev_micro_deficient[ti] = np.count_nonzero((self.micro_state==MicroNutrients.DEFICIENT) & alive)/alive.count()
-        self.results.people_alive[ti] = alive.count()/sim.pars['n_agents']
+        self.results.prev_micro_normal[ti] = np.count_nonzero((self.micro_state==MicroNutrients.NORMAL) & alive)/n_alive
+        self.results.prev_micro_deficient[ti] = np.count_nonzero((self.micro_state==MicroNutrients.DEFICIENT) & alive)/n_alive
+        self.results.people_alive[ti] = alive.count()/n_agents
         return

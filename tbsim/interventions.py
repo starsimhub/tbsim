@@ -32,11 +32,11 @@ class VitaminSupplementation(ss.Intervention):
             return
 
         nut = sim.diseases['malnutrition']
-        micro_deficient_uids = ss.true(
-            (sim.people.arm!=StudyArm.CONTROL) & 
+        micro_deficient_uids = (
+            (sim.people.arm != StudyArm.CONTROL) & 
             (nut.micro_state == MicroNutrients.DEFICIENT) & 
             (nut.macro_state != MacroNutrients.UNSATISFACTORY)
-        )
+        ).uids
         recover_uids = self.p_micro_recovery.filter(micro_deficient_uids)
 
         nut.ti_micro[recover_uids] = sim.ti + 1 # Next time step
@@ -78,7 +78,7 @@ class LargeScaleFoodFortification(ss.Intervention):
         eligible = (nut.macro_state == self.from_state) & ppl.alive
         if self.arm is not None:
             eligible &= ppl.arm == self.arm
-        eligible_uids = ss.true(eligible)
+        eligible_uids = eligible.uids
 
         recover_uids = self.p.filter(eligible_uids)
 

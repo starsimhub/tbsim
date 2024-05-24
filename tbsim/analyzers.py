@@ -30,24 +30,25 @@ class HarlemAnalyzer(ss.Analyzer):
     def apply(self, sim):
         super().apply(sim)
 
-        tb = sim.diseases['tb']
-        nut = sim.diseases['malnutrition']
+        tb = self.sim.diseases['tb']
+        nut = self.sim.diseases['malnutrition']
+        ti = self.sim.ti
         for arm in [StudyArm.CONTROL, StudyArm.VITAMIN]:
-            ppl = (sim.people.arm==arm) & (sim.people.alive)
+            ppl = (self.sim.people.arm==arm) & (self.sim.people.alive)
 
             n_people = np.count_nonzero(ppl)
-            new_infections = np.count_nonzero(tb.ti_infected[ppl] == sim.ti)
+            new_infections = np.count_nonzero(tb.ti_infected[ppl] == ti)
             n_infected = np.count_nonzero(tb.infected[ppl])
-            n_died = np.count_nonzero( (tb.ti_dead[(sim.people.arm==arm)] == sim.ti) )
+            n_died = np.count_nonzero( (tb.ti_dead[(self.sim.people.arm==arm)] == ti) )
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
             n_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
             rel_LS_mean = tb.rel_LS_prog[ppl & tb.infected].mean()
 
-            self.data.append([sim.year, arm.name, n_people, new_infections, n_infected, n_died, n_latent_slow, n_deficient, rel_LS_mean])
+            self.data.append([self.sim.year, arm.name, n_people, new_infections, n_infected, n_died, n_latent_slow, n_deficient, rel_LS_mean])
         return
 
-    def finalize(self, sim):
-        super().finalize(sim)
+    def finalize(self):
+        super().finalize()
         self.df = pd.DataFrame(self.data, columns = ['year', 'arm', 'n_people', 'new_infections', 'n_infected', 'n_died', 'n_latent_slow', 'n_deficient', 'rel_LS_mean'])
 
         self.df['cum_infections'] = self.df.groupby(['arm'])['new_infections'].cumsum()
@@ -63,4 +64,4 @@ class HarlemAnalyzer(ss.Analyzer):
         d = pd.melt(self.df, id_vars=['year', 'arm'], var_name='channel', value_name='Value')
         g = sns.relplot(data=d, kind='line', x='year', hue='arm', col='channel', y='Value', palette='Set1', facet_kws={'sharey':False})
 
-        return
+        return g.figure

@@ -1,6 +1,6 @@
 import starsim as ss
 import tbsim as mtb
-import networkx as nx
+import sciris as sc
 import pandas as pd
 import numpy as np
 
@@ -15,9 +15,9 @@ class StudyArm(IntEnum):
 
 
 class Harlem():
-    def __init__(self, pars=None):#p_microdeficient_given_macro, n_hhs=194):
+    def __init__(self, pars=None):
 
-        self.pars = dict(
+        self.pars = sc.objdict(
             p_microdeficient_given_macro = { # Guess values, not from data
                 mtb.MacroNutrients.UNSATISFACTORY: 1.0,
                 mtb.MacroNutrients.MARGINAL: 0.75,
@@ -26,7 +26,7 @@ class Harlem():
             },
             n_hhs = 194,
         )
-        self.pars = ss.dictmergeleft(self.pars, pars)
+        self.pars = sc.mergedicts(self.pars, pars)
 
         self.hhdat = pd.DataFrame({
             'size': np.arange(1,10),
@@ -103,7 +103,6 @@ class Harlem():
         return
 
     def choose_seed_infections(self, sim, p_hh):
-        tb = sim.diseases['tb']
         hh_has_seed = np.random.binomial(p=p_hh, n=1, size=len(self.hhs))
         seed_uids = []
         for hh, seed in zip(self.hhs, hh_has_seed):
@@ -111,5 +110,5 @@ class Harlem():
                 continue
             seed_uid = np.random.choice(hh.uids)
             seed_uids.append(seed_uid)
-        return np.array(seed_uids)
+        return ss.uids(seed_uids)
 
