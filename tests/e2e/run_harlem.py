@@ -83,11 +83,15 @@ def run_harlem(rand_seed=0):
 
     # -------- Interventions -------
     vs = mtb.VitaminSupplementation(year=[1942, 1943], rate=[10.0, 3.0]) # Need coverage, V1 vs V2
-    m = mtb.MacroNutrients
-    lsff0 = mtb.NutritionChange(year=[1942, 1944], rate=[1.25, 0], from_state=m.UNSATISFACTORY, to_state=m.MARGINAL)
-    lsff1 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=m.MARGINAL, to_state=m.SLIGHTLY_BELOW_STANDARD)
-    lsff2 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=m.SLIGHTLY_BELOW_STANDARD, to_state=m.STANDARD_OR_ABOVE)
-    intvs = [vs, lsff0, lsff1, lsff2]
+    m = mtb.MicroNutrients
+    M = mtb.MacroNutrients
+    nc0 = mtb.NutritionChange(year=[1942, 1944], rate=[1.25, 0], from_state=M.UNSATISFACTORY, to_state=M.MARGINAL,
+                p_new_micro=0.1, new_micro_state=m.NORMAL)
+    nc1 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=M.MARGINAL, to_state=M.SLIGHTLY_BELOW_STANDARD,
+                p_new_micro=0.0, new_micro_state=m.NORMAL)
+    nc2 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=M.SLIGHTLY_BELOW_STANDARD, to_state=M.STANDARD_OR_ABOVE,
+                p_new_micro=0.0, new_micro_state=m.NORMAL)
+    intvs = [vs, nc0, nc1, nc2]
 
     # -------- Analyzer -------
     az = mtb.HarlemAnalyzer()
