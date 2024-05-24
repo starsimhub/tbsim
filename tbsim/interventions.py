@@ -7,7 +7,7 @@ import starsim as ss
 from tbsim import TB, Malnutrition, MicroNutrients, MacroNutrients, StudyArm
 import sciris as sc
 
-__all__ = ['VitaminSupplementation', 'LargeScaleFoodFortification']
+__all__ = ['VitaminSupplementation', 'NutritionChange']
 
 class VitaminSupplementation(ss.Intervention):
 
@@ -47,7 +47,7 @@ class VitaminSupplementation(ss.Intervention):
         return len(recover_uids)
 
 
-class LargeScaleFoodFortification(ss.Intervention):
+class NutritionChange(ss.Intervention):
 
     def __init__(self, year, rate, from_state, to_state, arm=None, **kwargs):
         self.requires = Malnutrition
