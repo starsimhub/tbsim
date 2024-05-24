@@ -39,10 +39,8 @@ class HarlemNet(ss.Network):
     def update(self):
         super().update()
 
-        preg = self.sim.demographics['pregnancy']
-        deliveries = (preg.pregnant & (preg.ti_delivery <= self.sim.ti)).uids
-
-        if len(deliveries) == 0:
+        newborns = ((self.sim.people.age > 0) & (self.sim.people.age < self.sim.dt)).uids
+        if len(newborns) == 0:
             return
 
         mn = self.sim.networks['maternalnet'].to_df()
@@ -52,18 +50,18 @@ class HarlemNet(ss.Network):
 
         p1s = []
         p2s = []
-        for mother_uid in deliveries:
-            infant_uid = mn.loc[(mn['p1'] == mother_uid) & (mn['dur'] >= 0)]['p2'].values[0] # No twins!
-            hhid[infant_uid] = hhid[mother_uid]
-            arm[infant_uid] = arm[mother_uid]
+        for infant_uid in newborns:
+            mother_uid = mn.loc[(mn['p2'] == infant_uid) & (mn['dur'] >= 0)]['p1'].values[0] # No twins!
+            hhid[ss.uids(infant_uid)] = hhid[ss.uids(mother_uid)]
+            arm[ss.uids(infant_uid)] = arm[ss.uids(mother_uid)]
 
             for contact in hn.find_contacts(mother_uid):
                 p1s.append(contact)
                 p2s.append(infant_uid)
 
-        hn.contacts.p1 = np.concatenate([hn.contacts.p1, p1s]).astype(ss.dtypes.int)
-        hn.contacts.p2 = np.concatenate([hn.contacts.p2, p2s]).astype(ss.dtypes.int)
-        hn.contacts.beta = np.concatenate([hn.contacts.beta, np.ones_like(p1s)]).astype(ss.dtypes.float)
+        hn.contacts.p1 = ss.uids(np.concatenate([hn.contacts.p1, p1s]))
+        hn.contacts.p2 = ss.uids(np.concatenate([hn.contacts.p2, p2s]))
+        hn.contacts.beta = np.concatenate([hn.contacts.beta, np.ones_like(p1s)])#.astype(ss.dtypes.float)
 
         return
     

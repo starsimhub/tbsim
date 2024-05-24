@@ -38,21 +38,25 @@ class HarlemAnalyzer(ss.Analyzer):
 
             n_people = np.count_nonzero(ppl)
             new_infections = np.count_nonzero(tb.ti_infected[ppl] == ti)
+            new_active_infections = np.count_nonzero(tb.ti_active[ppl] == ti)
             n_infected = np.count_nonzero(tb.infected[ppl])
             n_died = np.count_nonzero( (tb.ti_dead[(self.sim.people.arm==arm)] == ti) )
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
             n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
             rel_LS_mean = tb.rel_LS_prog[ppl & tb.infected].mean()
 
-            self.data.append([self.sim.year, arm.name, n_people, new_infections, n_infected, n_died, n_latent_slow, n_micro_deficient, rel_LS_mean])
+            self.data.append([self.sim.year, arm.name, n_people, new_infections, new_active_infections, n_infected, n_died, n_latent_slow, n_micro_deficient, rel_LS_mean])
         return
 
     def finalize(self):
         super().finalize()
-        self.df = pd.DataFrame(self.data, columns = ['year', 'arm', 'n_people', 'new_infections', 'n_infected', 'n_died', 'n_latent_slow', 'n_micro_deficient', 'rel_LS_mean'])
+        self.df = pd.DataFrame(self.data, columns = ['year', 'arm', 'n_people', 'new_infections', 'new_active_infections', 'n_infected', 'n_died', 'n_latent_slow', 'n_micro_deficient', 'rel_LS_mean'])
 
         self.df['cum_infections'] = self.df.groupby(['arm'])['new_infections'].cumsum()
         self.df.drop('new_infections', axis=1, inplace=True)
+
+        self.df['cum_active_infections'] = self.df.groupby(['arm'])['new_active_infections'].cumsum()
+        self.df.drop('new_active_infections', axis=1, inplace=True)
 
         self.df['cum_died'] = self.df.groupby(['arm'])['n_died'].cumsum()
         self.df.drop('n_died', axis=1, inplace=True)
