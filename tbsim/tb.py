@@ -18,7 +18,7 @@ class TBS(): # Enum
     
 class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
-        super().__init__(pars, **kwargs)     
+        super().__init__(**kwargs)
 
         self.default_pars(
             init_prev = ss.bernoulli(0.01),   # Initial prevalence - TODO: Check if there is one

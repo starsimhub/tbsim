@@ -32,7 +32,7 @@ class Malnutrition(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         # According to https://www.who.int/news-room/questions-and-answers/item/malnutrition
 
-        super().__init__(pars, **kwargs)
+        super().__init__(**kwargs)
         self.default_pars(
             beta = 1.0,         # Transmission rate  - TODO: Check if there is one
         )
