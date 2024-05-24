@@ -151,7 +151,6 @@ class TB(ss.Infection):
             self.state[presym] = self.active_tb_state[presym]
 
             state = self.state[presym] 
-            # y = presym
             exptb_uids = presym[state ==TBS.ACTIVE_EXPTB]
             smpos_uids = presym[state ==TBS.ACTIVE_SMPOS]
             smneg_uids = presym[state ==TBS.ACTIVE_SMNEG]

@@ -96,8 +96,8 @@ def run_harlem(rand_seed=0):
     # define simulation parameters
     sim_pars = dict(
         dt = 7/365,
-        start = 1935, # Start early to burn-in
-        #start = 1942,
+        #start = 1935, # Start early to burn-in
+        start = 1942,
         end = 1947,
         rand_seed = rand_seed,
         )
@@ -108,8 +108,23 @@ def run_harlem(rand_seed=0):
     sim.initialize()
 
     harlem.set_states(sim)
-    seed_uids = harlem.choose_seed_infections(sim, p_hh=0.835) #83% or 84%
-    sim.diseases['tb'].set_prognoses(seed_uids)
+    seed_uids = harlem.choose_seed_infections()
+    tb = sim.diseases['tb']
+    tb.set_prognoses(seed_uids)
+
+    # After set_prognoses, seed_uids will be in latent slow or fast
+    # Change to ACTIVE_PRESYMP and set time of activation to current time step
+    tb.state[seed_uids] = mtb.TBS.ACTIVE_PRESYMP
+    tb.ti_active[seed_uids] = sim.ti
+
+    # In Harlem, 83% or 84% have SmPos active infections, let's fix that now
+    desired_n_active = 0.835 * len(seed_uids)
+    cur_n_active = np.count_nonzero(tb.active_tb_state[seed_uids]==mtb.TBS.ACTIVE_SMPOS)
+    add_n_active = desired_n_active - cur_n_active
+    non_smpos_uids = seed_uids[tb.active_tb_state[seed_uids]!=mtb.TBS.ACTIVE_SMPOS]
+    p = add_n_active / ( len(seed_uids) - cur_n_active)
+    change_to_smpos = np.random.rand(len(non_smpos_uids)) < p
+    tb.active_tb_state[non_smpos_uids[change_to_smpos]] = mtb.TBS.ACTIVE_SMPOS
 
     sim.run() # Actually run the sim
 

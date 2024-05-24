@@ -102,13 +102,9 @@ class Harlem():
         tb.rel_LS_prog[sim.people.uid] = c.pars.rel_LS_prog_func(nut.macro_state, nut.micro_state)
         return
 
-    def choose_seed_infections(self, sim, p_hh):
-        hh_has_seed = np.random.binomial(p=p_hh, n=1, size=len(self.hhs))
+    def choose_seed_infections(self):
         seed_uids = []
-        for hh, seed in zip(self.hhs, hh_has_seed):
-            if not seed:
-                continue
+        for hh in self.hhs:
             seed_uid = np.random.choice(hh.uids)
             seed_uids.append(seed_uid)
         return ss.uids(seed_uids)
-
