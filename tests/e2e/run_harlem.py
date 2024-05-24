@@ -101,7 +101,7 @@ def run_harlem(rand_seed=0):
     sim_pars = dict(
         dt = 7/365,
         #start = 1935, # Start early to burn-in
-        start = 1942,
+        start = 1941,
         end = 1947,
         rand_seed = rand_seed,
         )
