@@ -14,7 +14,7 @@ import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = True
+debug = False
 default_n_rand_seeds = [250, 1][debug]
 
 def compute_rel_LS_prog(macro, micro):
@@ -109,7 +109,7 @@ def run_harlem(rand_seed=0):
 
     harlem.set_states(sim)
     seed_uids = harlem.choose_seed_infections(sim, p_hh=0.835) #83% or 84%
-    tb.set_prognoses(sim, seed_uids)
+    sim.diseases['tb'].set_prognoses(seed_uids)
 
     sim.run() # Actually run the sim
 
@@ -127,8 +127,7 @@ def run_sims(n_seeds=default_n_rand_seeds):
     for rs in range(n_seeds):
         cfgs.append({'rand_seed':rs})
     T = sc.tic()
-    #results += sc.parallelize(run_harlem, iterkwargs=cfgs, die=False, serial=debug)
-    results = [run_harlem(0)]
+    results += sc.parallelize(run_harlem, iterkwargs=cfgs, die=False, serial=debug)
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
     df = pd.concat(results)
