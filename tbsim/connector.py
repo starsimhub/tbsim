@@ -16,6 +16,7 @@ class TB_Nutrition_Connector(ss.Connector):
 
         self.default_pars(
             rel_LS_prog_func = self.compute_rel_LS_prog,
+            rel_LF_prog_func = self.compute_rel_LF_prog,
             relsus_microdeficient = 5,
         )
         self.update_pars(pars, **kwargs)
@@ -26,6 +27,7 @@ class TB_Nutrition_Connector(ss.Connector):
         tb = self.sim.diseases['tb']
         nut = self.sim.diseases['malnutrition']
         tb.rel_LS_prog[self.sim.people.uid] = self.pars.rel_LS_prog_func(nut.macro_state, nut.micro_state)
+        tb.rel_LF_prog[self.sim.people.uid] = self.pars.rel_LF_prog_func(nut.macro_state, nut.micro_state)
         return
 
     @staticmethod
@@ -36,7 +38,16 @@ class TB_Nutrition_Connector(ss.Connector):
         ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 2.5
         ret[macro == MacroNutrients.UNSATISFACTORY] = 4.0
         return ret
-
+    
+    @staticmethod
+    def compute_rel_LF_prog(macro, micro):
+        assert len(macro) == len(micro), 'Length of macro and micro must match.'
+        ret = np.ones_like(macro)
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 2.50
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 5.0
+        ret[macro == MacroNutrients.UNSATISFACTORY] = 4.0
+        return ret
+    
     def update(self):
         """ Specify how malnutrition and TB interact """
         nut = self.sim.diseases['malnutrition']

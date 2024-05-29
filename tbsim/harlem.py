@@ -100,6 +100,9 @@ class Harlem():
         c = sim.connectors['tb_nutrition_connector']
         tb = sim.diseases['tb']
         tb.rel_LS_prog[sim.people.uid] = c.pars.rel_LS_prog_func(nut.macro_state, nut.micro_state)
+        tb.rel_LF_prog[sim.people.uid] = c.pars.rel_LF_prog_func(nut.macro_state, nut.micro_state)
+        
+        
         return
 
     def choose_seed_infections(self, sim, p_hh):

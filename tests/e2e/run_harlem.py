@@ -14,7 +14,7 @@ import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = False
+debug = True
 default_n_rand_seeds = [250, 1][debug]
 
 def compute_rel_LS_prog(macro, micro):
@@ -24,6 +24,17 @@ def compute_rel_LS_prog(macro, micro):
     ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 10.0
     ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 20.0
     ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 20.0
+    return ret
+
+def compute_rel_LF_prog(macro, micro):
+    assert len(macro) == len(micro), 'Length of macro and micro must match.'
+    ret = np.ones_like(macro)
+    # With Latent Fast, we assume that the progression is faster than Latent Slow therefore the multiplier is higher
+    # TODO: (For Researcher) Please suply the correct values
+    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 1.0
+    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 20.0
+    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 40.0
+    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 40.0
     return ret
 
 def run_harlem(rand_seed=0):
@@ -77,6 +88,7 @@ def run_harlem(rand_seed=0):
     # -------- Connector -------
     cn_pars = dict(
         rel_LS_prog_func=compute_rel_LS_prog,
+        rel_LF_prog_func=compute_rel_LF_prog,   
         relsus_microdeficient=5 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
