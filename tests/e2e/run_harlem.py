@@ -14,7 +14,7 @@ import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = True
+debug = False
 default_n_rand_seeds = [250, 1][debug]
 
 def compute_rel_LS_prog(macro, micro):

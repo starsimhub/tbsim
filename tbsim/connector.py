@@ -63,21 +63,25 @@ class TB_Nutrition_Connector(ss.Connector):
         change_micro_uids = (nut.ti_micro == ti).uids
         if len(change_macro_uids) > 0 or len(change_micro_uids) > 0:
             change_uids = ss.uids(np.unique(np.concatenate([change_macro_uids, change_micro_uids])))
-            k_old = tb.rel_LS_prog[change_uids]
+            k_old_ls = tb.rel_LS_prog[change_uids]
+            k_old_lf = tb.rel_LF_prog[change_uids]
 
             nut.macro_state[change_macro_uids] = nut.new_macro_state[change_macro_uids]
             nut.micro_state[change_micro_uids] = nut.new_micro_state[change_micro_uids]
 
-            k_new = self.pars.rel_LS_prog_func(nut.macro_state[change_uids], nut.micro_state[change_uids])
-            diff = k_old != k_new
+            k_new_ls = self.pars.rel_LS_prog_func(nut.macro_state[change_uids], nut.micro_state[change_uids])
+            k_new_lf = self.pars.rel_LF_prog_func(nut.macro_state[change_uids], nut.micro_state[change_uids])
+            diff_ls = k_old_ls != k_new_ls
+            diff_lf = k_old_lf != k_new_lf
 
-            if not diff.any():
+            if not diff_ls.any() and not diff_lf.any():
                 return
 
-            tb.rel_LS_prog[change_uids] = k_new # Update rel_LS_prog
+            tb.rel_LS_prog[change_uids] = k_new_ls # Update rel_LS_prog
+            tb.rel_LF_prog[change_uids] = k_new_lf # Update rel_LF_prog
 
             # Check for rate change while in latent slow
-            slow_change = diff & (self.sim.people.tb.state[change_uids] == TBS.LATENT_SLOW)
+            slow_change = diff_ls & (self.sim.people.tb.state[change_uids] == TBS.LATENT_SLOW)
             slow_change_uids = change_uids[slow_change]
             if len(slow_change_uids) > 0:
                 # New time of switching from LS to presymp:
@@ -86,6 +90,20 @@ class TB_Nutrition_Connector(ss.Connector):
                 t_latent = tb.ti_latent[slow_change_uids]*dt
                 t_now = ti*dt # Time of switching from health to undernourished
 
-                tb.ti_presymp[slow_change_uids] = -1/(k_new[slow_change]*r) * np.log( np.exp(-k_old[slow_change]*r*t_latent) - np.exp(-k_old[slow_change]*r*t_now) + np.exp(-k_new[slow_change]*r*t_now) - R) / dt
+                tb.ti_presymp[slow_change_uids] = -1/(k_new_ls[slow_change]*r) * np.log( np.exp(-k_old_ls[slow_change]*r*t_latent) - np.exp(-k_old_ls[slow_change]*r*t_now) + np.exp(-k_new_ls[slow_change]*r*t_now) - R) / dt
+
+            # Check for rate change while in latent fast
+            fast_change = diff_lf & (self.sim.people.tb.state[change_uids] == TBS.LATENT_FAST)
+            fast_change_uids = change_uids[fast_change]
+            if len(fast_change_uids) > 0:
+                # New time of switching from LF to presymp:
+                R = tb.ppf_LF_to_presymp[fast_change_uids]
+                r = tb.pars.rate_LF_to_presym * 365
+                t_latent = tb.ti_latent[fast_change_uids]*dt
+                t_now = ti*dt
+                
+                tb.ti_presymp[fast_change_uids] = -1/(k_new_lf[fast_change]*r) * np.log( np.exp(-k_old_lf[fast_change]*r*t_latent) - np.exp(-k_old_lf[fast_change]*r*t_now) + np.exp(-k_new_lf[fast_change]*r*t_now) - R) / dt
+                
+                
 
         return
