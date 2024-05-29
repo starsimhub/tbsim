@@ -69,7 +69,9 @@ class TB(ss.Infection):
         
         self.add_states(            
             ss.FloatArr('rel_LS_prog', default=1.0),                # Multiplier on the latent-slow progression rate
+            ss.FloatArr('rel_LF_prog', default=1.0),                # Multiplier on the latent-slow progression rate
             ss.FloatArr('ppf_LS_to_presymp', default=ss.random()), # CDF samples for transition from latent slow to active pre-symptomatic
+            ss.FloatArr('ppf_LF_to_presymp', default=ss.random()), # CDF samples for transition from latent slow to active pre-symptomatic
         )
         
         self.add_states(

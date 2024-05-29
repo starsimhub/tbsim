@@ -43,7 +43,7 @@ class HarlemAnalyzer(ss.Analyzer):
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
             n_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
             rel_LS_mean = tb.rel_LS_prog[ppl & tb.infected].mean()
-
+            rel_LS_mean = tb.rel_LF_prog[ppl & tb.infected].mean()
             self.data.append([self.sim.year, arm.name, n_people, new_infections, n_infected, n_died, n_latent_slow, n_deficient, rel_LS_mean])
         return
 
