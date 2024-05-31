@@ -4,7 +4,7 @@ import sciris as sc
 import pandas as pd
 import numpy as np
 
-__all__ = ['Harlem', 'StudyArm']
+__all__ = ['Harlem', 'StudyArm', 'HarlemPregnancy']
 
 
 from enum import IntEnum, auto
@@ -36,7 +36,7 @@ class Harlem():
         macro = mtb.MacroNutrients
         self.macrodat = pd.DataFrame({
             'habit': [ macro.STANDARD_OR_ABOVE, macro.SLIGHTLY_BELOW_STANDARD, macro.MARGINAL, macro.UNSATISFACTORY ],
-            # These are the 1942 levels
+            # These are the 1942 levels from Appendix Table 3 or 7 of Downes
             'p_control': [21.1, 28.9, 38.9, 11.1],
             'p_vitamin': [29.2, 30.3, 28.1, 12.4],
         })
@@ -95,7 +95,6 @@ class Harlem():
                 nut.macro_state[ss.uids(uid)] = hh.macro            # We are assuming that the macro state is the same for all members of the household
                 nut.micro_state[ss.uids(uid)] = mtb.MicroNutrients.DEFICIENT if np.random.rand() < p_deficient else mtb.MicroNutrients.NORMAL
 
-                    
         # Set relative LS progression after changing macro and micro states
         c = sim.connectors['tb_nutrition_connector']
         tb = sim.diseases['tb']
@@ -108,3 +107,31 @@ class Harlem():
             seed_uid = np.random.choice(hh.uids)
             seed_uids.append(seed_uid)
         return ss.uids(seed_uids)
+
+class HarlemPregnancy(ss.Pregnancy):
+
+    def make_embryos(self, conceive_uids):
+        newborn_uids = super().make_embryos(conceive_uids)
+
+        if len(newborn_uids) == 0:
+            return newborn_uids
+
+        people = self.sim.people
+        people.hhid[newborn_uids] = people.hhid[conceive_uids]
+        people.arm[newborn_uids] = people.arm[conceive_uids]
+
+        hn = self.sim.networks['harlemnet']
+
+        p1s = []
+        p2s = []
+        for newborn_uid, mother_uid in zip(newborn_uids, conceive_uids):
+            for contact in hn.find_contacts(mother_uid):
+                p1s.append(contact)
+                p2s.append(newborn_uid)
+
+        hn.contacts.p1 = ss.uids(np.concatenate([hn.contacts.p1, p1s]))
+        hn.contacts.p2 = ss.uids(np.concatenate([hn.contacts.p2, p2s]))
+        # Beta is zero while prenatal
+        hn.contacts.beta = np.concatenate([hn.contacts.beta, np.zeros_like(p1s)])#.astype(ss.dtypes.float)
+
+        return newborn_uids

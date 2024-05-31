@@ -20,10 +20,11 @@ default_n_rand_seeds = [250, 1][debug]
 def compute_rel_LS_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     ret = np.ones_like(macro)
-    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 1.0
-    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 10.0
-    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 20.0
-    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 20.0
+    ret[micro == mtb.MicroNutrients.DEFICIENT] = 5
+    #ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 1.5
+    #ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 2.0
+    #ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 2.5
+    #ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 3.0
     return ret
 
 def run_harlem(rand_seed=0):
@@ -54,7 +55,7 @@ def run_harlem(rand_seed=0):
     tb_pars = dict(
         beta = dict(harlem=0.03, random=0.003, maternal=0.0),
         init_prev = 0, # Infections seeded by Harlem class
-        rate_LS_to_presym = 3e-5 / 2, # Slow down LS-->Presym as this is now the rate for healthy individuals
+        rate_LS_to_presym = 3e-5, # Slow down LS-->Presym as this is now the rate for healthy individuals
 
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
@@ -70,23 +71,25 @@ def run_harlem(rand_seed=0):
 
     # Add demographics
     dems = [
-        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
+        mtb.HarlemPregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
     ]
 
     # -------- Connector -------
     cn_pars = dict(
         rel_LS_prog_func=compute_rel_LS_prog,
-        relsus_microdeficient=5 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
+        relsus_microdeficient = 1 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
 
     # -------- Interventions -------
     vs = mtb.VitaminSupplementation(year=[1942, 1943], rate=[10.0, 3.0]) # Need coverage, V1 vs V2
+
     m = mtb.MicroNutrients
     M = mtb.MacroNutrients
+    # Rates to match Appendix Table 7
     nc0 = mtb.NutritionChange(year=[1942, 1944], rate=[1.25, 0], from_state=M.UNSATISFACTORY, to_state=M.MARGINAL,
-                p_new_micro=0.1, new_micro_state=m.NORMAL)
+                p_new_micro=0.0, new_micro_state=m.NORMAL)
     nc1 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=M.MARGINAL, to_state=M.SLIGHTLY_BELOW_STANDARD,
                 p_new_micro=0.0, new_micro_state=m.NORMAL)
     nc2 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=M.SLIGHTLY_BELOW_STANDARD, to_state=M.STANDARD_OR_ABOVE,
