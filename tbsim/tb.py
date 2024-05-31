@@ -26,8 +26,12 @@ class TB(ss.Infection):
             p_latent_fast = ss.bernoulli(0.1), # Probability of latent fast as opposed to latent slow
 
             rate_LS_to_presym = 3e-5,                   # Latent Slow to Active Pre-Symptomatic (per day)
-            dur_LF_to_presymp = ss.expon(scale=1/6e-3), # Latent Fast to Active Pre-Symptomatic (per day)
+            
+            # This is not used in new implementation, but kept for reference and for further analysis
+            # dur_LF_to_presymp = ss.expon(scale=1/6e-3), # Latent Fast to Active Pre-Symptomatic (per day)
 
+            rate_LF_to_presym = 6e-3,                   # Latent Fast to Active Pre-Symptomatic (per day) # TODO: Check if this is correct
+            
             dur_presym = ss.expon(scale=1/3e-2),  # Pre-symptomatic to symptomatic (days)
             
             p_exptb = ss.bernoulli(0.1),
@@ -122,10 +126,13 @@ class TB(ss.Infection):
         self.active_tb_state[smneg_uids] = TBS.ACTIVE_SMNEG
 
         # Set ti of presymp
-        rate = self.rel_LS_prog[slow_uids] * self.pars.rate_LS_to_presym
-        self.ti_presymp[slow_uids] = np.ceil(ti - np.log(1 - self.ppf_LS_to_presymp[slow_uids])/rate  / 365 / dt)
-        self.ti_presymp[fast_uids] = np.ceil(ti + p.dur_LF_to_presymp.rvs(fast_uids) / 365 / dt)
-
+        rate_slow = self.rel_LS_prog[slow_uids] * self.pars.rate_LS_to_presym
+        self.ti_presymp[slow_uids] = np.ceil(ti - np.log(1 - self.ppf_LS_to_presymp[slow_uids])/rate_slow  / 365 / dt)
+        
+        rate_fast = self.rel_LF_prog[fast_uids] * self.pars.rate_LF_to_presym
+        # self.ti_presymp[fast_uids] = np.ceil(ti + p.dur_LF_to_presymp.rvs(fast_uids) / 365 / dt)
+        self.ti_presymp[fast_uids] = np.ceil(ti - np.log(1 - self.ppf_LF_to_presymp[fast_uids])/rate_fast  / 365 / dt)
+        
         # Update result count of new infections 
         self.results['new_infections'][ti] += len(uids)
         return

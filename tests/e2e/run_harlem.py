@@ -17,24 +17,22 @@ warnings.filterwarnings("ignore", "use_inf_as_na")
 debug = False
 default_n_rand_seeds = [250, 1][debug]
 
-def compute_rel_LS_prog(macro, micro):
+@staticmethod    
+def compute_rel_prog(macro, micro, standard=0, below_standard=0, marginal=0, unsatisfactory=0):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     ret = np.ones_like(macro)
-    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 1.0
-    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 10.0
-    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 20.0
-    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 20.0
+    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = standard
+    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = below_standard
+    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = marginal
+    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = unsatisfactory
+    return ret
+
+def compute_rel_LS_prog(macro, micro):
+    ret = compute_rel_prog(macro, micro, 1.0, 10.0, 20.0, 20.0)
     return ret
 
 def compute_rel_LF_prog(macro, micro):
-    assert len(macro) == len(micro), 'Length of macro and micro must match.'
-    ret = np.ones_like(macro)
-    # With Latent Fast, we assume that the progression is faster than Latent Slow therefore the multiplier is higher
-    # TODO: (For Researcher) Please suply the correct values
-    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 1.0
-    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 20.0
-    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 40.0
-    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 40.0
+    ret = compute_rel_prog(macro, micro, 1.0, 20.0, 40.0, 40.0)
     return ret
 
 def run_harlem(rand_seed=0):
@@ -66,7 +64,8 @@ def run_harlem(rand_seed=0):
         beta = dict(harlem=0.03, random=0.003, maternal=0.0),
         init_prev = 0, # Infections seeded by Harlem class
         rate_LS_to_presym = 3e-5 / 2, # Slow down LS-->Presym as this is now the rate for healthy individuals
-
+        rate_LF_to_presym = 6e-3 / 2, #TODO: (For Researcher) Please supply the correct value - OR MAKE SURE THS IS CORRECT
+        
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
         rel_trans_smneg     = 0.3,

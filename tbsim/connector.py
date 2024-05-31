@@ -29,25 +29,56 @@ class TB_Nutrition_Connector(ss.Connector):
         tb.rel_LS_prog[self.sim.people.uid] = self.pars.rel_LS_prog_func(nut.macro_state, nut.micro_state)
         tb.rel_LF_prog[self.sim.people.uid] = self.pars.rel_LF_prog_func(nut.macro_state, nut.micro_state)
         return
-
-    @staticmethod
+    
+    @staticmethod    
+    def compute_rel_prog(macro, micro, normal_factor=0, deficient_factor=0, unsatisfactory_factor=0):
+        assert len(macro) == len(micro), 'Length of macro and micro must match.'
+        ret = np.ones_like(macro)
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = normal_factor
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = deficient_factor
+        ret[macro == MacroNutrients.UNSATISFACTORY] = unsatisfactory_factor
+        return ret
+    
     def compute_rel_LS_prog(macro, micro):
-        assert len(macro) == len(micro), 'Length of macro and micro must match.'
-        ret = np.ones_like(macro)
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 1.25
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 2.5
-        ret[macro == MacroNutrients.UNSATISFACTORY] = 4.0
+        ret = TB_Nutrition_Connector.compute_rel_prog(macro, micro, normal_factor=1.25, deficient_factor=2.5, unsatisfactory_factor=4.0)
         return ret
     
-    @staticmethod
     def compute_rel_LF_prog(macro, micro):
-        assert len(macro) == len(micro), 'Length of macro and micro must match.'
-        ret = np.ones_like(macro)
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 2.50
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 5.0
-        ret[macro == MacroNutrients.UNSATISFACTORY] = 4.0
+        ret =  TB_Nutrition_Connector.compute_rel_prog(macro, micro, normal_factor=2.5, deficient_factor=5.0, unsatisfactory_factor=6.0)
         return ret
     
+    def update_rel_prog(self, tb, change_uids, k_old, k_new, state, rate):
+        """Update the rel_prog values and calculate the new time of switching from latent to presymp"""
+        diff = k_old != k_new
+        if not diff.any():
+            return
+
+        if state==TBS.LATENT_SLOW: 
+            tb.rel_LS_prog[change_uids] = k_new # Update rel_prog
+        if state==TBS.LATENT_FAST: 
+            tb.rel_LF_prog[change_uids] = k_new # Update rel_prog
+            
+        # Check for rate change while in latent state
+        state_change = diff & (self.sim.people.tb.state[change_uids] == state)
+        state_change_uids = change_uids[state_change]
+        if len(state_change_uids) > 0:
+            # New time of switching from latent to presymp:
+            if state==TBS.LATENT_SLOW: 
+                R = tb.ppf_LS_to_presymp[state_change_uids]
+            if state==TBS.LATENT_FAST:
+                R = tb.ppf_LF_to_presymp[state_change_uids]
+
+            r = rate * 365 # Converting days to years
+            t_latent = tb.ti_latent[state_change_uids]*self.sim.dt
+            t_now = self.sim.ti*self.sim.dt
+
+            tb.ti_presymp[state_change_uids] = (-1/(k_new[state_change]*r) 
+                                                * np.log( np.exp(-k_old[state_change]*r*t_latent) 
+                                                         - np.exp(-k_old[state_change]*r*t_now) 
+                                                         + np.exp(-k_new[state_change]*r*t_now) 
+                                                         - R) 
+                                                / self.sim.dt)
+            
     def update(self):
         """ Specify how malnutrition and TB interact """
         nut = self.sim.diseases['malnutrition']
@@ -79,31 +110,8 @@ class TB_Nutrition_Connector(ss.Connector):
 
             tb.rel_LS_prog[change_uids] = k_new_ls # Update rel_LS_prog
             tb.rel_LF_prog[change_uids] = k_new_lf # Update rel_LF_prog
-
-            # Check for rate change while in latent slow
-            slow_change = diff_ls & (self.sim.people.tb.state[change_uids] == TBS.LATENT_SLOW)
-            slow_change_uids = change_uids[slow_change]
-            if len(slow_change_uids) > 0:
-                # New time of switching from LS to presymp:
-                R = tb.ppf_LS_to_presymp[slow_change_uids]
-                r = tb.pars.rate_LS_to_presym * 365 # Converting days to years
-                t_latent = tb.ti_latent[slow_change_uids]*dt
-                t_now = ti*dt # Time of switching from health to undernourished
-
-                tb.ti_presymp[slow_change_uids] = -1/(k_new_ls[slow_change]*r) * np.log( np.exp(-k_old_ls[slow_change]*r*t_latent) - np.exp(-k_old_ls[slow_change]*r*t_now) + np.exp(-k_new_ls[slow_change]*r*t_now) - R) / dt
-
-            # Check for rate change while in latent fast
-            fast_change = diff_lf & (self.sim.people.tb.state[change_uids] == TBS.LATENT_FAST)
-            fast_change_uids = change_uids[fast_change]
-            if len(fast_change_uids) > 0:
-                # New time of switching from LF to presymp:
-                R = tb.ppf_LF_to_presymp[fast_change_uids]
-                r = tb.pars.rate_LF_to_presym * 365
-                t_latent = tb.ti_latent[fast_change_uids]*dt
-                t_now = ti*dt
-                
-                tb.ti_presymp[fast_change_uids] = -1/(k_new_lf[fast_change]*r) * np.log( np.exp(-k_old_lf[fast_change]*r*t_latent) - np.exp(-k_old_lf[fast_change]*r*t_now) + np.exp(-k_new_lf[fast_change]*r*t_now) - R) / dt
-                
-                
+            
+            self.update_rel_prog(tb, change_uids, k_old_ls, k_new_ls, TBS.LATENT_SLOW, tb.pars.rate_LS_to_presym)   # Update rel_LS_prog
+            self.update_rel_prog(tb, change_uids, k_old_lf, k_new_lf, TBS.LATENT_FAST, tb.pars.rate_LF_to_presym)   # Update rel_LF_prog
 
         return
