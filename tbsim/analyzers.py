@@ -5,11 +5,10 @@ Define Malnutrition analyzers
 import numpy as np
 import starsim as ss
 from tbsim import TB, TBS, Malnutrition, MicroNutrients, MacroNutrients, StudyArm
-import sciris as sc
-
+import networkx as nx
 import pandas as pd
 
-__all__ = ['HarlemAnalyzer']
+__all__ = ['HarlemAnalyzer', 'HHAnalyzer', 'NutritionAnalyzer']
 
 class HarlemAnalyzer(ss.Analyzer):
 
@@ -69,3 +68,99 @@ class HarlemAnalyzer(ss.Analyzer):
         g = sns.relplot(data=d, kind='line', x='year', hue='arm', col='channel', y='Value', palette='Set1', facet_kws={'sharey':False})
 
         return g.figure
+
+class HHAnalyzer(ss.Analyzer):
+
+    def __init__(self, **kwargs):
+        self.requires = [TB, Malnutrition]
+        self.data = []
+        self.df = None # Created on finalize
+
+        super().__init__(**kwargs)
+        return
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        self.initialized = True
+        return
+
+    def apply(self, sim, snap_years = [1942, 1944]):
+        super().apply(sim)
+
+        year = self.sim.year
+        dt = self.sim.dt
+
+        snap = False
+        for sy in snap_years:
+            if year >= sy and year < sy+dt:
+                snap = True
+                break
+        
+        if not snap:
+            return
+
+        hhn = self.sim.networks['harlemnet']
+        el = [(p1, p2) for p1,p2 in zip(hhn.contacts['p1'], hhn.contacts['p2'])]
+        G = nx.from_edgelist(el)
+        hh_sizes = np.array([len(c) for c in nx.connected_components(G)])
+        cnt, hh_size = np.histogram(hh_sizes, bins=range(20))
+        df = pd.DataFrame({sy:cnt}, index=pd.Index(hh_size[:-1], name='HH Size'))
+        self.data.append(df)
+        return
+
+    def finalize(self):
+        super().finalize()
+        self.df = pd.concat(self.data, axis=1)
+        return
+
+class NutritionAnalyzer(ss.Analyzer):
+
+    def __init__(self, **kwargs):
+        self.requires = [TB, Malnutrition]
+        self.data = []
+        self.df = None # Created on finalize
+
+        super().__init__(**kwargs)
+        return
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        self.initialized = True
+        return
+
+    def apply(self, sim, snap_years = [1942, 1944]):
+        super().apply(sim)
+
+        year = self.sim.year
+        dt = self.sim.dt
+
+        snap = False
+        for sy in snap_years:
+            if year >= sy and year < sy+dt:
+                snap = True
+                break
+        
+        if not snap:
+            return
+
+        macro_lookup = {MacroNutrients[name].value: name for name in MacroNutrients._member_names_}
+        micro_lookup = {MicroNutrients[name].value: name for name in MicroNutrients._member_names_}
+        arm_lookup = {StudyArm[name].value: name for name in StudyArm._member_names_}
+
+        nut = self.sim.diseases['malnutrition']
+        ppl = self.sim.people
+        df = pd.DataFrame({
+            'Macro': [macro_lookup[v] for v in nut.macro_state.values],
+            'Micro': [micro_lookup[v] for v in nut.micro_state.values],
+            'Arm': [arm_lookup[v] for v in ppl.arm.values],
+        }, index=pd.Index(ppl.uid))
+
+        sz = df.groupby(['Arm', 'Macro', 'Micro']).size()
+        sz.name = str(sy)
+        self.data.append(sz)
+        return
+
+    def finalize(self):
+        super().finalize()
+        self.df = pd.concat(self.data, axis=1)
+        return

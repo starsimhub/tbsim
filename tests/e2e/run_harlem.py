@@ -10,12 +10,13 @@ import seaborn as sns
 import matplotlib.dates as mdates
 import os 
 
+
 import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = False
-default_n_rand_seeds = [250, 1][debug]
+debug = True
+default_n_rand_seeds = [250, 2][debug]
 
 def compute_rel_LS_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
@@ -97,7 +98,12 @@ def run_harlem(rand_seed=0):
     intvs = [vs, nc0, nc1, nc2]
 
     # -------- Analyzer -------
-    az = mtb.HarlemAnalyzer()
+    azs = [
+        mtb.HarlemAnalyzer(),
+        mtb.HHAnalyzer(),
+        mtb.NutritionAnalyzer(),
+    ]
+
 
     # -------- Simulation -------
     # define simulation parameters
@@ -109,7 +115,7 @@ def run_harlem(rand_seed=0):
         rand_seed = rand_seed,
         )
     # initialize the simulation
-    sim = ss.Sim(people=pop, networks=nets, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=intvs, analyzers=az)
+    sim = ss.Sim(people=pop, networks=nets, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=intvs, analyzers=azs)
     sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
     sim.initialize()
@@ -138,9 +144,15 @@ def run_harlem(rand_seed=0):
     df = sim.analyzers['harlemanalyzer'].df
     df['rand_seed'] = rand_seed
 
+    dfhh = sim.analyzers['hhanalyzer'].df
+    dfhh['rand_seed'] = rand_seed
+
+    dfn = sim.analyzers['nutritionanalyzer'].df
+    dfn['rand_seed'] = rand_seed
+
     print(f'Finishing sim with rand_seed={rand_seed} ')
 
-    return df
+    return df, dfhh, dfn
 
 
 def run_sims(n_seeds=default_n_rand_seeds):
@@ -150,14 +162,21 @@ def run_sims(n_seeds=default_n_rand_seeds):
         cfgs.append({'rand_seed':rs})
     T = sc.tic()
     results += sc.parallelize(run_harlem, iterkwargs=cfgs, die=False, serial=debug)
+    epi, hh, nut = zip(*results)
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
-    df = pd.concat(results)
-    df.to_csv(os.path.join(cfg.RESULTS_DIRECTORY, f"result_{cfg.FILE_POSTFIX}.csv"))
+    df_epi = pd.concat(epi)
+    df_epi.to_csv(os.path.join(cfg.RESULTS_DIRECTORY, f"result_{cfg.FILE_POSTFIX}.csv"))
 
-    return df
+    df_hh = pd.concat(hh)
+    df_hh.to_csv(os.path.join(cfg.RESULTS_DIRECTORY, f"hhsizes_{cfg.FILE_POSTFIX}.csv"))
 
-def plot(df):
+    df_nut = pd.concat(nut)
+    df_nut.to_csv(os.path.join(cfg.RESULTS_DIRECTORY, f"nutrition_{cfg.FILE_POSTFIX}.csv"))
+
+    return df_epi, df_hh, df_nut
+
+def plot_epi(df):
     first_year = int(df['year'].iloc[0])
     assert df['year'].iloc[0] == first_year
     df['date'] = pd.to_datetime(365 * (df['year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
@@ -177,8 +196,86 @@ def plot(df):
     plt.close(g.figure)
     return
 
+def plot_hh(df):
+    dfm = df.reset_index().drop('rand_seed', axis=1).melt(id_vars='HH Size', var_name='Year', value_name='Frequency')
+    dfm['Year'] = dfm['Year'].astype(str)
+    g = sns.barplot(dfm, x='HH Size', y='Frequency', hue='Year')
+    sc.savefig(f"hhsizedist_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
+    plt.close(g.figure)
+    return
+
+
+
+def stackedbar(data, color, **kwargs):
+    
+    #categories = ['STANDARD_OR_ABOVE', 'SLIGHTLY_BELOW_STANDARD', 'MARGINAL', 'UNSATISFACTORY']
+    Mcats = mtb.MacroNutrients.__dict__['_member_names_']
+    data['Macro'] = pd.Categorical(data['Macro'], categories=Mcats)
+
+    mcats = mtb.MicroNutrients.__dict__['_member_names_']
+    data['Micro'] = pd.Categorical(data['Micro'], categories=mcats)
+
+    df = data.set_index(['Arm', 'Macro', 'Micro'])
+    #base = pd.DataFrame(np.zeros((len(Mcats), len(mcats))), index=pd.Index(Mcats, name='Macro'), columns=mcats)
+
+    # Use data with exact values from the publication
+    vitamin = [29.2, 30.3, 28.1, 12.4]
+    control = [21.1, 28.9, 38.9, 11.1]
+
+    # Calculate the micronutrient status
+    vit = df.loc['VITAMIN'].drop('Year', axis=1).unstack('Micro')['Frequency'].fillna(0).stack().astype(int)
+    ctl = df.loc['CONTROL'].drop('Year', axis=1).unstack('Micro')['Frequency'].fillna(0).stack().astype(int)
+
+    vitamin_deficient = vit.loc[slice(None), 'DEFICIENT'].values
+    vitamin_sufficient = vit.loc[slice(None), 'NORMAL'].values
+    control_deficient = ctl.loc[slice(None), 'DEFICIENT'].values
+    control_sufficient = ctl.loc[slice(None), 'NORMAL'].values
+
+    # Create the figure and axis
+    #fig, ax = plt.subplots(figsize=(10, 6))
+    ax = plt.gca()
+
+    # Plotting the bars with updated colors and order
+    bar_width = 0.35
+    index = np.arange(len(Mcats))
+
+    bars1 = ax.barh(index, vitamin_deficient, bar_width, color='steelblue', edgecolor='steelblue', label='Vitamin Group, Micronutrient-Deficient')
+    bars2 = ax.barh(index, vitamin_sufficient, bar_width, color='lightsteelblue', edgecolor='steelblue', left=vitamin_deficient, label='Vitamin Group, Micronutrient-Sufficient')
+    bars3 = ax.barh(index + bar_width, control_deficient, bar_width, color='goldenrod', edgecolor='goldenrod', label='Control Group, Micronutrient-Deficient')
+    bars4 = ax.barh(index + bar_width, control_sufficient, bar_width, color='wheat', edgecolor='goldenrod', left=control_deficient, label='Control Group, Micronutrient-Sufficient')
+
+    # Add labels and title
+    ax.set_xlabel('Per Cent')
+    ax.set_ylabel('Categories')
+    #ax.set_title('Distribution of Families According to Food Habits (1942)')
+    ax.set_yticks(index + bar_width / 2)
+    ax.set_yticklabels(Mcats)
+
+    # Combine legends for better readability
+    handles, labels = ax.get_legend_handles_labels()
+    unique_labels = dict(zip(labels, handles))
+    ax.legend(unique_labels.values(), unique_labels.keys(), loc='best')
+    return
+
+def plot_nut(df):
+    # Sum over reps
+    dfs = df.drop('rand_seed', axis=1).groupby(['Arm', 'Macro', 'Micro']).sum()
+    dfm = dfs.reset_index().melt(id_vars=['Arm', 'Micro', 'Macro'], var_name='Year', value_name='Frequency')
+    #g = sns.catplot(dfm, kind='bar', col='Year', y='Macro', order=['STANDARD_OR_ABOVE', 'SLIGHTLY_BELOW_STANDARD', 'MARGINAL', 'UNSATISFACTORY'], x='Frequency', hue='Arm', hue_order=['VITAMIN', 'CONTROL'])
+    g = sns.FacetGrid(data=dfm, col='Year') # , row='Arm'
+    #def stackedbar(data, color, **kwargs):
+    #    dfp = data.pivot(index='Macro', columns='Micro', values='Frequency').fillna(0)
+    #    dfp.plot(kind='barh', stacked=True, ax=plt.gca())
+    g.map_dataframe(stackedbar)
+    g.add_legend()
+    g.figure.tight_layout()
+    sc.savefig(f"nutrition_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
+    plt.close(g.figure)
+    return
+
+
 if __name__ == '__main__':
-    df = run_sims()
+    df_epi, df_hh, df_nut = run_sims()
 
     '''
     if debug:
@@ -189,7 +286,9 @@ if __name__ == '__main__':
         plt.show()
     '''
 
-    plot(df)
+    plot_nut(df_nut)
+    plot_epi(df_epi)
+    plot_hh(df_hh)
 
     print(f"Results directory {cfg.RESULTS_DIRECTORY}\nThis run: {cfg.FILE_POSTFIX}")
     print('Done')
