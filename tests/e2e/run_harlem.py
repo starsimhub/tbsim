@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import datetime as dt
 import seaborn as sns
 import matplotlib.dates as mdates
+import matplotlib.ticker as mtick
 import os 
 
 
@@ -15,7 +16,7 @@ import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = True
+debug = False
 default_n_rand_seeds = [250, 2][debug]
 
 def compute_rel_LS_prog(macro, micro):
@@ -198,8 +199,21 @@ def plot_epi(df):
 
 def plot_hh(df):
     dfm = df.reset_index().drop('rand_seed', axis=1).melt(id_vars='HH Size', var_name='Year', value_name='Frequency')
+    dfm['Per Cent'] = (df['rand_seed'].max()+1) * dfm.groupby('Year')['Frequency'].transform(lambda x: x / x.sum())
     dfm['Year'] = dfm['Year'].astype(str)
-    g = sns.barplot(dfm, x='HH Size', y='Frequency', hue='Year')
+    #g = sns.barplot(dfm, x='HH Size', y='Frequency', hue='Year')
+    g = sns.FacetGrid(data=dfm, height=4, aspect=1.5)
+    g.map_dataframe(sns.barplot, x='HH Size', y='Per Cent', hue='Year', palette='Set1')
+
+
+    def hh_data(data, color, **kwargs):
+        data = np.array([3, 17, 24, 20, 13, 9, 7, 4, 3]) / 100
+        ax = plt.gca()
+        ax.scatter(range(len(data)), data, 150, marker='+', lw=2, color='black')
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=None)) # or 0
+        return
+    g.map_dataframe(hh_data)
+
     sc.savefig(f"hhsizedist_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
     plt.close(g.figure)
     return
@@ -222,9 +236,29 @@ def stackedbar(data, color, **kwargs):
     vitamin = [29.2, 30.3, 28.1, 12.4]
     control = [21.1, 28.9, 38.9, 11.1]
 
+    vit_data = pd.DataFrame({
+        1942: [29.2, 30.3, 28.1, 12.4],
+        1944: [71.2, 18.8, 5.0, 5.0],
+        1947: [50.0, 37.2, 10.2, 2.6]
+    }, index=pd.Index(Mcats, name='Macro')) #.melt(var_name='Year', value_name='Per Cent')
+    ctl_data = pd.DataFrame({
+        1942: [21.1, 28.9, 38.9, 11.1],
+        1944: [70.9, 22.8, 3.8, 2.5],
+        1947: [71.6, 21.6, 4.1, 2.7]
+    }, index=pd.Index(Mcats, name='Macro')) # .melt(var_name='Year', value_name='Per Cent')
+
+    year = int(float(df.iloc[0]['Year']))
+    vit_data = vit_data[year] / 100
+    ctl_data = ctl_data[year] / 100
+    
+
+    #N = df['Frequency'].sum()
+    Nvit = df.loc['VITAMIN']['Frequency'].sum()
+    Nctl = df.loc['CONTROL']['Frequency'].sum()
+
     # Calculate the micronutrient status
-    vit = df.loc['VITAMIN'].drop('Year', axis=1).unstack('Micro')['Frequency'].fillna(0).stack().astype(int)
-    ctl = df.loc['CONTROL'].drop('Year', axis=1).unstack('Micro')['Frequency'].fillna(0).stack().astype(int)
+    vit = df.loc['VITAMIN'].drop('Year', axis=1).unstack('Micro')['Frequency'].fillna(0).stack().astype(int) / Nvit
+    ctl = df.loc['CONTROL'].drop('Year', axis=1).unstack('Micro')['Frequency'].fillna(0).stack().astype(int) / Nctl
 
     vitamin_deficient = vit.loc[slice(None), 'DEFICIENT'].values
     vitamin_sufficient = vit.loc[slice(None), 'NORMAL'].values
@@ -241,8 +275,10 @@ def stackedbar(data, color, **kwargs):
 
     bars1 = ax.barh(index, vitamin_deficient, bar_width, color='steelblue', edgecolor='steelblue', label='Vitamin Group, Micronutrient-Deficient')
     bars2 = ax.barh(index, vitamin_sufficient, bar_width, color='lightsteelblue', edgecolor='steelblue', left=vitamin_deficient, label='Vitamin Group, Micronutrient-Sufficient')
+    ax.scatter(vit_data.values, index, 100, c='black', marker='+', lw=2)#, label='Downes Appendix Table 7')
     bars3 = ax.barh(index + bar_width, control_deficient, bar_width, color='goldenrod', edgecolor='goldenrod', label='Control Group, Micronutrient-Deficient')
     bars4 = ax.barh(index + bar_width, control_sufficient, bar_width, color='wheat', edgecolor='goldenrod', left=control_deficient, label='Control Group, Micronutrient-Sufficient')
+    ax.scatter(ctl_data.values, index+bar_width, 100, c='black', marker='+', lw=2)
 
     # Add labels and title
     ax.set_xlabel('Per Cent')
@@ -250,6 +286,8 @@ def stackedbar(data, color, **kwargs):
     #ax.set_title('Distribution of Families According to Food Habits (1942)')
     ax.set_yticks(index + bar_width / 2)
     ax.set_yticklabels(Mcats)
+
+    ax.xaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=None)) # or 0
 
     # Combine legends for better readability
     handles, labels = ax.get_legend_handles_labels()
@@ -261,14 +299,14 @@ def plot_nut(df):
     # Sum over reps
     dfs = df.drop('rand_seed', axis=1).groupby(['Arm', 'Macro', 'Micro']).sum()
     dfm = dfs.reset_index().melt(id_vars=['Arm', 'Micro', 'Macro'], var_name='Year', value_name='Frequency')
-    #g = sns.catplot(dfm, kind='bar', col='Year', y='Macro', order=['STANDARD_OR_ABOVE', 'SLIGHTLY_BELOW_STANDARD', 'MARGINAL', 'UNSATISFACTORY'], x='Frequency', hue='Arm', hue_order=['VITAMIN', 'CONTROL'])
-    g = sns.FacetGrid(data=dfm, col='Year') # , row='Arm'
-    #def stackedbar(data, color, **kwargs):
-    #    dfp = data.pivot(index='Macro', columns='Micro', values='Frequency').fillna(0)
-    #    dfp.plot(kind='barh', stacked=True, ax=plt.gca())
+    g = sns.FacetGrid(data=dfm, col='Year', height=4, aspect=1.5) # , row='Arm'
     g.map_dataframe(stackedbar)
-    g.add_legend()
-    g.figure.tight_layout()
+    plt.subplots_adjust(bottom=0.3)
+
+    #handles, labels = plt.gca().get_legend_handles_labels()
+    #order = [1,2,3,4,0]
+    #plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order], loc='upper center', bbox_to_anchor=(0,-0.2), ncol=2)
+    plt.legend(loc='upper center', bbox_to_anchor=(0,-0.2), ncol=2)
     sc.savefig(f"nutrition_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
     plt.close(g.figure)
     return

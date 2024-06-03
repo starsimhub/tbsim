@@ -99,11 +99,15 @@ class HHAnalyzer(ss.Analyzer):
         if not snap:
             return
 
-        hhn = self.sim.networks['harlemnet']
-        el = [(p1, p2) for p1,p2 in zip(hhn.contacts['p1'], hhn.contacts['p2'])]
-        G = nx.from_edgelist(el)
-        hh_sizes = np.array([len(c) for c in nx.connected_components(G)])
-        cnt, hh_size = np.histogram(hh_sizes, bins=range(20))
+        hhid, hh_sizes = np.unique(sim.people.hhid, return_counts=True)
+        cnt, hh_size = np.histogram(hh_sizes, bins=range(1, 11))
+
+        #hhn = self.sim.networks['harlemnet']
+        #el = [(p1, p2) for p1,p2 in zip(hhn.contacts['p1'], hhn.contacts['p2'])]
+        #G = nx.from_edgelist(el)
+        #hh_sizes = np.array([len(c) for c in nx.connected_components(G)])
+        #cnt, hh_size = np.histogram(hh_sizes, bins=range(20))
+
         df = pd.DataFrame({sy:cnt}, index=pd.Index(hh_size[:-1], name='HH Size'))
         self.data.append(df)
         return

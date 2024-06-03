@@ -53,7 +53,6 @@ class TB(ss.Infection):
         self.choose_cure_or_die_ti = ss.random()
         self.will_die = ss.random()
         
-        print(f"TB model initialized with parameters: {self.pars}/n" )
         return
 
     def initialize(self, sim):
