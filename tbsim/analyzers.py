@@ -20,10 +20,9 @@ class HarlemAnalyzer(ss.Analyzer):
         super().__init__(**kwargs)
         return
 
-    def initialize(self, sim):
-        super().initialize(sim)
+    def init_results(self):
+        super().init_results()
         #self.results += ss.Result(self.name, 'n_recovered', sim.npts, dtype=int)
-        self.initialized = True
         return
 
     def apply(self, sim):
@@ -42,7 +41,11 @@ class HarlemAnalyzer(ss.Analyzer):
             n_died = np.count_nonzero( (tb.ti_dead[(self.sim.people.arm==arm)] == ti) )
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
             n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
-            rel_LS_mean = tb.rel_LS_prog[ppl & tb.infected].mean()
+            infected = ppl & tb.infected
+            if not infected.any():
+                rel_LS_mean = np.nan
+            else:
+                rel_LS_mean = tb.rel_LS_prog[infected].mean()
 
             self.data.append([self.sim.year, arm.name, n_people, new_infections, new_active_infections, n_infected, n_died, n_latent_slow, n_micro_deficient, rel_LS_mean])
         return
@@ -79,9 +82,8 @@ class HHAnalyzer(ss.Analyzer):
         super().__init__(**kwargs)
         return
 
-    def initialize(self, sim):
-        super().initialize(sim)
-        self.initialized = True
+    def init_results(self):
+        super().init_results()
         return
 
     def apply(self, sim, snap_years = [1942, 1944]):
@@ -103,7 +105,7 @@ class HHAnalyzer(ss.Analyzer):
         cnt, hh_size = np.histogram(hh_sizes, bins=range(1, 11))
 
         #hhn = self.sim.networks['harlemnet']
-        #el = [(p1, p2) for p1,p2 in zip(hhn.contacts['p1'], hhn.contacts['p2'])]
+        #el = [(p1, p2) for p1,p2 in zip(hhn.edges['p1'], hhn.edges['p2'])]
         #G = nx.from_edgelist(el)
         #hh_sizes = np.array([len(c) for c in nx.connected_components(G)])
         #cnt, hh_size = np.histogram(hh_sizes, bins=range(20))
@@ -125,11 +127,6 @@ class NutritionAnalyzer(ss.Analyzer):
         self.df = None # Created on finalize
 
         super().__init__(**kwargs)
-        return
-
-    def initialize(self, sim):
-        super().initialize(sim)
-        self.initialized = True
         return
 
     def apply(self, sim, snap_years = [1942, 1944]):

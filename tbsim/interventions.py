@@ -21,10 +21,9 @@ class VitaminSupplementation(ss.Intervention):
         self.p_micro_recovery = ss.bernoulli(p=lambda self, sim, uids: np.interp(sim.year, self.year, self.rate*sim.dt))
         return
 
-    def initialize(self, sim):
-        super().initialize(sim)
-        self.results += ss.Result(self.name, 'n_recovered', sim.npts, dtype=int)
-        self.initialized = True
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        self.results += ss.Result(self.name, 'n_recovered', self.sim.npts, dtype=int)
         return
 
     def apply(self, sim):
@@ -66,10 +65,9 @@ class NutritionChange(ss.Intervention):
         self.p_micro = ss.bernoulli(p=self.p_new_micro) # Prob of changing micro when changing macro
         return
 
-    def initialize(self, sim):
-        super().initialize(sim)
-        #self.results += ss.Result(self.name, 'n_recovered', sim.npts, dtype=int)
-        self.initialized = True
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        #self.results += ss.Result(self.name, 'n_recovered', self.sim.npts, dtype=int)
         return
 
     def apply(self, sim):

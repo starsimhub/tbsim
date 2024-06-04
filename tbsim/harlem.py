@@ -25,8 +25,10 @@ class Harlem():
                 mtb.MacroNutrients.STANDARD_OR_ABOVE: 0.0,
             },
             n_hhs = 194,
+            p_control = 0.5, # Household-level probability of control arm
         )
         self.pars = sc.mergedicts(self.pars, pars)
+        self.pars.n_hhs = int(np.round(self.pars.n_hhs)) # Must be an integer
 
         self.hhdat = pd.DataFrame({
             'size': np.arange(1,10),
@@ -45,12 +47,12 @@ class Harlem():
 
         self.armdat = pd.DataFrame({
             'arm': [StudyArm.CONTROL, StudyArm.VITAMIN],
-            'p': [0.5, 0.5]
+            'p': [self.pars.p_control, 1-self.pars.p_control]
         })
         self.armdat['p'] /= self.armdat['p'].sum()
 
         self.hhs = self.make_hhs()
-        self.n_agents = np.sum([hh.n for hh in self.hhs]) # Hopefully about 579
+        self.n_agents = np.sum([hh.n for hh in self.hhs]) # Hopefully about 579 if running all of Harlem
         return
 
     def make_hhs(self):
@@ -129,9 +131,9 @@ class HarlemPregnancy(ss.Pregnancy):
                 p1s.append(contact)
                 p2s.append(newborn_uid)
 
-        hn.contacts.p1 = ss.uids(np.concatenate([hn.contacts.p1, p1s]))
-        hn.contacts.p2 = ss.uids(np.concatenate([hn.contacts.p2, p2s]))
+        hn.edges.p1 = ss.uids(np.concatenate([hn.edges.p1, p1s]))
+        hn.edges.p2 = ss.uids(np.concatenate([hn.edges.p2, p2s]))
         # Beta is zero while prenatal
-        hn.contacts.beta = np.concatenate([hn.contacts.beta, np.zeros_like(p1s)])#.astype(ss.dtypes.float)
+        hn.edges.beta = np.concatenate([hn.edges.beta, np.zeros_like(p1s)])#.astype(ss.dtypes.float)
 
         return newborn_uids

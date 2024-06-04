@@ -55,10 +55,6 @@ class TB(ss.Infection):
         
         return
 
-    def initialize(self, sim):
-        super().initialize(sim)
-        return
-
     def _add_states(self):
         self.add_states(
             # Initialize states specific to TB:

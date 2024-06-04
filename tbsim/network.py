@@ -16,17 +16,17 @@ class HarlemNet(ss.Network):
     """_summary_
     
     """
-    def initialize(self, sim):
-        super().initialize(sim)
+    def init_pre(self, sim):
+        super().init_pre(sim)
         for hh in self.hhs:                 # For each household
-            p1s, p2s = hh.contacts()        # Get all their contacts
+            p1s, p2s = hh.edges()        # Get all their contacts
 
-            self.contacts.p1 = np.concatenate([self.contacts.p1, p1s])
-            self.contacts.p2 = np.concatenate([self.contacts.p2, p2s])
-            self.contacts.beta = np.concatenate([self.contacts.beta, np.ones_like(p1s)])
+            self.edges.p1 = np.concatenate([self.edges.p1, p1s])
+            self.edges.p2 = np.concatenate([self.edges.p2, p2s])
+            self.edges.beta = np.concatenate([self.edges.beta, np.ones_like(p1s)])
 
-        self.contacts.p1 = ss.uids(self.contacts.p1)
-        self.contacts.p2 = ss.uids(self.contacts.p2)
+        self.edges.p1 = ss.uids(self.edges.p1)
+        self.edges.p2 = ss.uids(self.edges.p2)
 
         return
     
@@ -46,7 +46,7 @@ class HarlemNet(ss.Network):
         # Activate household contacts by setting beta to 1
         hn = self.sim.networks['harlemnet']
         for infant_uid in newborns:
-            hn.contacts.beta[hn.contacts.p2 == infant_uid] = 1.0
+            hn.edges.beta[hn.edges.p2 == infant_uid] = 1.0
 
         return
     
@@ -75,7 +75,7 @@ class HouseHold():
     representing all possible pairs of contacts within a group of individuals identified by uids. 
     It then separates these pairs into two lists, p1s and p2s, and returns these lists.
     """
-    def contacts(self):
+    def edges(self):
         g = nx.complete_graph(self.uids)
         p1s = []
         p2s = []
