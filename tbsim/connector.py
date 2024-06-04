@@ -65,19 +65,26 @@ class TB_Nutrition_Connector(ss.Connector):
             # New time of switching from latent to presymp:
             if state==TBS.LATENT_SLOW: 
                 R = tb.ppf_LS_to_presymp[state_change_uids]
-            if state==TBS.LATENT_FAST:
+            elif state==TBS.LATENT_FAST:
                 R = tb.ppf_LF_to_presymp[state_change_uids]
-
+            else:
+                raise ValueError(f"Invalid state: {state}")
+            
             r = rate * 365 # Converting days to years
             t_latent = tb.ti_latent[state_change_uids]*self.sim.dt
             t_now = self.sim.ti*self.sim.dt
 
-            tb.ti_presymp[state_change_uids] = (-1/(k_new[state_change]*r) 
-                                                * np.log( np.exp(-k_old[state_change]*r*t_latent) 
-                                                         - np.exp(-k_old[state_change]*r*t_now) 
-                                                         + np.exp(-k_new[state_change]*r*t_now) 
-                                                         - R) 
-                                                / self.sim.dt)
+            x = np.exp(-k_old[state_change]*r*t_latent) - np.exp(-k_old[state_change]*r*t_now) + np.exp(-k_new[state_change]*r*t_now) - R
+            
+            
+            for i in range(len(x)):
+                if x[i] < 0:            # Handles the case when x is negative which is not possible to calculate the log of a negative number 
+                    print(f"state_change: {state} (-1/({k_new[state_change][0]}*{r}) * np.log( np.exp(-{k_old[state_change][0]}*{r}*{t_latent[0]})-np.exp(-{k_old[state_change][0]}*{r}*{t_now}) + np.exp(-{k_new[state_change][0]}*{r}*{t_now}) - {R[0]})  / {self.sim.dt})")
+                    print(f"Warning: x is negative: {x[i]}")
+                    tb.ti_presymp[state_change_uids] = R[i]     # Set the time of switching from latent to presymp to the previous value
+                else:
+                    tb.ti_presymp[state_change_uids] = -1/(k_new[state_change]*r) * np.log(x[i]) / self.sim.dt
+        return
             
     def update(self):
         """ Specify how malnutrition and TB interact """

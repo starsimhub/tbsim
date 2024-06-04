@@ -28,9 +28,9 @@ class TB(ss.Infection):
             rate_LS_to_presym = 3e-5,                   # Latent Slow to Active Pre-Symptomatic (per day)
             
             # This is not used in new implementation, but kept for reference and for further analysis
-            # dur_LF_to_presymp = ss.expon(scale=1/6e-3), # Latent Fast to Active Pre-Symptomatic (per day)
 
             rate_LF_to_presym = 6e-3,                   # Latent Fast to Active Pre-Symptomatic (per day) # TODO: Check if this is correct
+            dur_LF_to_presymp = ss.expon(scale=1/6e-3), # Latent Fast to Active Pre-Symptomatic (per day)
             
             dur_presym = ss.expon(scale=1/3e-2),  # Pre-symptomatic to symptomatic (days)
             
@@ -57,7 +57,7 @@ class TB(ss.Infection):
         self.choose_cure_or_die_ti = ss.random()
         self.will_die = ss.random()
         
-        print(f"TB model initialized with parameters: {self.pars}/n" )
+        #print(f"TB model initialized with parameters:\n {self.pars}\n" )
         return
 
     def initialize(self, sim):
@@ -73,9 +73,9 @@ class TB(ss.Infection):
         
         self.add_states(            
             ss.FloatArr('rel_LS_prog', default=1.0),                # Multiplier on the latent-slow progression rate
-            ss.FloatArr('rel_LF_prog', default=1.0),                # Multiplier on the latent-slow progression rate
+            ss.FloatArr('rel_LF_prog', default=1.0),                # Multiplier on the latent-fast progression rate
             ss.FloatArr('ppf_LS_to_presymp', default=ss.random()), # CDF samples for transition from latent slow to active pre-symptomatic
-            ss.FloatArr('ppf_LF_to_presymp', default=ss.random()), # CDF samples for transition from latent slow to active pre-symptomatic
+            ss.FloatArr('ppf_LF_to_presymp', default=ss.random()), # CDF samples for transition from latent fast to active pre-symptomatic
         )
         
         self.add_states(
@@ -129,9 +129,10 @@ class TB(ss.Infection):
         rate_slow = self.rel_LS_prog[slow_uids] * self.pars.rate_LS_to_presym
         self.ti_presymp[slow_uids] = np.ceil(ti - np.log(1 - self.ppf_LS_to_presymp[slow_uids])/rate_slow  / 365 / dt)
         
-        rate_fast = self.rel_LF_prog[fast_uids] * self.pars.rate_LF_to_presym
-        # self.ti_presymp[fast_uids] = np.ceil(ti + p.dur_LF_to_presymp.rvs(fast_uids) / 365 / dt)
-        self.ti_presymp[fast_uids] = np.ceil(ti - np.log(1 - self.ppf_LF_to_presymp[fast_uids])/rate_fast  / 365 / dt)
+        self.ti_presymp[fast_uids] = np.ceil(ti + p.dur_LF_to_presymp.rvs(fast_uids) / 365 / dt)
+        
+        #rate_fast = self.rel_LF_prog[fast_uids] * self.pars.rate_LF_to_presym
+        #self.ti_presymp[fast_uids] = np.ceil(ti - np.log(1 - self.ppf_LF_to_presymp[fast_uids])/rate_fast  / 365 / dt)
         
         # Update result count of new infections 
         self.results['new_infections'][ti] += len(uids)
