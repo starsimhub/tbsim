@@ -47,7 +47,7 @@ class TB_Nutrition_Connector(ss.Connector):
         ret =  TB_Nutrition_Connector.compute_rel_prog(macro, micro, normal_factor=2.5, deficient_factor=5.0, unsatisfactory_factor=6.0)
         return ret
     
-    def update_rel_prog(self, tb, change_uids, k_old, k_new, state, rate):
+    def update_rel_prog(self, tb, change_uids, k_old, k_new, state, rate, ti, dt):
         """Update the rel_prog values and calculate the new time of switching from latent to presymp"""
         diff = k_old != k_new
         if not diff.any():
@@ -74,16 +74,10 @@ class TB_Nutrition_Connector(ss.Connector):
             t_latent = tb.ti_latent[state_change_uids]*self.sim.dt
             t_now = self.sim.ti*self.sim.dt
 
-            x = np.exp(-k_old[state_change]*r*t_latent) - np.exp(-k_old[state_change]*r*t_now) + np.exp(-k_new[state_change]*r*t_now) - R
+            C = np.exp(-k_old[state_change]*r*t_latent) - np.exp(-k_old[state_change]*r*t_now)
+            time_from_C_to_R = -np.log(1-R)/ (k_new[state_change]*r) - -np.log(1-C)/ (k_new[state_change]*r)
+            tb.ti_presymp[state_change_uids] = np.ceil(ti + time_from_C_to_R/dt)
             
-            
-            for i in range(len(x)):
-                if x[i] < 0:            # Handles the case when x is negative which is not possible to calculate the log of a negative number 
-                    print(f"state_change: {state} (-1/({k_new[state_change][0]}*{r}) * np.log( np.exp(-{k_old[state_change][0]}*{r}*{t_latent[0]})-np.exp(-{k_old[state_change][0]}*{r}*{t_now}) + np.exp(-{k_new[state_change][0]}*{r}*{t_now}) - {R[0]})  / {self.sim.dt})")
-                    print(f"Warning: x is negative: {x[i]}")
-                    tb.ti_presymp[state_change_uids] = R[i]     # Set the time of switching from latent to presymp to the previous value
-                else:
-                    tb.ti_presymp[state_change_uids] = -1/(k_new[state_change]*r) * np.log(x[i]) / self.sim.dt
         return
             
     def update(self):
@@ -118,7 +112,7 @@ class TB_Nutrition_Connector(ss.Connector):
             tb.rel_LS_prog[change_uids] = k_new_ls # Update rel_LS_prog
             tb.rel_LF_prog[change_uids] = k_new_lf # Update rel_LF_prog
             
-            self.update_rel_prog(tb, change_uids, k_old_ls, k_new_ls, TBS.LATENT_SLOW, tb.pars.rate_LS_to_presym)   # Update rel_LS_prog
-            self.update_rel_prog(tb, change_uids, k_old_lf, k_new_lf, TBS.LATENT_FAST, tb.pars.rate_LF_to_presym)   # Update rel_LF_prog
+            self.update_rel_prog(tb, change_uids, k_old_ls, k_new_ls, TBS.LATENT_SLOW, tb.pars.rate_LS_to_presym, ti, dt)   # Update rel_LS_prog
+            #self.update_rel_prog(tb, change_uids, k_old_lf, k_new_lf, TBS.LATENT_FAST, tb.pars.rate_LF_to_presym, ti, dt)   # Update rel_LF_prog
 
         return
