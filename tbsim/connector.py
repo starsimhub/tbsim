@@ -75,6 +75,9 @@ class TB_Nutrition_Connector(ss.Connector):
                 t_latent = tb.ti_latent[slow_change_uids]*dt
                 t_now = ti*dt # Time of switching from health to undernourished
 
-                tb.ti_presymp[slow_change_uids] = -1/(k_new[slow_change]*r) * np.log( np.exp(-k_old[slow_change]*r*t_latent) - np.exp(-k_old[slow_change]*r*t_now) + np.exp(-k_new[slow_change]*r*t_now) - R) / dt
+                C = np.exp(-k_old[slow_change]*r*t_latent) - np.exp(-k_old[slow_change]*r*t_now)
+
+                time_from_C_to_R = -np.log(1-R)/ (k_new[slow_change]*r) - -np.log(1-C)/ (k_new[slow_change]*r)
+                tb.ti_presymp[slow_change_uids] = np.ceil(ti + time_from_C_to_R/dt)
 
         return

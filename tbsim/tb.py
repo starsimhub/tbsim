@@ -52,6 +52,9 @@ class TB(ss.Infection):
         # Random number streams used in state flow
         self.choose_cure_or_die_ti = ss.random()
         self.will_die = ss.random()
+
+        # TEMP
+        self.ppf_LS_to_presymp_rng = ss.random()
         
         return
 
@@ -75,6 +78,12 @@ class TB(ss.Infection):
             ss.FloatArr('ti_dead'),
             ss.FloatArr('ti_cure'),
         )
+        return
+
+    def init_post(self):
+        super().init_post()
+        # TEMP, shouldn't need this!
+        self.ppf_LS_to_presymp[self.sim.people.uid] = self.ppf_LS_to_presymp_rng(self.sim.people.uid)
         return
 
     @property

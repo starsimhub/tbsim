@@ -10,14 +10,13 @@ import seaborn as sns
 import matplotlib.dates as mdates
 import matplotlib.ticker as mtick
 import os 
-
-
 import warnings
+
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False
-default_n_rand_seeds = [1000, 2][debug]
+default_n_rand_seeds = [1000, 10][debug]
 
 def compute_rel_LS_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
@@ -30,6 +29,8 @@ def compute_rel_LS_prog(macro, micro):
 
 def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_rate=None, relsus_microdeficient=1, beta=0.1):
     # vitamin_year_rate is a list of tuples like [(1942, 10.0), (1943, 3.0)] or None if CONTROL
+    lbl = f'sim {idx} with rand_seed={rand_seed}, p_control={p_control}, vitamin_year_rate={vitamin_year_rate}'
+    print(f'Starting {lbl}')
 
     np.random.seed(rand_seed)
 
@@ -44,19 +45,12 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
     harlemnet = harlem.net()
 
     # Network parameters
-    #randnet_pars = dict(
-    #    n_contacts=ss.poisson(lam=5),
-    #    dur = 0, # End after one timestep
-    #)
-    # Initialize a random network
-    #randnet = ss.RandomNet(randnet_pars)
     matnet = ss.MaternalNet() # To track newborn --> household
     nets = [harlemnet, matnet] # randnet, 
 
     # ------- TB disease --------
     # Disease parameters
     tb_pars = dict(
-        ####beta = dict(harlem=0.03, random=0.003, maternal=0.0),
         beta = dict(harlem=beta, maternal=0.0),
         init_prev = 0, # Infections seeded by Harlem class
         rate_LS_to_presym = 3e-5, # Slow down LS-->Presym as this is now the rate for healthy individuals
@@ -92,7 +86,7 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
     # Rates to match Appendix Table 7
     nc0 = mtb.NutritionChange(year=[1942, 1944], rate=[1.25, 0], from_state=M.UNSATISFACTORY, to_state=M.MARGINAL,
                 p_new_micro=0.0, new_micro_state=m.NORMAL)
-    nc1 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=M.MARGINAL, to_state=M.SLIGHTLY_BELOW_STANDARD,
+    nc1 = mtb.NutritionChange(year=[1942, 1944], rate=[2.00, 0], from_state=M.MARGINAL, to_state=M.SLIGHTLY_BELOW_STANDARD,
                 p_new_micro=0.0, new_micro_state=m.NORMAL)
     nc2 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=M.SLIGHTLY_BELOW_STANDARD, to_state=M.STANDARD_OR_ABOVE,
                 p_new_micro=0.0, new_micro_state=m.NORMAL)
@@ -163,7 +157,7 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
     dfn['rand_seed'] = rand_seed
     dfn['Scenario'] = scen
 
-    print(f'Finishing sim {idx} with rand_seed={rand_seed}, p_control={p_control}, vitamin_year_rate={vitamin_year_rate}')
+    print(f'Finishing {lbl}')
 
     return df, dfhh, dfn
 
@@ -180,18 +174,18 @@ def run_scenarios(n_seeds=default_n_rand_seeds):
         #    'beta': 0.75,
         #    'n_hhs': 194,
         #},
-        'CONTROL': {
+        'BASE CONTROL': {
             'p_control': 1,
             'vitamin_year_rate': None,
             'relsus_microdeficient': 1,
-            'beta': 0.75,
+            'beta': 0.08,
             'n_hhs': 194/2,
         },
-        'VITAMIN': {
+        'BASE VITAMIN': {
             'p_control': 0,
             'vitamin_year_rate': [(1942, 10.0), (1943, 3.0)],
             'relsus_microdeficient': 1,
-            'beta': 0.75,
+            'beta': 0.08,
             'n_hhs': 194/2,
         },
         'RELSUS 5 CONTROL': {
@@ -212,7 +206,7 @@ def run_scenarios(n_seeds=default_n_rand_seeds):
 
     for skey, scen in scens.items():
         for rs in range(n_seeds):
-            cfgs.append({'scen': skey,'rand_seed':rs} | scen) # Merge dicts with pipe operators
+            cfgs.append({'scen': skey,'rand_seed':rs, 'idx':len(cfgs)} | scen) # Merge dicts with pipe operators
     T = sc.tic()
     results += sc.parallelize(run_harlem, iterkwargs=cfgs, die=False, serial=debug) # , kwargs={'n_hhs':194/2}
     epi, hh, nut = zip(*results)
@@ -372,12 +366,11 @@ def plot_active_infections(data):
 
     df['Incident Cases'] = df.groupby(['Scenario', 'rand_seed'])['cum_active_infections'].transform(lambda x: x - x.iloc[0]) 
 
-    g = sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', errorbar='se')
-    sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', estimator=None, units='rand_seed', alpha=0.1, lw=0.1, legend=False)
-
+    g = sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', errorbar='ci', palette='Paired')
+    sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', errorbar='se', palette='Paired', legend=False)
+    #sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', estimator=None, units='rand_seed', alpha=0.1, lw=0.1, legend=False)
     g.set_xlabel('Year')
-    locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
-    formatter = mdates.ConciseDateFormatter(locator)
+
     sc.savefig(f"incidence_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
     plt.close(g.figure)
 
