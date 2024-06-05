@@ -113,6 +113,6 @@ class TB_Nutrition_Connector(ss.Connector):
             tb.rel_LF_prog[change_uids] = k_new_lf # Update rel_LF_prog
             
             self.update_rel_prog(tb, change_uids, k_old_ls, k_new_ls, TBS.LATENT_SLOW, tb.pars.rate_LS_to_presym, ti, dt)   # Update rel_LS_prog
-            #self.update_rel_prog(tb, change_uids, k_old_lf, k_new_lf, TBS.LATENT_FAST, tb.pars.rate_LF_to_presym, ti, dt)   # Update rel_LF_prog
+            self.update_rel_prog(tb, change_uids, k_old_lf, k_new_lf, TBS.LATENT_FAST, tb.pars.rate_LF_to_presym, ti, dt)   # Update rel_LF_prog
 
         return
