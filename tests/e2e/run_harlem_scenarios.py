@@ -16,11 +16,11 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False
-default_n_rand_seeds = [1000, 10][debug]
+default_n_rand_seeds = [1000, 2][debug]
 run_scens = ['Base', 'NoSecular', 'SecularMicro', 'RelSus5', 'LSProgAlt']
 
 if debug:
-    run_scens = [r for i, r in enumerate(run_scens) if i in [1, 2]]
+    run_scens = [r for i, r in enumerate(run_scens) if i in [0, 1]]
 
 
 def compute_rel_LS_prog(macro, micro):
@@ -177,7 +177,8 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
 
     # Add demographics
     dems = [
-        mtb.HarlemPregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
+        #mtb.HarlemPregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
+        mtb.HarlemPregnancy(pars=dict(fertility_rate=150)), # Per 1,000 women aged 15-49
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
     ]
 
@@ -306,7 +307,7 @@ def plot_epi(df):
     dfs['date'] = pd.to_datetime(365 * (dfs['year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
 
     d = pd.melt(dfs.drop(['rand_seed', 'year'], axis=1), id_vars=['date', 'Scenario'], var_name='channel', value_name='Value')
-    g = sns.relplot(data=d, kind='line', x='date', hue='Scenario', col='channel', y='Value', palette='Set1',
+    g = sns.relplot(data=d, kind='line', x='date', hue='Scenario', col='channel', y='Value', palette='tab20',
         facet_kws={'sharey':False}, col_wrap=3, lw=2, errorbar='sd') # Can change errorbar to None for bootstrapped bars, but it is slow
 
     g.set_titles(col_template='{col_name}', row_template='{row_name}')
@@ -328,7 +329,7 @@ def plot_hh(df):
     dfm['Year'] = dfm['Year'].astype(str)
     #g = sns.barplot(dfm, x='HH Size', y='Frequency', hue='Year')
     g = sns.FacetGrid(data=dfm, height=4, aspect=1.5)
-    g.map_dataframe(sns.barplot, x='HH Size', y='Per Cent', hue='Year', palette='Set1')
+    g.map_dataframe(sns.barplot, x='HH Size', y='Per Cent', hue='Year', palette='tab10')
 
     def hh_data(data, color, **kwargs):
         data = np.array([3, 17, 24, 20, 13, 9, 7, 4, 3]) / 100
@@ -421,7 +422,7 @@ def plot_nut(df):
     # 'Scenario' was 'Arm'
     dfs = df.drop('rand_seed', axis=1).groupby(['Scenario', 'Arm', 'Macro', 'Micro']).sum()
     dfm = dfs.reset_index().melt(id_vars=['Scenario', 'Arm', 'Micro', 'Macro'], var_name='Year', value_name='Frequency')
-    g = sns.FacetGrid(data=dfm, col='Year', height=4, aspect=1.5) # , row='Arm'
+    g = sns.FacetGrid(data=dfm, col='Year', height=4, aspect=1.5, palette='tab10') # , row='Arm'
     g.map_dataframe(stackedbar)
     plt.subplots_adjust(bottom=0.3)
 
@@ -463,7 +464,7 @@ def plot_diff(data, channel='cum_active_infections'):
     df = df * -1
     dfm = pd.melt(df, var_name='Scenario', value_name='Active infections averted')
 
-    g = sns.displot(kind='kde', data=dfm, hue='Scenario', x='Active infections averted', rug=True, fill=True, bw_adjust=2)
+    g = sns.displot(kind='kde', data=dfm, hue='Scenario', x='Active infections averted', rug=True, fill=True, bw_adjust=2, palette='tab10')
     #g = sns.displot(kind='hist', data=dfm, hue='Scenario', x='Active infections averted', stat='density', common_norm=False, multiple='dodge', discrete=True)
     sc.savefig(f'diff_{channel}_{cfg.FILE_POSTFIX}.png', folder=cfg.RESULTS_DIRECTORY)
     plt.close(g.figure)
@@ -498,7 +499,7 @@ def plot_calib(data, channel='cum_active_infections'):
     df = pd.concat(calibs, axis=1)
     dfm = pd.melt(df, var_name='Scenario', value_name=channel)
 
-    g = sns.displot(kind='kde', data=dfm, hue='Scenario', x=channel, rug=True, fill=True)
+    g = sns.displot(kind='kde', data=dfm, hue='Scenario', x=channel, rug=True, fill=True, palette='tab10')
     sc.savefig(f'calib_{channel}_{cfg.FILE_POSTFIX}.png', folder=cfg.RESULTS_DIRECTORY)
     plt.close(g.figure)
 
@@ -514,11 +515,12 @@ def plot_active_infections(data):
 
     df['Incident Cases'] = df.groupby(['Scenario', 'rand_seed'])['cum_active_infections'].transform(lambda x: x - x.iloc[0]) 
 
-    g = sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', errorbar='ci', palette='Paired')
-    sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', errorbar='se', palette='Paired', legend=False)
+    g = sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', errorbar=('se', 2), palette='tab20')
+    #sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', errorbar=('sd', 2), palette='tab20', legend=False)
     #sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', estimator=None, units='rand_seed', alpha=0.1, lw=0.1, legend=False)
     g.set_xlabel('Year')
 
+    sc.savefig(f"incidence_{cfg.FILE_POSTFIX}.pdf", folder=cfg.RESULTS_DIRECTORY)
     sc.savefig(f"incidence_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
     plt.close(g.figure)
 
@@ -526,11 +528,13 @@ def plot_active_infections(data):
 
 
 if __name__ == '__main__':
-    if False:
+    if True:
         df_epi, df_hh, df_nut = run_scenarios()
     else:
-        resdir = os.path.join('figs', 'TB')
-        df_epi = pd.read_csv(os.path.join(resdir, 'result_06-04_21-05-49.csv'))
+        cfg.FILE_POSTFIX = '06-05_00-27-51'
+        cfg.RESULTS_DIRECTORY = os.path.join('figs', 'TB', cfg.FILE_POSTFIX)
+        df_epi = pd.read_csv(os.path.join(cfg.RESULTS_DIRECTORY, f'result_{cfg.FILE_POSTFIX}.csv'), index_col=0)
+        #df_epi = df_epi.loc[df_epi['Scenario'].isin(['Base CONTROL', 'Base VITAMIN', 'RelSus5 CONTROL', 'RelSus5 VITAMIN'])]
 
     '''
     if debug:
@@ -540,6 +544,7 @@ if __name__ == '__main__':
         sim.analyzers['harlemanalyzer'].plot()
         plt.show()
     '''
+
 
     plot_calib(df_epi, channel='cum_active_infections')
     plot_diff(df_epi, channel='cum_active_infections')

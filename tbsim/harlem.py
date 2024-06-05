@@ -119,8 +119,12 @@ class HarlemPregnancy(ss.Pregnancy):
             return newborn_uids
 
         people = self.sim.people
+        nut = self.sim.diseases['malnutrition']
         people.hhid[newborn_uids] = people.hhid[conceive_uids]
         people.arm[newborn_uids] = people.arm[conceive_uids]
+        # Assume baby has the same micro/macro state as mom
+        nut.micro_state[newborn_uids] = nut.micro_state[conceive_uids]
+        nut.macro_state[newborn_uids] = nut.macro_state[conceive_uids]
 
         hn = self.sim.networks['harlemnet']
 
