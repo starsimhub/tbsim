@@ -17,19 +17,127 @@ warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False
 default_n_rand_seeds = [1000, 10][debug]
+run_scens = ['Base', 'NoSecular', 'SecularMicro', 'RelSus5', 'LSProgAlt']
+
+if debug:
+    run_scens = [r for i, r in enumerate(run_scens) if i in [1, 2]]
+
 
 def compute_rel_LS_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     ret = np.ones_like(macro)
-    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 2 #1.5
-    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 5 #2.0
-    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 10 #2.5
-    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 20 #3.0
+    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 1.5
+    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 2.0
+    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 2.5
+    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 3.0
     return ret
 
-def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_rate=None, relsus_microdeficient=1, beta=0.1):
+
+def compute_rel_LS_prog_alternate(macro, micro):
+    assert len(macro) == len(micro), 'Length of macro and micro must match.'
+    ret = np.ones_like(macro)
+    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 2
+    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 5
+    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 10
+    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 20
+    return ret
+
+scens = {
+    #'COMBINED': {
+    #    'p_control': 0.5,
+    #    'vitamin_year_rate': [(1942, 10.0), (1943, 3.0)],
+    #    'relsus_microdeficient': 1,
+    #    'beta': 0.75,
+    #    'n_hhs': 194,
+    #},
+    'Base CONTROL': {
+        'p_control': 1,
+        'vitamin_year_rate': None,
+        'relsus_microdeficient': 1,
+        'beta': 0.12,
+        'n_hhs': 194/2,
+    },
+    'Base VITAMIN': {
+        'p_control': 0,
+        'vitamin_year_rate': [(1942, 10.0), (1943, 3.0)],
+        'relsus_microdeficient': 1,
+        'beta': 0.12,
+        'n_hhs': 194/2,
+        'ref': 'Base CONTROL',
+    },
+    'NoSecular CONTROL': {
+        'p_control': 1,
+        'vitamin_year_rate': None,
+        'relsus_microdeficient': 1,
+        'beta': 0.11,
+        'n_hhs': 194/2,
+        'secular_trend': False,
+    },
+    'NoSecular VITAMIN': {
+        'p_control': 0,
+        'vitamin_year_rate': [(1942, 10.0), (1943, 3.0)],
+        'relsus_microdeficient': 1,
+        'beta': 0.11,
+        'n_hhs': 194/2,
+        'secular_trend': False,
+        'ref': 'NoSecular CONTROL',
+    },
+    'SecularMicro CONTROL': {
+        'p_control': 1,
+        'vitamin_year_rate': None,
+        'relsus_microdeficient': 1,
+        'beta': 0.13,
+        'n_hhs': 194/2,
+        'p_new_micro': 0.5,
+    },
+    'SecularMicro VITAMIN': {
+        'p_control': 0,
+        'vitamin_year_rate': [(1942, 10.0), (1943, 3.0)],
+        'relsus_microdeficient': 1,
+        'beta': 0.13,
+        'n_hhs': 194/2,
+        'p_new_micro': 0.5,
+        'ref': 'SecularMicro CONTROL',
+    },
+    'RelSus5 CONTROL': {
+        'p_control': 1,
+        'vitamin_year_rate': None,
+        'relsus_microdeficient': 5,
+        'beta': 0.04,
+        'n_hhs': 194/2,
+    },
+    'RelSus5 VITAMIN': {
+        'p_control': 0,
+        'vitamin_year_rate': [(1942, 10.0), (1943, 3.0)],
+        'relsus_microdeficient': 5,
+        'beta': 0.04,
+        'n_hhs': 194/2,
+        'ref': 'RelSus5 CONTROL',
+    },
+
+    'LSProgAlt CONTROL': {
+        'p_control': 1,
+        'vitamin_year_rate': None,
+        'relsus_microdeficient': 1,
+        'beta': 0.08,
+        'n_hhs': 194/2,
+        'rel_LS_prog_func': compute_rel_LS_prog_alternate,
+    },
+    'LSProgAlt VITAMIN': {
+        'p_control': 0,
+        'vitamin_year_rate': [(1942, 10.0), (1943, 3.0)],
+        'relsus_microdeficient': 1,
+        'beta': 0.08,
+        'n_hhs': 194/2,
+        'rel_LS_prog_func': compute_rel_LS_prog_alternate,
+        'ref': 'LSProgAlt CONTROL',
+    },
+}
+
+def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_rate=None, relsus_microdeficient=1,
+               beta=0.1, secular_trend=True, p_new_micro=0.0, rel_LS_prog_func=compute_rel_LS_prog, **kwargs):
     # vitamin_year_rate is a list of tuples like [(1942, 10.0), (1943, 3.0)] or None if CONTROL
-    lbl = f'sim {idx} with rand_seed={rand_seed}, p_control={p_control}, vitamin_year_rate={vitamin_year_rate}'
+    lbl = f'sim {idx}: {scen} with rand_seed={rand_seed}, p_control={p_control}, vitamin_year_rate={vitamin_year_rate}'
     print(f'Starting {lbl}')
 
     np.random.seed(rand_seed)
@@ -75,7 +183,7 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
 
     # -------- Connector -------
     cn_pars = dict(
-        rel_LS_prog_func = compute_rel_LS_prog,
+        rel_LS_prog_func = rel_LS_prog_func,
         relsus_microdeficient = relsus_microdeficient # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
@@ -83,14 +191,16 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
     # -------- Interventions -------
     m = mtb.MicroNutrients
     M = mtb.MacroNutrients
-    # Rates to match Appendix Table 7
-    nc0 = mtb.NutritionChange(year=[1942, 1944], rate=[1.25, 0], from_state=M.UNSATISFACTORY, to_state=M.MARGINAL,
-                p_new_micro=0.0, new_micro_state=m.NORMAL)
-    nc1 = mtb.NutritionChange(year=[1942, 1944], rate=[2.00, 0], from_state=M.MARGINAL, to_state=M.SLIGHTLY_BELOW_STANDARD,
-                p_new_micro=0.0, new_micro_state=m.NORMAL)
-    nc2 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=M.SLIGHTLY_BELOW_STANDARD, to_state=M.STANDARD_OR_ABOVE,
-                p_new_micro=0.0, new_micro_state=m.NORMAL)
-    intvs = [nc0, nc1, nc2]
+    intvs = []
+    if secular_trend:
+        # Rates hand picked to match Appendix Table 7
+        nc0 = mtb.NutritionChange(year=[1942, 1944], rate=[1.25, 0], from_state=M.UNSATISFACTORY, to_state=M.MARGINAL,
+                    p_new_micro=p_new_micro, new_micro_state=m.NORMAL)
+        nc1 = mtb.NutritionChange(year=[1942, 1944], rate=[2.50, 0], from_state=M.MARGINAL, to_state=M.SLIGHTLY_BELOW_STANDARD,
+                    p_new_micro=p_new_micro, new_micro_state=m.NORMAL)
+        nc2 = mtb.NutritionChange(year=[1942, 1944], rate=[1.25, 0], from_state=M.SLIGHTLY_BELOW_STANDARD, to_state=M.STANDARD_OR_ABOVE,
+                    p_new_micro=p_new_micro, new_micro_state=m.NORMAL)
+        intvs = [nc0, nc1, nc2]
 
     vs = []
     if vitamin_year_rate is not None:
@@ -157,7 +267,7 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
     dfn['rand_seed'] = rand_seed
     dfn['Scenario'] = scen
 
-    print(f'Finishing {lbl}')
+    #print(f'Finishing {lbl}')
 
     return df, dfhh, dfn
 
@@ -166,45 +276,9 @@ def run_scenarios(n_seeds=default_n_rand_seeds):
     results = []
     cfgs = []
 
-    scens = {
-        #'COMBINED': {
-        #    'p_control': 0.5,
-        #    'vitamin_year_rate': [(1942, 10.0), (1943, 3.0)],
-        #    'relsus_microdeficient': 1,
-        #    'beta': 0.75,
-        #    'n_hhs': 194,
-        #},
-        'BASE CONTROL': {
-            'p_control': 1,
-            'vitamin_year_rate': None,
-            'relsus_microdeficient': 1,
-            'beta': 0.08,
-            'n_hhs': 194/2,
-        },
-        'BASE VITAMIN': {
-            'p_control': 0,
-            'vitamin_year_rate': [(1942, 10.0), (1943, 3.0)],
-            'relsus_microdeficient': 1,
-            'beta': 0.08,
-            'n_hhs': 194/2,
-        },
-        'RELSUS 5 CONTROL': {
-            'p_control': 1,
-            'vitamin_year_rate': None,
-            'relsus_microdeficient': 5,
-            'beta': 0.0225,
-            'n_hhs': 194/2,
-        },
-        'RELSUS 5 VITAMIN': {
-            'p_control': 0,
-            'vitamin_year_rate': [(1942, 10.0), (1943, 3.0)],
-            'relsus_microdeficient': 5,
-            'beta': 0.0225,
-            'n_hhs': 194/2,
-        },
-    }
-
     for skey, scen in scens.items():
+        if skey.split(' ')[0] not in run_scens: # Limit scenarios
+            continue
         for rs in range(n_seeds):
             cfgs.append({'scen': skey,'rand_seed':rs, 'idx':len(cfgs)} | scen) # Merge dicts with pipe operators
     T = sc.tic()
@@ -356,12 +430,86 @@ def plot_nut(df):
     plt.close(g.figure)
     return
 
+def diff(data, baseline, counterfactual, label, channel='cum_active_infections'):
+
+    final_year = data['year'].max()
+
+    bl = data.loc[(data['Scenario'] == baseline) & (data['year']==final_year)]
+    cf = data.loc[(data['Scenario'] == counterfactual) & (data['year']==final_year)]
+
+    # Sum over arm for this analysis
+    blm = bl.groupby(['rand_seed', 'year'])[channel].sum()
+    blm.name = baseline
+    cfm = cf.groupby(['rand_seed', 'year'])[channel].sum()
+    cfm.name = counterfactual
+
+    # Concat
+    df = pd.concat([cfm, blm], axis=1)
+    df[label] = df[counterfactual] - df[baseline]
+    df.index = df.index.droplevel('year')
+
+    return df
+
+def plot_diff(data, channel='cum_active_infections'):
+    scenarios = data['Scenario'].unique()
+    diffs = []
+    for scen in scenarios:
+        if 'ref' in scens[scen]:
+            label = scen.split(' ')[0]
+            d = diff(data, scens[scen]['ref'], scen, label=label, channel=channel)
+            diffs.append(d[label])
+
+    df = pd.concat(diffs, axis=1)
+    df = df * -1
+    dfm = pd.melt(df, var_name='Scenario', value_name='Active infections averted')
+
+    g = sns.displot(kind='kde', data=dfm, hue='Scenario', x='Active infections averted', rug=True, fill=True, bw_adjust=2)
+    #g = sns.displot(kind='hist', data=dfm, hue='Scenario', x='Active infections averted', stat='density', common_norm=False, multiple='dodge', discrete=True)
+    sc.savefig(f'diff_{channel}_{cfg.FILE_POSTFIX}.png', folder=cfg.RESULTS_DIRECTORY)
+    plt.close(g.figure)
+
+    return g.figure
+
+def plot_calib(data, channel='cum_active_infections'):
+    scenarios = data['Scenario'].unique()
+    calibs = []
+    for scen in scenarios:
+        if 'ref' not in scens[scen]:
+            label = scen.split(' ')[0]
+            
+            trial_start = 1942
+            years = data['year'].unique()
+            trial_start = years[np.argmax(years >= trial_start)]
+
+            final_year = data['year'].max()
+            df = data.loc[(data['Scenario'] == scen) & (data['year'].isin([trial_start, final_year]))]
+
+            # Sum over arm for this analysis
+            dfs = df.groupby(['rand_seed', 'year'])[[channel]].sum().reset_index()
+            dfm = pd.pivot(data=dfs, index='rand_seed', columns='year', values=channel)
+            dfm[label] = dfm[final_year] - dfm[trial_start]
+            dfm = dfm[[label]]
+
+            #dfs.index = dfs.index.droplevel('year')
+            #dfs.name = label
+            calibs.append(dfm)
+
+    # Concat
+    df = pd.concat(calibs, axis=1)
+    dfm = pd.melt(df, var_name='Scenario', value_name=channel)
+
+    g = sns.displot(kind='kde', data=dfm, hue='Scenario', x=channel, rug=True, fill=True)
+    sc.savefig(f'calib_{channel}_{cfg.FILE_POSTFIX}.png', folder=cfg.RESULTS_DIRECTORY)
+    plt.close(g.figure)
+
+    return g.figure
+
 def plot_active_infections(data):
     df = data.groupby(['Scenario', 'rand_seed', 'year'])[['cum_active_infections']].sum().sort_index() # Sum over arms
     trial_start = 1942
     df.index.get_level_values('year')
     years = df.index.get_level_values('year').unique()
-    trial_start = years[np.argmax(years > trial_start)]
+    trial_start = years[np.argmax(years >= trial_start)]
     df = df.loc[slice(None), slice(None), trial_start:]
 
     df['Incident Cases'] = df.groupby(['Scenario', 'rand_seed'])['cum_active_infections'].transform(lambda x: x - x.iloc[0]) 
@@ -378,7 +526,11 @@ def plot_active_infections(data):
 
 
 if __name__ == '__main__':
-    df_epi, df_hh, df_nut = run_scenarios()
+    if False:
+        df_epi, df_hh, df_nut = run_scenarios()
+    else:
+        resdir = os.path.join('figs', 'TB')
+        df_epi = pd.read_csv(os.path.join(resdir, 'result_06-04_21-05-49.csv'))
 
     '''
     if debug:
@@ -389,8 +541,10 @@ if __name__ == '__main__':
         plt.show()
     '''
 
-    plot_epi(df_epi)
+    plot_calib(df_epi, channel='cum_active_infections')
+    plot_diff(df_epi, channel='cum_active_infections')
     plot_active_infections(df_epi)
+    plot_epi(df_epi)
     plot_hh(df_hh)
     plot_nut(df_nut)
 
