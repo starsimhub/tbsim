@@ -30,21 +30,22 @@ class TB_Nutrition_Connector(ss.Connector):
         tb.rel_LF_prog[self.sim.people.uid] = self.pars.rel_LF_prog_func(nut.macro_state, nut.micro_state)
         return
     
-    @staticmethod    
-    def compute_rel_prog(macro, micro, normal_factor=0, deficient_factor=0, unsatisfactory_factor=0):
+    @staticmethod
+    def compute_rel_LS_prog(macro, micro):
         assert len(macro) == len(micro), 'Length of macro and micro must match.'
         ret = np.ones_like(macro)
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = normal_factor
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = deficient_factor
-        ret[macro == MacroNutrients.UNSATISFACTORY] = unsatisfactory_factor
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 1.0
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 5.0
+        ret[macro == MacroNutrients.UNSATISFACTORY] = 10.0
         return ret
-    
-    def compute_rel_LS_prog(macro, micro):
-        ret = TB_Nutrition_Connector.compute_rel_prog(macro, micro, normal_factor=1.25, deficient_factor=2.5, unsatisfactory_factor=4.0)
-        return ret
-    
+
+    @staticmethod
     def compute_rel_LF_prog(macro, micro):
-        ret =  TB_Nutrition_Connector.compute_rel_prog(macro, micro, normal_factor=2.5, deficient_factor=5.0, unsatisfactory_factor=6.0)
+        assert len(macro) == len(micro), 'Length of macro and micro must match.'
+        ret = np.ones_like(macro)
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 1.0
+        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 10.0
+        ret[macro == MacroNutrients.UNSATISFACTORY] = 20.0
         return ret
     
     def update_rel_prog(self, tb, change_uids, k_old, k_new, state, rate, ti, dt):
