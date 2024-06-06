@@ -52,12 +52,10 @@ class TB(ss.Infection):
         # Random number streams used in state flow
         self.choose_cure_or_die_ti = ss.random()
         self.will_die = ss.random()
-        
-        print(f"TB model initialized with parameters: {self.pars}/n" )
-        return
 
-    def initialize(self, sim):
-        super().initialize(sim)
+        # TEMP
+        self.ppf_LS_to_presymp_rng = ss.random()
+        
         return
 
     def _add_states(self):
@@ -69,7 +67,8 @@ class TB(ss.Infection):
         
         self.add_states(            
             ss.FloatArr('rel_LS_prog', default=1.0),                # Multiplier on the latent-slow progression rate
-            ss.FloatArr('ppf_LS_to_presymp', default=ss.random()), # CDF samples for transition from latent slow to active pre-symptomatic
+            ##### TEMP: ss.FloatArr('ppf_LS_to_presymp', default=ss.random()), # CDF samples for transition from latent slow to active pre-symptomatic
+            ss.FloatArr('ppf_LS_to_presymp'), # CDF samples for transition from latent slow to active pre-symptomatic
         )
         
         self.add_states(
@@ -80,6 +79,12 @@ class TB(ss.Infection):
             ss.FloatArr('ti_dead'),
             ss.FloatArr('ti_cure'),
         )
+        return
+
+    def init_post(self):
+        super().init_post()
+        # TEMP, shouldn't need this!
+        self.ppf_LS_to_presymp[self.sim.people.uid] = self.ppf_LS_to_presymp_rng(self.sim.people.uid)
         return
 
     @property
@@ -151,7 +156,6 @@ class TB(ss.Infection):
             self.state[presym] = self.active_tb_state[presym]
 
             state = self.state[presym] 
-            # y = presym
             exptb_uids = presym[state ==TBS.ACTIVE_EXPTB]
             smpos_uids = presym[state ==TBS.ACTIVE_SMPOS]
             smneg_uids = presym[state ==TBS.ACTIVE_SMNEG]

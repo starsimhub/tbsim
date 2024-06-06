@@ -46,7 +46,7 @@ class Malnutrition(ss.Disease):
             ss.FloatArr('ti_macro'),                          # Time index of change in macronutrition
             ss.FloatArr('new_macro_state'),                   # New macro nutrition state
 
-            ss.FloatArr('ti_micro'),                          # Time at which undernourished was diagnosed
+            ss.FloatArr('ti_micro'),                          # Time index of change in micronutrition
             ss.FloatArr('new_micro_state'),                   # New micro nutrition state
         )
         
