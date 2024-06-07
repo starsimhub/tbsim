@@ -87,9 +87,11 @@ class TB(ss.Infection):
         return
 
     def init_post(self):
-        super().init_post()
         # TEMP, shouldn't need this!
         self.ppf_LS_to_presymp[self.sim.people.uid] = self.ppf_LS_to_presymp_rng(self.sim.people.uid)
+        self.ppf_LF_to_presymp[self.sim.people.uid] = self.ppf_LF_to_presymp_rng(self.sim.people.uid)
+
+        super().init_post() # Must be after ^^^
         return
 
     @property
@@ -135,10 +137,7 @@ class TB(ss.Infection):
         
         rate_fast = self.rel_LF_prog[fast_uids] * self.pars.rate_LF_to_presym
         self.ti_presymp[fast_uids] = np.ceil(ti - np.log(1 - self.ppf_LF_to_presymp[fast_uids])/rate_fast  / 365 / dt)
-        
-        print('DEBUG:')
-        self.ti_presymp[fast_uids] = np.ceil(ti + p.dur_LF_to_presymp.rvs(fast_uids) / 365 / dt)
-        
+
         # Update result count of new infections 
         self.results['new_infections'][ti] += len(uids)
         return
