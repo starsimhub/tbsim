@@ -226,8 +226,6 @@ def plot_calib(data, scens, channel='cum_active_infections'):
             dfm[label] = dfm[final_year] - dfm[trial_start]
             dfm = dfm[[label]]
 
-            #dfs.index = dfs.index.droplevel('year')
-            #dfs.name = label
             calibs.append(dfm)
 
     # Concat

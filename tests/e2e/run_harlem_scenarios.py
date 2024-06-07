@@ -12,10 +12,10 @@ warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False
 default_n_rand_seeds = [1000, 2][debug]
-cache_from = [None, '06-07_00-29-12'][0] # Run sims if None, plot from dir if datestr provided
+cache_from = [None, '06-07_11-35-10'][0] # Run sims if None, plot from dir if datestr provided
 scen_filter = None # Put a list of scenarios here to restrict, e.g. ['Base']
 
-def compute_rel_LS_prog(macro, micro):
+def compute_rel_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     ret = np.ones_like(macro)
     ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 1.5
@@ -24,7 +24,7 @@ def compute_rel_LS_prog(macro, micro):
     ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 3.0
     return ret
 
-def compute_rel_LS_prog_alternate(macro, micro):
+def compute_rel_prog_alternate(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     ret = np.ones_like(macro)
     ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 2
@@ -62,12 +62,12 @@ def run_scen(scen, filter):
 
 scenarios = {
     'Base': {
-        'beta': 0.12,
+        'beta': 0.24,
         'active': run_scen('Base', scen_filter),
     },
 
     'MoreMicroDeficient': {
-        'beta': 0.10,
+        'beta': 0.20,
         'p_microdeficient_given_macro': {
             mtb.MacroNutrients.UNSATISFACTORY: 1.0,
             mtb.MacroNutrients.MARGINAL: 1.0,
@@ -78,36 +78,50 @@ scenarios = {
     },
 
     'LatentSeeding': {
-        'beta': 0.08,
+        'beta': 0.16,
         'init_prev': 0.33,
         'active': run_scen('LatentSeeding', scen_filter),
     },
 
     'RelSus': {
         'relsus_microdeficient': 5,
-        'beta': 0.04,
+        'beta': 0.08,
         'active': run_scen('RelSus', scen_filter),
     },
 
     'LSProgAlt': {
-        'beta': 0.08,
-        'rel_LS_prog_func': compute_rel_LS_prog_alternate,
+        'beta': 0.16,
+        'rel_LS_prog_func': compute_rel_prog_alternate,
         'active': run_scen('LSProgAlt', scen_filter),
     },
 
+    'LatentFast': {
+        'beta': 0.16,
+        'rel_LF_prog_func': compute_rel_prog,
+        'active': run_scen('LatentFast', scen_filter),
+    },
+
+    'FastSlowAlt': {
+        'beta': 0.16,
+        'rel_LF_prog_func': compute_rel_prog_alternate,
+        'rel_LS_prog_func': compute_rel_prog_alternate,
+        'active': run_scen('LatentFast', scen_filter),
+    },
+
     'AllVitamin': {
+        'beta': 0.24,
         'p_micro_recovery_func': p_micro_recovery_alt,
         'active': run_scen('AllVitamin', scen_filter),
     },
 
     'NoSecular': {
-        'beta': 0.11,
+        'beta': 0.22,
         'secular_trend': False,
         'active': False, # Disable
     },
 
     'SecularMicro': {
-        'beta': 0.13,
+        'beta': 0.26,
         'p_new_micro': 0.5,
         'active': False, # Disable
     },
@@ -134,7 +148,8 @@ for skey, scn in scenarios.items():
 
 def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5,
                vitamin_year_rate=None, relsus_microdeficient=1, beta=0.1,
-               secular_trend=True, p_new_micro=0.0, rel_LS_prog_func=compute_rel_LS_prog,
+               secular_trend=True, p_new_micro=0.0,
+               rel_LS_prog_func=compute_rel_prog, rel_LF_prog_func=mtb.TB_Nutrition_Connector.compute_rel_LF_prog,
                init_prev=0.0, p_microdeficient_given_macro=None,
                p_micro_recovery_func=p_micro_recovery_default, **kwargs):
     # vitamin_year_rate is a list of tuples like [(1942, 10.0), (1943, 3.0)] or None if CONTROL
@@ -188,6 +203,7 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5,
     # -------- Connector -------
     cn_pars = dict(
         rel_LS_prog_func = rel_LS_prog_func,
+        rel_LF_prog_func = rel_LF_prog_func,
         relsus_microdeficient = relsus_microdeficient # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)

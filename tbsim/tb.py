@@ -22,11 +22,11 @@ class TB(ss.Infection):
 
         self.default_pars(
             init_prev = ss.bernoulli(0.01),   # Initial prevalence - TODO: Check if there is one
-            beta = 0.25,         # Transmission rate  - TODO: Check if there is one
+            beta = 0.25, # Transmission rate  - TODO: Check if there is one
             p_latent_fast = ss.bernoulli(0.1), # Probability of latent fast as opposed to latent slow
 
-            rate_LS_to_presym = 3e-5,                   # Latent Slow to Active Pre-Symptomatic (per day)
-            rate_LF_to_presym = 6e-3,                   # Latent Fast to Active Pre-Symptomatic (per day)
+            rate_LS_to_presym = 3e-5, # Latent Slow to Active Pre-Symptomatic (per day)
+            rate_LF_to_presym = 6e-3, # Latent Fast to Active Pre-Symptomatic (per day)
 
             dur_presym = ss.expon(scale=1/3e-2),  # Pre-symptomatic to symptomatic (days)
             
