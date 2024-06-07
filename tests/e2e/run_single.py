@@ -4,9 +4,7 @@ import matplotlib.pyplot as plt
 
 def make_malnutrition():
     # --------- Malnutrition ----------
-    nut_pars = dict(
-        init_prev = 0.001,
-        )
+    nut_pars = dict()
     nut = mtb.Malnutrition(nut_pars)
 
     n_agents = 10000
@@ -81,9 +79,7 @@ def make_tb_nut():
     tb = mtb.TB(tb_pars)
 
     # ---------- Malnutrition --------
-    nut_pars = dict(
-        init_prev = 0.001,
-        )
+    nut_pars = dict()
     nut = mtb.Malnutrition(nut_pars)
 
     # -------- Network ---------
@@ -102,9 +98,7 @@ def make_tb_nut():
     ]
 
     # Connector
-    cn_pars = dict(
-        rel_LS_prog_risk = 2.0,
-    )
+    cn_pars = dict()
     cn = mtb.TB_Nutrition_Connector(cn_pars)
 
     # -------- simulation -------

@@ -57,9 +57,7 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     ]
 
     # Connector
-    cn_pars = dict(
-        rel_LS_prog_risk = xLS,
-    )
+    cn_pars = dict()
     cn = mtb.TB_Nutrition_Connector(cn_pars)
 
     # -------- simulation -------

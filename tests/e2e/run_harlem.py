@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore", "use_inf_as_na")
 debug = False
 default_n_rand_seeds = [1000, 10][debug]
 
-def compute_rel_LS_prog(macro, micro):
+def compute_rel_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     ret = np.ones_like(macro)
     #ret[micro == mtb.MicroNutrients.DEFICIENT] = 5
@@ -28,6 +28,7 @@ def compute_rel_LS_prog(macro, micro):
     ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 2.5
     ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 3.0
     return ret
+
 
 def run_harlem(rand_seed=0):
 
@@ -58,8 +59,9 @@ def run_harlem(rand_seed=0):
         ####beta = dict(harlem=0.03, random=0.003, maternal=0.0),
         beta = dict(harlem=0.03, random=0.0, maternal=0.0),
         init_prev = 0, # Infections seeded by Harlem class
-        rate_LS_to_presym = 3e-5, # Slow down LS-->Presym as this is now the rate for healthy individuals
-
+        rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
+        rate_LF_to_presym = 6e-3,  # TODO: double chek pars
+        
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
         rel_trans_smneg     = 0.3,
@@ -80,8 +82,9 @@ def run_harlem(rand_seed=0):
 
     # -------- Connector -------
     cn_pars = dict(
-        rel_LS_prog_func=compute_rel_LS_prog,
-        relsus_microdeficient = 1 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
+        rel_LS_prog_func=compute_rel_prog,
+        rel_LF_prog_func=compute_rel_prog,   
+        relsus_microdeficient=1 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
 
