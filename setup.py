@@ -47,5 +47,6 @@ setup(
         'starsim',
         'wheel',
         'setuptools',
+        'seaborn',
     ],
 )

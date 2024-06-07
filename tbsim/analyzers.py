@@ -40,20 +40,23 @@ class HarlemAnalyzer(ss.Analyzer):
             n_infected = np.count_nonzero(tb.infected[ppl])
             n_died = np.count_nonzero( (tb.ti_dead[(self.sim.people.arm==arm)] == ti) )
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
+            n_latent_fast = np.count_nonzero(tb.state[ppl] == TBS.LATENT_FAST)
             n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
             n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == MacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == MacroNutrients.MARGINAL) )
             infected = ppl & tb.infected
             if not infected.any():
                 rel_LS_mean = np.nan
+                rel_LF_mean = np.nan
             else:
                 rel_LS_mean = tb.rel_LS_prog[infected].mean()
+                rel_LF_mean = tb.rel_LF_prog[ppl & tb.infected].mean()
 
-            self.data.append([self.sim.year, arm.name, n_people, new_infections, new_active_infections, n_infected, n_died, n_latent_slow, n_micro_deficient, n_macro_deficient, rel_LS_mean])
+            self.data.append([self.sim.year, arm.name, n_people, new_infections, new_active_infections, n_infected, n_died, n_latent_slow, n_latent_fast, n_micro_deficient, n_macro_deficient, rel_LS_mean, rel_LF_mean])
         return
 
     def finalize(self):
         super().finalize()
-        self.df = pd.DataFrame(self.data, columns = ['year', 'arm', 'n_people', 'new_infections', 'new_active_infections', 'n_infected', 'n_died', 'n_latent_slow', 'n_micro_deficient', 'n_macro_deficient', 'rel_LS_mean'])
+        self.df = pd.DataFrame(self.data, columns = ['year', 'arm', 'n_people', 'new_infections', 'new_active_infections', 'n_infected', 'n_died', 'n_latent_slow', 'n_latent_fast','n_micro_deficient', 'n_macro_deficient', 'rel_LS_mean', 'rel_LF_mean'])
 
         self.df['cum_infections'] = self.df.groupby(['arm'])['new_infections'].cumsum()
         self.df.drop('new_infections', axis=1, inplace=True)
