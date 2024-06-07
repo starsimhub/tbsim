@@ -16,17 +16,17 @@ class HarlemNet(ss.Network):
     """_summary_
     
     """
-    def initialize(self, sim):
-        super().initialize(sim)
+    def init_pre(self, sim):
+        super().init_pre(sim)
         for hh in self.hhs:                 # For each household
-            p1s, p2s = hh.contacts()        # Get all their contacts
+            p1s, p2s = hh.edges()        # Get all their contacts
 
-            self.contacts.p1 = np.concatenate([self.contacts.p1, p1s])
-            self.contacts.p2 = np.concatenate([self.contacts.p2, p2s])
-            self.contacts.beta = np.concatenate([self.contacts.beta, np.ones_like(p1s)])
+            self.edges.p1 = np.concatenate([self.edges.p1, p1s])
+            self.edges.p2 = np.concatenate([self.edges.p2, p2s])
+            self.edges.beta = np.concatenate([self.edges.beta, np.ones_like(p1s)])
 
-        self.contacts.p1 = ss.uids(self.contacts.p1)
-        self.contacts.p2 = ss.uids(self.contacts.p2)
+        self.edges.p1 = ss.uids(self.edges.p1)
+        self.edges.p2 = ss.uids(self.edges.p2)
 
         return
     
@@ -39,31 +39,14 @@ class HarlemNet(ss.Network):
     def update(self):
         super().update()
 
-        preg = self.sim.demographics['pregnancy']
-        deliveries = (preg.pregnant & (preg.ti_delivery <= self.sim.ti)).uids
-
-        if len(deliveries) == 0:
+        newborns = ((self.sim.people.age > 0) & (self.sim.people.age < self.sim.dt)).uids
+        if len(newborns) == 0:
             return
 
-        mn = self.sim.networks['maternalnet'].to_df()
+        # Activate household contacts by setting beta to 1
         hn = self.sim.networks['harlemnet']
-        hhid = self.sim.people.hhid
-        arm = self.sim.people.arm
-
-        p1s = []
-        p2s = []
-        for mother_uid in deliveries:
-            infant_uid = mn.loc[(mn['p1'] == mother_uid) & (mn['dur'] >= 0)]['p2'].values[0] # No twins!
-            hhid[infant_uid] = hhid[mother_uid]
-            arm[infant_uid] = arm[mother_uid]
-
-            for contact in hn.find_contacts(mother_uid):
-                p1s.append(contact)
-                p2s.append(infant_uid)
-
-        hn.contacts.p1 = np.concatenate([hn.contacts.p1, p1s]).astype(ss.dtypes.int)
-        hn.contacts.p2 = np.concatenate([hn.contacts.p2, p2s]).astype(ss.dtypes.int)
-        hn.contacts.beta = np.concatenate([hn.contacts.beta, np.ones_like(p1s)]).astype(ss.dtypes.float)
+        for infant_uid in newborns:
+            hn.edges.beta[hn.edges.p2 == infant_uid] = 1.0
 
         return
     
@@ -92,7 +75,7 @@ class HouseHold():
     representing all possible pairs of contacts within a group of individuals identified by uids. 
     It then separates these pairs into two lists, p1s and p2s, and returns these lists.
     """
-    def contacts(self):
+    def edges(self):
         g = nx.complete_graph(self.uids)
         p1s = []
         p2s = []

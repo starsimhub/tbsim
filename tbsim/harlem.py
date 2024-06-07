@@ -4,7 +4,7 @@ import sciris as sc
 import pandas as pd
 import numpy as np
 
-__all__ = ['Harlem', 'StudyArm']
+__all__ = ['Harlem', 'StudyArm', 'HarlemPregnancy']
 
 
 from enum import IntEnum, auto
@@ -25,8 +25,10 @@ class Harlem():
                 mtb.MacroNutrients.STANDARD_OR_ABOVE: 0.0,
             },
             n_hhs = 194,
+            p_control = 0.5, # Household-level probability of control arm
         )
         self.pars = sc.mergedicts(self.pars, pars)
+        self.pars.n_hhs = int(np.round(self.pars.n_hhs)) # Must be an integer
 
         self.hhdat = pd.DataFrame({
             'size': np.arange(1,10),
@@ -36,7 +38,7 @@ class Harlem():
         macro = mtb.MacroNutrients
         self.macrodat = pd.DataFrame({
             'habit': [ macro.STANDARD_OR_ABOVE, macro.SLIGHTLY_BELOW_STANDARD, macro.MARGINAL, macro.UNSATISFACTORY ],
-            # These are the 1942 levels
+            # These are the 1942 levels from Appendix Table 3 or 7 of Downes
             'p_control': [21.1, 28.9, 38.9, 11.1],
             'p_vitamin': [29.2, 30.3, 28.1, 12.4],
         })
@@ -45,12 +47,12 @@ class Harlem():
 
         self.armdat = pd.DataFrame({
             'arm': [StudyArm.CONTROL, StudyArm.VITAMIN],
-            'p': [0.5, 0.5]
+            'p': [self.pars.p_control, 1-self.pars.p_control]
         })
         self.armdat['p'] /= self.armdat['p'].sum()
 
         self.hhs = self.make_hhs()
-        self.n_agents = np.sum([hh.n for hh in self.hhs]) # Hopefully about 579
+        self.n_agents = np.sum([hh.n for hh in self.hhs]) # Hopefully about 579 if running all of Harlem
         return
 
     def make_hhs(self):
@@ -95,7 +97,6 @@ class Harlem():
                 nut.macro_state[ss.uids(uid)] = hh.macro            # We are assuming that the macro state is the same for all members of the household
                 nut.micro_state[ss.uids(uid)] = mtb.MicroNutrients.DEFICIENT if np.random.rand() < p_deficient else mtb.MicroNutrients.NORMAL
 
-                    
         # Set relative LS progression after changing macro and micro states
         c = sim.connectors['tb_nutrition_connector']
         tb = sim.diseases['tb']
@@ -105,13 +106,41 @@ class Harlem():
         
         return
 
-    def choose_seed_infections(self, sim, p_hh):
-        hh_has_seed = np.random.binomial(p=p_hh, n=1, size=len(self.hhs))
+    def choose_seed_infections(self):
         seed_uids = []
-        for hh, seed in zip(self.hhs, hh_has_seed):
-            if not seed:
-                continue
+        for hh in self.hhs:
             seed_uid = np.random.choice(hh.uids)
             seed_uids.append(seed_uid)
         return ss.uids(seed_uids)
 
+class HarlemPregnancy(ss.Pregnancy):
+
+    def make_embryos(self, conceive_uids):
+        newborn_uids = super().make_embryos(conceive_uids)
+
+        if len(newborn_uids) == 0:
+            return newborn_uids
+
+        people = self.sim.people
+        nut = self.sim.diseases['malnutrition']
+        people.hhid[newborn_uids] = people.hhid[conceive_uids]
+        people.arm[newborn_uids] = people.arm[conceive_uids]
+        # Assume baby has the same micro/macro state as mom
+        nut.micro_state[newborn_uids] = nut.micro_state[conceive_uids]
+        nut.macro_state[newborn_uids] = nut.macro_state[conceive_uids]
+
+        hn = self.sim.networks['harlemnet']
+
+        p1s = []
+        p2s = []
+        for newborn_uid, mother_uid in zip(newborn_uids, conceive_uids):
+            for contact in hn.find_contacts(mother_uid):
+                p1s.append(contact)
+                p2s.append(newborn_uid)
+
+        hn.edges.p1 = ss.uids(np.concatenate([hn.edges.p1, p1s]))
+        hn.edges.p2 = ss.uids(np.concatenate([hn.edges.p2, p2s]))
+        # Beta is zero while prenatal
+        hn.edges.beta = np.concatenate([hn.edges.beta, np.zeros_like(p1s)])#.astype(ss.dtypes.float)
+
+        return newborn_uids

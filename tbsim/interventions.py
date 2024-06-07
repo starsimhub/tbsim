@@ -7,7 +7,7 @@ import starsim as ss
 from tbsim import TB, Malnutrition, MicroNutrients, MacroNutrients, StudyArm
 import sciris as sc
 
-__all__ = ['VitaminSupplementation', 'LargeScaleFoodFortification']
+__all__ = ['VitaminSupplementation', 'NutritionChange']
 
 class VitaminSupplementation(ss.Intervention):
 
@@ -21,10 +21,9 @@ class VitaminSupplementation(ss.Intervention):
         self.p_micro_recovery = ss.bernoulli(p=lambda self, sim, uids: np.interp(sim.year, self.year, self.rate*sim.dt))
         return
 
-    def initialize(self, sim):
-        super().initialize(sim)
-        self.results += ss.Result(self.name, 'n_recovered', sim.npts, dtype=int)
-        self.initialized = True
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        self.results += ss.Result(self.name, 'n_recovered', self.sim.npts, dtype=int)
         return
 
     def apply(self, sim):
@@ -47,26 +46,28 @@ class VitaminSupplementation(ss.Intervention):
         return len(recover_uids)
 
 
-class LargeScaleFoodFortification(ss.Intervention):
+class NutritionChange(ss.Intervention):
 
-    def __init__(self, year, rate, from_state, to_state, arm=None, **kwargs):
+    def __init__(self, year, rate, from_state, to_state, new_micro_state=None, p_new_micro=0, arm=None, **kwargs):
         self.requires = Malnutrition
         self.year = sc.promotetoarray(year)
         self.rate = sc.promotetoarray(rate)
         self.from_state = from_state
         self.to_state = to_state
+        self.new_micro_state = new_micro_state
+        self.p_new_micro = p_new_micro
         self.arm = None
-        self.name = f'LSFF from {self.from_state} to {self.to_state}'
+        self.name = f'Nutrition change from {self.from_state} to {self.to_state}'
 
         super().__init__(**kwargs)
 
         self.p = ss.bernoulli(p=lambda self, sim, uids: np.interp(sim.year, self.year, self.rate*sim.dt))
+        self.p_micro = ss.bernoulli(p=self.p_new_micro) # Prob of changing micro when changing macro
         return
 
-    def initialize(self, sim):
-        super().initialize(sim)
-        #self.results += ss.Result(self.name, 'n_recovered', sim.npts, dtype=int)
-        self.initialized = True
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        #self.results += ss.Result(self.name, 'n_recovered', self.sim.npts, dtype=int)
         return
 
     def apply(self, sim):
@@ -80,9 +81,14 @@ class LargeScaleFoodFortification(ss.Intervention):
             eligible &= ppl.arm == self.arm
         eligible_uids = eligible.uids
 
-        recover_uids = self.p.filter(eligible_uids)
+        change_uids = self.p.filter(eligible_uids)
 
-        nut.ti_macro[recover_uids] = sim.ti + 1 # Next time step
-        nut.new_macro_state[recover_uids] = self.to_state
+        nut.ti_macro[change_uids] = sim.ti + 1 # Next time step
+        nut.new_macro_state[change_uids] = self.to_state
 
-        return len(recover_uids)
+        if (self.p_new_micro > 0) and (self.new_micro_state is not None):
+            change_micro_uids = self.p_micro.filter(change_uids)
+            nut.ti_micro[change_micro_uids] = sim.ti + 1 # Next time step
+            nut.new_micro_state[change_micro_uids] = self.new_micro_state
+
+        return len(change_uids)

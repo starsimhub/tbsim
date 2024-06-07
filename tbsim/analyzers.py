@@ -5,11 +5,10 @@ Define Malnutrition analyzers
 import numpy as np
 import starsim as ss
 from tbsim import TB, TBS, Malnutrition, MicroNutrients, MacroNutrients, StudyArm
-import sciris as sc
-
+import networkx as nx
 import pandas as pd
 
-__all__ = ['HarlemAnalyzer']
+__all__ = ['HarlemAnalyzer', 'HHAnalyzer', 'NutritionAnalyzer']
 
 class HarlemAnalyzer(ss.Analyzer):
 
@@ -21,10 +20,9 @@ class HarlemAnalyzer(ss.Analyzer):
         super().__init__(**kwargs)
         return
 
-    def initialize(self, sim):
-        super().initialize(sim)
+    def init_results(self):
+        super().init_results()
         #self.results += ss.Result(self.name, 'n_recovered', sim.npts, dtype=int)
-        self.initialized = True
         return
 
     def apply(self, sim):
@@ -38,6 +36,7 @@ class HarlemAnalyzer(ss.Analyzer):
 
             n_people = np.count_nonzero(ppl)
             new_infections = np.count_nonzero(tb.ti_infected[ppl] == ti)
+            new_active_infections = np.count_nonzero(tb.ti_active[ppl] == ti)
             n_infected = np.count_nonzero(tb.infected[ppl])
             n_died = np.count_nonzero( (tb.ti_dead[(self.sim.people.arm==arm)] == ti) )
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
@@ -46,14 +45,26 @@ class HarlemAnalyzer(ss.Analyzer):
             rel_LS_mean = tb.rel_LS_prog[ppl & tb.infected].mean()
             rel_LF_mean = tb.rel_LF_prog[ppl & tb.infected].mean()
             self.data.append([self.sim.year, arm.name, n_people, new_infections, n_infected, n_died,  n_latent_fast, n_latent_slow, n_deficient, rel_LF_mean, rel_LS_mean])
+            n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
+            n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == MacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == MacroNutrients.MARGINAL) )
+            infected = ppl & tb.infected
+            if not infected.any():
+                rel_LS_mean = np.nan
+            else:
+                rel_LS_mean = tb.rel_LS_prog[infected].mean()
+
+            self.data.append([self.sim.year, arm.name, n_people, new_infections, new_active_infections, n_infected, n_died, n_latent_slow, n_micro_deficient, n_macro_deficient, rel_LS_mean])
         return
 
     def finalize(self):
         super().finalize()
-        self.df = pd.DataFrame(self.data, columns = ['year', 'arm', 'n_people', 'new_infections', 'n_infected', 'n_died', 'n_latent_fast', 'n_latent_slow', 'n_deficient', 'rel_LF_mean', 'rel_LS_mean'])
+        self.df = pd.DataFrame(self.data, columns = ['year', 'arm', 'n_people', 'new_infections', 'new_active_infections', 'n_infected', 'n_died', 'n_latent_slow', 'n_latent_fast','n_micro_deficient', 'n_macro_deficient', 'rel_LS_mean', 'rel_LF_mean'])
 
         self.df['cum_infections'] = self.df.groupby(['arm'])['new_infections'].cumsum()
         self.df.drop('new_infections', axis=1, inplace=True)
+
+        self.df['cum_active_infections'] = self.df.groupby(['arm'])['new_active_infections'].cumsum()
+        self.df.drop('new_active_infections', axis=1, inplace=True)
 
         self.df['cum_died'] = self.df.groupby(['arm'])['n_died'].cumsum()
         self.df.drop('n_died', axis=1, inplace=True)
@@ -66,3 +77,97 @@ class HarlemAnalyzer(ss.Analyzer):
         g = sns.relplot(data=d, kind='line', x='year', hue='arm', col='channel', y='Value', palette='Set1', facet_kws={'sharey':False})
 
         return g.figure
+
+class HHAnalyzer(ss.Analyzer):
+
+    def __init__(self, **kwargs):
+        self.requires = [TB, Malnutrition]
+        self.data = []
+        self.df = None # Created on finalize
+
+        super().__init__(**kwargs)
+        return
+
+    def init_results(self):
+        super().init_results()
+        return
+
+    def apply(self, sim, snap_years = [1942, 1944]):
+        super().apply(sim)
+
+        year = self.sim.year
+        dt = self.sim.dt
+
+        snap = False
+        for sy in snap_years:
+            if year >= sy and year < sy+dt:
+                snap = True
+                break
+        
+        if not snap:
+            return
+
+        hhid, hh_sizes = np.unique(sim.people.hhid, return_counts=True)
+        cnt, hh_size = np.histogram(hh_sizes, bins=range(1, 11))
+
+        #hhn = self.sim.networks['harlemnet']
+        #el = [(p1, p2) for p1,p2 in zip(hhn.edges['p1'], hhn.edges['p2'])]
+        #G = nx.from_edgelist(el)
+        #hh_sizes = np.array([len(c) for c in nx.connected_components(G)])
+        #cnt, hh_size = np.histogram(hh_sizes, bins=range(20))
+
+        df = pd.DataFrame({sy:cnt}, index=pd.Index(hh_size[:-1], name='HH Size'))
+        self.data.append(df)
+        return
+
+    def finalize(self):
+        super().finalize()
+        self.df = pd.concat(self.data, axis=1)
+        return
+
+class NutritionAnalyzer(ss.Analyzer):
+
+    def __init__(self, **kwargs):
+        self.requires = [TB, Malnutrition]
+        self.data = []
+        self.df = None # Created on finalize
+
+        super().__init__(**kwargs)
+        return
+
+    def apply(self, sim, snap_years = [1942, 1944]):
+        super().apply(sim)
+
+        year = self.sim.year
+        dt = self.sim.dt
+
+        snap = False
+        for sy in snap_years:
+            if year >= sy and year < sy+dt:
+                snap = True
+                break
+        
+        if not snap:
+            return
+
+        macro_lookup = {MacroNutrients[name].value: name for name in MacroNutrients._member_names_}
+        micro_lookup = {MicroNutrients[name].value: name for name in MicroNutrients._member_names_}
+        arm_lookup = {StudyArm[name].value: name for name in StudyArm._member_names_}
+
+        nut = self.sim.diseases['malnutrition']
+        ppl = self.sim.people
+        df = pd.DataFrame({
+            'Macro': [macro_lookup[v] for v in nut.macro_state.values],
+            'Micro': [micro_lookup[v] for v in nut.micro_state.values],
+            'Arm': [arm_lookup[v] for v in ppl.arm.values],
+        }, index=pd.Index(ppl.uid))
+
+        sz = df.groupby(['Arm', 'Macro', 'Micro']).size()
+        sz.name = str(sy)
+        self.data.append(sz)
+        return
+
+    def finalize(self):
+        super().finalize()
+        self.df = pd.concat(self.data, axis=1)
+        return

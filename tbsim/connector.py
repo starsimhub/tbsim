@@ -72,13 +72,13 @@ class TB_Nutrition_Connector(ss.Connector):
                 raise ValueError(f"Invalid state: {state}")
             
             r = rate * 365 # Converting days to years
-            t_latent = tb.ti_latent[state_change_uids]*self.sim.dt
-            t_now = self.sim.ti*self.sim.dt
+            t_latent = tb.ti_latent[state_change_uids]*dt
+            t_now = ti*dt # Time of switching from health to undernourished
 
             C = np.exp(-k_old[state_change]*r*t_latent) - np.exp(-k_old[state_change]*r*t_now)
             time_from_C_to_R = -np.log(1-R)/ (k_new[state_change]*r) - -np.log(1-C)/ (k_new[state_change]*r)
             tb.ti_presymp[state_change_uids] = np.ceil(ti + time_from_C_to_R/dt)
-            
+                        
         return
             
     def update(self):
@@ -112,8 +112,8 @@ class TB_Nutrition_Connector(ss.Connector):
 
             tb.rel_LS_prog[change_uids] = k_new_ls # Update rel_LS_prog
             tb.rel_LF_prog[change_uids] = k_new_lf # Update rel_LF_prog
-            
+
             self.update_rel_prog(tb, change_uids, k_old_ls, k_new_ls, TBS.LATENT_SLOW, tb.pars.rate_LS_to_presym, ti, dt)   # Update rel_LS_prog
             self.update_rel_prog(tb, change_uids, k_old_lf, k_new_lf, TBS.LATENT_FAST, tb.pars.rate_LF_to_presym, ti, dt)   # Update rel_LF_prog
-
+    
         return
