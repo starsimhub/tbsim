@@ -26,12 +26,8 @@ class TB(ss.Infection):
             p_latent_fast = ss.bernoulli(0.1), # Probability of latent fast as opposed to latent slow
 
             rate_LS_to_presym = 3e-5,                   # Latent Slow to Active Pre-Symptomatic (per day)
-            
-            # This is not used in new implementation, but kept for reference and for further analysis
+            rate_LF_to_presym = 6e-3,                   # Latent Fast to Active Pre-Symptomatic (per day)
 
-            rate_LF_to_presym = 6e-3,                   # Latent Fast to Active Pre-Symptomatic (per day) # TODO: Check if this is correct
-            dur_LF_to_presymp = ss.expon(scale=1/6e-3), # Latent Fast to Active Pre-Symptomatic (per day)
-            
             dur_presym = ss.expon(scale=1/3e-2),  # Pre-symptomatic to symptomatic (days)
             
             p_exptb = ss.bernoulli(0.1),
@@ -56,12 +52,11 @@ class TB(ss.Infection):
         # Random number streams used in state flow
         self.choose_cure_or_die_ti = ss.random()
         self.will_die = ss.random()
-        
-        #print(f"TB model initialized with parameters:\n {self.pars}\n" )
 
-        # TEMP
+        ##### TEMP: Shouldn't need a separate rng for this as the ss.FloatArr default should get it... but that's not working. This is a workaround
         self.ppf_LS_to_presymp_rng = ss.random()
-        
+        self.ppf_LF_to_presymp_rng = ss.random()
+
         return
 
     def _add_states(self):
@@ -74,8 +69,10 @@ class TB(ss.Infection):
         self.add_states(            
             ss.FloatArr('rel_LS_prog', default=1.0),                # Multiplier on the latent-slow progression rate
             ss.FloatArr('rel_LF_prog', default=1.0),                # Multiplier on the latent-fast progression rate
-            ss.FloatArr('ppf_LS_to_presymp'), # CDF samples for transition from latent slow to active pre-symptomatic
+            
             ##### TEMP: ss.FloatArr('ppf_LS_to_presymp', default=ss.random()), # CDF samples for transition from latent slow to active pre-symptomatic
+            ##### TEMP: ss.FloatArr('ppf_LF_to_presymp', default=ss.random()), # CDF samples for transition from latent fast to active pre-symptomatic
+            ss.FloatArr('ppf_LS_to_presymp'), # CDF samples for transition from latent slow to active pre-symptomatic
             ss.FloatArr('ppf_LF_to_presymp'), # CDF samples for transition from latent fast to active pre-symptomatic
         )
         
@@ -132,14 +129,12 @@ class TB(ss.Infection):
         self.active_tb_state[smpos_uids] = TBS.ACTIVE_SMPOS
         self.active_tb_state[smneg_uids] = TBS.ACTIVE_SMNEG
 
-        # Set ti of presymp
+        # Set ti of presymp for slow and fast progressors
         rate_slow = self.rel_LS_prog[slow_uids] * self.pars.rate_LS_to_presym
         self.ti_presymp[slow_uids] = np.ceil(ti - np.log(1 - self.ppf_LS_to_presymp[slow_uids])/rate_slow  / 365 / dt)
         
-        self.ti_presymp[fast_uids] = np.ceil(ti + p.dur_LF_to_presymp.rvs(fast_uids) / 365 / dt)
-        
-        #rate_fast = self.rel_LF_prog[fast_uids] * self.pars.rate_LF_to_presym
-        #self.ti_presymp[fast_uids] = np.ceil(ti - np.log(1 - self.ppf_LF_to_presymp[fast_uids])/rate_fast  / 365 / dt)
+        rate_fast = self.rel_LF_prog[fast_uids] * self.pars.rate_LF_to_presym
+        self.ti_presymp[fast_uids] = np.ceil(ti - np.log(1 - self.ppf_LF_to_presymp[fast_uids])/rate_fast  / 365 / dt)
         
         # Update result count of new infections 
         self.results['new_infections'][ti] += len(uids)

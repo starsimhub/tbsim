@@ -17,25 +17,18 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False
-default_n_rand_seeds = [50, 10][debug]
+default_n_rand_seeds = [1000, 10][debug]
 
-@staticmethod    
-def compute_rel_prog(macro, micro, standard=0, below_standard=0, marginal=0, unsatisfactory=0):
+def compute_rel_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     ret = np.ones_like(macro)
-    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = standard
-    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = below_standard
-    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = marginal
-    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = unsatisfactory
+    #ret[micro == mtb.MicroNutrients.DEFICIENT] = 5
+    ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 1.5
+    ret[(macro == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == mtb.MicroNutrients.DEFICIENT)] = 2.0
+    ret[(macro == mtb.MacroNutrients.MARGINAL)                  & (micro == mtb.MicroNutrients.DEFICIENT)] = 2.5
+    ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 3.0
     return ret
 
-def compute_rel_LS_prog(macro, micro):
-    ret = compute_rel_prog(macro, micro, 1.5, 2.0, 2.5, 3.0)
-    return ret
-
-def compute_rel_LF_prog(macro, micro):   #lATENT_FAST
-    ret = compute_rel_prog(macro, micro, 1.5, 4.0, 5.0, 6.0)
-    return ret
 
 def run_harlem(rand_seed=0):
 
@@ -67,7 +60,7 @@ def run_harlem(rand_seed=0):
         beta = dict(harlem=0.03, random=0.0, maternal=0.0),
         init_prev = 0, # Infections seeded by Harlem class
         rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
-        rate_LF_to_presym = 6e-3,  # TODO: (For Researcher) Please supply the correct value - OR MAKE SURE THS IS CORRECT
+        rate_LF_to_presym = 6e-3,  # TODO: double chek pars
         
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
@@ -89,8 +82,8 @@ def run_harlem(rand_seed=0):
 
     # -------- Connector -------
     cn_pars = dict(
-        rel_LS_prog_func=compute_rel_LS_prog,
-        rel_LF_prog_func=compute_rel_LF_prog,   
+        rel_LS_prog_func=compute_rel_prog,
+        rel_LF_prog_func=compute_rel_prog,   
         relsus_microdeficient=1 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
