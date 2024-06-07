@@ -43,9 +43,6 @@ class TB_Nutrition_Connector(ss.Connector):
     def compute_rel_LF_prog(macro, micro):
         assert len(macro) == len(micro), 'Length of macro and micro must match.'
         ret = np.ones_like(macro)
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 1.25
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 2.5
-        ret[macro == MacroNutrients.UNSATISFACTORY] = 4.0
         return ret
     
     def update_rel_prog(self, tb, change_uids, k_old, k_new, state, rate, ti, dt):

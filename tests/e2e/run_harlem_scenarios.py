@@ -12,8 +12,8 @@ warnings.filterwarnings("ignore", "use_inf_as_na")
 
 cache_from = None #'06-06_15-59-01' # Run sims if None, plot from dir if datestr provided
 scenario = None # Put a scenario like 'Base' here to run just one scenario, else all
-debug = False
-default_n_rand_seeds = [1000, 1][debug]
+debug = True
+default_n_rand_seeds = [1000, 2][debug]
 
 def compute_rel_LS_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
@@ -42,7 +42,6 @@ scen_default = {
 scenarios = {
     'Base': {
         'beta': 0.12,
-        'active': scenario is not None and scenario=='Base', # Always run base
     },
 
     'MoreMicroDeficient': {
@@ -53,25 +52,21 @@ scenarios = {
             mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD: 0.75,
             mtb.MacroNutrients.STANDARD_OR_ABOVE: 0.5,
         },
-        'active': True if scenario is not None and scenario=='MoreMicroDeficient' else not debug, # Run only if not debugging
     },
 
     'LatentSeeding': {
         'beta': 0.08,
         'init_prev': 0.33,
-        'active': True if scenario is not None and scenario=='LatentSeeding' else not debug, # Run only if not debugging
     },
 
     'RelSus': {
         'relsus_microdeficient': 5,
         'beta': 0.04,
-        'active': True if scenario is not None and scenario=='RelSus' else not debug, # Run only if not debugging
     },
 
     'LSProgAlt': {
         'beta': 0.08,
         'rel_LS_prog_func': compute_rel_LS_prog_alternate,
-        'active': True if scenario is not None and scenario=='LSProgAlt' else not debug, # Run only if not debugging
     },
 
     'NoSecular': {
