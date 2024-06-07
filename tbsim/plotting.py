@@ -14,16 +14,16 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 
-def plot_epi(df):
+def plot_epi(dfs):
     # Sum over arms
-    dfs = df.drop(['arm', 'p_control'], axis=1).groupby(['rand_seed', 'year', 'Scenario']).sum().reset_index()
+    #dfs = df.drop(['arm', 'p_control'], axis=1).groupby(['rand_seed', 'year', 'Scen', 'Arm']).sum().reset_index()
 
     first_year = int(dfs['year'].iloc[0])
     assert dfs['year'].iloc[0] == first_year
     dfs['date'] = pd.to_datetime(365 * (dfs['year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
 
-    d = pd.melt(dfs.drop(['rand_seed', 'year'], axis=1), id_vars=['date', 'Scenario'], var_name='channel', value_name='Value')
-    g = sns.relplot(data=d, kind='line', x='date', hue='Scenario', col='channel', y='Value', palette='tab20',
+    d = pd.melt(dfs.drop(['rand_seed', 'year', 'p_control', 'Scenario'], axis=1), id_vars=['date', 'Scen', 'arm'], var_name='channel', value_name='Value')
+    g = sns.relplot(data=d, kind='line', x='date', hue='Scen', style='arm', col='channel', y='Value', palette='tab10',
         facet_kws={'sharey':False}, col_wrap=3, lw=2, errorbar='sd') # Can change errorbar to None for bootstrapped bars, but it is slow
 
     g.set_titles(col_template='{col_name}', row_template='{row_name}')
@@ -191,13 +191,17 @@ def plot_diff(data, scens, channel='cum_active_infections'):
     #g = sns.displot(kind='hist', data=dfm, hue='Scenario', x='Active infections averted', stat='density', common_norm=False, multiple='dodge', discrete=True)
 
     g = sns.FacetGrid(data=dfm, hue='Scenario', palette='tab10', height=5)
-    g.map_dataframe(sns.kdeplot, x='Active infections averted', fill=True, bw_adjust=2) # rug=True, 
+    g.map_dataframe(sns.kdeplot, x='Active infections averted', fill=True) # rug=True, , bw_adjust=2
     def mean_line(data, color, ch, **kwargs):
         plt.axvline(data[ch].mean(), color=color, lw=1, ls='-')
     g.map_dataframe(mean_line, ch='Active infections averted')
     g.add_legend()
-
     sc.savefig(f'diff_{channel}_{cfg.FILE_POSTFIX}.png', folder=cfg.RESULTS_DIRECTORY)
+    plt.close(g.figure)
+
+    g = sns.boxenplot(data=dfm, y='Scenario', x='Active infections averted', orient='h')
+    g.figure.tight_layout()
+    sc.savefig(f'diffbox_{channel}_{cfg.FILE_POSTFIX}.png', folder=cfg.RESULTS_DIRECTORY)
     plt.close(g.figure)
 
     return g.figure
@@ -244,16 +248,18 @@ def plot_calib(data, scens, channel='cum_active_infections'):
     return g.figure
 
 def plot_active_infections(data):
-    df = data.groupby(['Scenario', 'rand_seed', 'year'])[['cum_active_infections']].sum().sort_index() # Sum over arms
+    #df = data.groupby(['Scen', 'arm', 'rand_seed', 'year'])[['cum_active_infections']].sum().sort_index() # Sum over arms
+    df = data.set_index(['Scen', 'arm', 'rand_seed', 'year'])[['cum_active_infections']].sort_index()
+
     trial_start = 1942
     df.index.get_level_values('year')
     years = df.index.get_level_values('year').unique()
     trial_start = years[np.argmax(years >= trial_start)]
-    df = df.loc[slice(None), slice(None), trial_start:]
+    df = df.loc[slice(None), slice(None), slice(None), trial_start:]
 
-    df['Incident Cases'] = df.groupby(['Scenario', 'rand_seed'])['cum_active_infections'].transform(lambda x: x - x.iloc[0]) 
+    df['Incident Cases'] = df.groupby(['Scen', 'arm', 'rand_seed'])['cum_active_infections'].transform(lambda x: x - x.iloc[0]) 
 
-    g = sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', errorbar=('se', 2), palette='tab20')
+    g = sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scen', style='arm', errorbar=('se', 2), palette='tab20')
     #sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', errorbar=('sd', 2), palette='tab20', legend=False)
     #sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='Scenario', estimator=None, units='rand_seed', alpha=0.1, lw=0.1, legend=False)
     g.set_xlabel('Year')
@@ -263,6 +269,8 @@ def plot_active_infections(data):
     plt.close(g.figure)
 
     return
+
+## Old code below here
 
 def plot_scenarios(df):
     g = sns.relplot(kind='line', data=df, x='year', y='Deaths', hue='xLS', 
