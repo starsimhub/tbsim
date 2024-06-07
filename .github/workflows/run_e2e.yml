@@ -1,0 +1,39 @@
+name: Run e2e scenarios
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to clone'
+        required: true
+        default: 'main' # Set a default branch
+  push:
+    branches:
+      - main
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+
+    - name: Clone tbsim repository
+      run: |
+        git clone --branch ${{ github.event.inputs.branch }} https://github.com/starsimhub/tbsim.git
+        cd tbsim
+
+    - name: Install tbsim dependencies
+      run: |
+        cd tbsim
+        pip install .
+
+    - name: Run e2e tests
+      run: |
+        cd tbsim/tests/e2e
+        for file in *.py; do python "$file"; done
