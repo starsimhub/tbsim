@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore", "use_inf_as_na")
 debug = False
 default_n_rand_seeds = [1000, 2][debug]
 cache_from = [None, '06-07_11-35-10'][0] # Run sims if None, plot from dir if datestr provided
-scen_filter = None # Put a list of scenarios here to restrict, e.g. ['Base']
+scen_filter = None #['LatentSeeding'] # Put a list of scenarios here to restrict, e.g. ['Base']
 
 def compute_rel_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
@@ -62,12 +62,12 @@ def run_scen(scen, filter):
 
 scenarios = {
     'Base': {
-        'beta': 0.24,
+        'beta': 0.12,
         'active': run_scen('Base', scen_filter),
     },
 
     'MoreMicroDeficient': {
-        'beta': 0.20,
+        'beta': 0.10,
         'p_microdeficient_given_macro': {
             mtb.MacroNutrients.UNSATISFACTORY: 1.0,
             mtb.MacroNutrients.MARGINAL: 1.0,
@@ -78,50 +78,50 @@ scenarios = {
     },
 
     'LatentSeeding': {
-        'beta': 0.16,
+        'beta': 0.05,
         'init_prev': 0.33,
         'active': run_scen('LatentSeeding', scen_filter),
     },
 
     'RelSus': {
         'relsus_microdeficient': 5,
-        'beta': 0.08,
+        'beta': 0.04,
         'active': run_scen('RelSus', scen_filter),
     },
 
     'LSProgAlt': {
-        'beta': 0.16,
+        'beta': 0.09,
         'rel_LS_prog_func': compute_rel_prog_alternate,
         'active': run_scen('LSProgAlt', scen_filter),
     },
 
     'LatentFast': {
-        'beta': 0.16,
+        'beta': 0.12,
         'rel_LF_prog_func': compute_rel_prog,
         'active': run_scen('LatentFast', scen_filter),
     },
 
     'FastSlowAlt': {
-        'beta': 0.16,
+        'beta': 0.09,
         'rel_LF_prog_func': compute_rel_prog_alternate,
         'rel_LS_prog_func': compute_rel_prog_alternate,
         'active': run_scen('LatentFast', scen_filter),
     },
 
     'AllVitamin': {
-        'beta': 0.24,
+        'beta': 0.11,
         'p_micro_recovery_func': p_micro_recovery_alt,
         'active': run_scen('AllVitamin', scen_filter),
     },
 
     'NoSecular': {
-        'beta': 0.22,
+        'beta': 0.12,
         'secular_trend': False,
         'active': False, # Disable
     },
 
     'SecularMicro': {
-        'beta': 0.26,
+        'beta': 0.14,
         'p_new_micro': 0.5,
         'active': False, # Disable
     },
