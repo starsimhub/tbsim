@@ -21,22 +21,7 @@ jobs:
         python-version: ['3.10']
 
     steps:
-    - name: Check commit message
-      id: check_message
-      run: |
-        if [[ "${{ github.event_name }}" == "push" ]]; then
-          MESSAGE=$(git log --format=%B -n 1 ${{ github.event.after }})
-          if [[ "$MESSAGE" == "Run e2e"* ]]; then
-            echo "::set-output name=run::true"
-          else
-            echo "::set-output name=run::false"
-          fi
-        else
-          echo "::set-output name=run::true"
-        fi
-
     - name: Checkout tbsim repository
-      if: steps.check_message.outputs.run == 'true'
       uses: actions/checkout@v2
       with:
         repository: 'your-username/tbsim'
@@ -44,19 +29,16 @@ jobs:
         fetch-depth: 1
 
     - name: Set up Python ${{ matrix.python-version }}
-      if: steps.check_message.outputs.run == 'true'
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Install tbsim dependencies
-      if: steps.check_message.outputs.run == 'true'
       run: |
         cd tbsim
         pip install .
 
     - name: Run e2e tests
-      if: steps.check_message.outputs.run == 'true'
       run: |
         cd tbsim/tests/e2e
         for file in *.py; do 
