@@ -34,7 +34,6 @@ jobs:
 
     - name: Install tbsim dependencies
       run: |
-        cd tbsim
         pip install .
 
     - name: Run e2e tests
