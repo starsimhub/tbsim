@@ -40,5 +40,6 @@ jobs:
       working-directory: tests/e2e
       run: |
         for file in *.py; do 
+          printf "\n***Running  $file ***\n"
           python "$file" || exit 1
         done
