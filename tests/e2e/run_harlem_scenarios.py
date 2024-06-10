@@ -7,12 +7,15 @@ import tbsim.config as cfg
 import os 
 import warnings
 
+from matplotlib import pyplot
+pyplot.rcParams['figure.dpi'] = 600
+
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False
 default_n_rand_seeds = [1000, 2][debug]
-cache_from = [None, '06-07_14-09-03 plus 06-10_14-02-53 1000 with LatentClearance'][1] # plot from dir if datestr provided
+cache_from = [None, '06-07_14-09-03 plus 06-10_14-02-53 1000 with LatentClearance'][0] # plot from dir if datestr provided
 scen_filter = None #['LatentClearance'] # Put a list of scenarios here to restrict, e.g. ['Base']
 calib = False # Run only CONTROL arm scenarios when tuning beta
 
@@ -79,13 +82,13 @@ def run_scen(scen, filter):
         return True
     return scen in filter
 
-scenarios = {
-    'Base': {
+scenarios = sc.odict(
+    Base = {
         'beta': 0.12,
         'active': run_scen('Base', scen_filter),
     },
 
-    'MoreMicroDeficient': {
+    MoreMicroDeficient = {
         'beta': 0.10,
         'p_microdeficient_given_macro': {
             mtb.MacroNutrients.UNSATISFACTORY: 1.0,
@@ -96,61 +99,61 @@ scenarios = {
         'active': run_scen('MoreMicroDeficient', scen_filter),
     },
 
-    'LatentSeeding': {
+    LatentSeeding = {
         'beta': 0.05,
         'init_prev': 0.33,
         'active': run_scen('LatentSeeding', scen_filter),
     },
 
-    'RelSus': {
+    RelSus = {
         'relsus_microdeficient': 5,
         'beta': 0.04,
         'active': run_scen('RelSus', scen_filter),
     },
 
-    'LSProgAlt': {
+    LSProgAlt = {
         'beta': 0.09,
         'rel_LS_prog_func': compute_rel_prog_alternate,
         'active': run_scen('LSProgAlt', scen_filter),
     },
 
-    'LatentFast': {
+    LatentFast = {
         'beta': 0.12,
         'rel_LF_prog_func': compute_rel_prog,
         'active': run_scen('LatentFast', scen_filter),
     },
 
-    'FastSlowAlt': {
+    FastSlowAlt = {
         'beta': 0.09,
         'rel_LF_prog_func': compute_rel_prog_alternate,
         'rel_LS_prog_func': compute_rel_prog_alternate,
         'active': run_scen('LatentFast', scen_filter),
     },
 
-    'AllVitamin': {
+    AllVitamin = {
         'beta': 0.11,
         'p_micro_recovery_func': p_micro_recovery_alt,
         'active': run_scen('AllVitamin', scen_filter),
     },
 
-    'LatentClearance': {
+    LatentClearance = {
         'beta': 0.16,
         'active': run_scen('LatentClearance', scen_filter),
         'p_clearance_func': p_cure_func
     },
 
-    'NoSecular': {
+    NoSecular = {
         'beta': 0.12,
         'secular_trend': False,
         'active': False, # Disable
     },
 
-    'SecularMicro': {
+    SecularMicro = {
         'beta': 0.14,
         'p_new_micro': 0.5,
         'active': False, # Disable
     },
-}
+)
 
 # Create matching CONTROL and VITAMIN arms for each of the above scenarios
 scens = {}
@@ -374,11 +377,11 @@ if __name__ == '__main__':
     '''
 
     skeys = df_hh['Scenario'].apply(lambda x: x.split(' ')[0]).unique()
-
-    mtb.plot_calib(df_epi, scens, channel='cum_active_infections')
-    mtb.plot_diff(df_epi, scens, channel='cum_active_infections')
-    mtb.plot_active_infections(df_epi)
-    mtb.plot_epi(df_epi)
+    scen_ord = [s for s in scenarios.keys() if s in skeys]
+    mtb.plot_calib(df_epi, scens, scen_ord=scen_ord, channel='cum_active_infections')
+    mtb.plot_diff(df_epi, scens, scen_ord=scen_ord, channel='cum_active_infections')
+    mtb.plot_active_infections(df_epi, scen_ord=scen_ord)
+    mtb.plot_epi(df_epi, scen_ord=scen_ord)
     mtb.plot_hh(df_hh)
 
     for skey in ['Base', 'MoreMicroDeficient']:
