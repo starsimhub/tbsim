@@ -12,8 +12,9 @@ warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False
 default_n_rand_seeds = [1000, 2][debug]
-cache_from = [None, '06-07_11-35-10'][0] # Run sims if None, plot from dir if datestr provided
-scen_filter = None #['LatentSeeding'] # Put a list of scenarios here to restrict, e.g. ['Base']
+cache_from = [None, '06-07_14-09-03 plus 06-10_14-02-53 1000 with LatentClearance'][1] # plot from dir if datestr provided
+scen_filter = None #['LatentClearance'] # Put a list of scenarios here to restrict, e.g. ['Base']
+calib = False # Run only CONTROL arm scenarios when tuning beta
 
 def compute_rel_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
@@ -46,6 +47,24 @@ def p_micro_recovery_default(self, sim, uids):
 def p_micro_recovery_alt(self, sim, uids):
     prob = np.interp(self.sim.year, self.year, self.rate*self.sim.dt)
     p = np.full(len(uids), prob)
+
+    return p
+
+def p_cure_func(self, sim, uids):
+    rate = np.zeros(len(uids))
+
+    # No recovery for those with unsatisfactory macro nutrients
+    nut = sim.diseases['malnutrition']
+
+    # Clearance rate (units are per-year)
+    rate[(nut.micro_state[uids] == mtb.MicroNutrients.NORMAL)] = 2
+
+    #rate[(nut.macro_state[uids] == mtb.MacroNutrients.UNSATISFACTORY)           & (nut.micro_state[uids] == mtb.MicroNutrients.NORMAL)] = 0.0 # Never
+    #rate[(nut.macro_state[uids] == mtb.MacroNutrients.MARGINAL)                 & (nut.micro_state[uids] == mtb.MicroNutrients.NORMAL)] = 0.5 # 2-years
+    #rate[(nut.macro_state[uids] == mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD)  & (nut.micro_state[uids] == mtb.MicroNutrients.NORMAL)] = 2.0 # 6-months
+    #rate[(nut.macro_state[uids] == mtb.MacroNutrients.STANDARD_OR_ABOVE)        & (nut.micro_state[uids] == mtb.MicroNutrients.NORMAL)] = 4.0 # 3-months
+
+    p = 1 - np.exp(-rate * sim.dt) # Linear conversion might be sufficient
 
     return p
 
@@ -114,6 +133,12 @@ scenarios = {
         'active': run_scen('AllVitamin', scen_filter),
     },
 
+    'LatentClearance': {
+        'beta': 0.16,
+        'active': run_scen('LatentClearance', scen_filter),
+        'p_clearance_func': p_cure_func
+    },
+
     'NoSecular': {
         'beta': 0.12,
         'secular_trend': False,
@@ -139,19 +164,22 @@ for skey, scn in scenarios.items():
     control['arm'] = 'CONTROL'
     scens[f'{skey} CONTROL'] = control
 
-    vitamin = control.copy()
-    vitamin['p_control'] = 0
-    vitamin['vitamin_year_rate'] = [(1942, 10.0), (1943, 3.0)]
-    vitamin['arm'] = 'VITAMIN'
-    vitamin['ref'] = f'{skey} CONTROL'
-    scens[f'{skey} VITAMIN'] = vitamin
+    if not calib:
+        vitamin = control.copy()
+        vitamin['p_control'] = 0
+        vitamin['vitamin_year_rate'] = [(1942, 10.0), (1943, 3.0)]
+        vitamin['arm'] = 'VITAMIN'
+        vitamin['ref'] = f'{skey} CONTROL'
+        scens[f'{skey} VITAMIN'] = vitamin
 
 def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5,
                vitamin_year_rate=None, relsus_microdeficient=1, beta=0.1,
                secular_trend=True, p_new_micro=0.0,
                rel_LS_prog_func=compute_rel_prog, rel_LF_prog_func=mtb.TB_Nutrition_Connector.compute_rel_LF_prog,
                init_prev=0.0, p_microdeficient_given_macro=None,
-               p_micro_recovery_func=p_micro_recovery_default, **kwargs):
+               p_micro_recovery_func=p_micro_recovery_default,
+               p_clearance_func=None,
+               **kwargs):
     # vitamin_year_rate is a list of tuples like [(1942, 10.0), (1943, 3.0)] or None if CONTROL
     lbl = f'sim {idx}: {scen} with rand_seed={rand_seed}, p_control={p_control}, vitamin_year_rate={vitamin_year_rate}'
     print(f'Starting {lbl}')
@@ -207,6 +235,8 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5,
         relsus_microdeficient = relsus_microdeficient # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
+    if p_clearance_func is not None:
+        cn.pars.p_latent_clearance.pars.p = p_clearance_func
 
     # -------- Interventions -------
     m = mtb.MicroNutrients
@@ -322,11 +352,16 @@ if __name__ == '__main__':
     if cache_from is None:
         df_epi, df_hh, df_nut = run_scenarios()
     else:
-        cfg.FILE_POSTFIX = cache_from
-        cfg.RESULTS_DIRECTORY = os.path.join('figs', 'TB', cfg.FILE_POSTFIX)
-        df_epi = pd.read_csv(os.path.join(cfg.RESULTS_DIRECTORY, f'result_{cfg.FILE_POSTFIX}.csv'), index_col=0)
-        df_hh = pd.read_csv(os.path.join(cfg.RESULTS_DIRECTORY, f'hhsizes_{cfg.FILE_POSTFIX}.csv'), index_col=0)
-        df_nut = pd.read_csv(os.path.join(cfg.RESULTS_DIRECTORY, f'nutrition_{cfg.FILE_POSTFIX}.csv'), index_col=0)
+        from pathlib import Path
+        cfg.RESULTS_DIRECTORY = os.path.join('figs', 'TB', cache_from)
+        fn = list(Path(cfg.RESULTS_DIRECTORY).glob("result_*.csv"))[0]
+        df_epi = pd.read_csv(fn, index_col=0)
+
+        fn = list(Path(cfg.RESULTS_DIRECTORY).glob("hhsizes_*.csv"))[0]
+        df_hh = pd.read_csv(fn, index_col=0)
+
+        fn = list(Path(cfg.RESULTS_DIRECTORY).glob("nutrition_*.csv"))[0]
+        df_nut = pd.read_csv(fn, index_col=0)
         #df_epi = df_epi.loc[df_epi['Scenario'].isin(['Base CONTROL', 'Base VITAMIN', 'RelSus5 CONTROL', 'RelSus5 VITAMIN'])]
 
     '''

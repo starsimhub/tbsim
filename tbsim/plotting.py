@@ -142,7 +142,7 @@ def plot_nut(df, scenarios=None, lbl=None):
     if scenarios is not None:
         dfm = dfm.set_index('Scenario').loc[scenarios].reset_index()
 
-    g = sns.FacetGrid(data=dfm, col='Year', height=4, aspect=1.5, palette='tab10') # , row='Arm'
+    g = sns.FacetGrid(data=dfm, col='Year', height=4, aspect=1, palette='tab10') # , row='Arm'
     g.map_dataframe(stackedbar)
     plt.subplots_adjust(bottom=0.3)
 

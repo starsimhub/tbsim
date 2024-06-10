@@ -14,7 +14,8 @@ class TBS(): # Enum
     ACTIVE_SMPOS    = 3.0    # Active TB, smear positive
     ACTIVE_SMNEG    = 4.0    # Active TB, smear negative
     ACTIVE_EXPTB    = 5.0    # Active TB, extra-pulmonary
-    DEAD            = 6.0    # TB death
+    CURE            = 6.0    # Being cured
+    DEAD            = 7.0    # TB death
     
 class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
@@ -196,13 +197,16 @@ class TB(ss.Infection):
             self.ti_dead[die_uids] = np.ceil(ti + dur_active[will_die] / dt)
             self.ti_cure[cure_uids] = np.ceil(ti + dur_active[~will_die] / dt)
 
-        # Active --> Susceptible
-        uids = ( (self.ti_cure <= ti) & ((self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB))).uids
+        # Active --> Susceptible or Cure --> Susceptible
+        uids = ( (self.ti_cure <= ti) & ((self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB) | (self.state==TBS.CURE))).uids
         if len(uids):
             # Set state and reset timers
-            self.state[uids] = TBS.NONE
             self.susceptible[uids] = True
             self.infected[uids] = False
+            self.state[uids] = TBS.NONE
+            self.active_tb_state[uids] = TBS.NONE
+            self.rel_LS_prog[uids] = 1.0
+            self.rel_LF_prog[uids] = 1.0
             self.ti_latent[uids] = np.nan
             self.ti_presymp[uids] = np.nan
             self.ti_active[uids] = np.nan

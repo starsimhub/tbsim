@@ -4,7 +4,7 @@ Define Malnutrition intervention
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, Malnutrition, MicroNutrients, MacroNutrients, StudyArm
+from tbsim import Malnutrition, MicroNutrients, MacroNutrients, StudyArm
 import sciris as sc
 
 __all__ = ['VitaminSupplementation', 'NutritionChange']
