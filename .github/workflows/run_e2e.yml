@@ -37,8 +37,8 @@ jobs:
         pip install .
 
     - name: Run e2e tests
+      working-directory: tests/e2e
       run: |
-        cd tbsim/tests/e2e
         for file in *.py; do 
           python "$file" || exit 1
         done
