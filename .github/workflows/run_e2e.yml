@@ -7,26 +7,31 @@ on:
         description: 'Branch to clone'
         required: true
         default: 'main' # Set a default branch
-  push:
+  pull_request: 
     branches:
       - main
+  push:
+    paths:
+      - '**.yml'
 jobs:
   run-tests:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10']
 
     steps:
-    - name: Checkout repository
+    - name: Checkout tbsim repository
       uses: actions/checkout@v2
+      with:
+        repository: 'your-username/tbsim'
+        ref: ${{ github.event.inputs.branch }}
+        fetch-depth: 1
 
-    - name: Set up Python 3.10
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
-        python-version: '3.10'
-
-    - name: Clone tbsim repository
-      run: |
-        git clone --branch ${{ github.event.inputs.branch }} https://github.com/starsimhub/tbsim.git
-        cd tbsim
+        python-version: ${{ matrix.python-version }}
 
     - name: Install tbsim dependencies
       run: |
@@ -36,4 +41,6 @@ jobs:
     - name: Run e2e tests
       run: |
         cd tbsim/tests/e2e
-        for file in *.py; do python "$file"; done
+        for file in *.py; do 
+          python "$file" || exit 1
+        done
