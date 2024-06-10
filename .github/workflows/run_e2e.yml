@@ -24,7 +24,6 @@ jobs:
     - name: Checkout tbsim repository
       uses: actions/checkout@v2
       with:
-        repository: 'your-username/tbsim'
         ref: ${{ github.event.inputs.branch }}
         fetch-depth: 1
 
@@ -35,12 +34,12 @@ jobs:
 
     - name: Install tbsim dependencies
       run: |
-        cd tbsim
         pip install .
 
     - name: Run e2e tests
+      working-directory: tests/e2e
       run: |
-        cd tbsim/tests/e2e
         for file in *.py; do 
+          printf "\n***Running  $file ***\n"
           python "$file" || exit 1
         done
