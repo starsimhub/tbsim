@@ -82,9 +82,9 @@ def run_harlem(rand_seed=0):
 
     # -------- Connector -------
     cn_pars = dict(
-        rel_LS_prog_func=compute_rel_prog,
-        rel_LF_prog_func=compute_rel_prog,   
-        relsus_microdeficient=1 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
+        rel_LS_prog_func = compute_rel_prog,
+        rel_LF_prog_func = compute_rel_prog,   
+        relsus_microdeficient = 1 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
 

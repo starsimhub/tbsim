@@ -17,7 +17,7 @@ class TB_Nutrition_Connector(ss.Connector):
         self.default_pars(
             rel_LS_prog_func = self.compute_rel_LS_prog,
             rel_LF_prog_func = self.compute_rel_LF_prog,
-            relsus_microdeficient = 5,
+            relsus_microdeficient = 1,
         )
         self.update_pars(pars, **kwargs)
         return

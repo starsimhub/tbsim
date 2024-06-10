@@ -10,12 +10,12 @@ import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-cache_from = None #'06-06_15-59-01' # Run sims if None, plot from dir if datestr provided
-scenario = None # Put a scenario like 'Base' here to run just one scenario, else all
-debug = True
+debug = False
 default_n_rand_seeds = [1000, 2][debug]
+cache_from = [None, '06-07_11-35-10'][0] # Run sims if None, plot from dir if datestr provided
+scen_filter = None #['LatentSeeding'] # Put a list of scenarios here to restrict, e.g. ['Base']
 
-def compute_rel_LS_prog(macro, micro):
+def compute_rel_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     ret = np.ones_like(macro)
     ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 1.5
@@ -24,7 +24,7 @@ def compute_rel_LS_prog(macro, micro):
     ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 3.0
     return ret
 
-def compute_rel_LS_prog_alternate(macro, micro):
+def compute_rel_prog_alternate(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     ret = np.ones_like(macro)
     ret[(macro == mtb.MacroNutrients.STANDARD_OR_ABOVE)         & (micro == mtb.MicroNutrients.DEFICIENT)] = 2
@@ -33,15 +33,37 @@ def compute_rel_LS_prog_alternate(macro, micro):
     ret[(macro == mtb.MacroNutrients.UNSATISFACTORY)            & (micro == mtb.MicroNutrients.DEFICIENT)] = 20
     return ret
 
+def p_micro_recovery_default(self, sim, uids):
+    prob = np.interp(self.sim.year, self.year, self.rate*self.sim.dt)
+    p = np.full(len(uids), prob)
+
+    # No recovery for those with unsatisfactory macro nutrients
+    nut = sim.diseases['malnutrition']
+    p[(nut.macro_state[uids] == mtb.MacroNutrients.UNSATISFACTORY)] = 0
+
+    return p
+
+def p_micro_recovery_alt(self, sim, uids):
+    prob = np.interp(self.sim.year, self.year, self.rate*self.sim.dt)
+    p = np.full(len(uids), prob)
+
+    return p
+
 # All scens will get these, which can be overwritten
 scen_default = {
     'relsus_microdeficient': 1,
     'n_hhs': 194/2,
 }
 
+def run_scen(scen, filter):
+    if filter is None:
+        return True
+    return scen in filter
+
 scenarios = {
     'Base': {
         'beta': 0.12,
+        'active': run_scen('Base', scen_filter),
     },
 
     'MoreMicroDeficient': {
@@ -52,31 +74,54 @@ scenarios = {
             mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD: 0.75,
             mtb.MacroNutrients.STANDARD_OR_ABOVE: 0.5,
         },
+        'active': run_scen('MoreMicroDeficient', scen_filter),
     },
 
     'LatentSeeding': {
-        'beta': 0.08,
+        'beta': 0.05,
         'init_prev': 0.33,
+        'active': run_scen('LatentSeeding', scen_filter),
     },
 
     'RelSus': {
         'relsus_microdeficient': 5,
         'beta': 0.04,
+        'active': run_scen('RelSus', scen_filter),
     },
 
     'LSProgAlt': {
-        'beta': 0.08,
-        'rel_LS_prog_func': compute_rel_LS_prog_alternate,
+        'beta': 0.09,
+        'rel_LS_prog_func': compute_rel_prog_alternate,
+        'active': run_scen('LSProgAlt', scen_filter),
+    },
+
+    'LatentFast': {
+        'beta': 0.12,
+        'rel_LF_prog_func': compute_rel_prog,
+        'active': run_scen('LatentFast', scen_filter),
+    },
+
+    'FastSlowAlt': {
+        'beta': 0.09,
+        'rel_LF_prog_func': compute_rel_prog_alternate,
+        'rel_LS_prog_func': compute_rel_prog_alternate,
+        'active': run_scen('LatentFast', scen_filter),
+    },
+
+    'AllVitamin': {
+        'beta': 0.11,
+        'p_micro_recovery_func': p_micro_recovery_alt,
+        'active': run_scen('AllVitamin', scen_filter),
     },
 
     'NoSecular': {
-        'beta': 0.11,
+        'beta': 0.12,
         'secular_trend': False,
         'active': False, # Disable
     },
 
     'SecularMicro': {
-        'beta': 0.13,
+        'beta': 0.14,
         'p_new_micro': 0.5,
         'active': False, # Disable
     },
@@ -90,17 +135,23 @@ for skey, scn in scenarios.items():
     control = scen_default.copy() | scn.copy()
     control['p_control'] = 1
     control['vitamin_year_rate'] = None
+    control['skey'] = skey
+    control['arm'] = 'CONTROL'
     scens[f'{skey} CONTROL'] = control
 
     vitamin = control.copy()
     vitamin['p_control'] = 0
     vitamin['vitamin_year_rate'] = [(1942, 10.0), (1943, 3.0)]
+    vitamin['arm'] = 'VITAMIN'
     vitamin['ref'] = f'{skey} CONTROL'
     scens[f'{skey} VITAMIN'] = vitamin
 
-def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_rate=None, relsus_microdeficient=1,
-               beta=0.1, secular_trend=True, p_new_micro=0.0, rel_LS_prog_func=compute_rel_LS_prog, init_prev=0.0, 
-               p_microdeficient_given_macro=None, **kwargs):
+def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5,
+               vitamin_year_rate=None, relsus_microdeficient=1, beta=0.1,
+               secular_trend=True, p_new_micro=0.0,
+               rel_LS_prog_func=compute_rel_prog, rel_LF_prog_func=mtb.TB_Nutrition_Connector.compute_rel_LF_prog,
+               init_prev=0.0, p_microdeficient_given_macro=None,
+               p_micro_recovery_func=p_micro_recovery_default, **kwargs):
     # vitamin_year_rate is a list of tuples like [(1942, 10.0), (1943, 3.0)] or None if CONTROL
     lbl = f'sim {idx}: {scen} with rand_seed={rand_seed}, p_control={p_control}, vitamin_year_rate={vitamin_year_rate}'
     print(f'Starting {lbl}')
@@ -152,6 +203,7 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
     # -------- Connector -------
     cn_pars = dict(
         rel_LS_prog_func = rel_LS_prog_func,
+        rel_LF_prog_func = rel_LF_prog_func,
         relsus_microdeficient = relsus_microdeficient # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
@@ -173,7 +225,7 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
     vs = []
     if vitamin_year_rate is not None:
         years, rates = zip(*vitamin_year_rate)
-        vs = mtb.VitaminSupplementation(year=years, rate=rates) # Need coverage, V1 vs V2
+        vs = mtb.VitaminSupplementation(year=years, rate=rates, p_micro_recovery_func=p_micro_recovery_func) # Need coverage, V1 vs V2
         intvs += [vs]
 
 
@@ -185,18 +237,14 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
     ]
 
     # -------- Simulation -------
-    # define simulation parameters
     sim_pars = dict(
         dt = 7/365,
-        #start = 1935, # Start early to burn-in
         start = 1941,
         end = 1947,
         rand_seed = rand_seed,
-        )
-    # initialize the simulation
+    )
     sim = ss.Sim(people=pop, networks=nets, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=intvs, analyzers=azs)
-    #sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
-    sim.pars.verbose = 0 # Don't print
+    sim.pars.verbose = 0 # change to sim.pars.dt / 5 to print status every 5 years instead of every 10 steps
 
     sim.initialize()
 
@@ -222,10 +270,16 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5, vitamin_year_
     sim.run() # Actually run the sim
 
     df = sim.analyzers['harlemanalyzer'].df
+    assert p_control == 0 or p_control == 1, f'p_control should be 0 or 1, but input was p_control={p_control}'
+    # Remove "arm" as it's not useful
+    df = df.loc[ df['arm'] == kwargs['arm']]
+
     # Could us df.attrs here?
     df['p_control'] = p_control
     df['rand_seed'] = rand_seed
     df['Scenario'] = scen
+    df['Scen'] = kwargs['skey'] # Raises a SettingWithCopyWarning?!
+    #df['Arm'] = kwargs['arm'] # Not needed because we have 'arm' from the analyzer
 
     dfhh = sim.analyzers['hhanalyzer'].df
     dfhh['rand_seed'] = rand_seed
@@ -248,7 +302,7 @@ def run_scenarios(n_seeds=default_n_rand_seeds):
         for rs in range(n_seeds):
             cfgs.append({'scen': skey,'rand_seed':rs, 'idx':len(cfgs)} | scen) # Merge dicts with pipe operators
     T = sc.tic()
-    results += sc.parallelize(run_harlem, iterkwargs=cfgs, die=False, serial=debug) # , kwargs={'n_hhs':194/2}
+    results += sc.parallelize(run_harlem, iterkwargs=cfgs, die=False, serial=False)
     epi, hh, nut = zip(*results)
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
@@ -268,7 +322,7 @@ if __name__ == '__main__':
     if cache_from is None:
         df_epi, df_hh, df_nut = run_scenarios()
     else:
-        cfg.FILE_POSTFIX = '06-06_15-59-01'
+        cfg.FILE_POSTFIX = cache_from
         cfg.RESULTS_DIRECTORY = os.path.join('figs', 'TB', cfg.FILE_POSTFIX)
         df_epi = pd.read_csv(os.path.join(cfg.RESULTS_DIRECTORY, f'result_{cfg.FILE_POSTFIX}.csv'), index_col=0)
         df_hh = pd.read_csv(os.path.join(cfg.RESULTS_DIRECTORY, f'hhsizes_{cfg.FILE_POSTFIX}.csv'), index_col=0)
@@ -284,13 +338,17 @@ if __name__ == '__main__':
         plt.show()
     '''
 
+    skeys = df_hh['Scenario'].apply(lambda x: x.split(' ')[0]).unique()
+
     mtb.plot_calib(df_epi, scens, channel='cum_active_infections')
     mtb.plot_diff(df_epi, scens, channel='cum_active_infections')
     mtb.plot_active_infections(df_epi)
     mtb.plot_epi(df_epi)
     mtb.plot_hh(df_hh)
+
     for skey in ['Base', 'MoreMicroDeficient']:
-        if skey in df_hh['Scenario'].apply(lambda x: x.split(' ')[0]).unique():
+        if skey in skeys:
+            print('plotting', skey)
             mtb.plot_nut(df_nut, scenarios = [f'{skey} CONTROL', f'{skey} VITAMIN'], lbl=skey)
 
     print(f'Results directory {cfg.RESULTS_DIRECTORY}\nThis run: {cfg.FILE_POSTFIX}')

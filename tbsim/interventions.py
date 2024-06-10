@@ -9,16 +9,27 @@ import sciris as sc
 
 __all__ = ['VitaminSupplementation', 'NutritionChange']
 
-class VitaminSupplementation(ss.Intervention):
 
-    def __init__(self, year: np.array, rate: np.array, **kwargs):
+def p_micro_recovery_default(self, sim, uids):
+    prob = np.interp(self.sim.year, self.year, self.rate*self.sim.dt)
+    p = np.full(len(uids), prob)
+
+    # No recovery for those with unsatisfactory macro nutrients
+    nut = sim.diseases['malnutrition']
+    p[(nut.macro_state[uids] == MacroNutrients.UNSATISFACTORY)] = 0
+
+    return p
+
+class VitaminSupplementation(ss.Intervention):
+    def __init__(self, year: np.array, rate: np.array, p_micro_recovery_func=None, **kwargs):
         self.requires = Malnutrition
         self.year = sc.promotetoarray(year)
         self.rate = sc.promotetoarray(rate)
+        self.p_micro_recovery_func = p_micro_recovery_default if p_micro_recovery_func is None else p_micro_recovery_func
 
         super().__init__(**kwargs)
 
-        self.p_micro_recovery = ss.bernoulli(p=lambda self, sim, uids: np.interp(sim.year, self.year, self.rate*sim.dt))
+        self.p_micro_recovery = ss.bernoulli(p=self.p_micro_recovery_func)
         return
 
     def init_pre(self, sim):
@@ -33,8 +44,7 @@ class VitaminSupplementation(ss.Intervention):
         nut = sim.diseases['malnutrition']
         micro_deficient_uids = (
             (sim.people.arm != StudyArm.CONTROL) & 
-            (nut.micro_state == MicroNutrients.DEFICIENT) & 
-            (nut.macro_state != MacroNutrients.UNSATISFACTORY)
+            (nut.micro_state == MicroNutrients.DEFICIENT)
         ).uids
         recover_uids = self.p_micro_recovery.filter(micro_deficient_uids)
 
