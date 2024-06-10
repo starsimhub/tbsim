@@ -24,7 +24,6 @@ jobs:
     - name: Checkout tbsim repository
       uses: actions/checkout@v2
       with:
-        repository: 'your-username/tbsim'
         ref: ${{ github.event.inputs.branch }}
         fetch-depth: 1
 
