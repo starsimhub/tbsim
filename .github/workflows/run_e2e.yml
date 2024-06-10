@@ -10,30 +10,53 @@ on:
   push:
     branches:
       - main
+      
 jobs:
   run-tests:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10']
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+    - name: Check commit message
+      id: check_message
+      run: |
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          MESSAGE=$(git log --format=%B -n 1 ${{ github.event.after }})
+          if [[ "$MESSAGE" == "Run e2e"* ]]; then
+            echo "::set-output name=run::true"
+          else
+            echo "::set-output name=run::false"
+          fi
+        else
+          echo "::set-output name=run::true"
+        fi
 
-    - name: Set up Python 3.10
+    - name: Checkout tbsim repository
+      if: steps.check_message.outputs.run == 'true'
+      uses: actions/checkout@v2
+      with:
+        repository: 'your-username/tbsim'
+        ref: ${{ github.event.inputs.branch }}
+        fetch-depth: 1
+
+    - name: Set up Python ${{ matrix.python-version }}
+      if: steps.check_message.outputs.run == 'true'
       uses: actions/setup-python@v2
       with:
-        python-version: '3.10'
-
-    - name: Clone tbsim repository
-      run: |
-        git clone --branch ${{ github.event.inputs.branch }} https://github.com/starsimhub/tbsim.git
-        cd tbsim
+        python-version: ${{ matrix.python-version }}
 
     - name: Install tbsim dependencies
+      if: steps.check_message.outputs.run == 'true'
       run: |
         cd tbsim
         pip install .
 
     - name: Run e2e tests
+      if: steps.check_message.outputs.run == 'true'
       run: |
         cd tbsim/tests/e2e
-        for file in *.py; do python "$file"; done
+        for file in *.py; do 
+          python "$file" || exit 1
+        done
