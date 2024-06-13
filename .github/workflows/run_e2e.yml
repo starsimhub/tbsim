@@ -4,9 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to clone'
+        description: 'Branch to test'
         required: true
         default: 'main' # Set a default branch
+      run_additional_tests:
+        description: 'Run additional test i.e. this_test.py'
+        required: false
+        default: 'None'
+        type: string
+
   pull_request: 
     branches:
       - main
@@ -35,11 +41,31 @@ jobs:
     - name: Install tbsim dependencies
       run: |
         pip install .
+        
+    - name: Clone and Install starsim
+      run: |
+        git clone https://github.com/starsimhub/starsim.git
+        cd starsim
+        pip install -e .
+    
+    - name: Pip List
+      run: |
+        pip list
 
     - name: Run e2e tests
       working-directory: tests/e2e
       run: |
-        for file in *.py; do 
-          printf "\n***Running  $file ***\n"
-          python "$file" || exit 1
-        done
+        python run_single.py
+
+    - name: Run Additional Tests
+      if: ${{ github.event.inputs.run_additional_tests != 'None' }}
+      working-directory: tests/e2e
+      run: |
+        echo Starting requested script: ${{ github.event.inputs.run_additional_tests }}....
+        python ${{ github.event.inputs.run_additional_tests }}   
+          
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: run-artifacts
+        path: /home/runner/work/tbsim/tbsim/tests/e2e/
