@@ -17,6 +17,7 @@ class TB_Nutrition_Connector(ss.Connector):
         self.default_pars(
             rel_LS_prog_func = self.compute_rel_LS_prog,
             rel_LF_prog_func = self.compute_rel_LF_prog,
+            p_latent_clearance = ss.bernoulli(p=0), # Placeholder for nutrition-induced clearance
             relsus_microdeficient = 1,
         )
         self.update_pars(pars, **kwargs)
@@ -44,7 +45,24 @@ class TB_Nutrition_Connector(ss.Connector):
         assert len(macro) == len(micro), 'Length of macro and micro must match.'
         ret = np.ones_like(macro)
         return ret
-    
+
+    @staticmethod
+    def p_cure_func(self, sim, uids):
+        rate = np.zeros(len(uids))
+
+        # No recovery for those with unsatisfactory macro nutrients
+        nut = sim.diseases['malnutrition']
+
+        # Clearance rate (units are per-year)
+        rate[(nut.macro_state[uids] == MacroNutrients.UNSATISFACTORY)           & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.0
+        rate[(nut.macro_state[uids] == MacroNutrients.MARGINAL)                 & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.1
+        rate[(nut.macro_state[uids] == MacroNutrients.SLIGHTLY_BELOW_STANDARD)  & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.25
+        rate[(nut.macro_state[uids] == MacroNutrients.STANDARD_OR_ABOVE)        & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.5
+
+        p = 1 - np.exp(-rate * sim.dt) # Linear conversion might be sufficient
+
+        return p
+
     def update_rel_prog(self, tb, change_uids, k_old, k_new, state, rate, ti, dt):
         """Update the rel_prog values and calculate the new time of switching from latent to presymp"""
         if state != TBS.LATENT_SLOW and state != TBS.LATENT_FAST:
@@ -105,5 +123,11 @@ class TB_Nutrition_Connector(ss.Connector):
 
             self.update_rel_prog(tb, change_uids, k_old_ls, k_new_ls, TBS.LATENT_SLOW, tb.pars.rate_LS_to_presym, ti, dt)   # Update rel_LS_prog
             self.update_rel_prog(tb, change_uids, k_old_lf, k_new_lf, TBS.LATENT_FAST, tb.pars.rate_LF_to_presym, ti, dt)   # Update rel_LF_prog
+
+        # Assess nutrition-induced clearance
+        latent_uids = ((tb.state == TBS.LATENT_FAST) | (tb.state == TBS.LATENT_SLOW)).uids
+        clear_uids = self.pars.p_latent_clearance.filter(latent_uids)
+        tb.state[clear_uids] = TBS.CURE
+        tb.ti_cure[clear_uids] = ti + 1 # Next time step
     
         return
