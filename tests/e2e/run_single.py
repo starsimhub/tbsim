@@ -41,7 +41,13 @@ def make_tb_nut():
     cn = mtb.TB_Nutrition_Connector(cn_pars)
 
     # --------- Interventions ------
+    
     # TODO: Add a set of common TB interventions
+    # Create a TB vaccine product   
+    tb_vaccine = ss.Product(name="TB Vaccine")
+    # Create a routine TB vaccination intervention
+    routine_vx = mtb.TBVaccinationCampaign(year=1997, from_state=0.1, product=tb_vaccine, prob=0.9)
+    
     # TODO: Add a set of common nutrition interventions - we may need to remove dependencies from Harlem scenarios. 
 
     # --------- Analyzers ----------
@@ -53,8 +59,10 @@ def make_tb_nut():
         start = 1980,
         end = 2020,
         )
-    sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
+    sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=routine_vx)
     sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
+
+    #
 
     return sim
 
