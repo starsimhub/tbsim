@@ -64,11 +64,11 @@ class TestTB(unittest.TestCase):
         
         print("none", tb.state[tb.state == mtb.TBS.NONE])
         print("Slow:", tb.state[tb.state == mtb.TBS.LATENT_SLOW])
-        print("Fast: ,tb.state[tb.state == mtb.TBS.LATENT_FAST])
-        print(tb.state[tb.state == mtb.TBS.ACTIVE_PRESYMP])
-        print(tb.state[tb.state == mtb.TBS.ACTIVE_EXPTB])
-        print(tb.state[tb.state == mtb.TBS.ACTIVE_SMNEG])
-        print(tb.state[tb.state == mtb.TBS.ACTIVE_SMPOS])
+        print("Fast:" ,tb.state[tb.state == mtb.TBS.LATENT_FAST])
+        print("Active Presymp:", tb.state[tb.state == mtb.TBS.ACTIVE_PRESYMP])
+        print("Active ExpTB:", tb.state[tb.state == mtb.TBS.ACTIVE_EXPTB])
+        print("Active Smear Negative: ", tb.state[tb.state == mtb.TBS.ACTIVE_SMNEG])
+        print("Active Smear Positive: ",tb.state[tb.state == mtb.TBS.ACTIVE_SMPOS])
         
         
     def test_update_death(self):
