@@ -34,14 +34,16 @@ class TBVaccinationCampaign(ss.Intervention):
     Base class for any intervention that uses campaign delivery; handles interpolation of input years.
     """
 
-    def __init__(self, year=1900, product=None, rate =.015, target_gender='All', target_age=10, from_state=None, new_value_fraction=1, prob=None, *args, **kwargs):
+    def __init__(self, year=1900, product=None, rate =.015, target_gender='All', target_age=10, target_state=None, new_value_fraction=1, prob=None, *args, **kwargs):
+        if product is None:
+            raise NotImplementedError('No product specified')
         self.year = sc.promotetoarray(year)
         self.rate = sc.promotetoarray(rate)
         self.target_gender = target_gender
         self.target_age = target_age
         self.prob = sc.promotetoarray(prob)
         self.product = product
-        self.from_state = from_state
+        self.target_state = target_state
         self.new_value_fraction = new_value_fraction
         super().__init__(*args, **kwargs)
         self.p = ss.bernoulli(p=lambda self, sim, uids: np.interp(sim.year, self.year, self.rate*sim.dt))
@@ -60,8 +62,8 @@ class TBVaccinationCampaign(ss.Intervention):
         tb = sim.diseases['tb']
         ppl = sim.people
         
-        # eligible = (tb.state == self.from_state) & ppl.alive & (ppl.age >= self.target_age) & (ppl.gender == self.target_gender)
-        eligible = (tb.state == self.from_state) & ppl.alive
+        # eligible = (tb.state == self.target_state) & ppl.alive & (ppl.age >= self.target_age) & (ppl.gender == self.target_gender)
+        eligible = (tb.state == self.target_state) & ppl.alive
         
         eligible_uids = eligible.uids
         
