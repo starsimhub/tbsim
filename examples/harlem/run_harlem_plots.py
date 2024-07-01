@@ -9,15 +9,6 @@ import datetime as dt
 import seaborn as sns
 import matplotlib.dates as mdates
 import matplotlib.ticker as mtick
-import os 
-
-
-import warnings
-warnings.filterwarnings("ignore", "is_categorical_dtype")
-warnings.filterwarnings("ignore", "use_inf_as_na")
-
-debug = False
-default_n_rand_seeds = [1000, 10][debug]
 
 def plot_epi(df):
     first_year = int(df['year'].iloc[0])
