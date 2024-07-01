@@ -35,6 +35,7 @@ class Malnutrition(ss.Disease):
         super().__init__(**kwargs)
         self.default_pars(
             beta = 1.0,         # Transmission rate  - TODO: Check if there is one
+            init_prev = 0.001,  # Initial prevalence 
         )
         self.update_pars(pars, **kwargs)
 
