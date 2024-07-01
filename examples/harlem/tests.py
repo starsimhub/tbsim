@@ -3,9 +3,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from unittest.mock import patch
-from tbsim.harlem.plotting import plot_epi, plot_hh, plot_nut, plot_active_infections
+from plots import plot_epi, plot_hh, plot_nut, plot_active_infections
 
-class TestMyModule(unittest.TestCase):
+class TestPlots(unittest.TestCase):
 
     def setUp(self):
         # Create a sample dataframe for testing
