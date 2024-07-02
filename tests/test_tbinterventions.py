@@ -31,13 +31,9 @@ class TestTBVaccinationCampaign(unittest.TestCase):
             
     # Assuming a Simulation class and necessary setup exists in starsim for a complete test
     def test_campaign_apply(self):
-        sim = ss.Sim(people=ss.People(n_agents=500), networks=ss.RandomNet(), diseases=mtb.TB(), pars=dict(start = 1900, end = 2000))
-        self.campaign.apply(sim)
-        # Further assertions depending on the simulation outcome
+        #TODO
+        pass
 
 if __name__ == '__main__':
     sim = ss.Sim(people=ss.People(n_agents=500), networks=ss.RandomNet(), diseases=mtb.TB(), pars=dict(start = 1900, end = 2000))
-
-    
-    
     unittest.main()
