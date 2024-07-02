@@ -47,6 +47,7 @@ class TestTB(unittest.TestCase):
 
 
     def test_infectious(self):
+        self.tb = mtb.TB()
         self.assertFalse(self.tb.infectious)
 
         self.tb.state = mtb.TBS.ACTIVE_PRESYMP
