@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 def make_tb_nut():
     # --------- People ----------
-    n_agents = 5000
+    n_agents = 1000
     extra_states = [
         ss.FloatArr('SES', default= ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (TODO)
     ]
@@ -46,7 +46,7 @@ def make_tb_nut():
     # Create a TB vaccine product   
     tb_vaccine = ss.Product(name="TB Vaccine")
     # Create a routine TB vaccination intervention
-    routine_vx = mtb.TBVaccinationCampaign(year=1997, from_state=0.1, product=tb_vaccine, prob=0.9)
+    routine_vx = mtb.TBVaccinationCampaign(year=1997, target_state=1.0, product=tb_vaccine, prob=0.9)
     
     # TODO: Add a set of common nutrition interventions - we may need to remove dependencies from Harlem scenarios. 
 
@@ -71,5 +71,5 @@ if __name__ == '__main__':
     sim_tbn = make_tb_nut()
     sim_tbn.run()
     mtb.plot_sim(sim_tbn)
-    plt.show()
+    #plt.show()
     plt.close()
