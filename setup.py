@@ -48,5 +48,6 @@ setup(
         'wheel',
         'setuptools',
         'seaborn',
+        'pytest',
     ],
 )
