@@ -6,17 +6,17 @@ import pandas as pd
 import os
 from tests.e2e.harlem.funcs import compute_rel_prog
 import tbsim.config as cfg
-from tests.e2e.harlem.experiments import Experiment, Scenarios
+from tests.e2e.harlem.suite import Experiment, Scenarios
 from tests.e2e.harlem.funcs import compute_rel_prog, compute_rel_prog_alternate, run_scen, p_micro_recovery_default, p_micro_recovery_alt, p_cure_func
 import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 #  Global variables
-scenarios = Scenarios.scenarios()     # Get the scenarios dict
+scenarios = Scenarios.get_scenarios()     # Get the scenarios dict
 scens = Experiment.generate_experiment()  # Create matching CONTROL and VITAMIN arms for each scenario
 debug = False
-default_n_rand_seeds = [100, 2][debug]
+default_n_rand_seeds = [300, 2][debug]
 cache_from = [None, '06-07_14-09-03 plus 06-10_14-02-53 1000 with LatentClearance'][0]
 scen_filter = None
 calib = False
@@ -212,11 +212,19 @@ if __name__ == '__main__':
 
         fn = list(Path(cfg.RESULTS_DIRECTORY).glob("nutrition_*.csv"))[0]
         df_nut = pd.read_csv(fn, index_col=0)
+        #df_epi = df_epi.loc[df_epi['Scenario'].isin(['Base CONTROL', 'Base VITAMIN', 'RelSus5 CONTROL', 'RelSus5 VITAMIN'])]
+
+    '''
+    if debug:
+        sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
+        sim.diseases['tb'].plot()
+        sim.plot()
+        sim.analyzers['harlemanalyzer'].plot()
+        plt.show()
+    '''
 
     skeys = df_hh['Scenario'].apply(lambda x: x.split(' ')[0]).unique()
-    scen_ord = [s for s in Scenarios.scenarios.keys() if s in skeys]
-    scens = Experiment.generate_experiments()
-    
+    scen_ord = [s for s in scenarios.keys() if s in skeys]
     mtb.plot_calib(df_epi, scens, scen_ord=scen_ord, channel='cum_active_infections')
     mtb.plot_diff(df_epi, scens, scen_ord=scen_ord, channel='cum_active_infections')
     mtb.plot_active_infections(df_epi, scen_ord=scen_ord)

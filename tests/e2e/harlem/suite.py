@@ -16,7 +16,7 @@ class Scenarios():
 
     # Define scenarios
     @staticmethod
-    def scenarios(scen_filter=None):
+    def get_scenarios(scen_filter=None):
         scenarios_dict = sc.odict(
             Base={
                 'beta': 0.12,
@@ -87,7 +87,7 @@ class Experiment(Scenarios):
     def generate_experiment(vitamin_year_rate=[(1942, 10.0), (1943, 3.0)], calib=False, scen_filter=None):
     # Create matching CONTROL and VITAMIN arms for each scenario
         scens = {}
-        for skey, scn in Scenarios.scenarios(scen_filter).items():
+        for skey, scn in Scenarios.get_scenarios(scen_filter).items():
             if 'active' in scn and not scn['active']:
                 continue
             control = Scenarios.defaults().copy() | scn.copy()
