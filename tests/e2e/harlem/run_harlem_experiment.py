@@ -4,10 +4,9 @@ import starsim as ss
 import sciris as sc
 import pandas as pd
 import os
-from tests.e2e.harlem.funcs import compute_rel_prog
 import tbsim.config as cfg
 from tests.e2e.harlem.suite import Experiment, Scenarios
-from tests.e2e.harlem.funcs import compute_rel_prog, compute_rel_prog_alternate, run_scen, p_micro_recovery_default, p_micro_recovery_alt, p_cure_func
+from tests.e2e.harlem.functions import compute_rel_prog, compute_rel_prog_alternate, run_scen, p_micro_recovery_default, p_micro_recovery_alt, p_cure_func
 import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
@@ -16,7 +15,7 @@ warnings.filterwarnings("ignore", "use_inf_as_na")
 scenarios = Scenarios.get_scenarios()     # Get the scenarios dict
 scens = Experiment.generate_experiment()  # Create matching CONTROL and VITAMIN arms for each scenario
 debug = False
-default_n_rand_seeds = [300, 2][debug]
+default_n_rand_seeds = [40, 2][debug]
 cache_from = [None, '06-07_14-09-03 plus 06-10_14-02-53 1000 with LatentClearance'][0]
 scen_filter = None
 calib = False
