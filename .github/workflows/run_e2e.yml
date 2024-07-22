@@ -1,4 +1,4 @@
-name: Run e2e scenarios
+ name: Run e2e scenarios
 
 on:
   workflow_dispatch:
@@ -38,19 +38,26 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install tbsim dependencies
+    # Step 1.2: Install tbsim
+    - name: Install tbsim
       run: |
-        pip install .
-        
-    - name: Clone and Install starsim
+        ls -l
+        pip install -e .
+        pip freeze      
+          
+    # Step 2.1: Checkout starsimhub/starsim repository
+    - name: Checkout starsimhub/starsim repository
+      uses: actions/checkout@v3
+      with:
+        repository: 'starsimhub/starsim'
+        path: 'starsim'
+      
+    # Step 2.2: Install starsim
+    - name: Install starsim
       run: |
-        git clone https://github.com/starsimhub/starsim.git
         cd starsim
         pip install -e .
-    
-    - name: Pip List
-      run: |
-        pip list
+        pip freeze
 
     - name: Run e2e tests
       working-directory: tests/e2e
