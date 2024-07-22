@@ -1,6 +1,6 @@
 import sciris as sc
 import tbsim as mtb
-from tests.e2e.harlem.functionparams import compute_rel_prog, compute_rel_prog_alternate, run_scen, p_micro_recovery_alt, p_cure_func
+from tests.e2e.harlem.functionObjects import compute_rel_prog, compute_rel_prog_alternate, run_scen, p_micro_recovery_alt, p_cure_func
 
 __all__ = ['Scenarios', 'Arms' ]
 class Scenarios():
