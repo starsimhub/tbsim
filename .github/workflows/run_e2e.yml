@@ -1,4 +1,4 @@
- name: Run e2e scenarios
+name: Run e2e scenarios
 
 on:
   workflow_dispatch:
