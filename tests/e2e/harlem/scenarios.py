@@ -1,8 +1,8 @@
 import sciris as sc
 import tbsim as mtb
-from tests.e2e.harlem.functions import compute_rel_prog, compute_rel_prog_alternate, run_scen, p_micro_recovery_alt, p_cure_func
+from tests.e2e.harlem.functionparams import compute_rel_prog, compute_rel_prog_alternate, run_scen, p_micro_recovery_alt, p_cure_func
 
-__all__ = ['Experiment', 'Scenarios']
+__all__ = ['Scenarios', 'Arms' ]
 class Scenarios():
     # Default scenario settings
     @staticmethod
@@ -80,10 +80,10 @@ class Scenarios():
         )
         return scenarios_dict
     
-class Experiment(Scenarios):
+class Arms(Scenarios):
     
     @staticmethod
-    def generate_experiment(vitamin_year_rate=[(1942, 10.0), (1943, 3.0)], calib=False, scen_filter=None):
+    def create_matching_arms(vitamin_year_rate=[(1942, 10.0), (1943, 3.0)], calib=False, scen_filter=None):
     # Create matching CONTROL and VITAMIN arms for each scenario
         scens = {}
         for skey, scn in Scenarios.get_scenarios(scen_filter).items():

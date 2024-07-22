@@ -5,15 +5,16 @@ import sciris as sc
 import pandas as pd
 import os
 import tbsim.config as cfg
-from tests.e2e.harlem.suite import Experiment, Scenarios
-from tests.e2e.harlem.functions import compute_rel_prog, compute_rel_prog_alternate, run_scen, p_micro_recovery_default, p_micro_recovery_alt, p_cure_func
+from tests.e2e.harlem.scenarios import Scenarios, Arms
+from tests.e2e.harlem.functionparams import compute_rel_prog, p_micro_recovery_default
 import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 #  Global variables
 scenarios = Scenarios.get_scenarios()     # Get the scenarios dict
-scens = Experiment.generate_experiment()  # Create matching CONTROL and VITAMIN arms for each scenario
+scens_arms = Arms.create_matching_arms()  # Create matching CONTROL and VITAMIN arms for each scenario:  vitamin_year_rate=[(1942, 10.0), (1943, 3.0)], calib=False, scen_filter=None
+
 debug = False
 default_n_rand_seeds = [40, 2][debug]
 cache_from = [None, '06-07_14-09-03 plus 06-10_14-02-53 1000 with LatentClearance'][0]
@@ -28,6 +29,9 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5,
                p_micro_recovery_func=p_micro_recovery_default,
                p_clearance_func=None,
                **kwargs):
+    
+    print(f'**** Running scenario:  {scen}')
+    
     # vitamin_year_rate is a list of tuples like [(1942, 10.0), (1943, 3.0)] or None if CONTROL
     lbl = f'sim {idx}: {scen} with rand_seed={rand_seed}, p_control={p_control}, vitamin_year_rate={vitamin_year_rate}'
     print(f'Starting {lbl}')
@@ -176,10 +180,11 @@ def run_scenarios(n_seeds=default_n_rand_seeds):
     results = []
     cfgs = []
 
-    for skey, scen in scens.items():
+    for skey, scen in scens_arms.items():
         for rs in range(n_seeds):
             cfgs.append({'scen': skey,'rand_seed':rs, 'idx':len(cfgs)} | scen) # Merge dicts with pipe operators
     T = sc.tic()
+
     results += sc.parallelize(run_harlem, iterkwargs=cfgs, die=False, serial=False)
     epi, hh, nut = zip(*results)
     print(f'That took: {sc.toc(T, output=True):.1f}s')
@@ -195,37 +200,39 @@ def run_scenarios(n_seeds=default_n_rand_seeds):
 
     return df_epi, df_hh, df_nut
 
+def use_cache(cache_from):
+    from pathlib import Path
+    cfg.RESULTS_DIRECTORY = os.path.join('figs', 'TB', cache_from)
+    fn = list(Path(cfg.RESULTS_DIRECTORY).glob("result_*.csv"))[0]
+    df_epi = pd.read_csv(fn, index_col=0)
+
+    fn = list(Path(cfg.RESULTS_DIRECTORY).glob("hhsizes_*.csv"))[0]
+    df_hh = pd.read_csv(fn, index_col=0)
+
+    fn = list(Path(cfg.RESULTS_DIRECTORY).glob("nutrition_*.csv"))[0]
+    df_nut = pd.read_csv(fn, index_col=0)
+    #df_epi = df_epi.loc[df_epi['Scenario'].isin(['Base CONTROL', 'Base VITAMIN', 'RelSus5 CONTROL', 'RelSus5 VITAMIN'])]
+    
+    return df_epi, df_hh, df_nut
 
 if __name__ == '__main__':
     
     if cache_from is None:
         df_epi, df_hh, df_nut = run_scenarios()
     else:
-        from pathlib import Path
-        cfg.RESULTS_DIRECTORY = os.path.join('figs', 'TB', cache_from)
-        fn = list(Path(cfg.RESULTS_DIRECTORY).glob("result_*.csv"))[0]
-        df_epi = pd.read_csv(fn, index_col=0)
+        df_epi, df_hh, df_nut = use_cache(cache_from)
 
-        fn = list(Path(cfg.RESULTS_DIRECTORY).glob("hhsizes_*.csv"))[0]
-        df_hh = pd.read_csv(fn, index_col=0)
-
-        fn = list(Path(cfg.RESULTS_DIRECTORY).glob("nutrition_*.csv"))[0]
-        df_nut = pd.read_csv(fn, index_col=0)
-        #df_epi = df_epi.loc[df_epi['Scenario'].isin(['Base CONTROL', 'Base VITAMIN', 'RelSus5 CONTROL', 'RelSus5 VITAMIN'])]
-
-    '''
-    if debug:
-        sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
-        sim.diseases['tb'].plot()
-        sim.plot()
-        sim.analyzers['harlemanalyzer'].plot()
-        plt.show()
-    '''
+    # if debug:
+    #     sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
+    #     sim.diseases['tb'].plot()
+    #     sim.plot()
+    #     sim.analyzers['harlemanalyzer'].plot()
+    #     plt.show()
 
     skeys = df_hh['Scenario'].apply(lambda x: x.split(' ')[0]).unique()
     scen_ord = [s for s in scenarios.keys() if s in skeys]
-    mtb.plot_calib(df_epi, scens, scen_ord=scen_ord, channel='cum_active_infections')
-    mtb.plot_diff(df_epi, scens, scen_ord=scen_ord, channel='cum_active_infections')
+    mtb.plot_calib(df_epi, scens_arms, scen_ord=scen_ord, channel='cum_active_infections')
+    mtb.plot_diff(df_epi, scens_arms, scen_ord=scen_ord, channel='cum_active_infections')
     mtb.plot_active_infections(df_epi, scen_ord=scen_ord)
     mtb.plot_epi(df_epi, scen_ord=scen_ord)
     mtb.plot_hh(df_hh)
