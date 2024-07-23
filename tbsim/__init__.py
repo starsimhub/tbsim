@@ -5,6 +5,6 @@ from .harlem.plotting import *
 from .config import *
 from .harlem.network import *
 from .harlem.harlem import *
-from .harlem.interventions import *
+from .interventions import *
 from .harlem.analyzers import *
 from .tbinterventions import *
