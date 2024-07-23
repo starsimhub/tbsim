@@ -3,8 +3,8 @@ from .malnutrition import *
 from .connector import *
 from .harlem.plotting import *
 from .config import *
-from .network import *
+from .harlem.network import *
 from .harlem.harlem import *
-from .interventions import *
-from .analyzers import *
+from .harlem.interventions import *
+from .harlem.analyzers import *
 from .tbinterventions import *
