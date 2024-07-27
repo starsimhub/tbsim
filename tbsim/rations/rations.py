@@ -6,6 +6,32 @@ import pandas as pd
 
 __all__ = ['Rations']
 
+'''
+PLAN:
+1. CREATE 2 arms: CONTROL and VITAMIN
+2. Create 2800 Agents (indexes 0-2799)
+3. households with sizes from 1 to 4
+4. Assign each household to an arm 50/50
+5. Assign each household a macro state based on the arm
+  2a. set prognoses for each agent on one of the Active TB states from day 1? (maybe warm up period? do we call it warm up period? :D )
+  
+to be continued... 
+
+'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class Rations():
     def __init__(self, pars=None):
 
