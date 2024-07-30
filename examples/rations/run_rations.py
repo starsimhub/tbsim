@@ -4,8 +4,7 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
-# from examples.rations.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
-# import functionObjects
+from examples.rations.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
 from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients
 
 import os 
@@ -16,16 +15,14 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = True
-default_n_rand_seeds = [1000, 1][debug]
+default_n_rand_seeds = [1000, 10][debug]
 
 def compute_rel_prog(macro, micro):
     
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     
     ret = np.ones_like(macro)
-    
-    #ret[micro == eMicroNutrients.DEFICIENT] = 5
-    
+      
     ret[(macro == eMacroNutrients.STANDARD_OR_ABOVE)         & (micro == eMicroNutrients.DEFICIENT)] = 1.5
     ret[(macro == eMacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == eMicroNutrients.DEFICIENT)] = 2.0
     ret[(macro == eMacroNutrients.MARGINAL)                  & (micro == eMicroNutrients.DEFICIENT)] = 2.5
@@ -212,10 +209,10 @@ if __name__ == '__main__':
     '''
     
     
-    # plot_active_infections(df_epi)      #Incidence
-    # plot_hh(df_hh)                      #Household size distribution  
-    # plot_nut(df_nut)                    #Nutrition
-    # plot_epi(df_epi)                    #Prevalence 
+    plot_active_infections(df_epi)      #Incidence
+    plot_hh(df_hh)                      #Household size distribution  
+    plot_nut(df_nut)                    #Nutrition
+    plot_epi(df_epi)                    #Prevalence 
 
     print(f"Results directory {cfg.RESULTS_DIRECTORY}\nThis run: {cfg.FILE_POSTFIX}")
     print('Done')
