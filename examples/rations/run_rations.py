@@ -5,7 +5,9 @@ import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
 # from examples.rations.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
-from tbsim.functionObjects import compute_rel_prog
+# import functionObjects
+from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients
+
 import os 
 
 
@@ -16,6 +18,20 @@ warnings.filterwarnings("ignore", "use_inf_as_na")
 debug = True
 default_n_rand_seeds = [1000, 1][debug]
 
+def compute_rel_prog(macro, micro):
+    
+    assert len(macro) == len(micro), 'Length of macro and micro must match.'
+    
+    ret = np.ones_like(macro)
+    
+    #ret[micro == eMicroNutrients.DEFICIENT] = 5
+    
+    ret[(macro == eMacroNutrients.STANDARD_OR_ABOVE)         & (micro == eMicroNutrients.DEFICIENT)] = 1.5
+    ret[(macro == eMacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == eMicroNutrients.DEFICIENT)] = 2.0
+    ret[(macro == eMacroNutrients.MARGINAL)                  & (micro == eMicroNutrients.DEFICIENT)] = 2.5
+    ret[(macro == eMacroNutrients.UNSATISFACTORY)            & (micro == eMicroNutrients.DEFICIENT)] = 3.0
+    return ret
+
 def run_rations(rand_seed=0):
 
     np.random.seed(rand_seed)
@@ -24,10 +40,10 @@ def run_rations(rand_seed=0):
     rations = mtb.Rations()
 
     # --------- People ----------
-    pop = rations.people()
+    pop = rations.people(n_agents=2800)
 
     # -------- Network ---------
-    rationsnet = rations.net()
+    householdnet = rations.net()
 
     # Network parameters
     randnet_pars = dict(
@@ -37,13 +53,13 @@ def run_rations(rand_seed=0):
     # Initialize a random network
     randnet = ss.RandomNet(randnet_pars)
     matnet = ss.MaternalNet() # To track newborn --> household
-    nets = [rationsnet, randnet, matnet]
+    nets = [householdnet, randnet, matnet]
 
     # ------- TB disease --------
     # Disease parameters
     tb_pars = dict(
         ####beta = dict(rations=0.03, random=0.003, maternal=0.0),
-        beta = dict(rations=0.03, random=0.0, maternal=0.0),
+        beta = dict(householdnet=0.03, random=0.0, maternal=0.0),
         init_prev = 0, # Infections seeded by Rations class
         rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
         rate_LF_to_presym = 6e-3,  # TODO: double chek pars
@@ -56,15 +72,17 @@ def run_rations(rand_seed=0):
     )
     tb = mtb.TB(tb_pars)
 
+
     # ---------- Malnutrition --------
     nut_pars = dict()
     nut = mtb.Malnutrition(nut_pars)
 
     # Add demographics
     dems = [
-        mtb.HarlemPregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
+        mtb.NutritionHouseholdPregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
     ]
+
 
     # -------- Connector -------
     cn_pars = dict(
@@ -73,6 +91,7 @@ def run_rations(rand_seed=0):
         relsus_microdeficient = 1 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
+
 
     # -------- Interventions -------
     vs = mtb.VitaminSupplementation(year=[1942, 1943], rate=[10.0, 3.0]) # Need coverage, V1 vs V2
@@ -90,9 +109,9 @@ def run_rations(rand_seed=0):
 
     # -------- Analyzer -------
     azs = [
-        mtb.HarlemAnalyzer(),
-        mtb.HHAnalyzer(),
-        mtb.NutritionAnalyzer(),
+        mtb.RationsAnalyzer(),
+        mtb.GenHHAnalyzer(),
+        mtb.GenNutritionAnalyzer(),
     ]
 
 
@@ -112,13 +131,15 @@ def run_rations(rand_seed=0):
                  pars=sim_pars, 
                  demographics=dems, 
                  connectors=cn, 
-                 interventions=intvs, 
-                 analyzers=azs)
+                 interventions=intvs,
+                analyzers=azs
+                 )
     sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
     sim.initialize()
 
-    rations.set_states(sim)
+    rations.set_states(sim, target_group='all')
+    
     seed_uids = rations.choose_seed_infections()
     tb = sim.diseases['tb']
     tb.set_prognoses(seed_uids)
@@ -139,13 +160,13 @@ def run_rations(rand_seed=0):
 
     sim.run() # Actually run the sim
 
-    df = sim.analyzers['harlemanalyzer'].df
+    df = sim.analyzers['rationsanalyzer'].df
     df['rand_seed'] = rand_seed
 
-    dfhh = sim.analyzers['hhanalyzer'].df
+    dfhh = sim.analyzers['genhhanalyzer'].df
     dfhh['rand_seed'] = rand_seed
 
-    dfn = sim.analyzers['nutritionanalyzer'].df
+    dfn = sim.analyzers['gennutritionanalyzer'].df
     dfn['rand_seed'] = rand_seed
 
     print(f'Finishing sim with rand_seed={rand_seed} ')
@@ -161,6 +182,9 @@ def run_sims(n_seeds=default_n_rand_seeds):
     T = sc.tic()
     results += sc.parallelize(run_rations, iterkwargs=cfgs, die=False, serial=debug)
     epi, hh, nut = zip(*results)
+    
+    #epi, hh, nut = run_rations(rand_seed=0)
+    
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
     df_epi = pd.concat(epi)
@@ -183,7 +207,7 @@ if __name__ == '__main__':
         sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
         sim.diseases['tb'].plot()
         sim.plot()
-        sim.analyzers['harlemanalyzer'].plot()
+        sim.analyzers['Rationsanalyzer'].plot()
         plt.show()
     '''
     

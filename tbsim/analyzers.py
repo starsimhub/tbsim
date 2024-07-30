@@ -4,13 +4,18 @@ Define Malnutrition analyzers
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, TBS, Malnutrition, MicroNutrients, MacroNutrients, StudyArm
+from tbsim import TB, TBS, Malnutrition, eMicroNutrients, eMacroNutrients
 import networkx as nx
 import pandas as pd
+from enum import IntEnum, auto
 
-__all__ = ['HarlemAnalyzer', 'HHAnalyzer', 'NutritionAnalyzer']
 
-class HarlemAnalyzer(ss.Analyzer):
+__all__ = ['RationsAnalyzer', 'GenHHAnalyzer', 'GenNutritionAnalyzer']
+class StudyArm(IntEnum):
+    CONTROL = auto()
+    VITAMIN = auto()
+    
+class RationsAnalyzer(ss.Analyzer):
 
     def __init__(self, **kwargs):
         self.requires = [TB, Malnutrition]
@@ -41,8 +46,8 @@ class HarlemAnalyzer(ss.Analyzer):
             n_died = np.count_nonzero( (tb.ti_dead[(self.sim.people.arm==arm)] == ti) )
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
             n_latent_fast = np.count_nonzero(tb.state[ppl] == TBS.LATENT_FAST)
-            n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
-            n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == MacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == MacroNutrients.MARGINAL) )
+            n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == eMicroNutrients.DEFICIENT)
+            n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == eMacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == eMacroNutrients.MARGINAL) )
             infected = ppl & tb.infected
             if not infected.any():
                 rel_LS_mean = np.nan
@@ -76,7 +81,7 @@ class HarlemAnalyzer(ss.Analyzer):
 
         return g.figure
 
-class HHAnalyzer(ss.Analyzer):
+class GenHHAnalyzer(ss.Analyzer):
 
     def __init__(self, **kwargs):
         self.requires = [TB, Malnutrition]
@@ -108,7 +113,7 @@ class HHAnalyzer(ss.Analyzer):
         hhid, hh_sizes = np.unique(sim.people.hhid, return_counts=True)
         cnt, hh_size = np.histogram(hh_sizes, bins=range(1, 11))
 
-        #hhn = self.sim.networks['harlemnet']
+        #hhn = self.sim.networks['Rationsnet']
         #el = [(p1, p2) for p1,p2 in zip(hhn.edges['p1'], hhn.edges['p2'])]
         #G = nx.from_edgelist(el)
         #hh_sizes = np.array([len(c) for c in nx.connected_components(G)])
@@ -123,7 +128,7 @@ class HHAnalyzer(ss.Analyzer):
         self.df = pd.concat(self.data, axis=1)
         return
 
-class NutritionAnalyzer(ss.Analyzer):
+class GenNutritionAnalyzer(ss.Analyzer):
 
     def __init__(self, **kwargs):
         self.requires = [TB, Malnutrition]
@@ -148,8 +153,8 @@ class NutritionAnalyzer(ss.Analyzer):
         if not snap:
             return
 
-        macro_lookup = {MacroNutrients[name].value: name for name in MacroNutrients._member_names_}
-        micro_lookup = {MicroNutrients[name].value: name for name in MicroNutrients._member_names_}
+        macro_lookup = {eMacroNutrients[name].value: name for name in eMacroNutrients._member_names_}
+        micro_lookup = {eMicroNutrients[name].value: name for name in eMicroNutrients._member_names_}
         arm_lookup = {StudyArm[name].value: name for name in StudyArm._member_names_}
 
         nut = self.sim.diseases['malnutrition']
