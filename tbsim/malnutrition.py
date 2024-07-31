@@ -6,7 +6,7 @@ import numpy as np
 import starsim as ss
 import sciris as sc
 from enum import IntEnum, auto
-
+import tbsim.nutritionenums as ne
 
 __all__ = ['Malnutrition', 'MacroNutrients', 'MicroNutrients']
 
@@ -42,6 +42,7 @@ class Malnutrition(ss.Disease):
         self.add_states(
             ss.FloatArr('macro_state', default= MacroNutrients.STANDARD_OR_ABOVE), # To keep track of the macronutrients state
             ss.FloatArr('micro_state', default=MicroNutrients.NORMAL),            # To keep track of the micronutrients state
+            ss.FloatArr('bmi_state', default=0.0),                                # To keep track of the BMI state
         )
         self.add_states(
             ss.FloatArr('ti_macro'),                          # Time index of change in macronutrition
@@ -49,6 +50,10 @@ class Malnutrition(ss.Disease):
 
             ss.FloatArr('ti_micro'),                          # Time index of change in micronutrition
             ss.FloatArr('new_micro_state'),                   # New micro nutrition state
+            
+            ss.FloatArr('ti_bmi'),                          # Time index of change in micronutrition
+            ss.FloatArr('new_bmi_state'),                   # New micro nutrition state
+
         )
         
         return
@@ -68,8 +73,13 @@ class Malnutrition(ss.Disease):
         new_micro = (self.ti_micro == ti).uids
         if len(new_micro) > 0:
             self.micro_state[new_micro] = self.new_micro_state[new_micro]
+
+        new_bmi = (self.ti_bmi == ti).uids
+        if len(new_bmi) > 0:
+            self.bmi_state[new_bmi] = self.new_bmi_state[new_bmi]
        
-        return new_macro, new_micro
+       
+        return new_macro, new_micro, new_bmi
 
     def init_results(self):
         """
@@ -86,6 +96,12 @@ class Malnutrition(ss.Disease):
             ss.Result(self.name, 'prev_micro_normal', npts, dtype=float),
             ss.Result(self.name, 'prev_micro_deficient', npts, dtype=float),
             ss.Result(self.name, 'people_alive', npts, dtype=float),
+            
+            ss.Result(self.name, 'prev_severe_thinness', npts, dtype=float),
+            ss.Result(self.name, 'prev_moderate_thinness', npts, dtype=float),
+            ss.Result(self.name, 'prev_mild_thinness', npts, dtype=float),
+            ss.Result(self.name, 'prev_normal_weight', npts, dtype=float),
+            # ss.Result(self.name, 'prev_overweight', npts, dtype=float),
         ]
         return
 
@@ -104,4 +120,13 @@ class Malnutrition(ss.Disease):
         self.results.prev_micro_normal[ti] = np.count_nonzero((self.micro_state==MicroNutrients.NORMAL) & alive)/n_alive
         self.results.prev_micro_deficient[ti] = np.count_nonzero((self.micro_state==MicroNutrients.DEFICIENT) & alive)/n_alive
         self.results.people_alive[ti] = alive.count()/n_agents
+        
+        
+        self.results.prev_severe_thinness[ti] = np.count_nonzero((self.bmi_state == ne.eBmiStatus.SEVERE_THINNESS) & alive) / n_alive
+        self.results.prev_moderate_thinness[ti] = np.count_nonzero((self.bmi_state == ne.eBmiStatus.MODERATE_THINNESS) & alive) / n_alive
+        self.results.prev_mild_thinness[ti] = np.count_nonzero((self.bmi_state == ne.eBmiStatus.MILD_THINNESS) & alive) / n_alive
+        self.results.prev_normal_weight[ti] = np.count_nonzero((self.bmi_state == ne.eBmiStatus.NORMAL_WEIGHT) & alive) / n_alive
+        # self.results.prev_overweight[ti] = np.count_nonzero((self.bmi_state == ne.eBmiStatus.OVERWEIGHT) & alive) / n_alive
+
+        
         return

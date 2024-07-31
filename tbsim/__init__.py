@@ -3,9 +3,10 @@ from .tb import TB, TBS
 from .malnutrition import Malnutrition, MacroNutrients, MicroNutrients
 from .config import *
 from .tbinterventions import Product, TBVaccinationCampaign
-from .nutritionenums import eBmiStatus, eDetailedStatus, eHighlevelStatus, eMacroNutrients, eMicroNutrients
-from .networks import HouseHoldNet, GenericHouseHold, NutritionHouseholdPregnancy
+from .nutritionenums import eStudyArm, eBmiStatus, eDetailedStatus, eHighlevelStatus, eMacroNutrients, eMicroNutrients
+from .networks import HouseHoldNet, GenericHouseHold, HouseholdNewborns
 from .rations.rations import Rations
+from .interventions import MicroNutrientsSupply, MacroNutrientsSupply, BmiNormalizationIntervention
 from .analyzers import RationsAnalyzer, GenHHAnalyzer, GenNutritionAnalyzer
 
 # Harlem specific imports

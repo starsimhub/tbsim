@@ -1,6 +1,11 @@
 from enum import IntEnum, auto
 
-__all__ = ['eMacroNutrients', 'eMicroNutrients', 'eHighlevelStatus', 'eDetailedStatus', 'eBmiStatus']
+__all__ = ['eStudyArm', 'eMacroNutrients', 'eMicroNutrients', 'eHighlevelStatus', 'eDetailedStatus', 'eBmiStatus']
+
+class eStudyArm(IntEnum):
+    CONTROL = auto()
+    VITAMIN = auto()
+
 
 class eMacroNutrients(IntEnum):
     STANDARD_OR_ABOVE = auto()

@@ -63,22 +63,26 @@ def stackedbar(data, color, **kwargs):
 
     df = data.set_index(['Arm', 'Macro', 'Micro'])
     #base = pd.DataFrame(np.zeros((len(Mcats), len(mcats))), index=pd.Index(Mcats, name='Macro'), columns=mcats)
-
+    
+    
+    # --------------------------  PUBLICATION DATA ------------------------------------
     # Use data with exact values from the publication
     vitamin = [29.2, 30.3, 28.1, 12.4]
     control = [21.1, 28.9, 38.9, 11.1]
 
     vit_data = pd.DataFrame({
-        1942: [29.2, 30.3, 28.1, 12.4],
-        1944: [71.2, 18.8, 5.0, 5.0],
-        1947: [50.0, 37.2, 10.2, 2.6]
+        2017: [29.2, 30.3, 28.1, 12.4],
+        2019: [71.2, 18.8, 5.0, 5.0],
+        2021: [50.0, 37.2, 10.2, 2.6]
     }, index=pd.Index(Mcats, name='Macro')) #.melt(var_name='Year', value_name='Per Cent')
     ctl_data = pd.DataFrame({
-        1942: [21.1, 28.9, 38.9, 11.1],
-        1944: [70.9, 22.8, 3.8, 2.5],
-        1947: [71.6, 21.6, 4.1, 2.7]
+        2017: [21.1, 28.9, 38.9, 11.1],
+        2019: [70.9, 22.8, 3.8, 2.5],
+        2021: [71.6, 21.6, 4.1, 2.7]
     }, index=pd.Index(Mcats, name='Macro')) # .melt(var_name='Year', value_name='Per Cent')
-
+    # ----------------------------------------------------------------------------------
+    
+    
     year = int(float(df.iloc[0]['Year']))
     vit_data = vit_data[year] / 100
     ctl_data = ctl_data[year] / 100

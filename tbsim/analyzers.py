@@ -4,7 +4,7 @@ Define Malnutrition analyzers
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, TBS, Malnutrition, eMicroNutrients, eMacroNutrients
+from tbsim import TB, TBS, Malnutrition, eMicroNutrients, eMacroNutrients, eBmiStatus
 import networkx as nx
 import pandas as pd
 from enum import IntEnum, auto
@@ -48,6 +48,7 @@ class RationsAnalyzer(ss.Analyzer):
             n_latent_fast = np.count_nonzero(tb.state[ppl] == TBS.LATENT_FAST)
             n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == eMicroNutrients.DEFICIENT)
             n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == eMacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == eMacroNutrients.MARGINAL) )
+            n_bmi_deficient = np.count_nonzero( (nut.bmi_state[ppl] < eBmiStatus.NORMAL_WEIGHT))
             infected = ppl & tb.infected
             if not infected.any():
                 rel_LS_mean = np.nan
@@ -56,12 +57,43 @@ class RationsAnalyzer(ss.Analyzer):
                 rel_LS_mean = tb.rel_LS_prog[infected].mean()
                 rel_LF_mean = tb.rel_LF_prog[ppl & tb.infected].mean()
 
-            self.data.append([self.sim.year, arm.name, n_people, new_infections, new_active_infections, n_infected, n_died, n_latent_slow, n_latent_fast, n_micro_deficient, n_macro_deficient, rel_LS_mean, rel_LF_mean])
+            self.data.append([self.sim.year, 
+                              arm.name, 
+                              n_people, 
+                              new_infections, 
+                              new_active_infections, 
+                              n_infected, 
+                              n_died, 
+                              n_latent_slow, 
+                              n_latent_fast, 
+                              n_micro_deficient, 
+                              n_macro_deficient, 
+                              n_bmi_deficient,
+                              rel_LS_mean, 
+                              rel_LF_mean])
         return
 
     def finalize(self):
         super().finalize()
-        self.df = pd.DataFrame(self.data, columns = ['year', 'arm', 'n_people', 'new_infections', 'new_active_infections', 'n_infected', 'n_died', 'n_latent_slow', 'n_latent_fast','n_micro_deficient', 'n_macro_deficient', 'rel_LS_mean', 'rel_LF_mean'])
+        self.df = pd.DataFrame(
+                        self.data, 
+                        columns=[
+                            'year', 
+                            'arm', 
+                            'n_people', 
+                            'new_infections', 
+                            'new_active_infections', 
+                            'n_infected', 
+                            'n_died', 
+                            'n_latent_slow', 
+                            'n_latent_fast',
+                            'n_micro_deficient',            # Number of people with micro nutrient deficiency
+                            'n_macro_deficient',            # Number of people with macro nutrient deficiency
+                            'n_bmi_deficient',              # Number of people with BMI deficiency
+                            'rel_LS_mean', 
+                            'rel_LF_mean'
+                        ]
+                    )
 
         self.df['cum_infections'] = self.df.groupby(['arm'])['new_infections'].cumsum()
         self.df.drop('new_infections', axis=1, inplace=True)
@@ -95,7 +127,7 @@ class GenHHAnalyzer(ss.Analyzer):
         super().init_results()
         return
 
-    def apply(self, sim, snap_years = [1942, 1944]):
+    def apply(self, sim, snap_years = [2017, 2021]):
         super().apply(sim)
 
         year = self.sim.year
@@ -138,7 +170,7 @@ class GenNutritionAnalyzer(ss.Analyzer):
         super().__init__(**kwargs)
         return
 
-    def apply(self, sim, snap_years = [1942, 1944]):
+    def apply(self, sim, snap_years = [2017, 2021]):
         super().apply(sim)
 
         year = self.sim.year

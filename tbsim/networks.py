@@ -2,7 +2,7 @@ import starsim as ss
 import numpy as np
 import networkx as nx
 
-__all__ = ['GenericHouseHold', 'HouseHoldNet', 'NutritionHouseholdPregnancy']
+__all__ = ['GenericHouseHold', 'HouseHoldNet', 'HouseholdNewborns']
 
 class HouseHoldNet(ss.Network):
     def __init__(self, hhs, pars=None, **kwargs):
@@ -63,12 +63,11 @@ class GenericHouseHold():
     macro:  Macro nutrition status of the household.
     arm:    Group in the study that the household belongs to.
     """ 
-    def __init__(self, hhid, uids, hh_macro, hh_micro, hh_bmi, study_arm):
+    def __init__(self, hhid, uids, hh_macro, hh_bmi, study_arm):
         self.hhid = hhid
         self.uids = uids
         self.n = len(uids)
         self.macro_metric = hh_macro
-        self.micro_metric = hh_micro
         self.bmi_metric = hh_bmi
         self.arm = study_arm
         return
@@ -88,22 +87,45 @@ class GenericHouseHold():
             p2s.append(p2)
         return p1s, p2s
     
-class NutritionHouseholdPregnancy(ss.Pregnancy):
+class HouseholdNewborns(ss.Pregnancy):
+    """
+    A class that represents the generation of newborns in a household network. Inherits from starsim.Pregnancy.
+    Attributes:
+        sim (Simulation): The simulation object.
+    """
 
-    def make_embryos(self, conceive_uids, targetNetworkName = 'householdnet'):
+    def assign_nutrition_status(self, newborn_uids, conceive_uids):
+        
+        nut = self.sim.diseases['malnutrition']
+        nut.micro_state[newborn_uids] = nut.micro_state[conceive_uids]
+        nut.macro_state[newborn_uids] = nut.macro_state[conceive_uids]
+        nut.bmi_state[newborn_uids] = nut.bmi_state[conceive_uids]
+        return
+            
+    def make_embryos(self, conceive_uids, targetNetworkName='householdnet'):
+        """
+        Generates newborns based on the given conceive UIDs.
+        Args:
+            conceive_uids (list): A list of UIDs representing the individuals who conceived.
+            targetNetworkName (str, optional): The name of the target network. Defaults to 'householdnet'.
+        Returns:
+            list: A list of UIDs representing the newborns.
+        """
+       
         newborn_uids = super().make_embryos(conceive_uids)
 
         if len(newborn_uids) == 0:
             return newborn_uids
 
+        # Assign household ID and study arm to newborns
         people = self.sim.people
-        nut = self.sim.diseases['malnutrition']
         people.hhid[newborn_uids] = people.hhid[conceive_uids]
         people.arm[newborn_uids] = people.arm[conceive_uids]
-        # Assume baby has the same micro/macro state as mom
-        nut.micro_state[newborn_uids] = nut.micro_state[conceive_uids]
-        nut.macro_state[newborn_uids] = nut.macro_state[conceive_uids]
+        
 
+        # Call the function
+        self.assign_nutrition_status(newborn_uids, conceive_uids) # type: ignore
+        
         hn = self.sim.networks[targetNetworkName]
 
         p1s = []
@@ -119,3 +141,7 @@ class NutritionHouseholdPregnancy(ss.Pregnancy):
         hn.edges.beta = np.concatenate([hn.edges.beta, np.zeros_like(p1s)])#.astype(ss.dtypes.float)
 
         return newborn_uids
+    
+
+
+    

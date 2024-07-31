@@ -15,45 +15,41 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = True
-default_n_rand_seeds = [1000, 10][debug]
+default_n_rand_seeds = [1000, 2][debug]
 
 def compute_rel_prog(macro, micro):
     
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
-    
     ret = np.ones_like(macro)
-      
-    ret[(macro == eMacroNutrients.STANDARD_OR_ABOVE)         & (micro == eMicroNutrients.DEFICIENT)] = 1.5
-    ret[(macro == eMacroNutrients.SLIGHTLY_BELOW_STANDARD)   & (micro == eMicroNutrients.DEFICIENT)] = 2.0
-    ret[(macro == eMacroNutrients.MARGINAL)                  & (micro == eMicroNutrients.DEFICIENT)] = 2.5
-    ret[(macro == eMacroNutrients.UNSATISFACTORY)            & (micro == eMicroNutrients.DEFICIENT)] = 3.0
+    ret[(macro == eMacroNutrients.STANDARD_OR_ABOVE) & (micro == eMicroNutrients.DEFICIENT)] = 1.5
+    ret[(macro == eMacroNutrients.SLIGHTLY_BELOW_STANDARD) & (micro == eMicroNutrients.DEFICIENT)] = 2.0
+    ret[(macro == eMacroNutrients.MARGINAL)  & (micro == eMicroNutrients.DEFICIENT)] = 2.5
+    ret[(macro == eMacroNutrients.UNSATISFACTORY)   & (micro == eMicroNutrients.DEFICIENT)] = 3.0
     return ret
 
 def run_rations(rand_seed=0):
 
     np.random.seed(rand_seed)
 
-    # --------- Rations ----------
+    # -------------- Rations ----------
     rations = mtb.Rations()
 
-    # --------- People ----------
-    pop = rations.people(n_agents=2800)
 
-    # -------- Network ---------
-    householdnet = rations.net()
+    # -------------- People ----------
+    pop = rations.people(n_agents=2900)
 
-    # Network parameters
+    # -------------- Network ---------
     randnet_pars = dict(
         n_contacts=ss.poisson(lam=5),
         dur = 0, # End after one timestep
     )
-    # Initialize a random network
     randnet = ss.RandomNet(randnet_pars)
     matnet = ss.MaternalNet() # To track newborn --> household
+    ###### matnet = mtb.HouseholdNewborns(pars=dict(fertility_rate=45)) # Why is this not used here?
+    householdnet = rations.net()
     nets = [householdnet, randnet, matnet]
 
-    # ------- TB disease --------
-    # Disease parameters
+    # -------------- TB disease --------
     tb_pars = dict(
         ####beta = dict(rations=0.03, random=0.003, maternal=0.0),
         beta = dict(householdnet=0.03, random=0.0, maternal=0.0),
@@ -76,7 +72,7 @@ def run_rations(rand_seed=0):
 
     # Add demographics
     dems = [
-        mtb.NutritionHouseholdPregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
+        mtb.HouseholdNewborns(pars=dict(fertility_rate=45)), # Per 1,000 women
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
     ]
 
@@ -91,18 +87,24 @@ def run_rations(rand_seed=0):
 
 
     # -------- Interventions -------
-    vs = mtb.VitaminSupplementation(year=[1942, 1943], rate=[10.0, 3.0]) # Need coverage, V1 vs V2
+    m = mtb.eMicroNutrients
+    Ma = mtb.eMacroNutrients
+    b = mtb.eBmiStatus
+    
+    vs = mtb.VitaminSupplementation(year=[2017, 1943], rate=[10.0, 3.0]) # Need coverage, V1 vs V2
 
-    m = mtb.MicroNutrients
-    M = mtb.MacroNutrients
-    # Rates to match Appendix Table 7
-    nc0 = mtb.NutritionChange(year=[1942, 1944], rate=[1.25, 0], from_state=M.UNSATISFACTORY, to_state=M.MARGINAL,
-                p_new_micro=0.0, new_micro_state=m.NORMAL)
-    nc1 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=M.MARGINAL, to_state=M.SLIGHTLY_BELOW_STANDARD,
-                p_new_micro=0.0, new_micro_state=m.NORMAL)
-    nc2 = mtb.NutritionChange(year=[1942, 1944], rate=[1.75, 0], from_state=M.SLIGHTLY_BELOW_STANDARD, to_state=M.STANDARD_OR_ABOVE,
-                p_new_micro=0.0, new_micro_state=m.NORMAL)
-    intvs = [vs, nc0, nc1, nc2]
+    
+        
+    # bi = mtb.BmiNormalizationIntervention(year_arr=[2017, 2021], rate_arr=[1.25, 0], from_state=b.SEVERE_THINNESS, to_state=b.MILD_THINNESS, p_new_macro=0.0, new_macro_state=M.SLIGHTLY_BELOW_STANDARD, p_new_micro=0, new_micro_state=m.NORMAL, ration=1)
+    
+    # Rates to match Appendix Table 7 # *******************  TODO:   Do we need these rates below for RATIONS?
+    
+    nc0 = mtb.NutritionChange(year=[2017, 2021], rate=[1.25, 0], from_state=Ma.UNSATISFACTORY, to_state=Ma.MARGINAL, p_new_micro=0.0, new_micro_state=m.NORMAL)
+    nc1 = mtb.NutritionChange(year=[2017, 2021], rate=[1.75, 0], from_state=Ma.MARGINAL, to_state=Ma.SLIGHTLY_BELOW_STANDARD, p_new_micro=0.0, new_micro_state=m.NORMAL)
+    nc2 = mtb.NutritionChange(year=[2017, 2021], rate=[1.75, 0], from_state=Ma.SLIGHTLY_BELOW_STANDARD, to_state=Ma.STANDARD_OR_ABOVE, p_new_micro=0.0, new_micro_state=m.NORMAL)
+    intvs = [vs, nc0, nc1, nc2, 
+            #  bi
+             ]
 
     # -------- Analyzer -------
     azs = [
@@ -113,15 +115,13 @@ def run_rations(rand_seed=0):
 
 
     # -------- Simulation -------
-    # define simulation parameters
     sim_pars = dict(
         dt = 7/365,
         #start = 1935, # Start early to burn-in
-        start = 1941,
-        end = 1947,
+        start = 2015,
+        end = 2023,
         rand_seed = rand_seed,
         )
-    # initialize the simulation
     sim = ss.Sim(people=pop, 
                  networks=nets, 
                  diseases=[tb, nut], 
