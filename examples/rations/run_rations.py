@@ -90,21 +90,20 @@ def run_rations(rand_seed=0):
     m = mtb.eMicroNutrients
     Ma = mtb.eMacroNutrients
     b = mtb.eBmiStatus
-    
-    vs = mtb.VitaminSupplementation(year=[2017, 1943], rate=[10.0, 3.0]) # Need coverage, V1 vs V2
-
-    
-        
-    # bi = mtb.BmiNormalizationIntervention(year_arr=[2017, 2021], rate_arr=[1.25, 0], from_state=b.SEVERE_THINNESS, to_state=b.MILD_THINNESS, p_new_macro=0.0, new_macro_state=M.SLIGHTLY_BELOW_STANDARD, p_new_micro=0, new_micro_state=m.NORMAL, ration=1)
+    bi = mtb.BmiNormalizationIntervention(year_arr=[2017, 2021], rate_arr=[1.25, 0],
+                                          from_bmi_state=b.SEVERE_THINNESS, to_bmi_state=b.MODERATE_THINNESS,
+                                          p_new_micro=0, new_micro_state=m.NORMAL, 
+                                          ration=1, arm=mtb.eStudyArm.VITAMIN)    
     
     # Rates to match Appendix Table 7 # *******************  TODO:   Do we need these rates below for RATIONS?
     
-    nc0 = mtb.NutritionChange(year=[2017, 2021], rate=[1.25, 0], from_state=Ma.UNSATISFACTORY, to_state=Ma.MARGINAL, p_new_micro=0.0, new_micro_state=m.NORMAL)
-    nc1 = mtb.NutritionChange(year=[2017, 2021], rate=[1.75, 0], from_state=Ma.MARGINAL, to_state=Ma.SLIGHTLY_BELOW_STANDARD, p_new_micro=0.0, new_micro_state=m.NORMAL)
-    nc2 = mtb.NutritionChange(year=[2017, 2021], rate=[1.75, 0], from_state=Ma.SLIGHTLY_BELOW_STANDARD, to_state=Ma.STANDARD_OR_ABOVE, p_new_micro=0.0, new_micro_state=m.NORMAL)
-    intvs = [vs, nc0, nc1, nc2, 
-            #  bi
-             ]
+    # nc0 = mtb.MacroNutrientsSupply(year=[2017, 2021], rate=[1.25, 0], from_state=Ma.UNSATISFACTORY, to_state=Ma.MARGINAL, p_new_micro=0.0, new_micro_state=m.NORMAL)
+    # nc1 = mtb.MacroNutrientsSupply(year=[2017, 2021], rate=[1.75, 0], from_state=Ma.MARGINAL, to_state=Ma.SLIGHTLY_BELOW_STANDARD, p_new_micro=0.0, new_micro_state=m.NORMAL)
+    # nc2 = mtb.MacroNutrientsSupply(year=[2017, 2021], rate=[1.75, 0], from_state=Ma.SLIGHTLY_BELOW_STANDARD, to_state=Ma.STANDARD_OR_ABOVE, p_new_micro=0.0, new_micro_state=m.NORMAL)
+    
+    
+    # intvs = [nc0, nc1, nc2, bi]
+    intvs = [bi]
 
     # -------- Analyzer -------
     azs = [

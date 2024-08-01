@@ -48,7 +48,8 @@ class RationsAnalyzer(ss.Analyzer):
             n_latent_fast = np.count_nonzero(tb.state[ppl] == TBS.LATENT_FAST)
             n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == eMicroNutrients.DEFICIENT)
             n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == eMacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == eMacroNutrients.MARGINAL) )
-            n_bmi_deficient = np.count_nonzero( (nut.bmi_state[ppl] < eBmiStatus.NORMAL_WEIGHT))
+            BMI_below_Normal = np.count_nonzero( (nut.bmi_state[ppl] > eBmiStatus.NORMAL_WEIGHT))
+            
             infected = ppl & tb.infected
             if not infected.any():
                 rel_LS_mean = np.nan
@@ -68,7 +69,7 @@ class RationsAnalyzer(ss.Analyzer):
                               n_latent_fast, 
                               n_micro_deficient, 
                               n_macro_deficient, 
-                              n_bmi_deficient,
+                              BMI_below_Normal,
                               rel_LS_mean, 
                               rel_LF_mean])
         return
@@ -89,7 +90,7 @@ class RationsAnalyzer(ss.Analyzer):
                             'n_latent_fast',
                             'n_micro_deficient',            # Number of people with micro nutrient deficiency
                             'n_macro_deficient',            # Number of people with macro nutrient deficiency
-                            'n_bmi_deficient',              # Number of people with BMI deficiency
+                            'BMI_below_Normal',              # Number of people with BMI deficiency
                             'rel_LS_mean', 
                             'rel_LF_mean'
                         ]

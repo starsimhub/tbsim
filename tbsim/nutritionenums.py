@@ -37,11 +37,10 @@ class eDetailedStatus(IntEnum):
     OBESITY = auto()                     # BMI of 30 or more
 
 class eBmiStatus(IntEnum):
-    SEVERE_THINNESS = auto()             # BMI < 16.0
-    MODERATE_THINNESS = auto()           # BMI 16.0 - 16.99
-    MILD_THINNESS = auto()               # BMI 17.0 - 18.49
     NORMAL_WEIGHT = auto()               # BMI 18.5 - 24.99
-    ABOVE_NORMAL_WEIGHT = auto()         # BMI 25.0 - 29.99
+    MILD_THINNESS = auto()               # BMI 17.0 - 18.49
+    MODERATE_THINNESS = auto()           # BMI 16.0 - 16.99
+    SEVERE_THINNESS = auto()             # BMI < 16.0
 
     # Obesity
     OVERWEIGHT = auto()                  # BMI 25.0 - 29.9
