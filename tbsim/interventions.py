@@ -153,25 +153,6 @@ class BmiNormalizationIntervention(ss.Intervention):
     - ration (float, optional):     Percentage of food supply based on default ration value. Default is 1.
     - arm (int, optional):          Arm identifier. Default is None.
     - **kwargs:                     Additional keyword arguments.
-
-    Attributes:
-    - requires: The required intervention for this class (Malnutrition).
-    - year: Array of years when the intervention is delivered.
-    - rate: Array of rates at which the intervention is delivered.
-    - from_macrostate: Starting macro state(s) converted from BMI.
-    - to_macrostate: Target macro state(s) converted from BMI.
-    - new_micro_state: New micro state(s) after normalization.
-    - p_new_micro: Probability of changing micro state when changing macro state.
-    - arm: Arm identifier.
-    - name: Name of the intervention.
-    - ration: Percentage of food supply based on default ration value.
-    - p: Bernoulli distribution for the probability of intervention delivery.
-    - p_micro: Bernoulli distribution for the probability of changing micro state.
-
-    Methods:
-    - init_pre(sim): Pre-initialization method.
-    - apply(sim): Apply the intervention.
-
     """
 
     def __init__(self, year_arr, rate_arr, from_bmi_state, to_bmi_state, p_MicroRecoveryBmiBased_func=None, new_micro_state=None, p_new_micro=0, ration=1, arm=None, **kwargs):
@@ -184,8 +165,8 @@ class BmiNormalizationIntervention(ss.Intervention):
         self.new_micro_state = new_micro_state
         self.p_new_micro = p_new_micro
         self.arm = arm
-        self.name = f'Nutrition change from {self.from_macrostate} to {self.to_macrostate}'
-        self.ration = ration
+        self.name = f'Nutrition change from {self.from_bmi_state} to {self.to_bmi_state}'
+        self.ration = ration  # can we use this as a factor to multiply the ration?
         super().__init__(**kwargs)
         self.p = ss.bernoulli(p=lambda self, sim, uids: np.interp(sim.year, self.year, self.rate * sim.dt))
         self.p_micro = ss.bernoulli(p=self.p_new_micro)
@@ -195,6 +176,12 @@ class BmiNormalizationIntervention(ss.Intervention):
         super().init_pre(sim)
         return
 
+    def apply_to(self, sim, target_group='all'):
+        if sim.year < self.year[0]:
+            return
+        print(f'Applying intervention {self.name} SPECIFICALLY to {target_group}')
+        return
+
     def apply(self, sim):
         if sim.year < self.year[0]:
             return
@@ -202,15 +189,16 @@ class BmiNormalizationIntervention(ss.Intervention):
         nut = sim.diseases['malnutrition']
         ppl = sim.people
 
-        eligible_macro = (nut.macro_state == self.from_macrostate) & ppl.alive
+        eligible = (nut.bmi_state == self.from_bmi_state) & ppl.alive
         if self.arm is not None:
-            eligible_macro &= ppl.arm == self.arm
-        eligible_uids = eligible_macro.uids
+            eligible &= ppl.arm == self.arm
+
+        eligible_uids = eligible.uids
 
         change_uids = self.p.filter(eligible_uids)
 
         nut.ti_macro[change_uids] = sim.ti + 1
-        nut.new_macro_state[change_uids] = self.to_macrostate
+        nut.new_macro_state[change_uids] = self.to_macrostate   ## WHY DO WE USE 'NEW'
 
         nut.ti_bmi[change_uids] = sim.ti + 1
         nut.new_bmi_state[change_uids] = self.to_bmi_state
