@@ -48,7 +48,7 @@ class RationsAnalyzer(ss.Analyzer):
             n_latent_fast = np.count_nonzero(tb.state[ppl] == TBS.LATENT_FAST)
             n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == eMicroNutrients.DEFICIENT)
             n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == eMacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == eMacroNutrients.MARGINAL) )
-            BMI_below_Normal = np.count_nonzero( (nut.bmi_state[ppl] > eBmiStatus.NORMAL_WEIGHT))
+            n_low_bmi = np.count_nonzero( (nut.bmi_state[ppl] == eBmiStatus.SEVERE_THINNESS) | (nut.bmi_state[ppl] == eBmiStatus.MODERATE_THINNESS))
             
             infected = ppl & tb.infected
             if not infected.any():
@@ -57,7 +57,7 @@ class RationsAnalyzer(ss.Analyzer):
             else:
                 rel_LS_mean = tb.rel_LS_prog[infected].mean()
                 rel_LF_mean = tb.rel_LF_prog[ppl & tb.infected].mean()
-
+ 
             self.data.append([self.sim.year, 
                               arm.name, 
                               n_people, 
@@ -69,7 +69,7 @@ class RationsAnalyzer(ss.Analyzer):
                               n_latent_fast, 
                               n_micro_deficient, 
                               n_macro_deficient, 
-                              BMI_below_Normal,
+                              n_low_bmi,
                               rel_LS_mean, 
                               rel_LF_mean])
         return
@@ -88,9 +88,9 @@ class RationsAnalyzer(ss.Analyzer):
                             'n_died', 
                             'n_latent_slow', 
                             'n_latent_fast',
-                            'n_micro_deficient',            # Number of people with micro nutrient deficiency
-                            'n_macro_deficient',            # Number of people with macro nutrient deficiency
-                            'BMI_below_Normal',              # Number of people with BMI deficiency
+                            'n_micro_deficient',      # Number of people with micro nutrient deficiency
+                            'n_macro_deficient',      # Number of people with macro nutrient deficiency
+                            'n_low_bmi',              # Number of people with severe or moderate thinness
                             'rel_LS_mean', 
                             'rel_LF_mean'
                         ]
@@ -145,6 +145,8 @@ class GenHHAnalyzer(ss.Analyzer):
 
         hhid, hh_sizes = np.unique(sim.people.hhid, return_counts=True)
         cnt, hh_size = np.histogram(hh_sizes, bins=range(1, 11))
+        
+
 
         #hhn = self.sim.networks['Rationsnet']
         #el = [(p1, p2) for p1,p2 in zip(hhn.edges['p1'], hhn.edges['p2'])]
@@ -188,6 +190,7 @@ class GenNutritionAnalyzer(ss.Analyzer):
 
         macro_lookup = {eMacroNutrients[name].value: name for name in eMacroNutrients._member_names_}
         micro_lookup = {eMicroNutrients[name].value: name for name in eMicroNutrients._member_names_}
+        bmi_lookup = {eBmiStatus[name].value: name for name in eBmiStatus._member_names_}
         arm_lookup = {StudyArm[name].value: name for name in StudyArm._member_names_}
 
         nut = self.sim.diseases['malnutrition']
@@ -195,10 +198,11 @@ class GenNutritionAnalyzer(ss.Analyzer):
         df = pd.DataFrame({
             'Macro': [macro_lookup[v] for v in nut.macro_state.values],
             'Micro': [micro_lookup[v] for v in nut.micro_state.values],
+            'Bmi': [bmi_lookup[v] for v in nut.bmi_state.values],
             'Arm': [arm_lookup[v] for v in ppl.arm.values],
         }, index=pd.Index(ppl.uid))
 
-        sz = df.groupby(['Arm', 'Macro', 'Micro']).size()
+        sz = df.groupby(['Arm', 'Macro', 'Micro', 'Bmi']).size()
         sz.name = str(sy)
         self.data.append(sz)
         return
