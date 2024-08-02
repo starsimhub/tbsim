@@ -32,33 +32,33 @@ class Rations():
                 mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD: 0.25,
                 mtb.MacroNutrients.STANDARD_OR_ABOVE: 0.0,
             },
+
             bmi_status_modifier = {                        # Guess values, not from data
                 mtb.eBmiStatus.SEVERE_THINNESS: 1.0,
                 mtb.eBmiStatus.MODERATE_THINNESS: 0.75,
                 mtb.eBmiStatus.MILD_THINNESS: 0.25,
                 mtb.eBmiStatus.NORMAL_WEIGHT: 0.0,
-                # mtb.eBmiStatus.OVERWEIGHT: 0.0,
             },
-            n_hhs = 2_800, # Number of households (2800 participants plus their families)
+            n_hhs = 2800, # Number of households (2800 participants plus their families)
             
             # Household-level probability of control arm - 50% is the default
             p_control = 0.5, # Household-level probability of control arm
+            hhdat = pd.DataFrame({
+                        'size': np.arange(2,6),
+                        'p': np.array([10, 30, 40, 20]) / 100
+                        }),
         )
-        
         self.pars = sc.mergedicts(self.pars, pars)
         self.pars.n_hhs = int(np.round(self.pars.n_hhs)) # Must be an integer
 
-        self.hhdat = pd.DataFrame({
-            'size': np.arange(1,5),
-            'p': np.array([3, 30, 40, 27]) / 100
-        })
 
+        self.hhdat = self.pars.hhdat
+        
         macro = mtb.MacroNutrients
         self.macrodat = pd.DataFrame({
             'options': [ macro.STANDARD_OR_ABOVE, macro.SLIGHTLY_BELOW_STANDARD, macro.MARGINAL, macro.UNSATISFACTORY ],
-            # These are the 1942 levels from Appendix Table 3 or 7 of Downes
-            'p_control': [21.1, 28.9, 38.9, 11.1],
-            'p_vitamin': [29.2, 30.3, 28.1, 12.4],
+            'p_control': [35, 15, 30, 20],  # [21.1, 28.9, 38.9, 11.1],
+            'p_vitamin': [34, 16, 21, 29],  #[29.2, 30.3, 28.1, 12.4],
         })
         self.macrodat['p_control'] /= self.macrodat['p_control'].sum()
         self.macrodat['p_vitamin'] /= self.macrodat['p_vitamin'].sum()
@@ -67,15 +67,14 @@ class Rations():
         
         self.bmidat = pd.DataFrame({
             'options': [
-                mtb.eBmiStatus.SEVERE_THINNESS,
-                mtb.eBmiStatus.MODERATE_THINNESS,
-                mtb.eBmiStatus.MILD_THINNESS,
                 mtb.eBmiStatus.NORMAL_WEIGHT,
-                # mtb.eBmiStatus.OVERWEIGHT 
+                mtb.eBmiStatus.MILD_THINNESS,
+                mtb.eBmiStatus.MODERATE_THINNESS,
+                mtb.eBmiStatus.SEVERE_THINNESS,
                 ],
             # 
-            'p_control': [15, 15, 30, 40],      # Guess values, not from data - must enter values from 
-            'p_vitamin': [13, 27, 33, 37],      # Guess values, not from data - must enter values
+            'p_control': [35, 15, 30, 20],      # Guess values, not from data - must enter values from 
+            'p_vitamin': [34, 16, 21, 29],      # Guess values, not from data - must enter values
         })
         self.bmidat['p_control'] /= self.bmidat['p_control'].sum()
         self.bmidat['p_vitamin'] /= self.bmidat['p_vitamin'].sum()
@@ -96,7 +95,7 @@ class Rations():
         self.hhs = self.make_hhs()
         
         # ---------- Create people ---------------
-        self.n_agents = np.sum([hh.n for hh in self.hhs]) # Hopefully about 579 if running all of Rations
+        self.n_agents = np.sum([hh.n for hh in self.hhs]) # Hopefully around 10000 if running all of Rations
         return
 
     def make_hhs(self):
@@ -131,7 +130,7 @@ class Rations():
 
         return hhs
 
-    def people(self, n_agents=None):
+    def people(self):
         extra_states = [
              ss.FloatArr('hhid', default=np.nan),
              ss.FloatArr('arm', default=np.nan),
@@ -139,9 +138,8 @@ class Rations():
              ss.FloatArr('micro_state', default=np.nan),
              ss.FloatArr('bmi_state', default=np.nan),
         ]
-        if n_agents is None:    # If n_agents is not provided, use the number of agents in the households
-            n_agents = self.n_agents
-            
+        n_agents = self.n_agents
+        print(f"Current total of people: {n_agents}")
         pop = ss.People(n_agents = self.n_agents, extra_states=extra_states)
         return pop
 
@@ -163,8 +161,9 @@ class Rations():
                 pop.hhid[ss.uids(uid)] = hh.hhid
                 pop.arm[ss.uids(uid)] = hh.arm
                 nut.macro_state[ss.uids(uid)] = hh.macro_metric            # We are assuming that the macro state is the same for all members of the household
+                nut.bmi_state[ss.uids(uid)] = hh.bmi_metric
+
                 nut.micro_state[ss.uids(uid)] = mtb.MicroNutrients.DEFICIENT if np.random.rand() < p_micro_deficient else mtb.MicroNutrients.NORMAL
-                nut.bmi_state[ss.uids(uid)] = mtb.eBmiStatus.SEVERE_THINNESS if np.random.rand() < p_bmi_deficient else mtb.eBmiStatus.NORMAL_WEIGHT
                 
         # Set relative LS progression after changing macro and micro states
         c = sim.connectors['tb_nutrition_connector']
