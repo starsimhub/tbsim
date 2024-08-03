@@ -5,7 +5,7 @@ import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
 from examples.rations.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
-from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients
+from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients, eBmiStatus
 
 import os 
 
@@ -32,20 +32,26 @@ def run_rations(rand_seed=0):
     np.random.seed(rand_seed)
 
     # -------------- Rations ----------
-    rations = mtb.Rations()
+    scenario_parameters = dict(hhdat = pd.DataFrame({
+                'size': np.arange(1,6),
+                'p': np.array([3, 17, 20, 37, 23]) / 100
+                }),
+                n_hhs = 2800, # Number of households
+                )
+    rations = mtb.Rations(scenario_parameters)
 
 
     # -------------- People ----------
-    pop = rations.people(n_agents=2900)
+    pop = rations.people()
 
     # -------------- Network ---------
-    randnet_pars = dict(
+    randomnet_parameters = dict(
         n_contacts=ss.poisson(lam=5),
         dur = 0, # End after one timestep
     )
-    randnet = ss.RandomNet(randnet_pars)
+    randnet = ss.RandomNet(randomnet_parameters)
     matnet = ss.MaternalNet() # To track newborn --> household
-    ###### matnet = mtb.HouseholdNewborns(pars=dict(fertility_rate=45)) # Why is this not used here?
+    # matnet = mtb.HouseholdNewborns(pars=dict(fertility_rate=45)) # Why is this not used here?
     householdnet = rations.net()
     nets = [householdnet, randnet, matnet]
 
@@ -55,7 +61,7 @@ def run_rations(rand_seed=0):
         beta = dict(householdnet=0.03, random=0.0, maternal=0.0),
         init_prev = 0, # Infections seeded by Rations class
         rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
-        rate_LF_to_presym = 6e-3,  # TODO: double chek pars
+        rate_LF_to_presym = 6e-3,  # TODO: double check pars
         
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
@@ -67,8 +73,9 @@ def run_rations(rand_seed=0):
 
 
     # ---------- Malnutrition --------
-    nut_pars = dict()
-    nut = mtb.Malnutrition(nut_pars)
+    
+    malnutrition_parameters = dict()
+    nut = mtb.Malnutrition(malnutrition_parameters)
 
     # Add demographics
     dems = [
@@ -87,24 +94,17 @@ def run_rations(rand_seed=0):
 
 
     # -------- Interventions -------
+    
     m = mtb.eMicroNutrients
-    Ma = mtb.eMacroNutrients
-    b = mtb.eBmiStatus
-    bi = mtb.BmiNormalizationIntervention(year_arr=[2017, 2021], rate_arr=[1.25, 0],
-                                          from_bmi_state=b.SEVERE_THINNESS, to_bmi_state=b.MODERATE_THINNESS,
-                                          p_new_micro=0, new_micro_state=m.NORMAL, 
-                                          ration=1, arm=mtb.eStudyArm.VITAMIN)    
+    M = mtb.eMacroNutrients
     
-    # Rates to match Appendix Table 7 # *******************  TODO:   Do we need these rates below for RATIONS?
+    intvs = []    
+    intvs.append( mtb.MacroNutrientsSupply(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=M.UNSATISFACTORY, to_state=M.MARGINAL, 
+                                           p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
+    intvs.append( mtb.MacroNutrientsSupply(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=M.UNSATISFACTORY, to_state=M.MARGINAL, 
+                                           p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
+   
     
-    # nc0 = mtb.MacroNutrientsSupply(year=[2017, 2021], rate=[1.25, 0], from_state=Ma.UNSATISFACTORY, to_state=Ma.MARGINAL, p_new_micro=0.0, new_micro_state=m.NORMAL)
-    # nc1 = mtb.MacroNutrientsSupply(year=[2017, 2021], rate=[1.75, 0], from_state=Ma.MARGINAL, to_state=Ma.SLIGHTLY_BELOW_STANDARD, p_new_micro=0.0, new_micro_state=m.NORMAL)
-    # nc2 = mtb.MacroNutrientsSupply(year=[2017, 2021], rate=[1.75, 0], from_state=Ma.SLIGHTLY_BELOW_STANDARD, to_state=Ma.STANDARD_OR_ABOVE, p_new_micro=0.0, new_micro_state=m.NORMAL)
-    
-    
-    # intvs = [nc0, nc1, nc2, bi]
-    intvs = [bi]
-
     # -------- Analyzer -------
     azs = [
         mtb.RationsAnalyzer(),
@@ -115,8 +115,7 @@ def run_rations(rand_seed=0):
 
     # -------- Simulation -------
     sim_pars = dict(
-        dt = 7/365,
-        #start = 1935, # Start early to burn-in
+        dt = 0.019230769230769232, #7/365,
         start = 2015,
         end = 2023,
         rand_seed = rand_seed,
@@ -145,15 +144,24 @@ def run_rations(rand_seed=0):
     tb.state[seed_uids] = mtb.TBS.ACTIVE_PRESYMP
     tb.ti_active[seed_uids] = sim.ti
 
-    # In Rations, 83% or 84% have SmPos active infections, let's fix that now
-    desired_n_active = 0.835 * len(seed_uids)
+   #  rations is at least 1 per HH # In Rations, 83% or 84% have SmPos active infections, let's fix that now
+    # desired_n_active = 2800 # 0.835 * len(seed_uids)
     cur_n_active = np.count_nonzero(tb.active_tb_state[seed_uids]==mtb.TBS.ACTIVE_SMPOS)
-    add_n_active = desired_n_active - cur_n_active
-    non_smpos_uids = seed_uids[tb.active_tb_state[seed_uids]!=mtb.TBS.ACTIVE_SMPOS]
-    p = add_n_active / ( len(seed_uids) - cur_n_active)
-    change_to_smpos = np.random.rand(len(non_smpos_uids)) < p
-    tb.active_tb_state[non_smpos_uids[change_to_smpos]] = mtb.TBS.ACTIVE_SMPOS
-
+    print(f'Current number of active infections: {cur_n_active}')
+    
+    # All the households should have one active infection at least which is SmPos
+    idx = ss.uids(rations.hhsIndexes)
+    print(f'Changing {len(idx)} households to have at least one active infection')
+    tb.active_tb_state[idx] = mtb.TBS.ACTIVE_SMPOS
+    
+    # add_n_active = desired_n_active - cur_n_active
+    # non_smpos_uids = seed_uids[tb.active_tb_state[seed_uids]!=mtb.TBS.ACTIVE_SMPOS]
+    # p = add_n_active / ( len(seed_uids) - cur_n_active)
+    
+    # change_to_smpos = np.random.rand(len(non_smpos_uids)) < p
+    
+    # tb.active_tb_state[non_smpos_uids[change_to_smpos]] = mtb.TBS.ACTIVE_SMPOS
+    
     sim.run() # Actually run the sim
 
     df = sim.analyzers['rationsanalyzer'].df
@@ -179,7 +187,7 @@ def run_sims(n_seeds=default_n_rand_seeds):
     results += sc.parallelize(run_rations, iterkwargs=cfgs, die=False, serial=debug)
     epi, hh, nut = zip(*results)
     
-    #epi, hh, nut = run_rations(rand_seed=0)
+    # epi, hh, nut = run_rations(rand_seed=0)
     
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 

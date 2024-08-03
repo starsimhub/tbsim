@@ -63,13 +63,14 @@ class GenericHouseHold():
     macro:  Macro nutrition status of the household.
     arm:    Group in the study that the household belongs to.
     """ 
-    def __init__(self, hhid, uids, hh_macro, hh_bmi, study_arm):
+    def __init__(self, hhid, uids, hh_macro, hh_bmi, study_arm, indexes_arr=None, properties=None):
         self.hhid = hhid
         self.uids = uids
         self.n = len(uids)
         self.macro_metric = hh_macro
         self.bmi_metric = hh_bmi
         self.arm = study_arm
+        self.indexTBState = 0        # Index of TB state in the state array, FOR USE IN CAPTURING TB STATE FOR 
         return
     
     """_summary_
@@ -86,6 +87,10 @@ class GenericHouseHold():
             p1s.append(p1)
             p2s.append(p2)
         return p1s, p2s
+    
+    def set_property(self, prop, value, uidx=None):
+        setattr(self, prop, value)
+        return
     
 class HouseholdNewborns(ss.Pregnancy):
     """

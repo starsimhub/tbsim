@@ -42,7 +42,7 @@ class Malnutrition(ss.Disease):
         self.add_states(
             ss.FloatArr('macro_state', default= MacroNutrients.STANDARD_OR_ABOVE), # To keep track of the macronutrients state
             ss.FloatArr('micro_state', default=MicroNutrients.NORMAL),            # To keep track of the micronutrients state
-            ss.FloatArr('bmi_state', default=ne.eBmiStatus.NORMAL_WEIGHT),                                # To keep track of the BMI state
+
         )
         self.add_states(
             ss.FloatArr('ti_macro'),                          # Time index of change in macronutrition
@@ -50,12 +50,13 @@ class Malnutrition(ss.Disease):
 
             ss.FloatArr('ti_micro'),                          # Time index of change in micronutrition
             ss.FloatArr('new_micro_state'),                   # New micro nutrition state
-            
-            ss.FloatArr('ti_bmi'),                          # Time index of change in micronutrition
-            ss.FloatArr('new_bmi_state'),                   # New micro nutrition state
-
         )
         
+        self.add_states(
+            ss.FloatArr('bmi_state', default=ne.eBmiStatus.NORMAL_WEIGHT),     # To keep track of the BMI state
+            ss.FloatArr('ti_bmi'),                          # Time index of change in micronutrition
+            ss.FloatArr('new_bmi_state'),                   # New micro nutrition state
+        )
         return
 
     def set_initial_states(self, sim):

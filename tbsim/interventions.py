@@ -8,7 +8,7 @@ from tbsim import Malnutrition, eMicroNutrients, eMacroNutrients, eBmiStatus
 import sciris as sc
 from enum import IntEnum, auto
 
-__all__ = ['MicroNutrientsSupply', 'MacroNutrientsSupply', 'BmiNormalizationIntervention']
+__all__ = ['MicroNutrientsSupply', 'MacroNutrientsSupply', 'BmiChangeIntervention', 'BmiNormalizationIntervention']
 
 class StudyArm(IntEnum):
     CONTROL = auto()
@@ -29,6 +29,7 @@ class MicroNutrientsSupply(ss.Intervention):
         self.requires = Malnutrition
         self.year = sc.promotetoarray(year)
         self.rate = sc.promotetoarray(rate)
+
         self.p_micro_recovery_func = p_micro_recovery_default if p_micro_recovery_func is None else p_micro_recovery_func
         self.ration = ration   # Ration of Vitatims supply
 
@@ -72,7 +73,7 @@ class MacroNutrientsSupply(ss.Intervention):
         self.new_micro_state = new_micro_state
         self.p_new_micro = p_new_micro
         self.arm = None
-        self.name = f'Nutrition change from {self.from_state} to {self.to_state}'
+        self.name = f'Macro Nutrition change from {self.from_state} to {self.to_state} on years {self.year } at rate {self.rate} on Arm {self.arm}'
         self.ration = ration    # Ration of food supply
         super().__init__(**kwargs)
 
@@ -109,6 +110,40 @@ class MacroNutrientsSupply(ss.Intervention):
         return len(change_uids)
 
 
+class BmiChangeIntervention(MacroNutrientsSupply):
+    def __init__(self, year, rate, from_state, to_state, new_micro_state=None, p_new_micro=0, arm=None, ration=1, **kwargs):
+            self.requires = Malnutrition
+            self.year = sc.promotetoarray(year)
+            self.rate = sc.promotetoarray(rate)
+            self.from_state = self.bmitomacro(from_state)
+            self.to_state = self.bmitomacro(to_state)
+            self.new_micro_state = new_micro_state
+            self.p_new_micro = p_new_micro
+            self.arm = None
+            self.name = f'BMI Nutrition change from {self.from_state} to {self.to_state}'
+            self.ration = ration    # Ration of food supply
+            super().__init__(**kwargs)
+
+            self.p = ss.bernoulli(p=lambda self, sim, uids: np.interp(sim.year, self.year, self.rate*sim.dt))
+            self.p_micro = ss.bernoulli(p=self.p_new_micro) # Prob of changing micro when changing macro
+            return    
+    def init_pre(self, sim):
+        return super().init_pre(sim)
+    
+    def apply(self, sim):
+        return super().apply(sim)
+    
+    def bmitomacro(self, bmi):
+        if bmi == eBmiStatus.SEVERE_THINNESS:
+            return eMacroNutrients.UNSATISFACTORY
+        elif bmi == eBmiStatus.MODERATE_THINNESS:
+            return eMacroNutrients.MARGINAL
+        elif bmi == eBmiStatus.MILD_THINNESS:
+            return eMacroNutrients.SLIGHTLY_BELOW_STANDARD
+        elif bmi == eBmiStatus.NORMAL_WEIGHT:
+            return eMacroNutrients.STANDARD_OR_ABOVE
+        else:
+            return eMacroNutrients.STANDARD_OR_ABOVE
 
 
 def p_MicroRecoveryBmiBased_func(self, sim, uids):

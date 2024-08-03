@@ -32,13 +32,6 @@ class Rations():
                 mtb.MacroNutrients.SLIGHTLY_BELOW_STANDARD: 0.25,
                 mtb.MacroNutrients.STANDARD_OR_ABOVE: 0.0,
             },
-
-            bmi_status_modifier = {                        # Guess values, not from data
-                mtb.eBmiStatus.SEVERE_THINNESS: 1.0,
-                mtb.eBmiStatus.MODERATE_THINNESS: 0.75,
-                mtb.eBmiStatus.MILD_THINNESS: 0.25,
-                mtb.eBmiStatus.NORMAL_WEIGHT: 0.0,
-            },
             n_hhs = 2800, # Number of households (2800 participants plus their families)
             
             # Household-level probability of control arm - 50% is the default
@@ -62,33 +55,22 @@ class Rations():
         })
         self.macrodat['p_control'] /= self.macrodat['p_control'].sum()
         self.macrodat['p_vitamin'] /= self.macrodat['p_vitamin'].sum()
-        
-        
-        
+
+        ebmi = mtb.eBmiStatus
         self.bmidat = pd.DataFrame({
-            'options': [
-                mtb.eBmiStatus.NORMAL_WEIGHT,
-                mtb.eBmiStatus.MILD_THINNESS,
-                mtb.eBmiStatus.MODERATE_THINNESS,
-                mtb.eBmiStatus.SEVERE_THINNESS,
-                ],
-            # 
+            'options': [ebmi.NORMAL_WEIGHT, ebmi.MILD_THINNESS,    ebmi.MODERATE_THINNESS, ebmi.SEVERE_THINNESS ],
             'p_control': [35, 15, 30, 20],      # Guess values, not from data - must enter values from 
             'p_vitamin': [34, 16, 21, 29],      # Guess values, not from data - must enter values
         })
         self.bmidat['p_control'] /= self.bmidat['p_control'].sum()
         self.bmidat['p_vitamin'] /= self.bmidat['p_vitamin'].sum()
-
-
-
-
         # Arm data - 
         self.armdat = pd.DataFrame({
             'arm': [mtb.StudyArm.CONTROL, mtb.StudyArm.VITAMIN],
             'p': [self.pars.p_control, 1-self.pars.p_control]
         })
         
-        
+                
         self.armdat['p'] /= self.armdat['p'].sum()
 
         # ---------- Create households ----------
@@ -96,6 +78,13 @@ class Rations():
         
         # ---------- Create people ---------------
         self.n_agents = np.sum([hh.n for hh in self.hhs]) # Hopefully around 10000 if running all of Rations
+        
+        # self.hhs[:0].macro_metric = mtb.MacroNutrients.STANDARD_OR_ABOVE
+        # self.hhs[29].uids[0]   ---> np.int64(115)
+
+        self.hhsIndexes = []
+        for hh in self.hhs:
+            self.hhsIndexes.append(hh.uids[0])
         return
 
     def make_hhs(self):
@@ -107,19 +96,18 @@ class Rations():
 
         idx = 0
         hhs = []
+        # FOR EACH CREATED HOUSEHOLD
         for hhid, (size, arm) in enumerate(zip(hh_sizes, arm)):
             uids = np.arange(idx, idx+size)
             
-            ######################  here -  I was incorporating the values for macrodat  versus bmidat from  FIX above 
             armstr = 'p_control' if arm == mtb.StudyArm.CONTROL else 'p_vitamin'
 
         
             pMa = self.macrodat[armstr].values
             pBmi = self.bmidat[armstr].values
             
-            # Randomly choose a metric value    
-            macro = np.random.choice(a=self.macrodat['options'].values, p=pMa)
-            bmi = np.random.choice(a=self.bmidat['options'].values, p=pBmi)
+            macro = np.random.choice(a=self.macrodat['options'].values, p=pMa)  # Randomly Choose the macro state option
+            bmi = np.random.choice(a=self.bmidat['options'].values, p=pBmi)     # Randomly Choose the bmi state option
             
             # Create the household
             hh = mtb.GenericHouseHold(hhid, uids, mtb.eMacroNutrients(macro),  mtb.eBmiStatus(bmi), mtb.eStudyArm(arm))
@@ -154,7 +142,7 @@ class Rations():
         nut = sim.diseases['malnutrition']
         
         for hh in self.hhs:
-            p_bmi_deficient = self.pars.bmi_status_modifier[hh.bmi_metric]
+            # p_bmi_deficient = self.pars.bmi_status_modifier[hh.bmi_metric]
             p_micro_deficient = self.pars.p_microdeficient_given_macro[hh.macro_metric]
             
             for uid in hh.uids:
