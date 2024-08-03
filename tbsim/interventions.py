@@ -122,7 +122,9 @@ class BmiChangeIntervention(MacroNutrientsSupply):
             self.arm = None
             self.name = f'BMI Nutrition change from {self.from_state} to {self.to_state}'
             self.ration = ration    # Ration of food supply
-            super().__init__(**kwargs)
+            super().__init__(self.year, self.rate, self.from_state, 
+                             self.to_state, self.new_micro_state, self.p_new_micro, 
+                             self.arm, ration, **kwargs)
 
             self.p = ss.bernoulli(p=lambda self, sim, uids: np.interp(sim.year, self.year, self.rate*sim.dt))
             self.p_micro = ss.bernoulli(p=self.p_new_micro) # Prob of changing micro when changing macro

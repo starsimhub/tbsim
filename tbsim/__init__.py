@@ -6,7 +6,7 @@ from .tbinterventions import Product, TBVaccinationCampaign
 from .nutritionenums import eStudyArm, eBmiStatus, eDetailedStatus, eHighlevelStatus, eMacroNutrients, eMicroNutrients
 from .networks import HouseHoldNet, GenericHouseHold, HouseholdNewborns
 from .rations.rations import Rations
-from .interventions import MicroNutrientsSupply, MacroNutrientsSupply, BmiNormalizationIntervention
+from .interventions import MicroNutrientsSupply, MacroNutrientsSupply, BmiChangeIntervention, BmiNormalizationIntervention
 from .analyzers import RationsAnalyzer, GenHHAnalyzer, GenNutritionAnalyzer
 
 # Harlem specific imports

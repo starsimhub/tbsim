@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = True
-default_n_rand_seeds = [1000, 2][debug]
+default_n_rand_seeds = [1000, 5][debug]
 
 def compute_rel_prog(macro, micro):
     
@@ -94,16 +94,21 @@ def run_rations(rand_seed=0):
 
 
     # -------- Interventions -------
-    
+    # Enums:
     m = mtb.eMicroNutrients
     M = mtb.eMacroNutrients
+    b = mtb.eBmiStatus
     
+    # Interventions array:
     intvs = []    
-    intvs.append( mtb.MacroNutrientsSupply(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=M.UNSATISFACTORY, to_state=M.MARGINAL, 
-                                           p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
-    intvs.append( mtb.MacroNutrientsSupply(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=M.UNSATISFACTORY, to_state=M.MARGINAL, 
+    #   Table S11: Weight loss in household contacts in RATIONS trial and the association with nutritional status at baseline   
+    intvs.append( mtb.BmiChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
                                            p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
-   
+    intvs.append( mtb.BmiChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
+                                           p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
+    intvs.append( mtb.BmiChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.05], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
+                                           p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
+    
     
     # -------- Analyzer -------
     azs = [
@@ -149,7 +154,7 @@ def run_rations(rand_seed=0):
     cur_n_active = np.count_nonzero(tb.active_tb_state[seed_uids]==mtb.TBS.ACTIVE_SMPOS)
     print(f'Current number of active infections: {cur_n_active}')
     
-    # All the households should have one active infection at least which is SmPos
+    # 2800 indexes with active TB - (one per household)
     idx = ss.uids(rations.hhsIndexes)
     print(f'Changing {len(idx)} households to have at least one active infection')
     tb.active_tb_state[idx] = mtb.TBS.ACTIVE_SMPOS
@@ -157,9 +162,7 @@ def run_rations(rand_seed=0):
     # add_n_active = desired_n_active - cur_n_active
     # non_smpos_uids = seed_uids[tb.active_tb_state[seed_uids]!=mtb.TBS.ACTIVE_SMPOS]
     # p = add_n_active / ( len(seed_uids) - cur_n_active)
-    
     # change_to_smpos = np.random.rand(len(non_smpos_uids)) < p
-    
     # tb.active_tb_state[non_smpos_uids[change_to_smpos]] = mtb.TBS.ACTIVE_SMPOS
     
     sim.run() # Actually run the sim
