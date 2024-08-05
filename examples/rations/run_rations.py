@@ -5,7 +5,7 @@ import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
 from examples.rations.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
-from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients, eBmiStatus
+from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients
 
 import os 
 
@@ -31,12 +31,12 @@ def run_rations(rand_seed=0):
 
     np.random.seed(rand_seed)
 
-    # -------------- Rations ----------
+    # -------------- Rations  ----------
     scenario_parameters = dict(hhdat = pd.DataFrame({
                 'size': np.arange(1,6),
                 'p': np.array([3, 17, 20, 37, 23]) / 100
                 }),
-                n_hhs = 2800, # Number of households
+                n_hhs = 2800, # Number of households to generate
                 )
     rations = mtb.Rations(scenario_parameters)
 
@@ -106,6 +106,8 @@ def run_rations(rand_seed=0):
                                            p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
     intvs.append( mtb.BmiChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
                                            p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
+    intvs.append( mtb.MicroNutrientsSupply(year=[2017, 2017.1, 2017.2, 2017.3, 2017.4, 2017.5], rate=[0.2, 0.2,0.2, 0.2,0.2, 0.2]))
+    
     intvs.append( mtb.BmiChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.05], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
                                            p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
     
@@ -154,10 +156,17 @@ def run_rations(rand_seed=0):
     cur_n_active = np.count_nonzero(tb.active_tb_state[seed_uids]==mtb.TBS.ACTIVE_SMPOS)
     print(f'Current number of active infections: {cur_n_active}')
     
-    # 2800 indexes with active TB - (one per household)
+    
+    # Setting TB active states to 2800 indexes of households
+    # ------------------------------------------------------
+    active_TB_states = [mtb.TBS.ACTIVE_SMPOS, 
+                        mtb.TBS.ACTIVE_SMNEG, 
+                        mtb.TBS.ACTIVE_EXPTB]
     idx = ss.uids(rations.hhsIndexes)
-    print(f'Changing {len(idx)} households to have at least one active infection')
-    tb.active_tb_state[idx] = mtb.TBS.ACTIVE_SMPOS
+    random_distribution = np.random.choice(active_TB_states, len(idx))
+    print(f'Changing {len(idx)} households to have at least one person with active infection')
+    tb.active_tb_state[idx] = random_distribution
+    # ------------------------------------------------------
     
     # add_n_active = desired_n_active - cur_n_active
     # non_smpos_uids = seed_uids[tb.active_tb_state[seed_uids]!=mtb.TBS.ACTIVE_SMPOS]
