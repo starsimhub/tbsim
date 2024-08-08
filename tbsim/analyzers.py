@@ -116,11 +116,11 @@ class RationsAnalyzer(ss.Analyzer):
 
 class GenHHAnalyzer(ss.Analyzer):
 
-    def __init__(self, **kwargs):
+    def __init__(self, track_years= [2017, 2021], **kwargs):
         self.requires = [TB, Malnutrition]
         self.data = []
         self.df = None # Created on finalize
-
+        self.track_years = track_years
         super().__init__(**kwargs)
         return
 
@@ -128,33 +128,25 @@ class GenHHAnalyzer(ss.Analyzer):
         super().init_results()
         return
 
-    def apply(self, sim, snap_years = [2017, 2021]):
+    def apply(self, sim):
         super().apply(sim)
-
+        track_years = self.track_years
         year = self.sim.year
         dt = self.sim.dt
 
-        snap = False
-        for sy in snap_years:
-            if year >= sy and year < sy+dt:
-                snap = True
+        track = False
+        for t_year in track_years:
+            if year >= t_year and year < t_year+dt:
+                track = True
                 break
         
-        if not snap:
+        if not track:
             return
 
         hhid, hh_sizes = np.unique(sim.people.hhid, return_counts=True)
         cnt, hh_size = np.histogram(hh_sizes, bins=range(1, 11))
         
-
-
-        #hhn = self.sim.networks['Rationsnet']
-        #el = [(p1, p2) for p1,p2 in zip(hhn.edges['p1'], hhn.edges['p2'])]
-        #G = nx.from_edgelist(el)
-        #hh_sizes = np.array([len(c) for c in nx.connected_components(G)])
-        #cnt, hh_size = np.histogram(hh_sizes, bins=range(20))
-
-        df = pd.DataFrame({sy:cnt}, index=pd.Index(hh_size[:-1], name='HH Size'))
+        df = pd.DataFrame({t_year:cnt}, index=pd.Index(hh_size[:-1], name='HH Size'))
         self.data.append(df)
         return
 
@@ -165,29 +157,29 @@ class GenHHAnalyzer(ss.Analyzer):
 
 class GenNutritionAnalyzer(ss.Analyzer):
 
-    def __init__(self, **kwargs):
+    def __init__(self, track_years_arr=[], group_by=['Arm', 'Macro', 'Micro'], **kwargs):
         self.requires = [TB, Malnutrition]
         self.data = []
-        self.df = None # Created on finalize
-
+        self.df = None                              # Created on finalize
+        self.track_years = track_years_arr
+        self.group_by = group_by
         super().__init__(**kwargs)
         return
 
-    def apply(self, sim, snap_years = [2017, 2021]):
+    def apply(self, sim):
         super().apply(sim)
-
+        track_years = self.track_years
         year = self.sim.year
         dt = self.sim.dt
 
-        snap = False
-        for sy in snap_years:
-            if year >= sy and year < sy+dt:
-                snap = True
+        trackit = False
+        for t_year in track_years:
+            if year >= t_year and year < t_year+dt:
+                trackit = True
                 break
         
-        if not snap:
+        if not trackit:
             return
-
         macro_lookup = {eMacroNutrients[name].value: name for name in eMacroNutrients._member_names_}
         micro_lookup = {eMicroNutrients[name].value: name for name in eMicroNutrients._member_names_}
         bmi_lookup = {eBmiStatus[name].value: name for name in eBmiStatus._member_names_}
@@ -195,6 +187,8 @@ class GenNutritionAnalyzer(ss.Analyzer):
 
         nut = self.sim.diseases['malnutrition']
         ppl = self.sim.people
+        
+        # Convert state codes to names
         df = pd.DataFrame({
             'Macro': [macro_lookup[v] for v in nut.macro_state.values],
             'Micro': [micro_lookup[v] for v in nut.micro_state.values],
@@ -202,8 +196,8 @@ class GenNutritionAnalyzer(ss.Analyzer):
             'Arm': [arm_lookup[v] for v in ppl.arm.values],
         }, index=pd.Index(ppl.uid))
 
-        sz = df.groupby(['Arm', 'Macro', 'Micro', 'Bmi']).size()
-        sz.name = str(sy)
+        sz = df.groupby(self.group_by).size()
+        sz.name = str(t_year)
         self.data.append(sz)
         return
 

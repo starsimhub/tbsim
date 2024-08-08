@@ -5,6 +5,7 @@ import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
 from examples.rations.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
+import examples.rations.rationsBaseClass as rBC
 from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients
 
 import os 
@@ -15,7 +16,7 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = True
-default_n_rand_seeds = [1000, 5][debug]
+default_n_rand_seeds = [1000, 10][debug]
 
 def compute_rel_prog(macro, micro):
     
@@ -26,6 +27,7 @@ def compute_rel_prog(macro, micro):
     ret[(macro == eMacroNutrients.MARGINAL)  & (micro == eMicroNutrients.DEFICIENT)] = 2.5
     ret[(macro == eMacroNutrients.UNSATISFACTORY)   & (micro == eMicroNutrients.DEFICIENT)] = 3.0
     return ret
+
 
 def run_rations(rand_seed=0):
 
@@ -38,7 +40,7 @@ def run_rations(rand_seed=0):
                 }),
                 n_hhs = 2800, # Number of households to generate
                 )
-    rations = mtb.Rations(scenario_parameters)
+    rations = rBC.Rations(scenario_parameters)
 
 
     # -------------- People ----------
@@ -104,6 +106,7 @@ def run_rations(rand_seed=0):
     #   Table S11: Weight loss in household contacts in RATIONS trial and the association with nutritional status at baseline   
     intvs.append( mtb.BmiChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
                                            p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
+    
     intvs.append( mtb.BmiChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
                                            p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
     intvs.append( mtb.MicroNutrientsSupply(year=[2017, 2017.1, 2017.2, 2017.3, 2017.4, 2017.5], rate=[0.2, 0.2,0.2, 0.2,0.2, 0.2]))
@@ -116,7 +119,7 @@ def run_rations(rand_seed=0):
     azs = [
         mtb.RationsAnalyzer(),
         mtb.GenHHAnalyzer(),
-        mtb.GenNutritionAnalyzer(),
+        mtb.GenNutritionAnalyzer(track_years_arr=[2017, 2018], group_by=['Arm', 'Macro', 'Micro'])
     ]
 
 

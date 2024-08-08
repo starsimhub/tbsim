@@ -8,12 +8,12 @@ __all__ = ['Rations']
 
 '''
 PLAN:
-1. Create 2800 Agents (indexes 0-2799)
-1.a. Give a TB Active status (Active smear posivite, Active Extra Pulmonary)
-2. Allocate 1400 to CONTROL and and 1400 VITAMIN groups
-3. Generate households with sizes from 1 to 4
-4. Assign each household to an arm 50/50
-5. Assign each household a macro state based on the arm
+1. Create 2800 Agents (indexes 0-2799)  -  DONE
+1.a. Give a TB Active status (Active smear posivite, Active Extra Pulmonary) - DONE
+2. Allocate 1400 to CONTROL and and 1400 VITAMIN groups done
+3. Generate households with sizes from 1 to 6 done
+4. Assign each household to an arm 50/50 - done
+5. Assign each household a macro state based on the arm -done
   2a. set prognoses for each agent on one of the Active TB states from day 1? (maybe warm up period? do we call it warm up period? :D )
   
 
@@ -91,7 +91,7 @@ class Rations():
         # Create households
         hh_sizes = np.random.choice(a=self.hhdat['size'].values, p=self.hhdat['p'].values, size=self.pars.n_hhs)
         
-        # Assign arms
+        # Assign armstbsim/rations/rations.py
         arm = np.random.choice(a=self.armdat['arm'].values, p=self.armdat['p'].values, size=self.pars.n_hhs)
 
         idx = 0
