@@ -38,7 +38,7 @@ class Malnutrition(ss.Disease):
             init_prev = 0.001,  # Initial prevalence 
         )
         self.update_pars(pars, **kwargs)
-
+        # Adding Malnutrition states to handle the Individual Properties related to this disease 
         self.add_states(
             # MacroNutrients states
             ss.FloatArr('macro_state', default= MacroNutrients.STANDARD_OR_ABOVE), 

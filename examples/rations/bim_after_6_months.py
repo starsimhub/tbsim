@@ -4,6 +4,7 @@ import pandas as pd
 import tbsim
 
 st = tbsim.nutritionenums.eBmiStatus
+desc = tbsim.nutritionenums.descriptions
 
 Adults_Control_Arm = {
     st.SEVERE_THINNESS.name: [130, 14, 4, 0, 0],
@@ -21,11 +22,11 @@ Adults_Intervention_Arm = {
     st.OVERWEIGHT.name: [0, 0, 0, 74, 237]
 }
 
-index= ["Severe\n <16 ",
-        "Moderate\n 16.0-16.99 ", 
-        "Mild\n 17.0-18.49 ", 
-        "Normal\n 18.5-24.99 ", 
-        "Over\n ≥25.0 "]
+index= [desc.SEVERE_THINNESS[0], 
+        desc.MODERATE_THINNESS[0], 
+        desc.MILD_THINNESS[0], 
+        desc.NORMAL_WEIGHT[0], 
+        desc.OVERWEIGHT[0]]
 
 def get_variable_name(var):
     globals_dict = globals()

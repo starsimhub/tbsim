@@ -1,3 +1,6 @@
+""" 
+"""
+
 import starsim as ss
 import tbsim as mtb
 import numpy as np
@@ -5,18 +8,22 @@ import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
 from examples.rations.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
-import examples.rations.rationsBaseClass as rBC
+import examples.rations.rations as rRS
 from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients
-
+import warnings
 import os 
 
+# ______________________________________________________________
+#
+#                  SCRIPT TO RUN RATIONS 
+#                     1 Scenario only                      
+# ______________________________________________________________
 
-import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = True
-default_n_rand_seeds = [1000, 10][debug]
+default_n_rand_seeds = [1000, 20][debug]
 
 def compute_rel_prog(macro, micro):
     
@@ -30,18 +37,17 @@ def compute_rel_prog(macro, micro):
 
 
 def run_rations(rand_seed=0):
-
     np.random.seed(rand_seed)
 
-    # -------------- Rations  ----------
-    scenario_parameters = dict(hhdat = pd.DataFrame({
+    # ---------------- Rations Class Instance Creation  -----------------
+    params = dict(
+        hhdat = pd.DataFrame({
                 'size': np.arange(1,6),
                 'p': np.array([3, 17, 20, 37, 23]) / 100
                 }),
                 n_hhs = 2800, # Number of households to generate
                 )
-    rations = rBC.Rations(scenario_parameters)
-
+    rations = rRS.RATIONS(params)
 
     # -------------- People ----------
     pop = rations.people()
@@ -59,7 +65,8 @@ def run_rations(rand_seed=0):
 
     # -------------- TB disease --------
     tb_pars = dict(
-        ####beta = dict(rations=0.03, random=0.003, maternal=0.0),
+        #beta = dict(rations=0.03, random=0.003, maternal=0.0),
+        
         beta = dict(householdnet=0.03, random=0.0, maternal=0.0),
         init_prev = 0, # Infections seeded by Rations class
         rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
@@ -79,14 +86,14 @@ def run_rations(rand_seed=0):
     malnutrition_parameters = dict()
     nut = mtb.Malnutrition(malnutrition_parameters)
 
-    # Add demographics
+    # ---------- Demographics --------
     dems = [
         mtb.HouseholdNewborns(pars=dict(fertility_rate=45)), # Per 1,000 women
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
     ]
 
 
-    # -------- Connector -------
+    # ----------- Connector ----------
     cn_pars = dict(
         rel_LS_prog_func = compute_rel_prog,
         rel_LF_prog_func = compute_rel_prog,   
@@ -104,16 +111,19 @@ def run_rations(rand_seed=0):
     # Interventions array:
     intvs = []    
     #   Table S11: Weight loss in household contacts in RATIONS trial and the association with nutritional status at baseline   
-    intvs.append( mtb.BmiChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
+    intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
                                            p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
     
-    intvs.append( mtb.BmiChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
-                                           p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
-    intvs.append( mtb.MicroNutrientsSupply(year=[2017, 2017.1, 2017.2, 2017.3, 2017.4, 2017.5], rate=[0.2, 0.2,0.2, 0.2,0.2, 0.2]))
+    intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
+                                           p_new_micro=0.01, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
     
-    intvs.append( mtb.BmiChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.05], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
+    intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
                                            p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
     
+    intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
+                                           p_new_micro=0.01, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
+        
+    intvs.append( mtb.MicroNutrientsSupply(year=[2017, 2017.1, 2017.2, 2017.3, 2017.4, 2017.5], rate=[0.2, 0.2,0.2, 0.2,0.2, 0.2]))
     
     # -------- Analyzer -------
     azs = [
@@ -142,7 +152,8 @@ def run_rations(rand_seed=0):
     sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
     sim.initialize()
-
+    
+    # Set the states of the people
     rations.set_states(sim, target_group='all')
     
     seed_uids = rations.choose_seed_infections()
@@ -163,8 +174,7 @@ def run_rations(rand_seed=0):
     # Setting TB active states to 2800 indexes of households
     # ------------------------------------------------------
     active_TB_states = [mtb.TBS.ACTIVE_SMPOS, 
-                        mtb.TBS.ACTIVE_SMNEG, 
-                        mtb.TBS.ACTIVE_EXPTB]
+                            mtb.TBS.ACTIVE_EXPTB]
     idx = ss.uids(rations.hhsIndexes)
     random_distribution = np.random.choice(active_TB_states, len(idx))
     print(f'Changing {len(idx)} households to have at least one person with active infection')

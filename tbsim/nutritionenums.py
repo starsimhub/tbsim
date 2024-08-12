@@ -49,14 +49,12 @@ class eBmiStatus(IntEnum):
     OBESE_CLASS_III_VERY_SEVERE = auto() # BMI ≥ 40.0
 
 class descriptions():
-    BMI_RANGES = {
-        "SEVERE_THINNESS": "< 16.0",
-        "MODERATE_THINNESS": "16.0 - 16.9",
-        "MILD_THINNESS": "17.0 - 18.4",
-        "NORMAL_WEIGHT": "18.5 - 24.9",
-        "OVERWEIGHT": "25.0 - 29.9",
-        "OBESE_CLASS_I_MODERATE": "30.0 - 34.9",
-        "OBESE_CLASS_II_SEVERE": "35.0 - 39.9",
-        "OBESE_CLASS_III_VERY_SEVERE": "≥ 40.0"
-    }
+    SEVERE_THINNESS = "Severe Thinness: \n< 16.0",
+    MODERATE_THINNESS= "Moderate Thiness: \n16.0 - 16.9",
+    MILD_THINNESS="Mild Thinness: \n17.0 - 18.4",
+    NORMAL_WEIGHT= "Normal Weight: \n18.5 - 24.9",
+    OVERWEIGHT= "Overweight: \n25.0 - 29.9",
+    OBESE_CLASS_I_MODERATE= "Obese class I Moderate: \n30.0 - 34.9",
+    OBESE_CLASS_II_SEVERE= "Obese Class II Severe: \n35.0 - 39.9",
+    OBESE_CLASS_III_VERY_SEVERE= "Obese Class III Very Severe \n≥ 40.0"
     

@@ -7,7 +7,7 @@ import starsim as ss
 from tbsim import Malnutrition, eMicroNutrients, eMacroNutrients, eBmiStatus, eStudyArm
 import sciris as sc
 
-__all__ = ['MicroNutrientsSupply', 'MacroNutrientsSupply', 'BmiChangeIntervention']
+__all__ = ['MicroNutrientsSupply', 'NutritionChange', 'BMIChangeIntervention']
 
     
 def p_micro_recovery_default(self, sim, uids):
@@ -58,9 +58,9 @@ class MicroNutrientsSupply(ss.Intervention):
         return len(recover_uids)
 
 
-class MacroNutrientsSupply(ss.Intervention):
+class NutritionChange(ss.Intervention):
 
-    def __init__(self, year, rate, from_state, to_state, new_micro_state=None, p_new_micro=0, arm=None, ration=1, **kwargs):
+    def __init__(self, year, rate, from_state, to_state, new_micro_state=None, p_new_micro=0, arm=None, portion=1, **kwargs):
         self.requires = Malnutrition
         self.year = sc.promotetoarray(year)
         self.rate = sc.promotetoarray(rate)
@@ -68,9 +68,10 @@ class MacroNutrientsSupply(ss.Intervention):
         self.to_state = to_state
         self.new_micro_state = new_micro_state
         self.p_new_micro = p_new_micro
-        self.arm = None
+        self.arm = arm
         self.name = f'Macro Nutrition change from {self.from_state} to {self.to_state} on years {self.year } at rate {self.rate} on Arm {self.arm}'
-        self.ration = ration    # Ration of food supply
+        # self.portion = portion    # Percentage of food supply to be changed - full portion (default) is 1
+                
         super().__init__(**kwargs)
 
         self.p = ss.bernoulli(p=lambda self, sim, uids: np.interp(sim.year, self.year, self.rate*sim.dt))
@@ -105,7 +106,7 @@ class MacroNutrientsSupply(ss.Intervention):
         return len(change_uids)
 
 
-class BmiChangeIntervention(MacroNutrientsSupply):
+class BMIChangeIntervention(NutritionChange):
     def __init__(self, year, rate, from_state, to_state, new_micro_state=None, p_new_micro=0, arm=None, ration=1, **kwargs):
             self.requires = Malnutrition
             self.year = sc.promotetoarray(year)
@@ -114,8 +115,8 @@ class BmiChangeIntervention(MacroNutrientsSupply):
             self.to_state = self.bmitomacro(to_state)
             self.new_micro_state = new_micro_state
             self.p_new_micro = p_new_micro
-            self.arm = None
-            self.name = f'BMI Nutrition change from {self.from_state} to {self.to_state}'
+            self.arm = arm
+            self.name = f'BMI Nutrition change from {self.from_state} to {self.to_state} arm {self.arm}'
             self.ration = ration    # Ration of food supply
             super().__init__(self.year, self.rate, self.from_state, 
                              self.to_state, self.new_micro_state, self.p_new_micro, 
