@@ -1,29 +1,18 @@
 # RATIONS 
 
-## PLAN:
 
-* Create 2800 Agents (indexes 0-2799)  -  `[DONE`
-  * Give a TB Active status (Active smear posivite, Active Extra Pulmonary) - `DONE`
-
-    \
+* Create 2800 Agents (indexes 0-2799)  -  `[DONE]`
+   * Give a TB Active status (Active smear posivite, Active Extra Pulmonary) - `[DONE]`
 * Allocate 1400 to CONTROL and and 1400 VITAMIN groups     `[DONE]`
-
-  \
 * Generate households with sizes from 1 to 6               `[DONE]`
-
-  \
 * Assign each household to an arm 50/50 -                  `[DONE]`
-* -- Hopefully will end up slightly higher than 10,000 agents    `[DONE]`
-
-  \
+   * Hopefully will end up slightly higher than 10,000 agents    `[DONE]`
 * Food Habit/BMI:
-  \-- Assign BMI status
-  \-- Map the BMI status to macro as part of the intervention
-
-  \
-* Assign each household a macro state based on the arm     `DONE`
+  * Assign BMI status
+  * Map the BMI status to macro as part of the intervention
+* Assign each household a macro state based on the arm     `[DONE]`
   2a. set prognoses for each agent on one of the Active TB states from day 1? (maybe warm up period? do we call it warm up period? :D )
-* add the bmi state to the Malnutrition class - `DONE`
+* add the bmi state to the Malnutrition class - `[DONE]`
 
 
 ## TODO:
