@@ -2,9 +2,9 @@ import starsim as ss
 import numpy as np
 import networkx as nx
 
-__all__ = ['GenericHouseHold', 'HouseHoldNet', 'HouseholdNewborns']
+__all__ = ['HouseholdUnit', 'HouseholdNet', 'HouseholdNewborns']
 
-class HouseHoldNet(ss.Network):
+class HouseholdNet(ss.Network):
     def __init__(self, hhs, pars=None, **kwargs):
         super().__init__(**kwargs)
 
@@ -51,11 +51,9 @@ class HouseHoldNet(ss.Network):
         return
     
     
-"""_Summary_
-The HouseHold network class.
-"""
-class GenericHouseHold():
+class HouseholdUnit():
     """
+    
     _Attributes:_
     hhid:   Unique identifier for the household.
     uids:   List of unique identifiers for household members.

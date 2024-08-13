@@ -4,7 +4,7 @@ from .malnutrition import Malnutrition, MacroNutrients, MicroNutrients
 from .config import *
 from .tbinterventions import Product, TBVaccinationCampaign
 from .nutritionenums import eStudyArm, eBmiStatus, eDetailedStatus, eHighlevelStatus, eMacroNutrients, eMicroNutrients, descriptions
-from .networks import HouseHoldNet, GenericHouseHold, HouseholdNewborns
+from .networks import HouseholdNet, HouseholdUnit, HouseholdNewborns
 from .interventions import MicroNutrientsSupply, NutritionChange, BMIChangeIntervention
 from .analyzers import RationsAnalyzer, GenHHAnalyzer, GenNutritionAnalyzer
 from .connectors import TB_Nutrition_Connector

@@ -132,12 +132,18 @@ class BMIChangeIntervention(NutritionChange):
         return super().apply(sim)
     
     def bmitomacro(self, bmi):
+        # BMI status is a subset of macro nutrients status 
+        # Using enum names to make it easier to understand
+                
         if bmi == eBmiStatus.SEVERE_THINNESS:
             return eMacroNutrients.UNSATISFACTORY
+        
         elif bmi == eBmiStatus.MODERATE_THINNESS:
             return eMacroNutrients.MARGINAL
+        
         elif bmi == eBmiStatus.MILD_THINNESS:
             return eMacroNutrients.SLIGHTLY_BELOW_STANDARD
+        
         elif bmi == eBmiStatus.NORMAL_WEIGHT:
             return eMacroNutrients.STANDARD_OR_ABOVE
         else:

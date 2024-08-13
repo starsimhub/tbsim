@@ -166,7 +166,7 @@ class RATIONS():
             bmi = np.random.choice(a=self.bmidat['status'].values, p=pBmi)     # Randomly Choose the bmi state option
             
             # Create the household
-            hh = mtb.GenericHouseHold(hhid, uids, mtb.eMacroNutrients(macro),  mtb.eBmiStatus(bmi), mtb.eStudyArm(arm))
+            hh = mtb.HouseholdUnit(hhid, uids, mtb.eMacroNutrients(macro),  mtb.eBmiStatus(bmi), mtb.eStudyArm(arm))
             
             # Append the household to the list
             hhs.append(hh)
@@ -180,7 +180,7 @@ class RATIONS():
     # ____________________________________________________
     def net(self):
         # Create the network of households
-        net = mtb.HouseHoldNet(self.hhs)
+        net = mtb.HouseholdNet(self.hhs)
         return net
 
     # ____________________________________________________
