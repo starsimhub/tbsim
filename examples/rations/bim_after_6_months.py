@@ -105,9 +105,10 @@ def plot_heatmap(index={}, data=[{}], ex_diagonal=False, ex_below_diagonal=False
 
     for ax, df, title, tot in zip(axes, dfs, titles, tots):
         # Plotting the heatmap
+        value_type = '(%)' if use_percentages else ''
         heatmap = ax.imshow(df, cmap=cmap, interpolation='nearest', vmin=0.1)  # Use vmin to exclude placeholder color
         ax.set_title(title, pad=20)
-        ax.set_xlabel(f'{tot} people - BMI after 6 months')
+        ax.set_xlabel(f'{tot} people - BMI after 6 months {value_type}')
         ax.set_ylabel(f'Baseline BMI (kg/m²) in the {title}')
         ax.set_xticks(range(len(df.columns)))
         ax.set_xticklabels(df.columns, rotation=45)
@@ -128,5 +129,5 @@ def plot_heatmap(index={}, data=[{}], ex_diagonal=False, ex_below_diagonal=False
 
 if __name__ == '__main__':
     # plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm], False, False)
-    plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm] )
+    plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm], False, False, True  )
     
