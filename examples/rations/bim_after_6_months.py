@@ -1,6 +1,7 @@
-
+from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 import tbsim
 
 st = tbsim.nutritionenums.eBmiStatus
@@ -34,27 +35,79 @@ def get_variable_name(var):
     if len(var_name) == 0:
         return None
     return var_name[0].replace("_", " ")
-    
-
-def plot_heatmap(index={}, data=[{}]):
+        
+def exclude_diagonal(df):
     """
-    Plot heatmap data in subplots.
+    Set diagonal values to a placeholder value to exclude them from the heatmap.
+    Args:
+        df (pd.DataFrame): DataFrame with data.
+    Returns:
+        pd.DataFrame: DataFrame with diagonal values set to a placeholder value.
+    """
+    df_with_placeholder = df.copy()
+    np.fill_diagonal(df_with_placeholder.values, -1)  # Set diagonal to a placeholder value (-1)
+    return df_with_placeholder
+
+def exclude_below_diagonal(df):
+    """
+    Set values below the diagonal to a placeholder value to exclude them from the heatmap.
+    Args:
+        df (pd.DataFrame): DataFrame with data.
+    Returns:
+        pd.DataFrame: DataFrame with values below the diagonal set to a placeholder value.
+    """
+    df_with_placeholder = df.copy()
+    num_rows, num_cols = df.shape
+    for i in range(num_rows):
+        for j in range(num_cols):
+            if i > j:  # Below diagonal
+                df_with_placeholder.iat[i, j] = -1  # Set to placeholder value
+    return df_with_placeholder
+
+def convert_to_percentages(df):
+    """
+    Convert values in the DataFrame to percentages of the total sum.
+    Args:
+        df (pd.DataFrame): DataFrame with data.
+    Returns:
+        pd.DataFrame: DataFrame with percentages.
+    """
+    df_sum = df.sum().sum()
+    if df_sum == 0:
+        return df  # Return unchanged if the sum is zero to avoid division by zero
+    df_percentage = (df / df_sum * 100).round(2)  # Calculate percentages
+    return df_percentage
+
+def plot_heatmap(index={}, data=[{}], ex_diagonal=False, ex_below_diagonal=False, use_percentages= False, colormap='OrRd'):
+    """
+    Plot heatmap data in subplots, excluding diagonal values.
     Args:
         index (list): The index labels for the DataFrame.
         data (list): A list of dictionaries containing the data to plot.
     """
     # Creating DataFrames
     dfs = [pd.DataFrame(d, index=index) for d in data]
-    
+    tots = [df.sum().sum() for df in dfs]
+    if use_percentages:
+        dfs = [convert_to_percentages(df) for df in dfs]  # Convert to percentages
+    if ex_diagonal: 
+        dfs = [exclude_diagonal(df) for df in dfs]  # Exclude diagonal values
+    if ex_below_diagonal:
+        dfs = [exclude_below_diagonal(df) for df in dfs]  # Exclude values below diagonal
     # Creating a figure with two subplots
     fig, axes = plt.subplots(1, 2, figsize=(18, 7))
     titles = [get_variable_name(data[0]), get_variable_name(data[1])]
 
-    for ax, df, title in zip(axes, dfs, titles):
+    # Define a custom colormap that makes the placeholder value less visible
+   
+    cmap = plt.get_cmap(colormap)
+    cmap.set_under('white')  # Set color for values below the minimum of the colormap
+
+    for ax, df, title, tot in zip(axes, dfs, titles, tots):
         # Plotting the heatmap
-        heatmap = ax.imshow(df, cmap='OrRd', interpolation='nearest')
+        heatmap = ax.imshow(df, cmap=cmap, interpolation='nearest', vmin=0.1)  # Use vmin to exclude placeholder color
         ax.set_title(title, pad=20)
-        ax.set_xlabel('BMI after 6 months')
+        ax.set_xlabel(f'{tot} people - BMI after 6 months')
         ax.set_ylabel(f'Baseline BMI (kg/m²) in the {title}')
         ax.set_xticks(range(len(df.columns)))
         ax.set_xticklabels(df.columns, rotation=45)
@@ -62,7 +115,8 @@ def plot_heatmap(index={}, data=[{}]):
         ax.set_yticklabels(df.index)
         for i in range(len(df.index)):
             for j in range(len(df.columns)):
-                ax.text(j, i, df.iloc[i, j], ha='center', va='center', color='black')
+                if df.iloc[i, j] != -1:  # Only display text for non-placeholder values
+                    ax.text(j, i, df.iloc[i, j], ha='center', va='center', color='black')
         fig.colorbar(heatmap, ax=ax)
         ax.xaxis.set_ticks_position('top')
 
@@ -71,5 +125,8 @@ def plot_heatmap(index={}, data=[{}]):
     
     plt.show()    
     
+
 if __name__ == '__main__':
-    plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm])
+    # plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm], False, False)
+    plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm] )
+    
