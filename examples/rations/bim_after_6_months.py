@@ -1,8 +1,9 @@
-from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import tbsim
+import sciris as sc
+import tbsim.config as cfg
 
 st = tbsim.nutritionenums.eBmiStatus
 desc = tbsim.nutritionenums.descriptions
@@ -78,7 +79,7 @@ def convert_to_percentages(df):
     df_percentage = (df / df_sum * 100).round(2)  # Calculate percentages
     return df_percentage
 
-def plot_heatmap(index={}, data=[{}], ex_diagonal=False, ex_below_diagonal=False, use_percentages= False, colormap='OrRd'):
+def plot_heatmap(index={}, data=[{}], ex_diagonal=False, ex_below_diagonal=False, use_percentages= False, colormap='OrRd', filename='heatmap'):
     """
     Plot heatmap data in subplots, excluding diagonal values.
     Args:
@@ -122,12 +123,17 @@ def plot_heatmap(index={}, data=[{}], ex_diagonal=False, ex_below_diagonal=False
         ax.xaxis.set_ticks_position('top')
 
     plt.tight_layout(pad=4.0)
-    fig.suptitle('BMI at baseline and at the end of 6 months in adult household contacts', fontsize=14)
+    fig.suptitle(f"BMI at baseline and at the end of 6 months in adult household contacts\n{filename.replace('_', ' ')}", fontsize=14)
+    sc.savefig(f"{filename}_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
+    print(f"Open plot: '{cfg.RESULTS_DIRECTORY}\{filename}_{cfg.FILE_POSTFIX}.png'")
+    plt.close()
     
-    plt.show()    
     
 
 if __name__ == '__main__':
-    # plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm], False, False)
-    plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm], False, False, True  )
+    plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm], False, False, False, 'OrRd', filename="All_Values" )
+    plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm], True, False, True, 'YlGnBu', filename="BMI_With_Changes" )
+    plot_heatmap(index, [Adults_Control_Arm, Adults_Intervention_Arm], True, True, True, 'BuGn', filename="BMI_Improvements_Only" )
+    
+    print(f"Figures: {cfg.RESULTS_DIRECTORY}")
     
