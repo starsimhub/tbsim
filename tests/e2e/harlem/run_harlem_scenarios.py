@@ -5,8 +5,8 @@ import sciris as sc
 import pandas as pd
 import os
 import tbsim.config as cfg
-from tests.e2e.harlem.scenarios import Scenarios, Arms
-from tests.e2e.harlem.functionObjects import compute_rel_prog, p_micro_recovery_default
+from tbsim.harlem.scenarios import Scenarios, Arms
+from tbsim.harlem.functionObjects import compute_rel_prog, p_micro_recovery_default
 import warnings
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
