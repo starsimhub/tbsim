@@ -10,7 +10,7 @@ def _create_res_dir(postfix):
     os.makedirs(dir_path, exist_ok=True)
     return dir_path
 
-def generate_file_postfix(format='%m-%d_%H-%M-%S'):
+def generate_file_postfix(format='%m-%d_%H-%M'):
     """ Generate a postfix for file names based on the current date and time.
         format:  Format needed to generate the filename friendly date and time string.
         Returns: str: The generated postfix.  

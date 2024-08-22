@@ -4,18 +4,13 @@ Define Malnutrition analyzers
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, TBS, Malnutrition, eMicroNutrients, eMacroNutrients, eBmiStatus
+from tbsim import TB, TBS, Malnutrition, MicroNutrients, MacroNutrients, StudyArm
 import networkx as nx
 import pandas as pd
-from enum import IntEnum, auto
 
+__all__ = ['HarlemAnalyzer', 'HHAnalyzer', 'NutritionAnalyzer']
 
-__all__ = ['RationsAnalyzer', 'GenHHAnalyzer', 'GenNutritionAnalyzer']
-class StudyArm(IntEnum):
-    CONTROL = auto()
-    VITAMIN = auto()
-    
-class RationsAnalyzer(ss.Analyzer):
+class HarlemAnalyzer(ss.Analyzer):
 
     def __init__(self, **kwargs):
         self.requires = [TB, Malnutrition]
@@ -46,10 +41,8 @@ class RationsAnalyzer(ss.Analyzer):
             n_died = np.count_nonzero( (tb.ti_dead[(self.sim.people.arm==arm)] == ti) )
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
             n_latent_fast = np.count_nonzero(tb.state[ppl] == TBS.LATENT_FAST)
-            n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == eMicroNutrients.DEFICIENT)
-            n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == eMacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == eMacroNutrients.MARGINAL) )
-            n_low_bmi = np.count_nonzero( (nut.bmi_state[ppl] == eBmiStatus.SEVERE_THINNESS) | (nut.bmi_state[ppl] == eBmiStatus.MODERATE_THINNESS))
-            
+            n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
+            n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == MacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == MacroNutrients.MARGINAL) )
             infected = ppl & tb.infected
             if not infected.any():
                 rel_LS_mean = np.nan
@@ -57,44 +50,13 @@ class RationsAnalyzer(ss.Analyzer):
             else:
                 rel_LS_mean = tb.rel_LS_prog[infected].mean()
                 rel_LF_mean = tb.rel_LF_prog[ppl & tb.infected].mean()
- 
-            self.data.append([self.sim.year, 
-                              arm.name, 
-                              n_people, 
-                              new_infections, 
-                              new_active_infections, 
-                              n_infected, 
-                              n_died, 
-                              n_latent_slow, 
-                              n_latent_fast, 
-                              n_micro_deficient, 
-                              n_macro_deficient, 
-                              n_low_bmi,
-                              rel_LS_mean, 
-                              rel_LF_mean])
+
+            self.data.append([self.sim.year, arm.name, n_people, new_infections, new_active_infections, n_infected, n_died, n_latent_slow, n_latent_fast, n_micro_deficient, n_macro_deficient, rel_LS_mean, rel_LF_mean])
         return
 
     def finalize(self):
         super().finalize()
-        self.df = pd.DataFrame(
-                        self.data, 
-                        columns=[
-                            'year', 
-                            'arm', 
-                            'n_people', 
-                            'new_infections', 
-                            'new_active_infections', 
-                            'n_infected', 
-                            'n_died', 
-                            'n_latent_slow', 
-                            'n_latent_fast',
-                            'n_micro_deficient',      # Number of people with micro nutrient deficiency
-                            'n_macro_deficient',      # Number of people with macro nutrient deficiency
-                            'n_low_bmi',              # Number of people with severe or moderate thinness
-                            'rel_LS_mean', 
-                            'rel_LF_mean'
-                        ]
-                    )
+        self.df = pd.DataFrame(self.data, columns = ['year', 'arm', 'n_people', 'new_infections', 'new_active_infections', 'n_infected', 'n_died', 'n_latent_slow', 'n_latent_fast','n_micro_deficient', 'n_macro_deficient', 'rel_LS_mean', 'rel_LF_mean'])
 
         self.df['cum_infections'] = self.df.groupby(['arm'])['new_infections'].cumsum()
         self.df.drop('new_infections', axis=1, inplace=True)
@@ -114,13 +76,13 @@ class RationsAnalyzer(ss.Analyzer):
 
         return g.figure
 
-class GenHHAnalyzer(ss.Analyzer):
+class HHAnalyzer(ss.Analyzer):
 
-    def __init__(self, track_years= [2017, 2021], **kwargs):
+    def __init__(self, **kwargs):
         self.requires = [TB, Malnutrition]
         self.data = []
         self.df = None # Created on finalize
-        self.track_years = track_years
+
         super().__init__(**kwargs)
         return
 
@@ -128,25 +90,31 @@ class GenHHAnalyzer(ss.Analyzer):
         super().init_results()
         return
 
-    def apply(self, sim):
+    def apply(self, sim, snap_years = [1942, 1944]):
         super().apply(sim)
-        track_years = self.track_years
+
         year = self.sim.year
         dt = self.sim.dt
 
-        track = False
-        for t_year in track_years:
-            if year >= t_year and year < t_year+dt:
-                track = True
+        snap = False
+        for sy in snap_years:
+            if year >= sy and year < sy+dt:
+                snap = True
                 break
         
-        if not track:
+        if not snap:
             return
 
         hhid, hh_sizes = np.unique(sim.people.hhid, return_counts=True)
         cnt, hh_size = np.histogram(hh_sizes, bins=range(1, 11))
-        
-        df = pd.DataFrame({t_year:cnt}, index=pd.Index(hh_size[:-1], name='HH Size'))
+
+        #hhn = self.sim.networks['harlemnet']
+        #el = [(p1, p2) for p1,p2 in zip(hhn.edges['p1'], hhn.edges['p2'])]
+        #G = nx.from_edgelist(el)
+        #hh_sizes = np.array([len(c) for c in nx.connected_components(G)])
+        #cnt, hh_size = np.histogram(hh_sizes, bins=range(20))
+
+        df = pd.DataFrame({sy:cnt}, index=pd.Index(hh_size[:-1], name='HH Size'))
         self.data.append(df)
         return
 
@@ -155,49 +123,45 @@ class GenHHAnalyzer(ss.Analyzer):
         self.df = pd.concat(self.data, axis=1)
         return
 
-class GenNutritionAnalyzer(ss.Analyzer):
+class NutritionAnalyzer(ss.Analyzer):
 
-    def __init__(self, track_years_arr=[], group_by=['Arm', 'Macro', 'Micro'], **kwargs):
+    def __init__(self, **kwargs):
         self.requires = [TB, Malnutrition]
         self.data = []
-        self.df = None                              # Created on finalize
-        self.track_years = track_years_arr
-        self.group_by = group_by
+        self.df = None # Created on finalize
+
         super().__init__(**kwargs)
         return
 
-    def apply(self, sim):
+    def apply(self, sim, snap_years = [1942, 1944]):
         super().apply(sim)
-        track_years = self.track_years
+
         year = self.sim.year
         dt = self.sim.dt
 
-        trackit = False
-        for t_year in track_years:
-            if year >= t_year and year < t_year+dt:
-                trackit = True
+        snap = False
+        for sy in snap_years:
+            if year >= sy and year < sy+dt:
+                snap = True
                 break
         
-        if not trackit:
+        if not snap:
             return
-        macro_lookup = {eMacroNutrients[name].value: name for name in eMacroNutrients._member_names_}
-        micro_lookup = {eMicroNutrients[name].value: name for name in eMicroNutrients._member_names_}
-        bmi_lookup = {eBmiStatus[name].value: name for name in eBmiStatus._member_names_}
+
+        macro_lookup = {MacroNutrients[name].value: name for name in MacroNutrients._member_names_}
+        micro_lookup = {MicroNutrients[name].value: name for name in MicroNutrients._member_names_}
         arm_lookup = {StudyArm[name].value: name for name in StudyArm._member_names_}
 
         nut = self.sim.diseases['malnutrition']
         ppl = self.sim.people
-        
-        # Convert state codes to names
         df = pd.DataFrame({
             'Macro': [macro_lookup[v] for v in nut.macro_state.values],
             'Micro': [micro_lookup[v] for v in nut.micro_state.values],
-            'Bmi': [bmi_lookup[v] for v in nut.bmi_state.values],
             'Arm': [arm_lookup[v] for v in ppl.arm.values],
         }, index=pd.Index(ppl.uid))
 
-        sz = df.groupby(self.group_by).size()
-        sz.name = str(t_year)
+        sz = df.groupby(['Arm', 'Macro', 'Micro']).size()
+        sz.name = str(sy)
         self.data.append(sz)
         return
 
