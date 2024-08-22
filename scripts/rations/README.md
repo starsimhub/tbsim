@@ -17,9 +17,9 @@
 
 ## TODO:
 
-* handle interventions differences - for indexes, control and interviention groups.
-* add real data for Baseline information (bmi, macro, etc)
-* scenarios
+* Handle interventions differences - for indexes, control and intervention groups.
+* Add real data for Baseline information (bmi, macro, etc)
+* Scenarios
 
  <NEED TO ADD MORE TODOs HERE>
 

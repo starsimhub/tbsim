@@ -20,7 +20,7 @@ class MicroNutrients(IntEnum):
     NORMAL = auto()
     DEFICIENT = auto()
 
-class Malnutrition(ss.Disease):         
+class Malnutrition(ss.Disease):
     """
     This class implements a basic Malnutrition model. It inherits from the startim Disease class.
     """
