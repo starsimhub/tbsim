@@ -10,7 +10,7 @@ import seaborn as sns
 import matplotlib.dates as mdates
 import matplotlib.ticker as mtick
 
-def plot_epi(df):
+def plot_epi(resdir, df):
     first_year = int(df['year'].iloc[0])
     assert df['year'].iloc[0] == first_year
     df['date'] = pd.to_datetime(365 * (df['year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
@@ -26,11 +26,11 @@ def plot_epi(df):
         formatter = mdates.ConciseDateFormatter(locator)
         ax.xaxis.set_major_locator(locator)
         ax.xaxis.set_major_formatter(formatter)
-    sc.savefig(f"result_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
+    sc.savefig('epi.png', folder=resdir)
     plt.close(g.figure)
     return
 
-def plot_hh(df):
+def plot_hh(resdir, df):
     dfm = df.reset_index().drop('rand_seed', axis=1).melt(id_vars='HH Size', var_name='Year', value_name='Frequency')
     dfm['Per Cent'] = (df['rand_seed'].max()+1) * dfm.groupby('Year')['Frequency'].transform(lambda x: x / x.sum())
     dfm['Year'] = dfm['Year'].astype(str)
@@ -48,7 +48,7 @@ def plot_hh(df):
 
     g.add_legend()
 
-    sc.savefig(f"hhsizedist_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
+    sc.savefig('hhsizedist.png', folder=resdir)
     plt.close(g.figure)
     return
 
@@ -128,7 +128,7 @@ def stackedbar(data, color, **kwargs):
     ax.legend(unique_labels.values(), unique_labels.keys(), loc='best')
     return
 
-def plot_nut(df):
+def plot_nut(resdir, df):
     # Sum over reps
     dfs = df.drop('rand_seed', axis=1).groupby(['Arm', 'Macro', 'Micro']).sum()
     dfm = dfs.reset_index().melt(id_vars=['Arm', 'Micro', 'Macro'], var_name='Year', value_name='Frequency')
@@ -137,11 +137,11 @@ def plot_nut(df):
     plt.subplots_adjust(bottom=0.3)
 
     plt.legend(loc='upper center', bbox_to_anchor=(0,-0.2), ncol=2)
-    sc.savefig(f"nutrition_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
+    sc.savefig('nutrition.png', folder=resdir)
     plt.close(g.figure)
     return
 
-def plot_active_infections(data):
+def plot_active_infections(resdir, data):
     df = data.set_index(['arm', 'rand_seed', 'year'])[['cum_active_infections']].sort_index()
     trial_start = 1942
     df.index.get_level_values('year')
@@ -155,9 +155,9 @@ def plot_active_infections(data):
     sns.lineplot(data=df.reset_index(), x='year', y='Incident Cases', hue='arm', estimator=None, units='rand_seed', alpha=0.1, lw=0.1, legend=False)
 
     g.set_xlabel('Year')
-    locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
-    formatter = mdates.ConciseDateFormatter(locator)
-    sc.savefig(f"incidence_{cfg.FILE_POSTFIX}.png", folder=cfg.RESULTS_DIRECTORY)
+    #locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+    #formatter = mdates.ConciseDateFormatter(locator)
+    sc.savefig('incidence.png', folder=resdir)
     plt.close(g.figure)
 
     return

@@ -9,7 +9,6 @@ import sciris as sc
 
 __all__ = ['MicroNutrientsSupply', 'NutritionChange', 'BMIChangeIntervention']
 
-    
 def p_micro_recovery_default(self, sim, uids):
     prob = np.interp(self.sim.year, self.year, self.rate*self.sim.dt)
     p = np.full(len(uids), prob)

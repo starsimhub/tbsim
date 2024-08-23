@@ -181,7 +181,7 @@ class TB(ss.Infection):
             rand_die = self.will_die.rvs(presym)
             uids = presym
             
-            #total_rate = p.rate_active_to_cure + p.rate_exptb_to_dead
+            # Next state is cure or dead, add rates
             total_rate = np.concatenate([
                 p.rate_exptb_to_dead * np.ones(len(exptb_uids)),
                 p.rate_smpos_to_dead * np.ones(len(smpos_uids)),

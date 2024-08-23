@@ -50,10 +50,23 @@ class HouseholdNet(ss.Network):
 
         return
     
-    
+    def add_members(self, newborn_mother_dyads):
+        p1s = []
+        p2s = []
+        for newborn_uid, mother_uid in newborn_mother_dyads:
+            for contact in self.find_contacts(mother_uid):
+                p1s.append(contact)
+                p2s.append(newborn_uid)
+
+        self.edges.p1 = ss.uids(np.concatenate([self.edges.p1, p1s]))
+        self.edges.p2 = ss.uids(np.concatenate([self.edges.p2, p2s]))
+
+        # Beta is zero while prenatal
+        self.edges.beta = np.concatenate([self.edges.beta, np.zeros_like(p1s)])#.astype(ss.dtypes.float)
+
+
 class HouseholdUnit():
     """
-    
     _Attributes:_
     hhid:   Unique identifier for the household.
     uids:   List of unique identifiers for household members.
@@ -68,7 +81,6 @@ class HouseholdUnit():
         self.macro_metric = hh_macro
         self.bmi_metric = hh_bmi
         self.arm = study_arm
-        self.indexTBState = 0        # Index of TB state in the state array, FOR USE IN CAPTURING TB STATE FOR 
         return
     
     """_summary_
@@ -98,7 +110,6 @@ class HouseholdNewborns(ss.Pregnancy):
     """
 
     def assign_nutrition_status(self, newborn_uids, conceive_uids):
-        
         nut = self.sim.diseases['malnutrition']
         nut.micro_state[newborn_uids] = nut.micro_state[conceive_uids]
         nut.macro_state[newborn_uids] = nut.macro_state[conceive_uids]
@@ -114,37 +125,21 @@ class HouseholdNewborns(ss.Pregnancy):
         Returns:
             list: A list of UIDs representing the newborns.
         """
-       
+
         newborn_uids = super().make_embryos(conceive_uids)
 
         if len(newborn_uids) == 0:
             return newborn_uids
 
-        # Assign household ID and study arm to newborns
+        # Assign household ID, study arm, and nutrition status to newborns
         people = self.sim.people
         people.hhid[newborn_uids] = people.hhid[conceive_uids]
         people.arm[newborn_uids] = people.arm[conceive_uids]
-        
+        self.assign_nutrition_status(newborn_uids, conceive_uids)
 
-        # Call the function
-        self.assign_nutrition_status(newborn_uids, conceive_uids) # type: ignore
-        
+        # Connect to networks
         hn = self.sim.networks[targetNetworkName]
-
-        p1s = []
-        p2s = []
-        for newborn_uid, mother_uid in zip(newborn_uids, conceive_uids):
-            for contact in hn.find_contacts(mother_uid):
-                p1s.append(contact)
-                p2s.append(newborn_uid)
-
-        hn.edges.p1 = ss.uids(np.concatenate([hn.edges.p1, p1s]))
-        hn.edges.p2 = ss.uids(np.concatenate([hn.edges.p2, p2s]))
-        # Beta is zero while prenatal
-        hn.edges.beta = np.concatenate([hn.edges.beta, np.zeros_like(p1s)])#.astype(ss.dtypes.float)
+        dyads = zip(newborn_uids, conceive_uids)
+        hn.add_members(dyads)
 
         return newborn_uids
-    
-
-
-    
