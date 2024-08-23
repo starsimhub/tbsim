@@ -15,7 +15,8 @@ class TBS(): # Enum
     ACTIVE_SMNEG    = 4.0    # Active TB, smear negative
     ACTIVE_EXPTB    = 5.0    # Active TB, extra-pulmonary
     CURE            = 6.0    # Being cured
-    DEAD            = 7.0    # TB death
+    TREATMENT       = 7.0    # Being cured
+    DEAD            = 8.0    # TB death
     
 class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
@@ -45,6 +46,8 @@ class TB(ss.Infection):
             rel_trans_smneg     = 0.3,
             rel_trans_exptb     = 0.05,
             rel_trans_presymp   = 0.1,
+
+            dur_to_cure_on_tx = ss.expon(scale=365/6) # About 2 months
         )
         self.update_pars(pars, **kwargs)
         
@@ -64,7 +67,7 @@ class TB(ss.Infection):
         self.add_states(
             # Initialize states specific to TB:
             ss.FloatArr('state', default=TBS.NONE),                 # One state to rule them all?
-            ss.FloatArr('active_tb_state', default=TBS.NONE),         # Form of active TB (SmPos, SmNeg, or ExpTB)
+            ss.FloatArr('active_tb_state', default=TBS.NONE),       # Form of active TB (SmPos, SmNeg, or ExpTB)
         )
         
         self.add_states(            
@@ -84,6 +87,7 @@ class TB(ss.Infection):
             ss.FloatArr('ti_active'),
             ss.FloatArr('ti_dead'),
             ss.FloatArr('ti_cure'),
+            ss.FloatArr('ti_treatment')
         )
         return
 
@@ -101,7 +105,7 @@ class TB(ss.Infection):
         Infectious if in any of the active states
         """
         return (self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)
-    
+
     def set_prognoses(self, uids, from_uids=None):
         super().set_prognoses(uids, from_uids)
 
@@ -152,7 +156,6 @@ class TB(ss.Infection):
 
         # Latent --> active pre-symptomatic
         latents = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))  & (self.ti_presymp <= ti)).uids
-        
         if len(latents):
             self.state[latents] = TBS.ACTIVE_PRESYMP
             self.rel_trans[latents] = p.rel_trans_presymp
@@ -198,7 +201,7 @@ class TB(ss.Infection):
             self.ti_cure[cure_uids] = np.ceil(ti + dur_active[~will_die] / dt)
 
         # Active --> Susceptible or Cure --> Susceptible
-        uids = ( (self.ti_cure <= ti) & ((self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB) | (self.state==TBS.CURE))).uids
+        uids = ( (self.ti_cure <= ti) & ((self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB) | (self.state==TBS.CURE) | (self.state==TBS.TREATMENT))).uids
         if len(uids):
             # Set state and reset timers
             self.susceptible[uids] = True
@@ -219,6 +222,31 @@ class TB(ss.Infection):
             self.sim.people.request_death(deaths)
             self.state[deaths] = TBS.DEAD
         self.results['new_deaths'][ti] = len(deaths)
+
+        # On treatment
+        treatment_uids = (self.state == TBS.TREATMENT).uids
+        if len(treatment_uids):
+            print('TODO: treatment placeholder')
+            self.rel_trans[treatment_uids] *= np.exp(-36*(ti - self.ti_treatment[treatment_uids])*dt) # About 0.5 at one week
+
+        return
+
+    def start_treatment(self, uids):
+        # Begin individual on TB treatment
+
+        ti, dt = self.sim.ti, self.sim.dt
+
+        # Assume TB is drug susceptible
+        assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
+        self.state[uids] = TBS.TREATMENT
+        self.ti_treatment[uids] = self.sim.ti
+        
+        # Avert all death
+        self.ti_dead[uids] = np.nan
+
+        # Set cure time
+        dur_to_cure_on_tx = self.pars.dur_to_cure_on_tx(uids)
+        self.ti_cure[uids] = np.ceil(ti + dur_to_cure_on_tx / dt)
 
         return
 

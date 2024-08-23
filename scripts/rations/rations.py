@@ -18,10 +18,10 @@ class RATIONSTrial(ss.Intervention):
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         
-        self.add_states(
+        self.add_states( # For individual people
             ss.FloatArr('hhid'),
-            ss.BoolArr('is_seed'),
-            ss.BoolArr('arm')
+            ss.BoolArr('intv_arm'),
+            ss.FloatArr('ti_dx'), # Only used for seeds, but easier here
         )
 
         self.default_pars(
@@ -30,16 +30,23 @@ class RATIONSTrial(ss.Intervention):
             p_sm_pos = ss.bernoulli(0.72), # SmPos vs SmNeg for active pulmonary TB of index patients
             dur_active_to_dx = ss.weibull(c=2, scale=3 * 7/365),
             dur_dx_to_first_visit = ss.uniform(low=0, high=365/12),
-            hhsize_ctrl = ss.histogram(
-                values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
-                bins=np.array([1,2,3,4,5,6,7, 11, 15, 16][1:]),
-                density=False),
-            hhsize_intv = ss.histogram(
-                values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
-                bins=np.array([1,2,3,4,5,6,7, 11, 15, 16][1:]),
-                density=False),
+            #hhsize_ctrl = ss.histogram(
+            #    values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
+            #    bins=np.array([1,2,3,4,5,6,7, 11, 15, 16][1:]),
+            #    density=False),
+            #hhsize_intv = ss.histogram(
+            #    values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
+            #    bins=np.array([1,2,3,4,5,6,7, 11, 15, 16][1:]),
+            #    density=False),
         )
         self.update_pars(pars, **kwargs)
+
+        # States for seeds/households
+        self.seed_uids = np.full(self.pars.n_hhs, fill_value=np.nan)
+        self.ti_first_visit = np.full(self.pars.n_hhs, fill_value=np.nan)
+        self.ti_visit = np.full(self.pars.n_hhs, fill_value=np.nan)
+        self.uids_by_hhid = []
+        self.hhs = None
 
         return
 
@@ -52,58 +59,41 @@ class RATIONSTrial(ss.Intervention):
         # Pick one adult to be the source. At time of diagnosis, must be 18+
         # with microbiologically confirmed pulminary TB
         over18 = ppl.age>=18
-        seed_uids = ss.uids(np.random.choice(a=ppl.uid, p=over18/np.count_nonzero(over18), size=self.pars.n_hhs, replace=False))
-        self.is_seed[seed_uids] = True
-        non_seeds = np.setdiff1d(ppl.uid, seed_uids)
+        self.seed_uids = ss.uids(np.random.choice(a=ppl.uid, p=over18/np.count_nonzero(over18), size=self.pars.n_hhs, replace=False))
+        non_seeds = ss.uids(np.setdiff1d(ppl.uid, self.seed_uids))
 
-        arm = self.pars.p_intv.rvs(seed_uids)
-        self.arm[seed_uids] = arm
-
-        hhsize = np.zeros(self.pars.n_hhs, dtype=int)
-        hhsize[arm == Arm.CONTROL]      = self.pars.hhsize_ctrl(seed_uids[arm == Arm.CONTROL])
-        hhsize[arm == Arm.INTERVENTION] = self.pars.hhsize_intv(seed_uids[arm == Arm.INTERVENTION])
+        self.intv_arm[self.seed_uids] = self.pars.p_intv.rvs(self.seed_uids)
 
         # Map people to households
-        idx = 0
-        hhs = []
-        for hhid, (seed_uid, size, arm) in enumerate(zip(seed_uids, hhsize, arm)):
-            nonseed_uids = non_seeds[idx : idx+size-1] # -1 because the seed will be included
-            hh_uids = ss.uids(np.concatenate( (np.array([seed_uid]), nonseed_uids) ))
-            self.hhid[hh_uids] = hhid
+        self.hhid[self.seed_uids] = np.arange(self.pars.n_hhs)
+        self.hhid[non_seeds] = np.random.choice(np.arange(self.pars.n_hhs), len(non_seeds), replace=True)
 
-            if False:
-                armstr = 'ctrl' if arm == mtb.StudyArm.CONTROL else 'intv'
+        # Now that we know how agents map to hhs, we can update some things...
+        hhn = self.sim.networks['householdnet']
+        for hhid in np.arange(self.pars.n_hhs):
+            uids_in_hh = (self.hhid == hhid).uids
+            self.uids_by_hhid.append(uids_in_hh)
+
+            # Set the arm for the other HH members
+            self.intv_arm[uids_in_hh] = self.intv_arm[self.seed_uids[hhid]]
             
-                pMa = self.macrodat[armstr].values
-                pBmi = self.bmidat[armstr].values
-                
-                macro = np.random.choice(a=self.macrodat['habit'].values, p=pMa)  # Randomly Choose the macro state option
-                bmi = np.random.choice(a=self.bmidat['status'].values, p=pBmi)     # Randomly Choose the bmi state option
-                
-                # Create the household
-                hh = mtb.HouseholdUnit(hhid, uids, mtb.eMacroNutrients(macro),  mtb.eBmiStatus(bmi), mtb.eStudyArm(arm))
-                
-                # Append the household to the list
-                hhs.append(hh)
-            idx += size
-
-        # UPDATE NETWORK
-
+            # Add this household to the network
+            hhn.add_hh(uids_in_hh)
 
         # Initialize the TB infection
-        tb.set_prognoses(seed_uids)
+        tb.set_prognoses(self.seed_uids)
 
         # After set_prognoses, seed_uids will be in latent slow or fast.  Latent
         # phase doesn't matter, not transmissible during that period.  So fast
         # forward to end of latent, beginning of active PRE-SYMPTOMATIC stage.
         # Change to ACTIVE_PRESYMP and set time of activation to current time
         # step.
-        tb.ti_presymp[seed_uids] = self.sim.ti # +1?
+        tb.ti_presymp[self.seed_uids] = self.sim.ti # +1?
 
         # All RATIONS index cases are pulmonary, choose SmPos vs SmNeg
-        smpos = self.pars.p_sm_pos(seed_uids)
-        tb.active_tb_state[seed_uids[smpos]] = mtb.TBS.ACTIVE_SMPOS
-        tb.active_tb_state[seed_uids[~smpos]] = mtb.TBS.ACTIVE_SMNEG
+        smpos = self.pars.p_sm_pos(self.seed_uids)
+        tb.active_tb_state[self.seed_uids[smpos]] = mtb.TBS.ACTIVE_SMPOS
+        tb.active_tb_state[self.seed_uids[~smpos]] = mtb.TBS.ACTIVE_SMNEG
 
         # The individual should be shedding active pulmonary TB for some period
         # of time before seeking care, distribution from input
@@ -118,31 +108,48 @@ class RATIONSTrial(ss.Intervention):
 
 
     def apply(self, sim):
-        super().apply()
+        super().apply(sim)
 
         tb = self.sim.diseases['tb']
         ti, dt = self.sim.ti, self.sim.dt
 
-        # SEEDS: Pre symp --> Active
-        presym_uids = ( ((self.state[self.is_seed] == mtb.TBS.ACTIVE_SMPOS) | (self.state[self.is_seed] == mtb.TBS.ACTIVE_SMNEG)) & (tb.ti_active[self.id_seed] <= ti)).uids
-        if len(presym_uids):
+        # SEEDS: Pre symp --> Active (state change has already happend in TB on this timestep)
+        active_uids = self.seed_uids[ np.isin(tb.state[self.seed_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (tb.ti_active[self.seed_uids] == ti) ]
+        if len(active_uids):
             # Newly active, figure out time to care seeking
-            dur_untreated = self.pars.dur_active_to_dx(presym_uids)
-            self.ti_dx[presym_uids] = ti + int(round(dur_untreated/dt))
-        
+            dur_untreated = self.pars.dur_active_to_dx(active_uids)
+            self.ti_dx[active_uids] = np.ceil(ti + dur_untreated / dt)
+
         # SEEDS: Active --> Diagnosed and beginning immediate treatment
-        dx_uids = ( ((self.state[self.is_seed] == mtb.TBS.ACTIVE_SMPOS) | (self.state[self.is_seed] == mtb.TBS.ACTIVE_SMNEG)) & (self.ti_dx[self.id_seed] <= ti)).uids
+        dx_uids = self.seed_uids[np.isin(tb.state[self.seed_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (self.ti_dx[self.seed_uids] == ti)]
         if len(dx_uids):
             # Newly diagnosed. Start treatment and determine when the first RATIONS visit will occur.
-            tb.ti_treated[dx_uids] = ti # TODO
+            tb.start_treatment(dx_uids)
 
             dur_dx_to_first_visit = self.pars.dur_dx_to_first_visit(dx_uids)
-            self.ti_first_visit[presym_uids] = ti + int(round(dur_dx_to_first_visit/dt))
+            hhids = self.hhid[dx_uids].astype(int)
+            self.ti_first_visit[hhids] = np.ceil(ti + dur_dx_to_first_visit / dt)
+            self.ti_visit[hhids] = self.ti_first_visit[hhids]
 
         # If frequency is right, do a "visit"
-        # VISIT IS TO A HH, NOT A PERSON
-        # WILL NEED UIDS OF ALL HH MEMBERS TO CHECK FOR SYMPTOMS, ETC
-        # SET TIMER TO NEXT VISIT, END VISITS AT 6, 12, or 6-12MO
+        #visit_hhids = np.argwhere(self.ti_visit <= ti)
+        visit_hhids = np.where(self.ti_visit == ti)[0]
+        if len(visit_hhids):
+            visit_uids = ss.uids(np.concatenate([self.uids_by_hhid[h] for h in visit_hhids]))
+
+            # Check for new active cases
+            active = np.isin(tb.state[visit_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB]) # Include extra-pulmonary here?
+            not_dx = np.isnan(self.ti_dx[visit_uids])
+            new_active_uids = visit_uids[ active & not_dx]
+
+            if len(new_active_uids):
+                print('HEY, we have transmission! Intervention Arm?', self.intv_arm[new_active_uids])
+
+
+            # SET TIMER TO NEXT VISIT, END VISITS AT 6, 12, or 6-12MO
+            pass
+
+
 
 
         return

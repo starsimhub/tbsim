@@ -44,12 +44,13 @@ def run_rations(rand_seed=0):
 
     # ---------------- Rations Class Instance Creation  -----------------
     matnet = ss.MaternalNet() # To track newborn --> household
-    householdnet = ss.Network(name='householdnet') # Placeholder
+    householdnet = mtb.HouseholdNet()
     nets = [householdnet, matnet]
 
     # -------------- TB disease --------
     tb_pars = dict(
-        beta = dict(householdnet=0.03, maternal=0.0),
+        #beta = dict(householdnet=0.03, maternal=0.0),
+        beta = dict(householdnet=0.5, maternal=0.0),
         init_prev = 0, # Infections seeded by Rations class
         rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
         rate_LF_to_presym = 6e-3,  # TODO: double check pars
@@ -165,7 +166,7 @@ def run_sims(n_seeds=default_n_rand_seeds):
 
 
 if __name__ == '__main__':
-    df = run_sims()
+    ret = run_sims()
 
     '''
     if debug:
@@ -176,10 +177,18 @@ if __name__ == '__main__':
         plt.show()
     '''
     
-    plot_active_infections(resdir, df['rationsanalyzer'])      #Incidence
-    plot_hh(resdir, df['genhhanalyzer'])                      #Household size distribution  
-    plot_nut(resdir, df['gennutritionanalyzer'])                    #Nutrition
-    plot_epi(resdir, df['rationsanalyzer'])                    #Prevalence 
+    if 'rationsanalyzer' in ret:
+        plot_active_infections(resdir, ret['rationsanalyzer'])      #Incidence
+
+    if 'genhhanalyzer' in ret:
+        plot_hh(resdir, ret['genhhanalyzer'])                      #Household size distribution  
+
+    
+    if 'gennutritionanalyzer' in ret:
+        plot_nut(resdir, ret['gennutritionanalyzer'])                    #Nutrition
+
+    if 'rationsanalyzer' in ret:
+        plot_epi(resdir, ret['rationsanalyzer'])                    #Prevalence 
 
     print(f'Results directory {resdir}.')
     print('Done')

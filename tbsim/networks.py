@@ -5,10 +5,10 @@ import networkx as nx
 __all__ = ['HouseholdUnit', 'HouseholdNet', 'HouseholdNewborns']
 
 class HouseholdNet(ss.Network):
-    def __init__(self, hhs, pars=None, **kwargs):
+    def __init__(self, hhs=None, pars=None, **kwargs):
         super().__init__(**kwargs)
 
-        self.hhs = hhs
+        self.hhs = [] if hhs is None else hhs
         self.default_pars()
         self.update_pars(pars, **kwargs)
         return
@@ -16,9 +16,26 @@ class HouseholdNet(ss.Network):
     """_summary_
     
     """
+
+    def add_hh(self, uids):
+        g = nx.complete_graph(uids)
+        p1s = []
+        p2s = []
+        for edge in g.edges():
+            p1, p2 = edge
+            p1s.append(p1)
+            p2s.append(p2)
+
+        self.edges.p1 = ss.uids(np.concatenate([self.edges.p1, p1s]))
+        self.edges.p2 = ss.uids(np.concatenate([self.edges.p2, p2s]))
+        self.edges.beta = np.concatenate([self.edges.beta, np.ones_like(p1s)])
+        return
+
+
     def init_pre(self, sim):
         super().init_pre(sim)
         for hh in self.hhs:                 # For each household
+            self.add_hh(hh)
             p1s, p2s = hh.edges()        # Get all their contacts
 
             self.edges.p1 = np.concatenate([self.edges.p1, p1s])
@@ -74,13 +91,13 @@ class HouseholdUnit():
     macro:  Macro nutrition status of the household.
     arm:    Group in the study that the household belongs to.
     """ 
-    def __init__(self, hhid, uids, hh_macro, hh_bmi, study_arm, indexes_arr=None, properties=None):
+    def __init__(self, hhid, uids): #, hh_macro, hh_bmi, study_arm):
         self.hhid = hhid
         self.uids = uids
         self.n = len(uids)
-        self.macro_metric = hh_macro
-        self.bmi_metric = hh_bmi
-        self.arm = study_arm
+        #self.macro_metric = hh_macro
+        #self.bmi_metric = hh_bmi
+        #self.arm = study_arm
         return
     
     """_summary_
