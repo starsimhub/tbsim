@@ -47,6 +47,10 @@ class RATIONSTrial(ss.Intervention):
         super().init_post()
 
         ppl = self.sim.people
+        tb = self.sim.diseases['tb']
+
+        # Pick one adult to be the source. At time of diagnosis, must be 18+
+        # with microbiologically confirmed pulminary TB
         over18 = ppl.age>=18
         seed_uids = ss.uids(np.random.choice(a=ppl.uid, p=over18/np.count_nonzero(over18), size=self.pars.n_hhs, replace=False))
         self.is_seed[seed_uids] = True
@@ -65,46 +69,41 @@ class RATIONSTrial(ss.Intervention):
         for hhid, (seed_uid, size, arm) in enumerate(zip(seed_uids, hhsize, arm)):
             nonseed_uids = non_seeds[idx : idx+size-1] # -1 because the seed will be included
             hh_uids = ss.uids(np.concatenate( (np.array([seed_uid]), nonseed_uids) ))
-            self.hhid[ hh_uids ] = hhid
+            self.hhid[hh_uids] = hhid
 
-
-
-            armstr = 'ctrl' if arm == mtb.StudyArm.CONTROL else 'intv'
-        
-            pMa = self.macrodat[armstr].values
-            pBmi = self.bmidat[armstr].values
+            if False:
+                armstr = 'ctrl' if arm == mtb.StudyArm.CONTROL else 'intv'
             
-            macro = np.random.choice(a=self.macrodat['habit'].values, p=pMa)  # Randomly Choose the macro state option
-            bmi = np.random.choice(a=self.bmidat['status'].values, p=pBmi)     # Randomly Choose the bmi state option
-            
-            # Create the household
-            hh = mtb.HouseholdUnit(hhid, uids, mtb.eMacroNutrients(macro),  mtb.eBmiStatus(bmi), mtb.eStudyArm(arm))
-            
-            # Append the household to the list
-            hhs.append(hh)
+                pMa = self.macrodat[armstr].values
+                pBmi = self.bmidat[armstr].values
+                
+                macro = np.random.choice(a=self.macrodat['habit'].values, p=pMa)  # Randomly Choose the macro state option
+                bmi = np.random.choice(a=self.bmidat['status'].values, p=pBmi)     # Randomly Choose the bmi state option
+                
+                # Create the household
+                hh = mtb.HouseholdUnit(hhid, uids, mtb.eMacroNutrients(macro),  mtb.eBmiStatus(bmi), mtb.eStudyArm(arm))
+                
+                # Append the household to the list
+                hhs.append(hh)
             idx += size
 
-        # Pick one adult to be the source. At time of diagnosis, must be 18+
-        # with microbiologically confirmed pulminary TB, so probably an adult?
-        inds18plus = [u for u in self.uids if u.age >= 18]
-        self.seed_uid = ss.choice(inds18plus)
-        tb = sim.diseases['tb']
-        tb.set_prognoses(self.seed_uid)
+        # UPDATE NETWORK
+
+
+        # Initialize the TB infection
+        tb.set_prognoses(seed_uids)
 
         # After set_prognoses, seed_uids will be in latent slow or fast.  Latent
         # phase doesn't matter, not transmissible during that period.  So fast
         # forward to end of latent, beginning of active PRE-SYMPTOMATIC stage.
         # Change to ACTIVE_PRESYMP and set time of activation to current time
         # step.
-        tb.ti_presymp[self.seed_uid] = sim.ti # +1?
+        tb.ti_presymp[seed_uids] = self.sim.ti # +1?
 
-        # All RATIONS index cases are pulmonary. Using TBsim defaults, assuming 72% are SmPos and the rest are SmNeg
-        random_distribution = np.random.choice([mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG], p=[0.72, 0.28], size=len(self.seed_uid))
-        tb.active_tb_state[self.seed_uid] = random_distribution
-
-        # AFTER pre-symptomatic period, the individual needs to transition to
-        # one of the pulmonary stages (Sm+ or Sm-), we don't want
-        # extra-pulmonary
+        # All RATIONS index cases are pulmonary, choose SmPos vs SmNeg
+        smpos = self.pars.p_sm_pos(seed_uids)
+        tb.active_tb_state[seed_uids[smpos]] = mtb.TBS.ACTIVE_SMPOS
+        tb.active_tb_state[seed_uids[~smpos]] = mtb.TBS.ACTIVE_SMNEG
 
         # The individual should be shedding active pulmonary TB for some period
         # of time before seeking care, distribution from input
@@ -115,14 +114,37 @@ class RATIONSTrial(ss.Intervention):
         # At some additional delay, the household receives its first visit +
         # food basket for either just the index (control) or index + HH members
         # (intervention).
+        return
 
 
-    def update():
-        super().update()
+    def apply(self, sim):
+        super().apply()
 
-        # Check for new active --> treatment
+        tb = self.sim.diseases['tb']
+        ti, dt = self.sim.ti, self.sim.dt
+
+        # SEEDS: Pre symp --> Active
+        presym_uids = ( ((self.state[self.is_seed] == mtb.TBS.ACTIVE_SMPOS) | (self.state[self.is_seed] == mtb.TBS.ACTIVE_SMNEG)) & (tb.ti_active[self.id_seed] <= ti)).uids
+        if len(presym_uids):
+            # Newly active, figure out time to care seeking
+            dur_untreated = self.pars.dur_active_to_dx(presym_uids)
+            self.ti_dx[presym_uids] = ti + int(round(dur_untreated/dt))
+        
+        # SEEDS: Active --> Diagnosed and beginning immediate treatment
+        dx_uids = ( ((self.state[self.is_seed] == mtb.TBS.ACTIVE_SMPOS) | (self.state[self.is_seed] == mtb.TBS.ACTIVE_SMNEG)) & (self.ti_dx[self.id_seed] <= ti)).uids
+        if len(dx_uids):
+            # Newly diagnosed. Start treatment and determine when the first RATIONS visit will occur.
+            tb.ti_treated[dx_uids] = ti # TODO
+
+            dur_dx_to_first_visit = self.pars.dur_dx_to_first_visit(dx_uids)
+            self.ti_first_visit[presym_uids] = ti + int(round(dur_dx_to_first_visit/dt))
 
         # If frequency is right, do a "visit"
+        # VISIT IS TO A HH, NOT A PERSON
+        # WILL NEED UIDS OF ALL HH MEMBERS TO CHECK FOR SYMPTOMS, ETC
+        # SET TIMER TO NEXT VISIT, END VISITS AT 6, 12, or 6-12MO
+
+
         return
 
 
