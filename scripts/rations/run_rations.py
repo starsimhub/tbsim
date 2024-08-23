@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
+from scripts.rations.rations import RATIONSTrial
 from scripts.rations.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
-import scripts.rations.rations as rRS
 from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients
 import warnings
 import os 
@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = True
-default_n_rand_seeds = [1000, 3][debug]
+default_n_rand_seeds = [1000, 1][debug]
 
 resdir = cfg.create_res_dir()
 
@@ -40,34 +40,16 @@ def compute_rel_prog(macro, micro):
 def run_rations(rand_seed=0):
     np.random.seed(rand_seed)
 
+    pop = ss.People(n_agents = 1400 + 4724 + 1400 + 5621)
+
     # ---------------- Rations Class Instance Creation  -----------------
-    params = dict(
-        #hhdat = pd.DataFrame({
-        #    'size': np.arange(1,6),
-        #    'p': np.array([3, 17, 20, 37, 23]) / 100
-        #    }),
-        n_hhs = 2800, # Number of households to generate
-    )
-    rations = rRS.RATIONS(params)
-
-    # -------------- People ----------
-    pop = rations.people()
-
-    # -------------- Network ---------
-    randomnet_parameters = dict(
-        n_contacts=ss.poisson(lam=5),
-        dur = 0, # End after one timestep
-    )
-    randnet = ss.RandomNet(randomnet_parameters)
     matnet = ss.MaternalNet() # To track newborn --> household
-    householdnet = rations.net()
-    nets = [householdnet, randnet, matnet]
+    householdnet = ss.Network(name='householdnet') # Placeholder
+    nets = [householdnet, matnet]
 
     # -------------- TB disease --------
     tb_pars = dict(
-        #beta = dict(rations=0.03, random=0.003, maternal=0.0),
-        
-        beta = dict(householdnet=0.03, random=0.0, maternal=0.0),
+        beta = dict(householdnet=0.03, maternal=0.0),
         init_prev = 0, # Infections seeded by Rations class
         rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
         rate_LF_to_presym = 6e-3,  # TODO: double check pars
@@ -86,7 +68,7 @@ def run_rations(rand_seed=0):
 
     # ---------- Demographics --------
     dems = [
-        mtb.HouseholdNewborns(pars=dict(fertility_rate=45)), # Per 1,000 women
+        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women ### DJK: HouseholdNewborns
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
     ]
 
@@ -105,28 +87,28 @@ def run_rations(rand_seed=0):
     b = mtb.eBmiStatus
     
     # Interventions array:
-    intvs = []    
+    intvs = [RATIONSTrial()]
     #   Table S11: Weight loss in household contacts in RATIONS trial and the association with nutritional status at baseline   
-    intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
-                                           p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
+    #intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
+    #                                       p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
     
-    intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
-                                           p_new_micro=0.01, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
+    #intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
+    #                                       p_new_micro=0.01, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
     
-    intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
-                                           p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
+    #intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
+    #                                       p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
     
-    intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
-                                           p_new_micro=0.01, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
+    #intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
+    #                                       p_new_micro=0.01, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
         
-    intvs.append( mtb.MicroNutrientsSupply(year=[2017, 2017.1, 2017.2, 2017.3, 2017.4, 2017.5], rate=[0.2, 0.2,0.2, 0.2,0.2, 0.2]))
+    #intvs.append( mtb.MicroNutrientsSupply(year=[2017, 2017.1, 2017.2, 2017.3, 2017.4, 2017.5], rate=[0.2, 0.2,0.2, 0.2,0.2, 0.2]))
     
     # -------- Analyzer -------
-    azs = [
-        mtb.RationsAnalyzer(),
-        mtb.GenHHAnalyzer(),
-        mtb.GenNutritionAnalyzer(track_years_arr=[2017, 2018], group_by=['Arm', 'Macro', 'Micro'])
-    ]
+    azs = None #[
+        #mtb.RationsAnalyzer(),
+        #mtb.GenHHAnalyzer(),
+        #mtb.GenNutritionAnalyzer(track_years_arr=[2017, 2018], group_by=['Arm', 'Macro', 'Micro'])
+    #]
 
     # -------- Simulation -------
     sim_pars = dict(
@@ -149,22 +131,6 @@ def run_rations(rand_seed=0):
 
     sim.initialize()
     
-    # Set the states of the people
-    rations.set_states(sim)
-
-    seed_uids = rations.choose_seed_infections()
-    tb = sim.diseases['tb']
-    tb.set_prognoses(seed_uids)
-
-    # After set_prognoses, seed_uids will be in latent slow or fast
-    # Change to ACTIVE_PRESYMP and set time of activation to current time step
-    tb.state[seed_uids] = mtb.TBS.ACTIVE_PRESYMP
-    tb.ti_active[seed_uids] = sim.ti
-
-    # All RATIONS index cases are pulminary. Using TBsim defaults, assuming 72% are SmPos and the rest are SmNeg
-    random_distribution = np.random.choice([mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG], p=[0.72, 0.28], size=len(seed_uids))
-    tb.active_tb_state[seed_uids] = random_distribution
-
     sim.run() # Actually run the sim
 
     ret = {}

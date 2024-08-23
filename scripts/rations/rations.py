@@ -4,43 +4,98 @@ import tbsim as mtb
 import sciris as sc
 import numpy as np
 import pandas as pd
+from enum import IntEnum, auto
 
-__all__ = ['RATIONS']
+__all__ = ['RATIONSTrial', 'RATIONS']
+
+# mtb.StudyArm?
+class Arm(IntEnum):
+    CONTROL = 0
+    INTERVENTION = 1
 
 
-class RationsHouseholds(ss.Intervention):
+class RATIONSTrial(ss.Intervention):
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         
         self.add_states(
             ss.FloatArr('hhid'),
             ss.BoolArr('is_seed'),
-            ss.BoolArr('intervention_arm')
+            ss.BoolArr('arm')
         )
 
         self.default_pars(
-            p_sm_pos = ss.bernoulli(0.72),
+            n_hhs = 2_800,
+            p_intv = ss.bernoulli(0.5), # 50% randomization
+            p_sm_pos = ss.bernoulli(0.72), # SmPos vs SmNeg for active pulmonary TB of index patients
             dur_active_to_dx = ss.weibull(c=2, scale=3 * 7/365),
             dur_dx_to_first_visit = ss.uniform(low=0, high=365/12),
+            hhsize_ctrl = ss.histogram(
+                values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
+                bins=np.array([1,2,3,4,5,6,7, 11, 15, 16][1:]),
+                density=False),
+            hhsize_intv = ss.histogram(
+                values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
+                bins=np.array([1,2,3,4,5,6,7, 11, 15, 16][1:]),
+                density=False),
         )
         self.update_pars(pars, **kwargs)
 
         return
 
-    def initialize(self, sim):
-        super().initialize(sim)
-        # Pick one adult to be the source
-        # At time of diagnosis, must be 18+ with microbiologically confirmed pulminary TB, so probably an adult?
+    def init_post(self):
+        super().init_post()
 
-        # Latent phase doesn't matter, not transmissible during that period
-        # So fast forward to end of latent, beginning of active PRE-SYMPTOMATIC stage
+        ppl = self.sim.people
+        over18 = ppl.age>=18
+        seed_uids = ss.uids(np.random.choice(a=ppl.uid, p=over18/np.count_nonzero(over18), size=self.pars.n_hhs, replace=False))
+        self.is_seed[seed_uids] = True
+        non_seeds = np.setdiff1d(ppl.uid, seed_uids)
+
+        arm = self.pars.p_intv.rvs(seed_uids)
+        self.arm[seed_uids] = arm
+
+        hhsize = np.zeros(self.pars.n_hhs, dtype=int)
+        hhsize[arm == Arm.CONTROL]      = self.pars.hhsize_ctrl(seed_uids[arm == Arm.CONTROL])
+        hhsize[arm == Arm.INTERVENTION] = self.pars.hhsize_intv(seed_uids[arm == Arm.INTERVENTION])
+
+        # Map people to households
+        idx = 0
+        hhs = []
+        for hhid, (seed_uid, size, arm) in enumerate(zip(seed_uids, hhsize, arm)):
+            nonseed_uids = non_seeds[idx : idx+size-1] # -1 because the seed will be included
+            hh_uids = ss.uids(np.concatenate( (np.array([seed_uid]), nonseed_uids) ))
+            self.hhid[ hh_uids ] = hhid
+
+
+
+            armstr = 'ctrl' if arm == mtb.StudyArm.CONTROL else 'intv'
+        
+            pMa = self.macrodat[armstr].values
+            pBmi = self.bmidat[armstr].values
+            
+            macro = np.random.choice(a=self.macrodat['habit'].values, p=pMa)  # Randomly Choose the macro state option
+            bmi = np.random.choice(a=self.bmidat['status'].values, p=pBmi)     # Randomly Choose the bmi state option
+            
+            # Create the household
+            hh = mtb.HouseholdUnit(hhid, uids, mtb.eMacroNutrients(macro),  mtb.eBmiStatus(bmi), mtb.eStudyArm(arm))
+            
+            # Append the household to the list
+            hhs.append(hh)
+            idx += size
+
+        # Pick one adult to be the source. At time of diagnosis, must be 18+
+        # with microbiologically confirmed pulminary TB, so probably an adult?
         inds18plus = [u for u in self.uids if u.age >= 18]
         self.seed_uid = ss.choice(inds18plus)
         tb = sim.diseases['tb']
         tb.set_prognoses(self.seed_uid)
 
-        # After set_prognoses, seed_uids will be in latent slow or fast
-        # Change to ACTIVE_PRESYMP and set time of activation to current time step
+        # After set_prognoses, seed_uids will be in latent slow or fast.  Latent
+        # phase doesn't matter, not transmissible during that period.  So fast
+        # forward to end of latent, beginning of active PRE-SYMPTOMATIC stage.
+        # Change to ACTIVE_PRESYMP and set time of activation to current time
+        # step.
         tb.ti_presymp[self.seed_uid] = sim.ti # +1?
 
         # All RATIONS index cases are pulmonary. Using TBsim defaults, assuming 72% are SmPos and the rest are SmNeg
