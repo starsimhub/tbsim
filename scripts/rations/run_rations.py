@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = True
-default_n_rand_seeds = [1000, 1][debug]
+default_n_rand_seeds = [1000, 2][debug]
 
 resdir = cfg.create_res_dir()
 
@@ -88,7 +88,8 @@ def run_rations(rand_seed=0):
     b = mtb.eBmiStatus
     
     # Interventions array:
-    intvs = [RATIONSTrial()]
+    RATIONS_trial = RATIONSTrial()
+    intvs = [RATIONS_trial]
     #   Table S11: Weight loss in household contacts in RATIONS trial and the association with nutritional status at baseline   
     #intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
     #                                       p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
@@ -114,8 +115,8 @@ def run_rations(rand_seed=0):
     # -------- Simulation -------
     sim_pars = dict(
         dt = 7/365,
-        start = 2015,
-        end = 2023,
+        start = 2019, # Dates don't matter
+        end = 2030, # Long enough that all presymptomatic period end + 2y
         rand_seed = rand_seed,
     )
 
@@ -126,15 +127,26 @@ def run_rations(rand_seed=0):
         demographics=dems, 
         connectors=cn, 
         interventions=intvs,
-        analyzers=azs
+        analyzers=azs,
+
+        copy_inputs=False
     )
     sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
-    sim.initialize()
-    
-    sim.run() # Actually run the sim
+    sim.run() # Run the sim
+
+    #sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
 
     ret = {}
+
+    ret['results'] = pd.DataFrame({
+        'year': sim.results.yearvec,
+        'incident_cases_ctrl': RATIONS_trial.results.incident_cases_ctrl,
+        'incident_cases_intv': RATIONS_trial.results.incident_cases_intv,
+        'new_hhs_enrolled'   : RATIONS_trial.results.new_hhs_enrolled,
+        'rand_seed': rand_seed,
+    })
+
     for k, az in sim.analyzers.items():
         df = az.df
         df['rand_seed'] = rand_seed
@@ -155,13 +167,40 @@ def run_sims(n_seeds=default_n_rand_seeds):
     results += sc.parallelize(run_rations, iterkwargs=cfgs, die=False, serial=debug)
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
-    #epi, hh, nut = zip(*results)
     dfs = {}
     for k in results[0].keys():
         df_list = [r[k] for r in results]
         dfs[k] = pd.concat(df_list)
         dfs[k].to_csv(os.path.join(resdir, f'{k}.csv'))
 
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import datetime as dt 
+
+    dfr = dfs['results']
+    first_year = int(dfr['year'].iloc[0])
+    assert dfr['year'].iloc[0] == first_year
+    dfr['date'] = pd.to_datetime(365 * (dfr['year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
+
+    fig, axv = plt.subplots(1,2)
+
+    dfm = dfr.set_index('date').groupby([pd.Grouper(freq='ME')])['new_hhs_enrolled'].sum().to_frame()
+    months = ['2019-08-31', '2019-09-30', '2019-10-31', '2019-11-30', '2019-12-31', '2020-01-31', '2020-02-29', '2020-03-31', '2020-04-30', '2020-05-31', '2020-06-30', '2020-07-31', '2020-08-31', '2020-09-30', '2020-10-31', '2020-11-30', '2020-12-31', '2021-01-31']
+    enrolled = [105, 215, 244, 284, 248, 263, 265, 184, 63, 69, 122, 104, 54, 107, 112, 115, 186, 60]
+    dfm.loc[months, 'RATIONS'] = enrolled
+    dfm = dfm.reset_index().melt(id_vars='date', var_name='Source', value_name='Households Enrolled').replace({'Source':{'new_hhs_enrolled':'Simulation'}})
+    sns.barplot(data=dfm.reset_index(), x='date', y='Households Enrolled', hue='Source', ax=axv[0])
+
+    df = dfr[['year', 'rand_seed', 'incident_cases_ctrl', 'incident_cases_intv']] \
+        .set_index(['year', 'rand_seed']) \
+        .cumsum() \
+        .reset_index('year') \
+        .reset_index('rand_seed', drop=True) \
+        .melt(id_vars='year', var_name='Arm', value_name='Incident Cases') \
+        .replace({'Arm': {'incident_cases_ctrl':'Control', 'incident_cases_intv':'Intervention'}})
+    sns.lineplot(data=df, x='year', y='Incident Cases', hue='Arm', ax=axv[1])
+
+    plt.show()
     return dfs
 
 

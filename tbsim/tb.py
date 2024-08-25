@@ -31,7 +31,7 @@ class TB(ss.Infection):
             rate_LF_to_presym = 6e-3, # Latent Fast to Active Pre-Symptomatic (per day)
 
             dur_presym = ss.expon(scale=1/3e-2),  # Pre-symptomatic to symptomatic (days)
-            
+
             p_exptb = ss.bernoulli(0.1),
             p_smpos = ss.bernoulli(0.65 / (0.65+0.25)), # Amongst those without extrapulminary TB
 
@@ -47,7 +47,7 @@ class TB(ss.Infection):
             rel_trans_exptb     = 0.05,
             rel_trans_presymp   = 0.1,
 
-            dur_to_cure_on_tx = ss.expon(scale=365/6) # About 2 months
+            dur_to_cure_on_tx = ss.expon(scale=1/6) # About 2 months (1/6 of a year)
         )
         self.update_pars(pars, **kwargs)
         
@@ -182,8 +182,7 @@ class TB(ss.Infection):
             # Using Gillespie SSA
             rand_ti = self.choose_cure_or_die_ti.rvs(presym)
             rand_die = self.will_die.rvs(presym)
-            uids = presym
-            
+
             # Next state is cure or dead, add rates
             total_rate = np.concatenate([
                 p.rate_exptb_to_dead * np.ones(len(exptb_uids)),
@@ -193,8 +192,8 @@ class TB(ss.Infection):
             dur_active = -np.log(rand_ti)/total_rate / 365
             will_die = rand_die < p.rate_active_to_cure / total_rate
 
-            die_uids = uids[will_die]
-            cure_uids = uids[~will_die]
+            die_uids = presym[will_die]
+            cure_uids = presym[~will_die]
 
             # Determine duration of symp (before death)
             self.ti_dead[die_uids] = np.ceil(ti + dur_active[will_die] / dt)

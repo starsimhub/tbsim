@@ -22,6 +22,7 @@ class RATIONSTrial(ss.Intervention):
             ss.FloatArr('hhid'),
             ss.BoolArr('intv_arm'),
             ss.FloatArr('ti_dx'), # Only used for seeds, but easier here
+            ss.FloatArr('ti_treatment')
         )
 
         self.default_pars(
@@ -30,6 +31,7 @@ class RATIONSTrial(ss.Intervention):
             p_sm_pos = ss.bernoulli(0.72), # SmPos vs SmNeg for active pulmonary TB of index patients
             dur_active_to_dx = ss.weibull(c=2, scale=3 * 7/365),
             dur_dx_to_first_visit = ss.uniform(low=0, high=365/12),
+            dur_visit_to_tx = ss.weibull(c=2, scale=3 * 7/365),
             #hhsize_ctrl = ss.histogram(
             #    values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
             #    bins=np.array([1,2,3,4,5,6,7, 11, 15, 16][1:]),
@@ -48,6 +50,13 @@ class RATIONSTrial(ss.Intervention):
         self.uids_by_hhid = []
         self.hhs = None
 
+        return
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        self.results += ss.Result(self.name, 'new_hhs_enrolled', self.sim.npts, dtype=int)
+        self.results += ss.Result(self.name, 'incident_cases_ctrl', self.sim.npts, dtype=int)
+        self.results += ss.Result(self.name, 'incident_cases_intv', self.sim.npts, dtype=int)
         return
 
     def init_post(self):
@@ -133,24 +142,48 @@ class RATIONSTrial(ss.Intervention):
 
         # If frequency is right, do a "visit"
         #visit_hhids = np.argwhere(self.ti_visit <= ti)
+        self.results['new_hhs_enrolled'][ti] += np.count_nonzero(self.ti_first_visit == ti)
         visit_hhids = np.where(self.ti_visit == ti)[0]
         if len(visit_hhids):
             visit_uids = ss.uids(np.concatenate([self.uids_by_hhid[h] for h in visit_hhids]))
 
             # Check for new active cases
             active = np.isin(tb.state[visit_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB]) # Include extra-pulmonary here?
-            not_dx = np.isnan(self.ti_dx[visit_uids])
+            not_dx = np.isnan(self.ti_dx[visit_uids]) # TODO: Doesn't allow for reinfection?
             new_active_uids = visit_uids[ active & not_dx]
 
             if len(new_active_uids):
-                print('HEY, we have transmission! Intervention Arm?', self.intv_arm[new_active_uids])
+                # Record cases
+                self.results['incident_cases_ctrl'][ti] = np.count_nonzero(~self.intv_arm[new_active_uids] )
+                self.results['incident_cases_intv'][ti] = np.count_nonzero( self.intv_arm[new_active_uids] )
 
+                # SET TIME TO TREATMENT
+                dur_visit_to_tx = self.pars.dur_visit_to_tx(new_active_uids)
+                self.ti_treatment[new_active_uids] = np.ceil(ti + dur_visit_to_tx / dt)
 
-            # SET TIMER TO NEXT VISIT, END VISITS AT 6, 12, or 6-12MO
-            pass
+            # PLAN NEXT VISIT
+            # The basket was provided to the participants for the duration of
+            # treatment—6 months for drug susceptible tuberculosis and 12 months
+            # for multidrug-resistant tuberculosis. The intervention was extended
+            # if the patient had a BMI of lower than 18·5 kg/m² or any household
+            # contact in the intervention group fulfilled the following: an adult
+            # household contact with a BMI of lower than 16 kg/m²; children (aged
+            # <10 years) with a weight-for-age Z-score of lower than –2SD and
+            # adolescents (aged 10–18 years) with BMI-for-age Z-scores of lower
+            # than –2SD. This extension was for a period of 12 months or until
+            # improvements above these cutoffs, whichever was shorter.
+            # --> Connect to nutrition module HERE
 
+            # Set timer to next visit, end visits at 6, 12, OR 6-12mo
+            # "monthly for the first year and every 3 months thereafter"
+            within_1y = (ti - self.ti_first_visit[visit_hhids]) * dt < 1 # year
+            self.ti_visit[visit_hhids[within_1y]] = np.ceil(ti + 1/12 / dt)
+            self.ti_visit[visit_hhids[~within_1y]] = np.ceil(ti + 3/12 / dt)
 
-
+        treatment_uids = (self.ti_treatment == ti).uids
+        if len(treatment_uids):
+            # Start treatment for those diagnosed during a household visit
+            tb.start_treatment(treatment_uids)
 
         return
 
@@ -386,4 +419,3 @@ class RATIONS():
             seed_uid = np.random.choice(hh.uids)
             seed_uids.append(seed_uid)
         return ss.uids(seed_uids)
-
