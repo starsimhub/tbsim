@@ -1,4 +1,5 @@
 """ 
+Run simulation scenarios of the RATIONS trial
 """
 
 import starsim as ss
@@ -13,20 +14,15 @@ from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients
 import warnings
 import os 
 
-# ______________________________________________________________
-#
-#                  SCRIPT TO RUN RATIONS 
-#                     1 Scenario only                      
-# ______________________________________________________________
-
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = True
-default_n_rand_seeds = [1000, 20][debug]
+debug = False # NOTE: Debug runs in serial
+default_n_rand_seeds = [20, 2][debug]
 
 resdir = cfg.create_res_dir()
 
+# TODO: Move
 def compute_rel_prog(macro, micro):
     assert len(macro) == len(micro), 'Length of macro and micro must match.'
     ret = np.ones_like(macro)
@@ -37,17 +33,25 @@ def compute_rel_prog(macro, micro):
     return ret
 
 
-def run_rations(rand_seed=0):
+def run_RATIONS(rand_seed=0):
+    '''
+    Run a single simulation of the RATIONS trial
+    '''
+
+    # Set the global random seed in case any random numbers are used outside of Starsim
     np.random.seed(rand_seed)
 
+    # Create the population with enough people for 1400 index cases and 4724
+    # household contacts in the control arm and 1400 index cases and 5621
+    # household contacts in the intervention arm
     pop = ss.People(n_agents = 1400 + 4724 + 1400 + 5621)
 
-    # ---------------- Rations Class Instance Creation  -----------------
+    # Create networks
     matnet = ss.MaternalNet() # To track newborn --> household
     householdnet = mtb.HouseholdNet()
     nets = [householdnet, matnet]
 
-    # -------------- TB disease --------
+    # Create the instance of TB disease
     tb_pars = dict(
         #beta = dict(householdnet=0.03, maternal=0.0),
         beta = dict(householdnet=0.5, maternal=0.0),
@@ -63,33 +67,34 @@ def run_rations(rand_seed=0):
     )
     tb = mtb.TB(tb_pars)
 
-    # ---------- Malnutrition --------
+    # Create malnutrition --------
     malnutrition_parameters = dict()
     nut = mtb.Malnutrition(malnutrition_parameters)
 
-    # ---------- Demographics --------
+    # Create demographics
     dems = [
         ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women ### DJK: HouseholdNewborns
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
     ]
 
-    # ----------- Connector ----------
+    # Create the connector between TB and malnutrition
     cn_pars = dict(
         rel_LS_prog_func = compute_rel_prog,
         rel_LF_prog_func = compute_rel_prog,   
-        relsus_microdeficient = 1 # Increased susceptibilty of those with micronutrient deficiency (could make more complex function like LS_prog)
+        relsus_microdeficient = 1 # Increased susceptibility of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     cn = mtb.TB_Nutrition_Connector(cn_pars)
 
     # -------- Interventions -------
-    # Enums:
+
+    # Most of the RATIONS trial is handled by the RATIONSTrial intervention
+    RATIONS_trial = RATIONSTrial()
+    intvs = [RATIONS_trial]
+
+    # Create additional interventions, these will likely move elsewhere
     m = mtb.eMicroNutrients
     M = mtb.eMacroNutrients
     b = mtb.eBmiStatus
-    
-    # Interventions array:
-    RATIONS_trial = RATIONSTrial()
-    intvs = [RATIONS_trial]
     #   Table S11: Weight loss in household contacts in RATIONS trial and the association with nutritional status at baseline   
     #intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
     #                                       p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
@@ -105,18 +110,18 @@ def run_rations(rand_seed=0):
         
     #intvs.append( mtb.MicroNutrientsSupply(year=[2017, 2017.1, 2017.2, 2017.3, 2017.4, 2017.5], rate=[0.2, 0.2,0.2, 0.2,0.2, 0.2]))
     
-    # -------- Analyzer -------
+    # Create analyzers
     azs = None #[
         #mtb.RationsAnalyzer(),
         #mtb.GenHHAnalyzer(),
         #mtb.GenNutritionAnalyzer(track_years_arr=[2017, 2018], group_by=['Arm', 'Macro', 'Micro'])
     #]
 
-    # -------- Simulation -------
+    # Create the simulation parameters and simulation
     sim_pars = dict(
         dt = 7/365,
         start = 2019, # Dates don't matter
-        end = 2030, # Long enough that all presymptomatic period end + 2y
+        end = 2030, # Long enough that all pre-symptomatic period end + 2y
         rand_seed = rand_seed,
     )
 
@@ -129,7 +134,7 @@ def run_rations(rand_seed=0):
         interventions=intvs,
         analyzers=azs,
 
-        copy_inputs=False
+        copy_inputs=False # No need to create a copy of the inputs
     )
     sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
@@ -137,8 +142,8 @@ def run_rations(rand_seed=0):
 
     #sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
 
+    # Build a dictionary of results
     ret = {}
-
     ret['results'] = pd.DataFrame({
         'year': sim.results.yearvec,
         'incident_cases_ctrl': RATIONS_trial.results.incident_cases_ctrl,
@@ -157,16 +162,18 @@ def run_rations(rand_seed=0):
     return ret
 
 
-def run_sims(n_seeds=default_n_rand_seeds):
+def run_scenarios(scens, n_seeds=default_n_rand_seeds):
     results = []
     cfgs = []
-    for rs in range(n_seeds):
-        cfgs.append({'rand_seed':rs})
+    for scen in scens:
+        for rs in range(n_seeds):
+            cfgs.append({'scen':scen, 'rand_seed':rs})
 
     T = sc.tic()
-    results += sc.parallelize(run_rations, iterkwargs=cfgs, die=False, serial=debug)
+    results += sc.parallelize(run_RATIONS, iterkwargs=cfgs, die=False, serial=debug)
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
+    # Aggregate the results
     dfs = {}
     for k in results[0].keys():
         df_list = [r[k] for r in results]
@@ -212,29 +219,24 @@ def run_sims(n_seeds=default_n_rand_seeds):
 
 
 if __name__ == '__main__':
-    ret = run_sims()
+    ret = run_scenarios()
 
-    '''
-    if debug:
-        sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
-        sim.diseases['tb'].plot()
-        sim.plot()
-        sim.analyzers['Rationsanalyzer'].plot()
-        plt.show()
-    '''
-    
+    # Create plots
     if 'rationsanalyzer' in ret:
-        plot_active_infections(resdir, ret['rationsanalyzer'])      #Incidence
+        #Incidence
+        plot_active_infections(resdir, ret['rationsanalyzer'])
 
     if 'genhhanalyzer' in ret:
-        plot_hh(resdir, ret['genhhanalyzer'])                      #Household size distribution  
+        #Household size distribution  
+        plot_hh(resdir, ret['genhhanalyzer'])
 
     
     if 'gennutritionanalyzer' in ret:
-        plot_nut(resdir, ret['gennutritionanalyzer'])                    #Nutrition
+        #Nutrition
+        plot_nut(resdir, ret['gennutritionanalyzer'])
 
     if 'rationsanalyzer' in ret:
-        plot_epi(resdir, ret['rationsanalyzer'])                    #Prevalence 
+        #Prevalence 
+        plot_epi(resdir, ret['rationsanalyzer'])
 
-    print(f'Results directory {resdir}.')
-    print('Done')
+    print(f'Done, results directory is {resdir}.')

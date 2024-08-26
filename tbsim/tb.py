@@ -20,6 +20,8 @@ class TBS(): # Enum
     
 class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
+
+        print('TODO: note treatment placeholder')
         super().__init__(**kwargs)
 
         self.default_pars(
@@ -226,7 +228,7 @@ class TB(ss.Infection):
         # On treatment
         treatment_uids = (self.state == TBS.TREATMENT).uids
         if len(treatment_uids):
-            print('TODO: treatment placeholder')
+            # TREATMENT PLACEHOLDER
             self.rel_trans[treatment_uids] *= np.exp(-36*(ti - self.ti_treatment[treatment_uids])*dt) # About 0.5 at one week
 
         return
