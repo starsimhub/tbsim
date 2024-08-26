@@ -29,8 +29,9 @@ class RATIONSTrial(ss.Intervention):
             n_hhs = 2_800,
             p_intv = ss.bernoulli(0.5), # 50% randomization
             p_sm_pos = ss.bernoulli(0.72), # SmPos vs SmNeg for active pulmonary TB of index patients
-            dur_active_to_dx = ss.weibull(c=2, scale=3 * 7/365),
-            dur_dx_to_first_visit = ss.uniform(low=0, high=365/12),
+            dur_active_to_dx = ss.weibull(c=2, scale=3/12), # Sensitive parameter - determines how much HH transmission BEFORE the trial
+            #dur_active_to_dx = ss.constant(v=0.01),
+            dur_dx_to_first_visit = ss.uniform(low=0, high=1/12),
             dur_visit_to_tx = ss.weibull(c=2, scale=3 * 7/365),
             #hhsize_ctrl = ss.histogram(
             #    values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
@@ -129,8 +130,16 @@ class RATIONSTrial(ss.Intervention):
             dur_untreated = self.pars.dur_active_to_dx(active_uids)
             self.ti_dx[active_uids] = np.ceil(ti + dur_untreated / dt)
 
+            # Individual could self cure (an exponential) prior to being diagnosed, hmm!
+            # Let's say that the seeds don't cure, instead they'll go on treatment soon enough and clear that way.
+            tb.ti_cure[active_uids] = np.nan
+
+            # And let's make it so seeds do not die from TB
+            tb.ti_dead[active_uids] = np.nan
+
         # SEEDS: Active --> Diagnosed and beginning immediate treatment
-        dx_uids = self.seed_uids[np.isin(tb.state[self.seed_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (self.ti_dx[self.seed_uids] == ti)]
+        #dx_uids = self.seed_uids[np.isin(tb.state[self.seed_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (self.ti_dx[self.seed_uids] == ti)]
+        dx_uids = self.seed_uids[self.ti_dx[self.seed_uids] == ti]
         if len(dx_uids):
             # Newly diagnosed. Start treatment and determine when the first RATIONS visit will occur.
             tb.start_treatment(dx_uids)

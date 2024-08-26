@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = True
-default_n_rand_seeds = [1000, 2][debug]
+default_n_rand_seeds = [1000, 20][debug]
 
 resdir = cfg.create_res_dir()
 
@@ -173,6 +173,7 @@ def run_sims(n_seeds=default_n_rand_seeds):
         dfs[k] = pd.concat(df_list)
         dfs[k].to_csv(os.path.join(resdir, f'{k}.csv'))
 
+    # TODO: Move to plotting
     import matplotlib.pyplot as plt
     import seaborn as sns
     import datetime as dt 
@@ -199,6 +200,12 @@ def run_sims(n_seeds=default_n_rand_seeds):
         .melt(id_vars='year', var_name='Arm', value_name='Incident Cases') \
         .replace({'Arm': {'incident_cases_ctrl':'Control', 'incident_cases_intv':'Intervention'}})
     sns.lineplot(data=df, x='year', y='Incident Cases', hue='Arm', ax=axv[1])
+
+    import matplotlib.dates as mdates
+    locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+    formatter = mdates.ConciseDateFormatter(locator)
+    axv[0].xaxis.set_major_locator(locator)
+    axv[0].xaxis.set_major_formatter(formatter)
 
     plt.show()
     return dfs

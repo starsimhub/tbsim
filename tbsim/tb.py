@@ -214,6 +214,7 @@ class TB(ss.Infection):
             self.ti_active[uids] = np.nan
             self.ti_dead[uids] = np.nan
             self.ti_cure[uids] = np.nan
+            self.ti_treatment[uids] = np.nan
 
         # Active --> Death
         deaths = ( (self.state != TBS.DEAD) & (self.ti_dead <= ti) ).uids
@@ -236,7 +237,11 @@ class TB(ss.Infection):
         ti, dt = self.sim.ti, self.sim.dt
 
         # Assume TB is drug susceptible
-        assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
+
+        # Only treat individuals who have active TB
+        filter = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+        uids = uids[filter]
+
         self.state[uids] = TBS.TREATMENT
         self.ti_treatment[uids] = self.sim.ti
         
@@ -247,7 +252,7 @@ class TB(ss.Infection):
         dur_to_cure_on_tx = self.pars.dur_to_cure_on_tx(uids)
         self.ti_cure[uids] = np.ceil(ti + dur_to_cure_on_tx / dt)
 
-        return
+        return len(uids)
 
     def update_death(self, uids):
         if len(uids) == 0:
