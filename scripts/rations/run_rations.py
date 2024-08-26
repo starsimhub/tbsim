@@ -17,7 +17,7 @@ import os
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = True # NOTE: Debug runs in serial
+debug = False # NOTE: Debug runs in serial
 default_n_rand_seeds = [10, 2][debug]
 
 resdir = cfg.create_res_dir()
