@@ -22,7 +22,8 @@ class RATIONSTrial(ss.Intervention):
             ss.FloatArr('hhid'),
             ss.BoolArr('intv_arm'),
             ss.FloatArr('ti_dx'), # Only used for seeds, but easier here
-            ss.FloatArr('ti_treatment')
+            ss.FloatArr('ti_treatment'),
+            ss.FloatArr('ti_enrolled'),
         )
 
         self.default_pars(
@@ -55,9 +56,10 @@ class RATIONSTrial(ss.Intervention):
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        self.results += ss.Result(self.name, 'new_hhs_enrolled', self.sim.npts, dtype=int)
-        self.results += ss.Result(self.name, 'incident_cases_ctrl', self.sim.npts, dtype=int)
-        self.results += ss.Result(self.name, 'incident_cases_intv', self.sim.npts, dtype=int)
+        for arm in ['ctrl', 'intv']:
+            self.results += ss.Result(self.name, f'new_hhs_enrolled_{arm}', self.sim.npts, dtype=int)
+            self.results += ss.Result(self.name, f'incident_cases_{arm}', self.sim.npts, dtype=int)
+            self.results += ss.Result(self.name, f'coprevalent_cases_{arm}', self.sim.npts, dtype=int)
         return
 
     def init_post(self):
@@ -141,17 +143,31 @@ class RATIONSTrial(ss.Intervention):
         #dx_uids = self.seed_uids[np.isin(tb.state[self.seed_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (self.ti_dx[self.seed_uids] == ti)]
         dx_uids = self.seed_uids[self.ti_dx[self.seed_uids] == ti]
         if len(dx_uids):
+            # Seeds can be infected & diagnosed multiple times, only keep the first
+            hhids = self.hhid[dx_uids].astype(int)
+            first = np.isnan(self.ti_first_visit[hhids])
+
+            # Filter to first
+            dx_uids = dx_uids[first]
+            hhids = hhids[first]
+
             # Newly diagnosed. Start treatment and determine when the first RATIONS visit will occur.
             tb.start_treatment(dx_uids)
 
             dur_dx_to_first_visit = self.pars.dur_dx_to_first_visit(dx_uids)
-            hhids = self.hhid[dx_uids].astype(int)
             self.ti_first_visit[hhids] = np.ceil(ti + dur_dx_to_first_visit / dt)
             self.ti_visit[hhids] = self.ti_first_visit[hhids]
 
-        # If frequency is right, do a "visit"
-        #visit_hhids = np.argwhere(self.ti_visit <= ti)
-        self.results['new_hhs_enrolled'][ti] += np.count_nonzero(self.ti_first_visit == ti)
+        first_visit_hhids = np.where(self.ti_first_visit == ti)[0]
+        if len(first_visit_hhids):
+            first_visit_uids = ss.uids(np.concatenate([self.uids_by_hhid[h] for h in first_visit_hhids]))
+            ti_first_visit_byuid = np.concatenate([np.full(len(self.uids_by_hhid[h]), fill_value=self.ti_first_visit[h]) for h in first_visit_hhids])
+            self.ti_enrolled[first_visit_uids] = ti_first_visit_byuid
+            first_visit_seed_uids = ss.uids(np.intersect1d(self.seed_uids, first_visit_uids))
+            self.results['new_hhs_enrolled_ctrl'][ti] += np.count_nonzero(~self.intv_arm[first_visit_seed_uids])
+            self.results['new_hhs_enrolled_intv'][ti] += np.count_nonzero( self.intv_arm[first_visit_seed_uids])
+
+        # Visit households
         visit_hhids = np.where(self.ti_visit == ti)[0]
         if len(visit_hhids):
             visit_uids = ss.uids(np.concatenate([self.uids_by_hhid[h] for h in visit_hhids]))
@@ -163,8 +179,14 @@ class RATIONSTrial(ss.Intervention):
 
             if len(new_active_uids):
                 # Record cases
-                self.results['incident_cases_ctrl'][ti] = np.count_nonzero(~self.intv_arm[new_active_uids] )
-                self.results['incident_cases_intv'][ti] = np.count_nonzero( self.intv_arm[new_active_uids] )
+                #hh_within_2m = (ti - self.ti_first_visit[visit_hhids]) * dt < 2/12 # within first 2 months
+                #within_2m = ss.uids(np.concatenate([np.full(len(self.uids_by_hhid[h]), fill_value=hh_within_2m[h]) for h in visit_hhids]))
+                
+                within_2m = (ti - self.ti_enrolled[new_active_uids]) * dt < 2/12 # within first 2 months
+                self.results['incident_cases_ctrl'][ti] = np.count_nonzero(~self.intv_arm[new_active_uids[~within_2m]] )
+                self.results['incident_cases_intv'][ti] = np.count_nonzero( self.intv_arm[new_active_uids[~within_2m]] )
+                self.results['coprevalent_cases_ctrl'][ti] = np.count_nonzero(~self.intv_arm[new_active_uids[within_2m]] )
+                self.results['coprevalent_cases_intv'][ti] = np.count_nonzero( self.intv_arm[new_active_uids[within_2m]] )
 
                 # SET TIME TO TREATMENT
                 dur_visit_to_tx = self.pars.dur_visit_to_tx(new_active_uids)
@@ -188,6 +210,9 @@ class RATIONSTrial(ss.Intervention):
             within_1y = (ti - self.ti_first_visit[visit_hhids]) * dt < 1 # year
             self.ti_visit[visit_hhids[within_1y]] = np.ceil(ti + 1/12 / dt)
             self.ti_visit[visit_hhids[~within_1y]] = np.ceil(ti + 3/12 / dt)
+
+            over_2y = (ti - self.ti_first_visit[visit_hhids]) * dt >= 2 # years
+            self.ti_visit[visit_hhids[over_2y]] = np.nan # Do not visit again
 
         treatment_uids = (self.ti_treatment == ti).uids
         if len(treatment_uids):
