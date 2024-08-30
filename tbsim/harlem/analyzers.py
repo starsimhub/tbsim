@@ -4,7 +4,7 @@ Define Malnutrition analyzers
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, TBS, Malnutrition, MicroNutrients, MacroNutrients, StudyArm
+from tbsim import TB, TBS, Malnutrition, StudyArm #, MicroNutrients, MacroNutrients
 import networkx as nx
 import pandas as pd
 
@@ -41,8 +41,8 @@ class HarlemAnalyzer(ss.Analyzer):
             n_died = np.count_nonzero( (tb.ti_dead[(self.sim.people.arm==arm)] == ti) )
             n_latent_slow = np.count_nonzero(tb.state[ppl] == TBS.LATENT_SLOW)
             n_latent_fast = np.count_nonzero(tb.state[ppl] == TBS.LATENT_FAST)
-            n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
-            n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == MacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == MacroNutrients.MARGINAL) )
+            #n_micro_deficient = np.count_nonzero(nut.micro_state[ppl] == MicroNutrients.DEFICIENT)
+            #n_macro_deficient = np.count_nonzero( (nut.macro_state[ppl] == MacroNutrients.UNSATISFACTORY) | (nut.macro_state[ppl] == MacroNutrients.MARGINAL) )
             infected = ppl & tb.infected
             if not infected.any():
                 rel_LS_mean = np.nan
@@ -51,7 +51,8 @@ class HarlemAnalyzer(ss.Analyzer):
                 rel_LS_mean = tb.rel_LS_prog[infected].mean()
                 rel_LF_mean = tb.rel_LF_prog[ppl & tb.infected].mean()
 
-            self.data.append([self.sim.year, arm.name, n_people, new_infections, new_active_infections, n_infected, n_died, n_latent_slow, n_latent_fast, n_micro_deficient, n_macro_deficient, rel_LS_mean, rel_LF_mean])
+            #self.data.append([self.sim.year, arm.name, n_people, new_infections, new_active_infections, n_infected, n_died, n_latent_slow, n_latent_fast, n_micro_deficient, n_macro_deficient, rel_LS_mean, rel_LF_mean])
+            self.data.append([self.sim.year, arm.name, n_people, new_infections, new_active_infections, n_infected, n_died, n_latent_slow, n_latent_fast, rel_LS_mean, rel_LF_mean])
         return
 
     def finalize(self):
@@ -148,19 +149,20 @@ class NutritionAnalyzer(ss.Analyzer):
         if not snap:
             return
 
-        macro_lookup = {MacroNutrients[name].value: name for name in MacroNutrients._member_names_}
-        micro_lookup = {MicroNutrients[name].value: name for name in MicroNutrients._member_names_}
+        #macro_lookup = {MacroNutrients[name].value: name for name in MacroNutrients._member_names_}
+        #micro_lookup = {MicroNutrients[name].value: name for name in MicroNutrients._member_names_}
         arm_lookup = {StudyArm[name].value: name for name in StudyArm._member_names_}
 
         nut = self.sim.diseases['malnutrition']
         ppl = self.sim.people
         df = pd.DataFrame({
-            'Macro': [macro_lookup[v] for v in nut.macro_state.values],
-            'Micro': [micro_lookup[v] for v in nut.micro_state.values],
+            #'Macro': [macro_lookup[v] for v in nut.macro_state.values],
+            #'Micro': [micro_lookup[v] for v in nut.micro_state.values],
             'Arm': [arm_lookup[v] for v in ppl.arm.values],
         }, index=pd.Index(ppl.uid))
 
-        sz = df.groupby(['Arm', 'Macro', 'Micro']).size()
+        #sz = df.groupby(['Arm', 'Macro', 'Micro']).size()
+        sz = df.groupby(['Arm']).size()
         sz.name = str(sy)
         self.data.append(sz)
         return

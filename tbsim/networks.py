@@ -130,7 +130,7 @@ class HouseholdNewborns(ss.Pregnancy):
         nut = self.sim.diseases['malnutrition']
         nut.micro_state[newborn_uids] = nut.micro_state[conceive_uids]
         nut.macro_state[newborn_uids] = nut.macro_state[conceive_uids]
-        nut.bmi_state[newborn_uids] = nut.bmi_state[conceive_uids]
+        #nut.bmi_state[newborn_uids] = nut.bmi_state[conceive_uids]
         return
             
     def make_embryos(self, conceive_uids, targetNetworkName='householdnet'):

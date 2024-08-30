@@ -17,7 +17,7 @@ import os
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = False # NOTE: Debug runs in serial
+debug = True # NOTE: Debug runs in serial
 default_n_rand_seeds = [10, 2][debug]
 
 resdir = cfg.create_res_dir()
@@ -86,9 +86,9 @@ def run_RATIONS(skey, scen, rand_seed=0):
 
     # Create the connector between TB and malnutrition
     cn_pars = dict(
-        rel_LS_prog_func = compute_rel_prog,
-        rel_LF_prog_func = compute_rel_prog,   
-        relsus_microdeficient = 1 # Increased susceptibility of those with micronutrient deficiency (could make more complex function like LS_prog)
+        #rel_LS_prog_func = compute_rel_prog,
+        #rel_LF_prog_func = compute_rel_prog,   
+        #relsus_microdeficient = 1 # Increased susceptibility of those with micronutrient deficiency (could make more complex function like LS_prog)
     )
     if scen is not None and 'Connector' in scen.keys() and scen['Connector'] is not None:
         cn_pars.update(scen['Connector'])

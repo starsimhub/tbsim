@@ -4,11 +4,11 @@ Define a connector between TB and Malnutrition
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, Malnutrition, TBS, MacroNutrients, MicroNutrients
+from tbsim import TB, Malnutrition, TBS#, MacroNutrients, MicroNutrients
 
-__all__ = ['TB_Nutrition_Connector']
+__all__ = ['TB_Nutrition_Connector_Harlem']
 
-class TB_Nutrition_Connector(ss.Connector):
+class TB_Nutrition_Connector_Harlem(ss.Connector):
     """ Connect TB to Malnutrition """
 
     def __init__(self, pars=None, **kwargs):
@@ -35,9 +35,9 @@ class TB_Nutrition_Connector(ss.Connector):
     def compute_rel_LS_prog(macro, micro):
         assert len(macro) == len(micro), 'Length of macro and micro must match.'
         ret = np.ones_like(macro)
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 1.25
-        ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 2.5
-        ret[macro == MacroNutrients.UNSATISFACTORY] = 4.0
+        #ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.NORMAL)] = 1.25
+        #ret[(macro == MacroNutrients.MARGINAL) & (micro == MicroNutrients.DEFICIENT)] = 2.5
+        #ret[macro == MacroNutrients.UNSATISFACTORY] = 4.0
         return ret
 
     @staticmethod
@@ -54,10 +54,10 @@ class TB_Nutrition_Connector(ss.Connector):
         nut = sim.diseases['malnutrition']
 
         # Clearance rate (units are per-year)
-        rate[(nut.macro_state[uids] == MacroNutrients.UNSATISFACTORY)           & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.0
-        rate[(nut.macro_state[uids] == MacroNutrients.MARGINAL)                 & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.1
-        rate[(nut.macro_state[uids] == MacroNutrients.SLIGHTLY_BELOW_STANDARD)  & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.25
-        rate[(nut.macro_state[uids] == MacroNutrients.STANDARD_OR_ABOVE)        & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.5
+        #rate[(nut.macro_state[uids] == MacroNutrients.UNSATISFACTORY)           & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.0
+        #rate[(nut.macro_state[uids] == MacroNutrients.MARGINAL)                 & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.1
+        #rate[(nut.macro_state[uids] == MacroNutrients.SLIGHTLY_BELOW_STANDARD)  & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.25
+        #rate[(nut.macro_state[uids] == MacroNutrients.STANDARD_OR_ABOVE)        & (nut.micro_state[uids] == MicroNutrients.NORMAL)] = 0.5
 
         p = 1 - np.exp(-rate * sim.dt) # Linear conversion might be sufficient
 
@@ -104,6 +104,7 @@ class TB_Nutrition_Connector(ss.Connector):
         ti = self.sim.ti
         dt = self.sim.dt
 
+        '''
         # Let's set rel_sus!
         tb.rel_sus[nut.micro_state == MicroNutrients.DEFICIENT] = self.pars.relsus_microdeficient
         tb.rel_sus[nut.micro_state == MicroNutrients.NORMAL] = 1
@@ -129,5 +130,6 @@ class TB_Nutrition_Connector(ss.Connector):
         clear_uids = self.pars.p_latent_clearance.filter(latent_uids)
         tb.state[clear_uids] = TBS.CURE
         tb.ti_cure[clear_uids] = ti + 1 # Next time step
-    
+        '''
+
         return

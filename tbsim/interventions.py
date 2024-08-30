@@ -44,13 +44,13 @@ class MicroNutrientsSupply(ss.Intervention):
 
         nut = sim.diseases['malnutrition']
         micro_deficient_uids = (
-            (sim.people.arm != eStudyArm.CONTROL) & 
-            (nut.micro_state == eMicroNutrients.DEFICIENT)
+            (sim.people.arm != eStudyArm.CONTROL)# & 
+            #(nut.micro_state == eMicroNutrients.DEFICIENT)
         ).uids
         recover_uids = self.p_micro_recovery.filter(micro_deficient_uids)
 
-        nut.ti_micro[recover_uids] = sim.ti + 1 # Next time step
-        nut.new_micro_state[recover_uids] = eMicroNutrients.NORMAL
+        #nut.ti_micro[recover_uids] = sim.ti + 1 # Next time step
+        #nut.new_micro_state[recover_uids] = eMicroNutrients.NORMAL
 
         self.results['n_recovered'][sim.ti] = len(recover_uids)
 

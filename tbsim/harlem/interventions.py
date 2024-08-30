@@ -4,7 +4,7 @@ Define Malnutrition intervention
 
 import numpy as np
 import starsim as ss
-from tbsim import Malnutrition, MicroNutrients, MacroNutrients, StudyArm
+from tbsim import Malnutrition, StudyArm # , MicroNutrients, MacroNutrients
 import sciris as sc
 
 __all__ = ['VitaminSupplementation', 'NutritionChange']
@@ -16,7 +16,7 @@ def p_micro_recovery_default(self, sim, uids):
 
     # No recovery for those with unsatisfactory macro nutrients
     nut = sim.diseases['malnutrition']
-    p[(nut.macro_state[uids] == MacroNutrients.UNSATISFACTORY)] = 0
+    ###p[(nut.macro_state[uids] == MacroNutrients.UNSATISFACTORY)] = 0
 
     return p
 
@@ -43,13 +43,13 @@ class VitaminSupplementation(ss.Intervention):
 
         nut = sim.diseases['malnutrition']
         micro_deficient_uids = (
-            (sim.people.arm != StudyArm.CONTROL) & 
-            (nut.micro_state == MicroNutrients.DEFICIENT)
+            (sim.people.arm != StudyArm.CONTROL) #& 
+            ###(nut.micro_state == MicroNutrients.DEFICIENT)
         ).uids
         recover_uids = self.p_micro_recovery.filter(micro_deficient_uids)
 
         nut.ti_micro[recover_uids] = sim.ti + 1 # Next time step
-        nut.new_micro_state[recover_uids] = MicroNutrients.NORMAL
+        ###nut.new_micro_state[recover_uids] = MicroNutrients.NORMAL
 
         self.results['n_recovered'][sim.ti] = len(recover_uids)
 
