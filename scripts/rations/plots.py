@@ -10,6 +10,26 @@ import seaborn as sns
 import matplotlib.dates as mdates
 import matplotlib.ticker as mtick
 
+def plot_rations(resdir, df):
+    first_year = int(df['Year'].iloc[0])
+    assert df['Year'].iloc[0] == first_year
+    df['date'] = pd.to_datetime(365 * (df['Year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
+
+    #months = sc.date(['2019-08-31', '2019-09-30', '2019-10-31', '2019-11-30', '2019-12-31', '2020-01-31', '2020-02-29', '2020-03-31', '2020-04-30', '2020-05-31', '2020-06-30', '2020-07-31', '2020-08-31', '2020-09-30', '2020-10-31', '2020-11-30', '2020-12-31', '2021-01-31'])
+    #enrolled = np.array([105, 215, 244, 284, 248, 263, 265, 184, 63, 69, 122, 104, 54, 107, 112, 115, 186, 60]).cumsum()
+    #axv[0].plot(months, enrolled, label='RATIONS Trial')
+    g = sns.relplot(kind='line', data=df, x='date', col='Channel', y='Values', hue='Scenario', style='Arm', errorbar='ci', facet_kws={'sharey': False, 'sharex': True}) # Hoping errorbar ci makes things faster
+
+    for ax in g.axes.flat:
+        locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+
+    sc.savefig('rations.png', folder=resdir)
+    plt.close(g.figure)
+    return
+
 def plot_epi(resdir, df):
     first_year = int(df['year'].iloc[0])
     assert df['year'].iloc[0] == first_year

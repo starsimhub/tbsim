@@ -9,7 +9,7 @@ import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
 from scripts.rations.rations import RATIONSTrial
-from scripts.rations.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
+from scripts.rations.plots import plot_rations, plot_epi, plot_hh, plot_nut, plot_active_infections
 from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients
 import warnings
 import os 
@@ -17,8 +17,8 @@ import os
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = True # NOTE: Debug runs in serial
-default_n_rand_seeds = [10, 2][debug]
+debug = False # NOTE: Debug runs in serial
+default_n_rand_seeds = [25, 2][debug]
 
 resdir = cfg.create_res_dir()
 
@@ -208,31 +208,7 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
         dfs[k] = pd.concat(df_list)
         dfs[k].to_csv(os.path.join(resdir, f'{k}.csv'))
 
-    #################
-    # TODO: Move to plotting
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-    import seaborn as sns
-    import datetime as dt 
 
-    dfr = dfs['results']
-    first_year = int(dfr['Year'].iloc[0])
-    assert dfr['Year'].iloc[0] == first_year
-    dfr['date'] = pd.to_datetime(365 * (dfr['Year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
-
-    #months = sc.date(['2019-08-31', '2019-09-30', '2019-10-31', '2019-11-30', '2019-12-31', '2020-01-31', '2020-02-29', '2020-03-31', '2020-04-30', '2020-05-31', '2020-06-30', '2020-07-31', '2020-08-31', '2020-09-30', '2020-10-31', '2020-11-30', '2020-12-31', '2021-01-31'])
-    #enrolled = np.array([105, 215, 244, 284, 248, 263, 265, 184, 63, 69, 122, 104, 54, 107, 112, 115, 186, 60]).cumsum()
-    #axv[0].plot(months, enrolled, label='RATIONS Trial')
-    g = sns.relplot(kind='line', data=dfr, x='date', col='Channel', y='Values', hue='Scenario', style='Arm', errorbar='ci', facet_kws={'sharey': False, 'sharex': True}) # Hoping errorbar ci makes things faster
-
-    for ax in g.axes.flat:
-        locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
-        formatter = mdates.ConciseDateFormatter(locator)
-        ax.xaxis.set_major_locator(locator)
-        ax.xaxis.set_major_formatter(formatter)
-
-    plt.show()
-    #################
 
     return dfs
 
@@ -241,6 +217,9 @@ if __name__ == '__main__':
     # Define the scenarios
     scens = {
         'Baseline': None,
+        'Baseline no link': {
+            'Connector': dict(rr_activation_func=mtb.TB_Nutrition_Connector.ones_rr), # All ones
+        },
         'Increase transmission before trial enrollment': {
             'TB': None,
             'Malnutrition': None,
@@ -253,6 +232,9 @@ if __name__ == '__main__':
     ret = run_scenarios(scens)
 
     # Create plots
+    if 'results' in ret:
+        plot_rations(resdir, ret['results'])
+
     if 'rationsanalyzer' in ret:
         # Incidence
         plot_active_infections(resdir, ret['rationsanalyzer'])

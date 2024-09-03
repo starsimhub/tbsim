@@ -92,6 +92,7 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
 
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
+        rate *= self.rr_clearance[uids]
 
         prob = 1-np.exp(-DAYS_PER_YEAR * rate * sim.dt) # or just rate * dt
         return prob
@@ -187,18 +188,22 @@ class TB(ss.Infection):
             self.infected[new_clear_uids] = False
             self.state[new_clear_uids] = TBS.NONE
             self.active_tb_state[new_clear_uids] = TBS.NONE
-            self.rr_activation[new_clear_uids] = 1
-            self.rr_clearance[new_clear_uids] = 1
-            self.rr_death[new_clear_uids] = 1
             self.ti_presymp[new_clear_uids] = np.nan
             self.ti_active[new_clear_uids] = np.nan
 
         # Active --> Death
+        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
         new_death_uids = self.p_active_to_death.filter(active_uids)
         if len(new_death_uids):
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
         self.results['new_deaths'][ti] = len(new_death_uids)
+
+        # Reset relative rates for the next time step, they will be recalculated
+        uids = self.sim.people.auids
+        self.rr_activation[uids] = 1
+        self.rr_clearance[uids] = 1
+        self.rr_death[uids] = 1
 
         return
 
@@ -206,10 +211,10 @@ class TB(ss.Infection):
         # Begin individual on TB treatment, assuming all TB is drug susceptible
 
         # Only treat individuals who have active TB
-        assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        self.on_treatment[uids] = True
-        self.rr_death[uids] = 0 # People on treatment don't die...
-        return len(uids)
+        tx_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids
+        self.on_treatment[tx_uids] = True
+        self.rr_death[tx_uids] = 0 # People on treatment don't die...
+        return len(tx_uids)
 
     def update_death(self, uids):
         if len(uids) == 0:

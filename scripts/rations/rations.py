@@ -134,18 +134,21 @@ class RATIONSTrial(ss.Intervention):
         ti, dt = self.sim.ti, self.sim.dt
 
         # INDEX CASES: Pre symp --> Active (state change has already happend in TB on this timestep)
-        active_uids = self.index_uids[ np.isin(tb.state[self.index_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (tb.ti_active[self.index_uids] == ti) ]
-        if len(active_uids):
+        new_active_uids = self.index_uids[ np.isin(tb.state[self.index_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (tb.ti_active[self.index_uids] == ti) ]
+        if len(new_active_uids):
             # Newly active, figure out time to care seeking
-            dur_untreated = self.pars.dur_active_to_dx(active_uids)
-            self.ti_dx[active_uids] = np.ceil(ti + dur_untreated / dt)
+            dur_untreated = self.pars.dur_active_to_dx(new_active_uids)
+            self.ti_dx[new_active_uids] = np.ceil(ti + dur_untreated / dt)
 
+        # INDEX CASES: Do not clear or die from active infection
+        active_uids = self.index_uids[ np.isin(tb.state[self.index_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (~np.isnan(self.ti_dx[self.index_uids])) & (ti <= self.ti_dx[self.index_uids])]
+        if len(active_uids):
             # Individual could self cure (an exponential) prior to being diagnosed, hmm!
             # Let's say that the index cases don't cure, instead they'll go on treatment soon enough and clear that way.
-            tb.rr_clearance[active_uids] = np.nan
+            tb.rr_clearance[active_uids] = 0
 
             # And let's make it so index cases do not die from TB
-            tb.rr_death[active_uids] = np.nan
+            tb.rr_death[active_uids] = 0
 
         # INDEX CASES: Active --> Diagnosed and beginning immediate treatment
         dx_uids = self.index_uids[self.ti_dx[self.index_uids] == ti]

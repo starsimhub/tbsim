@@ -43,6 +43,9 @@ class Malnutrition(ss.Disease):
         p = self.weight_percentile
         Z = norm().ppf(p) # Convert percentile to z-score
         weight = mu * (lam*sigma*Z + 1)**(1/lam)
+        # if L=0, w = mu * np.exp(sigma * Z)
+
+        # https://iris.who.int/bitstream/handle/10665/44026/9789241547635_eng.pdf?sequence=1
 
         return weight
 
@@ -62,8 +65,8 @@ class Malnutrition(ss.Disease):
 
             # Internal state
             # PROBLEM: Correlation between weight and height
-            ss.FloatArr('height_percentile', default=ss.uniform()), # Percentile
-            ss.FloatArr('weight_percentile', default=ss.uniform()), # Percentile, increases when receiving micro, then declines
+            ss.FloatArr('height_percentile', default=ss.uniform()), # Percentile, stays fixed
+            ss.FloatArr('weight_percentile', default=ss.uniform()), # Percentile, increases when receiving micro, then declines?
             ss.FloatArr('micro', default=ss.uniform()), # Continuous? Normal distribution around zero. Z-score, sigmoid thing. Half-life.
 
             # With downstream implications via the connector to:
@@ -90,6 +93,7 @@ class Malnutrition(ss.Disease):
         """
         Set initial values for states.
         """
+        # Could correlate weight and height here, via gaussian along the diagonal with corner correction?
         return
 
     '''
@@ -111,7 +115,7 @@ class Malnutrition(ss.Disease):
 
         # Random walks
         self.weight_percentile[uids] += self.dweight(uids)
-        self.weight_percentile[uids] = np.clip(self.weight_percentile[uids], 0.025, 0.975)
+        self.weight_percentile[uids] = np.clip(self.weight_percentile[uids], 0.025, 0.975) # needed?
 
         '''
         new_macro = (self.ti_macro == ti).uids

@@ -15,8 +15,8 @@ class TB_Nutrition_Connector(ss.Connector):
         super().__init__(label='TB-Malnutrition', requires=[TB, Malnutrition])
 
         self.default_pars(
-            rr_activation_func = self.compute_rr_activation,
-            rr_clearance_func = self.compute_rr_clearance,
+            rr_activation_func = self.supplementation_rr, #self.longroth_bmi_rr,
+            rr_clearance_func = self.ones_rr,
             relsus_func = self.compute_relsus,
         )
         self.update_pars(pars, **kwargs)
@@ -29,14 +29,21 @@ class TB_Nutrition_Connector(ss.Connector):
         return
 
     @staticmethod
-    def compute_rr_activation(mn, uids):
+    def supplementation_rr(tb, mn, uids):
+        rr = np.ones_like(uids)
+        rr[mn.receiving_macro[uids] & mn.receiving_micro[uids]] = 0.5
+        return rr
+
+
+    @staticmethod
+    def longroth_bmi_rr(tb, mn, uids):
         rr = np.ones_like(uids)
         bmi = mn.weight[uids] / mn.height[uids]**2
         rr[bmi < 18] = 2
         return rr
 
     @staticmethod
-    def compute_rr_clearance(mn, uids):
+    def ones_rr(tb, mn, uids):
         rr = np.ones_like(uids)
         return rr
 
@@ -52,8 +59,10 @@ class TB_Nutrition_Connector(ss.Connector):
         mn = self.sim.diseases['malnutrition']
 
         uids = tb.infected.uids
-        tb.rr_activation[uids] = self.pars.rr_activation_func(mn, uids)
-        tb.rr_clearance[uids] = self.pars.rr_clearance_func(mn, uids)
+        # Relative rates start at 1 each time step
+        tb.rr_activation[uids] *= self.pars.rr_activation_func(tb, mn, uids)
+        tb.rr_clearance[uids] *= self.pars.rr_clearance_func(tb, mn, uids)
+
 
         uids = (~tb.infected).uids
         tb.rel_sus[uids] = self.pars.relsus_func(tb, mn, uids)
