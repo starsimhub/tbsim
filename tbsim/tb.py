@@ -41,12 +41,13 @@ class TB(ss.Infection):
             p_smpos = ss.bernoulli(0.65 / (0.65+0.25)), # Amongst those without extrapulminary TB
 
             # Relative transmissibility of each state, TODO: VALUES and list sources
+            rel_trans_presymp = 0.1,
             rel_trans_smpos   = 1.0,
             rel_trans_smneg   = 0.3,
             rel_trans_exptb   = 0.05,
-            rel_trans_presymp = 0.1,
+            rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
 
-            reltrans_dist = None,
+            reltrans_het = ss.constant(v=1.0),
         )
         self.update_pars(pars, **kwargs)
         
@@ -61,6 +62,8 @@ class TB(ss.Infection):
 
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
+
+            ss.FloatArr('reltrans_het', default=1.0),           # Individual-level heterogeneity on infectiousness, acts in addition to stage-based rates
         )
 
         self.p_latent_to_presym = ss.bernoulli(p=self.p_latent_to_presym)
@@ -69,12 +72,6 @@ class TB(ss.Infection):
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
 
         return
-
-    def init_post(self):
-        super().init_post()
-        if isinstance(self.pars.reltrans_dist, ss.Dist):
-            uids = self.sim.people.auids
-            self.rel_trans[uids] = self.pars.reltrans_dist(uids)
 
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
@@ -136,13 +133,13 @@ class TB(ss.Infection):
         self.susceptible[uids] = False
         self.infected[uids] = True # Not needed, but useful for reporting
 
+        # Set base transmission heterogeneity
+        self.reltrans_het[uids] = self.pars.reltrans_het(uids)
+
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
-
-        # Determine time index to become active pre-symptomatic
-        #self.ppf_LS_to_presymp[slow_uids] = p.ppf_LS_to_presymp.rvs(slow_uids)
 
         # Determine which agents will have extrapulminary TB
         exptb_uids, not_exptb_uids = p.p_exptb.filter(uids, both=True)
@@ -169,7 +166,6 @@ class TB(ss.Infection):
         if len(new_presymp_uids):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_presymp[new_presymp_uids] = ti
-            self.rel_trans[new_presymp_uids] = p.rel_trans_presymp
 
         # Pre symp --> Active
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
@@ -183,10 +179,6 @@ class TB(ss.Infection):
             smpos_uids = new_active_uids[active_state ==TBS.ACTIVE_SMPOS]
             smneg_uids = new_active_uids[active_state ==TBS.ACTIVE_SMNEG]
 
-            # Set relative transmission rates for each Active state
-            self.rel_trans[exptb_uids] = p.rel_trans_exptb
-            self.rel_trans[smpos_uids] = p.rel_trans_smpos
-            self.rel_trans[smneg_uids] = p.rel_trans_smneg
 
         # Active --> Susceptible via natural recovery or as accelerated by treatment
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids
@@ -207,6 +199,28 @@ class TB(ss.Infection):
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
         self.results['new_deaths'][ti] = len(new_death_uids)
+
+        # Set rel_trans
+        self.rel_trans[:] = 1 # Reset
+
+        state_reltrans = [
+            (TBS.ACTIVE_PRESYMP, p.rel_trans_presymp),
+            (TBS.ACTIVE_EXPTB, p.rel_trans_exptb),
+            (TBS.ACTIVE_SMPOS, p.rel_trans_smpos),
+            (TBS.ACTIVE_SMNEG, p.rel_trans_smneg),
+        ]
+
+        for state, reltrans in state_reltrans:
+            uids = self.state == state
+            self.rel_trans[uids] *= reltrans
+
+        # Transmission heterogeneity
+        uids = self.infectious
+        self.rel_trans[uids] *= self.reltrans_het[uids]
+
+        # Treatment can reduce transmissibility
+        uids = self.on_treatment
+        self.rel_trans[uids] *= self.pars.rel_trans_treatment
 
         # Reset relative rates for the next time step, they will be recalculated
         uids = self.sim.people.auids

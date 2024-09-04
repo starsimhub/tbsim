@@ -200,7 +200,7 @@ if __name__ == '__main__':
         #},
         'Relative sus & trans het + nutrition-->TB activation': {
             'TB': dict(
-                reltrans_dist = ss.gamma(a=2, scale=1/2), # mean = a*scale (keep as 1)
+                reltrans_het = ss.gamma(a=0.5, scale=2), # mean = a*scale (keep as 1)
             ),
             'Connector': dict(
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.5),
