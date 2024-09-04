@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from enum import IntEnum, auto
 
-__all__ = ['RATIONSTrial', 'RATIONS']
+__all__ = ['RATIONSTrial', 'RATIONS', 'Arm']
 
 class Arm(IntEnum):
     CONTROL = 0

@@ -45,6 +45,8 @@ class TB(ss.Infection):
             rel_trans_smneg   = 0.3,
             rel_trans_exptb   = 0.05,
             rel_trans_presymp = 0.1,
+
+            reltrans_dist = None,
         )
         self.update_pars(pars, **kwargs)
         
@@ -65,7 +67,14 @@ class TB(ss.Infection):
         self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
+
         return
+
+    def init_post(self):
+        super().init_post()
+        if isinstance(self.pars.reltrans_dist, ss.Dist):
+            uids = self.sim.people.auids
+            self.rel_trans[uids] = self.pars.reltrans_dist(uids)
 
     @staticmethod
     def p_latent_to_presym(self, sim, uids):

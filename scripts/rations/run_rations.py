@@ -188,15 +188,23 @@ if __name__ == '__main__':
         'Baseline': None,
         'Nutrition-->TB activation link': {
             'Connector': dict(
-                rr_activation_func = mtb.TB_Nutrition_Connector.supplementation_rr,
+                rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.5),
                 rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
                 ),
         },
-        'Nutrition-->TB clearance link': {
+        #'Nutrition-->TB clearance link': {
+        #    'Connector': dict(
+        #        rr_activation_func = mtb.TB_Nutrition_Connector.ones_rr,
+        #        rr_clearance_func = partial(clearance_rr_func, rate_ratio=10),
+        #        ),
+        #},
+        'Relative sus & trans het + nutrition-->TB activation': {
+            'TB': dict(
+                reltrans_dist = ss.gamma(a=2, scale=1/2), # mean = a*scale (keep as 1)
+            ),
             'Connector': dict(
-                rr_activation_func = mtb.TB_Nutrition_Connector.ones_rr,
-                rr_clearance_func = partial(clearance_rr_func, rate_ratio=10),
-                ),
+                rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.5),
+            ),
         },
         #'Increase index treatment seeking delays': {
         #    'TB': None,

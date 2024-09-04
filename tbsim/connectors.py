@@ -29,9 +29,9 @@ class TB_Nutrition_Connector(ss.Connector):
         return
 
     @staticmethod
-    def supplementation_rr(tb, mn, uids):
+    def supplementation_rr(tb, mn, uids, rate_ratio=0.5):
         rr = np.ones_like(uids)
-        rr[mn.receiving_macro[uids] & mn.receiving_micro[uids]] = 0.5
+        rr[mn.receiving_macro[uids] & mn.receiving_micro[uids]] = rate_ratio
         return rr
 
 
