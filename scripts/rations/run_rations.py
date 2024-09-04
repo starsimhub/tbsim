@@ -10,7 +10,6 @@ import sciris as sc
 import tbsim.config as cfg
 from scripts.rations.rations import RATIONSTrial
 from scripts.rations.plots import plot_rations, plot_epi, plot_hh, plot_nut, plot_active_infections
-from tbsim.nutritionenums import eMacroNutrients, eMicroNutrients
 import warnings
 import os 
 
@@ -18,27 +17,15 @@ warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False # NOTE: Debug runs in serial
-default_n_rand_seeds = [25, 2][debug]
+default_n_rand_seeds = [10, 2][debug]
 
 resdir = cfg.create_res_dir()
-
-# TODO: Move
-def compute_rel_prog(macro, micro):
-    assert len(macro) == len(micro), 'Length of macro and micro must match.'
-    ret = np.ones_like(macro)
-    ret[(macro == eMacroNutrients.STANDARD_OR_ABOVE) & (micro == eMicroNutrients.DEFICIENT)] = 1.5
-    ret[(macro == eMacroNutrients.SLIGHTLY_BELOW_STANDARD) & (micro == eMicroNutrients.DEFICIENT)] = 2.0
-    ret[(macro == eMacroNutrients.MARGINAL)  & (micro == eMicroNutrients.DEFICIENT)] = 2.5
-    ret[(macro == eMacroNutrients.UNSATISFACTORY)   & (micro == eMicroNutrients.DEFICIENT)] = 3.0
-    return ret
 
 
 def run_RATIONS(skey, scen, rand_seed=0):
     '''
     Run a single simulation of the RATIONS trial
     '''
-
-    # TODO: Handle scenario
 
     # Set the global random seed in case any random numbers are used outside of Starsim
     np.random.seed(rand_seed)
@@ -80,16 +67,12 @@ def run_RATIONS(skey, scen, rand_seed=0):
 
     # Create demographics
     dems = [
-        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women ### DJK: HouseholdNewborns
+        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
     ]
 
     # Create the connector between TB and malnutrition
-    cn_pars = dict(
-        #rel_LS_prog_func = compute_rel_prog,
-        #rel_LF_prog_func = compute_rel_prog,   
-        #relsus_microdeficient = 1 # Increased susceptibility of those with micronutrient deficiency (could make more complex function like LS_prog)
-    )
+    cn_pars = {}
     if scen is not None and 'Connector' in scen.keys() and scen['Connector'] is not None:
         cn_pars.update(scen['Connector'])
     cn = mtb.TB_Nutrition_Connector(cn_pars)
@@ -103,25 +86,6 @@ def run_RATIONS(skey, scen, rand_seed=0):
     RATIONS_trial = RATIONSTrial(rations_pars)
     intvs = [RATIONS_trial]
 
-    # Create additional interventions, these will likely move elsewhere
-    m = mtb.eMicroNutrients
-    M = mtb.eMacroNutrients
-    b = mtb.eBmiStatus
-    #   Table S11: Weight loss in household contacts in RATIONS trial and the association with nutritional status at baseline   
-    #intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
-    #                                       p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
-    
-    #intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
-    #                                       p_new_micro=0.01, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.VITAMIN))
-    
-    #intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.132], from_state=b.SEVERE_THINNESS, to_state=b.MODERATE_THINNESS, 
-    #                                       p_new_micro=0.0, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
-    
-    #intvs.append( mtb.BMIChangeIntervention(year=[2017, 2017.5], rate=[0.0, 0.168], from_state=b.MODERATE_THINNESS, to_state=b.NORMAL_WEIGHT, 
-    #                                       p_new_micro=0.01, new_micro_state=m.NORMAL, arm=mtb.eStudyArm.CONTROL))
-        
-    #intvs.append( mtb.MicroNutrientsSupply(year=[2017, 2017.1, 2017.2, 2017.3, 2017.4, 2017.5], rate=[0.2, 0.2,0.2, 0.2,0.2, 0.2]))
-    
     # Create analyzers
     azs = None #[
         #mtb.RationsAnalyzer(),
@@ -158,7 +122,6 @@ def run_RATIONS(skey, scen, rand_seed=0):
 
     # Build a dictionary of results
     ret = {}
-
     rtr = RATIONS_trial.results
     dat = [
         (rtr.incident_cases_ctrl.cumsum(), 'Incident Cases', 'Control'),
@@ -213,20 +176,35 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
     return dfs
 
 
+def clearance_rr_func(tb, mn, uids, rate_ratio=2):
+    rr = np.ones_like(uids)
+    rr[mn.receiving_macro[uids] & mn.receiving_micro[uids]] = rate_ratio
+    return rr
+
 if __name__ == '__main__':
     # Define the scenarios
+    from functools import partial
     scens = {
         'Baseline': None,
-        'Baseline no link': {
-            'Connector': dict(rr_activation_func=mtb.TB_Nutrition_Connector.ones_rr), # All ones
+        'Nutrition-->TB activation link': {
+            'Connector': dict(
+                rr_activation_func = mtb.TB_Nutrition_Connector.supplementation_rr,
+                rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
+                ),
         },
-        'Increase transmission before trial enrollment': {
-            'TB': None,
-            'Malnutrition': None,
-            'Connector': None,
-            'RATIONS': dict(dur_active_to_dx = ss.weibull(c=2, scale=6/12)),
-            'Simulation': None,
+        'Nutrition-->TB clearance link': {
+            'Connector': dict(
+                rr_activation_func = mtb.TB_Nutrition_Connector.ones_rr,
+                rr_clearance_func = partial(clearance_rr_func, rate_ratio=10),
+                ),
         },
+        #'Increase index treatment seeking delays': {
+        #    'TB': None,
+        #    'Malnutrition': None,
+        #    'Connector': None,
+        #    'RATIONS': dict(dur_active_to_dx = ss.weibull(c=2, scale=6/12)),
+        #    'Simulation': None,
+        #},
     }
 
     ret = run_scenarios(scens)

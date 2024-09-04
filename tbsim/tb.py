@@ -17,7 +17,8 @@ class TBS(): # Enum
     ACTIVE_SMNEG    = 4.0    # Active TB, smear negative
     ACTIVE_EXPTB    = 5.0    # Active TB, extra-pulmonary
     DEAD            = 8.0    # TB death
-    
+
+
 class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
@@ -27,14 +28,14 @@ class TB(ss.Infection):
             beta = 0.25, # Transmission rate  - TODO: Check if there is one
             p_latent_fast = ss.bernoulli(0.1), # Probability of latent fast as opposed to latent slow
 
-            rate_LS_to_presym = 3e-5, # Latent Slow to Active Pre-Symptomatic (per day)
-            rate_LF_to_presym = 6e-3, # Latent Fast to Active Pre-Symptomatic (per day)
-            rate_presym_to_active = 3e-2,  # Pre-symptomatic to symptomatic (per day)
-            rate_active_to_clear = 2.4e-4, # Active infection to natural clearance (per day)
+            rate_LS_to_presym = 3e-5,           # Latent Slow to Active Pre-Symptomatic (per day)
+            rate_LF_to_presym = 6e-3,           # Latent Fast to Active Pre-Symptomatic (per day)
+            rate_presym_to_active = 3e-2,       # Pre-symptomatic to symptomatic (per day)
+            rate_active_to_clear = 2.4e-4,      # Active infection to natural clearance (per day)
             rate_exptb_to_dead = 0.15 * 4.5e-4, # Extra-Pulmonary TB to Dead (per day)
             rate_smpos_to_dead = 4.5e-4,        # Smear Positive Pulmonary TB to Dead (per day)
             rate_smneg_to_dead = 0.3 * 4.5e-4,  # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = 2/12 / DAYS_PER_YEAR, # 2 months (per day)
+            rate_treatment_to_clear = 2/12 / DAYS_PER_YEAR, # 2 months (per day, for consistency)
 
             p_exptb = ss.bernoulli(0.1),
             p_smpos = ss.bernoulli(0.65 / (0.65+0.25)), # Amongst those without extrapulminary TB
@@ -90,7 +91,6 @@ class TB(ss.Infection):
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
-
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
         rate *= self.rr_clearance[uids]
 

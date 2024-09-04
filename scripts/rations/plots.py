@@ -18,7 +18,7 @@ def plot_rations(resdir, df):
     #months = sc.date(['2019-08-31', '2019-09-30', '2019-10-31', '2019-11-30', '2019-12-31', '2020-01-31', '2020-02-29', '2020-03-31', '2020-04-30', '2020-05-31', '2020-06-30', '2020-07-31', '2020-08-31', '2020-09-30', '2020-10-31', '2020-11-30', '2020-12-31', '2021-01-31'])
     #enrolled = np.array([105, 215, 244, 284, 248, 263, 265, 184, 63, 69, 122, 104, 54, 107, 112, 115, 186, 60]).cumsum()
     #axv[0].plot(months, enrolled, label='RATIONS Trial')
-    g = sns.relplot(kind='line', data=df, x='date', col='Channel', y='Values', hue='Scenario', style='Arm', errorbar='ci', facet_kws={'sharey': False, 'sharex': True}) # Hoping errorbar ci makes things faster
+    g = sns.relplot(kind='line', data=df, x='date', col='Channel', y='Values', hue='Scenario', style='Arm', errorbar='sd', facet_kws={'sharey': False, 'sharex': True}) # Hoping errorbar ci makes things faster
 
     for ax in g.axes.flat:
         locator = mdates.AutoDateLocator(minticks=3, maxticks=7)

@@ -8,7 +8,6 @@ from enum import IntEnum, auto
 
 __all__ = ['RATIONSTrial', 'RATIONS']
 
-# mtb.StudyArm?
 class Arm(IntEnum):
     CONTROL = 0
     INTERVENTION = 1
@@ -20,7 +19,7 @@ class RATIONSTrial(ss.Intervention):
         
         self.add_states( # For individual people
             ss.FloatArr('hhid'),
-            ss.BoolArr('intv_arm'),
+            ss.BoolArr('arm', default=Arm.CONTROL),
             ss.BoolArr('is_index'),
             ss.FloatArr('ti_dx'), # Only used for index cases, but easier here
             ss.FloatArr('ti_treatment'),
@@ -81,7 +80,7 @@ class RATIONSTrial(ss.Intervention):
         self.is_index[self.index_uids] = True
         non_seeds = ss.uids(np.setdiff1d(ppl.uid, self.index_uids))
 
-        self.intv_arm[self.index_uids] = self.pars.p_intv.rvs(self.index_uids)
+        self.arm[self.index_uids] = self.pars.p_intv.rvs(self.index_uids)
 
         # Map people to households
         self.hhid[ self.is_index] = np.arange(self.pars.n_hhs)
@@ -94,7 +93,7 @@ class RATIONSTrial(ss.Intervention):
             self.uids_by_hhid.append(uids_in_hh)
 
             # Set the arm for the other HH members
-            self.intv_arm[uids_in_hh] = self.intv_arm[self.index_uids[hhid]]
+            self.arm[uids_in_hh] = self.arm[self.index_uids[hhid]]
             
             # Add this household to the network
             hhn.add_hh(uids_in_hh)
@@ -175,26 +174,28 @@ class RATIONSTrial(ss.Intervention):
             ti_first_visit_byuid = np.concatenate([np.full(len(self.uids_by_hhid[h]), fill_value=self.ti_first_visit[h]) for h in first_visit_hhids])
             self.ti_enrolled[first_visit_uids] = ti_first_visit_byuid
             first_visit_index_uids = ss.uids(np.intersect1d(self.index_uids, first_visit_uids))
-            self.results['new_hhs_enrolled_ctrl'][ti] += np.count_nonzero(~self.intv_arm[first_visit_index_uids])
-            self.results['new_hhs_enrolled_intv'][ti] += np.count_nonzero( self.intv_arm[first_visit_index_uids])
+            self.results['new_hhs_enrolled_ctrl'][ti] += np.count_nonzero(self.arm[first_visit_index_uids] == Arm.CONTROL)
+            self.results['new_hhs_enrolled_intv'][ti] += np.count_nonzero(self.arm[first_visit_index_uids] == Arm.INTERVENTION)
 
         # Visit households
         visit_hhids = np.where(self.ti_visit == ti)[0]
         if len(visit_hhids):
+            # TODO: During RATIONS, were newborns added to the trial populations? If not, we could just set the birth rate to 0.
+
             visit_uids = ss.uids(np.concatenate([self.uids_by_hhid[h] for h in visit_hhids]))
 
             # Check for new active cases
             active = np.isin(tb.state[visit_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB]) # Include extra-pulmonary here?
-            not_dx = np.isnan(self.ti_dx[visit_uids]) # TODO: Doesn't allow for reinfection?
+            not_dx = np.isnan(self.ti_dx[visit_uids])
             new_active_uids = visit_uids[ active & not_dx]
 
             if len(new_active_uids):
                 # Record cases
                 within_2m = (ti - self.ti_enrolled[new_active_uids]) * dt < 2/12 # within first 2 months
-                self.results['coprevalent_cases_ctrl'][ti] = np.count_nonzero(~self.intv_arm[new_active_uids[within_2m]] )
-                self.results['coprevalent_cases_intv'][ti] = np.count_nonzero( self.intv_arm[new_active_uids[within_2m]] )
-                self.results['incident_cases_ctrl'][ti] = np.count_nonzero(~self.intv_arm[new_active_uids[~within_2m]] )
-                self.results['incident_cases_intv'][ti] = np.count_nonzero( self.intv_arm[new_active_uids[~within_2m]] )
+                self.results['coprevalent_cases_ctrl'][ti] = np.count_nonzero(self.arm[new_active_uids[within_2m]] == Arm.CONTROL )
+                self.results['coprevalent_cases_intv'][ti] = np.count_nonzero(self.arm[new_active_uids[within_2m]] == Arm.INTERVENTION)
+                self.results['incident_cases_ctrl'][ti] = np.count_nonzero(self.arm[new_active_uids[~within_2m]] == Arm.CONTROL)
+                self.results['incident_cases_intv'][ti] = np.count_nonzero(self.arm[new_active_uids[~within_2m]] == Arm.INTERVENTION)
 
                 # SET TIME TO TREATMENT
                 dur_visit_to_tx = self.pars.dur_visit_to_tx(new_active_uids)
@@ -212,7 +213,7 @@ class RATIONSTrial(ss.Intervention):
             # adolescents (aged 10–18 years) with BMI-for-age Z-scores of lower
             # than –2SD. This extension was for a period of 12 months or until
             # improvements above these cutoffs, whichever was shorter.
-            uids = visit_uids[self.is_index[visit_uids] | self.intv_arm[visit_uids]] # Index or intervention arm
+            uids = visit_uids[self.is_index[visit_uids] | (self.arm[visit_uids] == Arm.INTERVENTION)] # Index or intervention arm
             nut.receiving_macro[uids] = True
             nut.receiving_micro[uids] = True
 
@@ -225,9 +226,12 @@ class RATIONSTrial(ss.Intervention):
             over_2y = (ti - self.ti_first_visit[visit_hhids]) * dt >= 2 # years
             self.ti_visit[visit_hhids[over_2y]] = np.nan # Do not visit again
 
-            over2y_uids_byhh = [self.uids_by_hhid[h] for h in visit_hhids[over_2y]]
-            if len(over2y_uids_byhh) > 0:
-                uids = ss.uids(np.concatenate(over2y_uids_byhh))
+            # 6mo intervention for starters
+            # TODO: Extend some households up to 12 months based on conditions noted above
+            over_6m = (ti - self.ti_first_visit[visit_hhids]) * dt >= 6/12 # 6 months
+            over6m_uids_byhh = [self.uids_by_hhid[h] for h in visit_hhids[over_6m]]
+            if len(over6m_uids_byhh) > 0:
+                uids = ss.uids(np.concatenate(over6m_uids_byhh))
                 nut.receiving_macro[uids] = False
                 nut.receiving_micro[uids] = False
 

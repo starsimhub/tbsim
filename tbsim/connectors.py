@@ -15,7 +15,7 @@ class TB_Nutrition_Connector(ss.Connector):
         super().__init__(label='TB-Malnutrition', requires=[TB, Malnutrition])
 
         self.default_pars(
-            rr_activation_func = self.supplementation_rr, #self.longroth_bmi_rr,
+            rr_activation_func = self.ones_rr, #self.supplementation_rr, self.longroth_bmi_rr,
             rr_clearance_func = self.ones_rr,
             relsus_func = self.compute_relsus,
         )
@@ -62,7 +62,6 @@ class TB_Nutrition_Connector(ss.Connector):
         # Relative rates start at 1 each time step
         tb.rr_activation[uids] *= self.pars.rr_activation_func(tb, mn, uids)
         tb.rr_clearance[uids] *= self.pars.rr_clearance_func(tb, mn, uids)
-
 
         uids = (~tb.infected).uids
         tb.rel_sus[uids] = self.pars.relsus_func(tb, mn, uids)
