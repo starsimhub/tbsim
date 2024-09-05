@@ -34,7 +34,6 @@ class TB_Nutrition_Connector(ss.Connector):
         rr[mn.receiving_macro[uids] & mn.receiving_micro[uids]] = rate_ratio
         return rr
 
-
     @staticmethod
     def longroth_bmi_rr(tb, mn, uids):
         rr = np.ones_like(uids)

@@ -16,7 +16,7 @@ import os
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = False # NOTE: Debug runs in serial
+debug = True # NOTE: Debug runs in serial
 default_n_rand_seeds = [10, 2][debug]
 
 resdir = cfg.create_res_dir()
@@ -192,12 +192,12 @@ if __name__ == '__main__':
                 rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
                 ),
         },
-        #'Nutrition-->TB clearance link': {
-        #    'Connector': dict(
-        #        rr_activation_func = mtb.TB_Nutrition_Connector.ones_rr,
-        #        rr_clearance_func = partial(clearance_rr_func, rate_ratio=10),
-        #        ),
-        #},
+        'Nutrition-->TB clearance link': {
+            'Connector': dict(
+                rr_activation_func = mtb.TB_Nutrition_Connector.ones_rr,
+                rr_clearance_func = partial(clearance_rr_func, rate_ratio=10),
+                ),
+        },
         'Relative sus & trans het + nutrition-->TB activation': {
             'TB': dict(
                 reltrans_het = ss.gamma(a=0.5, scale=2), # mean = a*scale (keep as 1)
@@ -206,13 +206,13 @@ if __name__ == '__main__':
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.5),
             ),
         },
-        #'Increase index treatment seeking delays': {
-        #    'TB': None,
-        #    'Malnutrition': None,
-        #    'Connector': None,
-        #    'RATIONS': dict(dur_active_to_dx = ss.weibull(c=2, scale=6/12)),
-        #    'Simulation': None,
-        #},
+        'Increase index treatment seeking delays': {
+            'TB': None,
+            'Malnutrition': None,
+            'Connector': None,
+            'RATIONS': dict(dur_active_to_dx = ss.weibull(c=2, scale=6/12)),
+            'Simulation': None,
+        },
     }
 
     ret = run_scenarios(scens)

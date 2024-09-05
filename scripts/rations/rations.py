@@ -9,16 +9,59 @@ from enum import IntEnum, auto
 __all__ = ['RATIONSTrial', 'RATIONS', 'Arm']
 
 class Arm(IntEnum):
-    CONTROL = 0
+    CONTROL      = 0
     INTERVENTION = 1
 
+class Cluster(IntEnum):
+    DTC_SARAIKELA           = auto() #1
+    RAJNAGAR                = auto() #2
+    CHANDIL                 = auto() #3
+    ADITYAPUR               = auto() #4
+    GAMHARIA                = auto() #5
+    KHARSWAN                = auto() #6
+    ICHAGARH                = auto() #7
+    ANGARHA_RATU            = auto() #8
+    BUNDU                   = auto() #9
+    DORANDA                 = auto() #10
+    ITKI                    = auto() #11
+    MANDAR_BURMU            = auto() #12
+    ORMANJHI                = auto() #13
+    SADAR                   = auto() #14
+    JAGANNATHPUR            = auto() #15
+    DTC_CHAIBASA_URBAN      = auto() #16
+    DTC_CHAIBASA_RURAL      = auto() #17
+    CHAKRADHARPUR           = auto() #18
+    JHINKPANI               = auto() #19
+    MANJHARI                = auto() #20
+    TANTNAGAR               = auto() #21
+    DHALBHUMGARH            = auto() #22
+    SADAR2                  = auto() #23
+    MUSABONI                = auto() #24
+    MANGO                   = auto() #25
+    BAHRAGORA               = auto() #26
+    JUGSALAI                = auto() #27
+    POTKA                   = auto() #28
+
+cluster_to_arm = {k:Arm.CONTROL for k in Cluster.__members__.values()}
+intv_clusters = [Cluster.RAJNAGAR, Cluster.CHANDIL, Cluster.ICHAGARH, Cluster.BUNDU, Cluster.DORANDA, Cluster.ITKI, Cluster.SADAR, Cluster.JAGANNATHPUR, Cluster.DTC_CHAIBASA_URBAN, Cluster.TANTNAGAR, Cluster.DHALBHUMGARH, Cluster.SADAR2, Cluster.MUSABONI, Cluster.POTKA]
+for k in intv_clusters:
+    assert k in Cluster.__members__.values()
+    cluster_to_arm[k] = Arm.INTERVENTION
+
+cluster_to_ACF = pd.DataFrame({
+    'Cluster': Cluster.__members__.keys(),
+    'ACF': [539, 255, 209, 272, 335, 152, 241, 124, 273, 332, 800, 207, 124, 2843, 265, 775, 775, 564, 204, 193, 121, 268, 451, 289, 300, 300, 512, 251],
+    'Population': [93759, 136600, 157949, 349065, 309072, 88642, 83099, 112759, 82975, 597044, 50058, 218474, 94137, 437178, 99169, 69565, 69565, 56531, 53792, 68450, 63910, 61932, 631364, 107084, 223805, 153051, 49660, 199612]
+}, index=pd.Index([x.value for x in Cluster.__members__.values()], dtype=int, name='cid'))
+cluster_to_ACF['Pulmonary Case Incidence Rate per 100,000'] = 100_000 * cluster_to_ACF['ACF'] / cluster_to_ACF['Population']
 
 class RATIONSTrial(ss.Intervention):
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         
         self.add_states( # For individual people
-            ss.FloatArr('hhid'),
+            ss.FloatArr('cid'),  # Cluster ID
+            ss.FloatArr('hhid'), # Household id
             ss.BoolArr('arm', default=Arm.CONTROL),
             ss.BoolArr('is_index'),
             ss.FloatArr('ti_dx'), # Only used for index cases, but easier here
@@ -27,8 +70,8 @@ class RATIONSTrial(ss.Intervention):
         )
 
         self.default_pars(
+            n_clusters=28,
             n_hhs = 2_800,
-            p_intv = ss.bernoulli(0.5), # 50% randomization
 
             p_sm_pos = ss.bernoulli(0.72), # SmPos vs SmNeg for active pulmonary TB of index patients
 
@@ -39,11 +82,7 @@ class RATIONSTrial(ss.Intervention):
 
             dur_visit_to_tx = ss.weibull(c=2, scale=3 * 7/365), # for secondary cases, same as "dur_active_to_dx"?
             
-            #hhsize_ctrl = ss.histogram(
-            #    values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
-            #    bins=np.array([1,2,3,4,5,6,7, 11, 15, 16][1:]),
-            #    density=False),
-            #hhsize_intv = ss.histogram(
+            #hhsize = ss.histogram(
             #    values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
             #    bins=np.array([1,2,3,4,5,6,7, 11, 15, 16][1:]),
             #    density=False),
@@ -80,7 +119,11 @@ class RATIONSTrial(ss.Intervention):
         self.is_index[self.index_uids] = True
         non_seeds = ss.uids(np.setdiff1d(ppl.uid, self.index_uids))
 
-        self.arm[self.index_uids] = self.pars.p_intv.rvs(self.index_uids)
+        # Map index seeds to clusters
+        self.cid[self.is_index] = np.repeat([x.value for x in Cluster.__members__.values()], int(self.pars.n_hhs / self.pars.n_clusters))
+
+        # Map index seeds to arm (via cluster)
+        self.arm[self.index_uids] = [cluster_to_arm[Cluster(int(k))] for k in self.cid[self.is_index]]
 
         # Map people to households
         self.hhid[ self.is_index] = np.arange(self.pars.n_hhs)
@@ -92,9 +135,10 @@ class RATIONSTrial(ss.Intervention):
             uids_in_hh = (self.hhid == hhid).uids
             self.uids_by_hhid.append(uids_in_hh)
 
-            # Set the arm for the other HH members
+            # Set the cluster and arm for the other HH members
+            self.cluster[uids_in_hh] = self.cluster[self.index_uids[hhid]]
             self.arm[uids_in_hh] = self.arm[self.index_uids[hhid]]
-            
+
             # Add this household to the network
             hhn.add_hh(uids_in_hh)
 
@@ -131,6 +175,8 @@ class RATIONSTrial(ss.Intervention):
         tb = self.sim.diseases['tb']
         nut = self.sim.diseases['malnutrition']
         ti, dt = self.sim.ti, self.sim.dt
+
+        # BACKGROUND INCIDENCE
 
         # INDEX CASES: Pre symp --> Active (state change has already happend in TB on this timestep)
         new_active_uids = self.index_uids[ np.isin(tb.state[self.index_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (tb.ti_active[self.index_uids] == ti) ]

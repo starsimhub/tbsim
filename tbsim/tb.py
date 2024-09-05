@@ -175,11 +175,6 @@ class TB(ss.Infection):
             self.state[new_active_uids] = active_state
             self.ti_active[new_active_uids] = ti
 
-            exptb_uids = new_active_uids[active_state ==TBS.ACTIVE_EXPTB]
-            smpos_uids = new_active_uids[active_state ==TBS.ACTIVE_SMPOS]
-            smneg_uids = new_active_uids[active_state ==TBS.ACTIVE_SMNEG]
-
-
         # Active --> Susceptible via natural recovery or as accelerated by treatment
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids
         new_clear_uids = self.p_active_to_clear.filter(active_uids)
