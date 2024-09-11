@@ -28,6 +28,27 @@ def plot_rations(resdir, df):
 
     sc.savefig('rations.png', folder=resdir)
     plt.close(g.figure)
+
+    fig, axv = plt.subplots(1,2, sharey=True, figsize=(10,5))
+
+    dfg = df.groupby(['Channel', 'Arm', 'Scenario', 'Seed'])['Values'] \
+        .sum() \
+        .loc[['Incident Cases', 'Person Years']] \
+        .unstack('Channel')
+
+    dfg['Incidence Rate per 1,000'] = 1000 * dfg['Incident Cases'] / dfg['Person Years']
+
+    # Calibration
+    for ax, arm, data in zip(axv, ['Control', 'Intervention'], [90/9557, 62/12208]):
+        sns.barplot(data=dfg.loc[arm], y='Scenario', x='Incidence Rate per 1,000', hue='Scenario', ax=ax)
+        ax.axvline(x=1000 * data, color='r', lw=2, label='RATIONS data')
+        ax.set_title(arm)
+
+    fig.tight_layout()
+
+    sc.savefig('calib.png', folder=resdir)
+    plt.close(fig)
+
     return
 
 def plot_epi(resdir, df):

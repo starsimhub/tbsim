@@ -16,13 +16,13 @@ import os
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = True # NOTE: Debug runs in serial
-default_n_rand_seeds = [10, 2][debug]
+debug = False # NOTE: Debug runs in serial
+default_n_rand_seeds = [25, 1][debug]
 
 resdir = cfg.create_res_dir()
 
 
-def run_RATIONS(skey, scen, rand_seed=0):
+def build_RATIONS(skey, scen, rand_seed=0):
     '''
     Run a single simulation of the RATIONS trial
     '''
@@ -43,8 +43,7 @@ def run_RATIONS(skey, scen, rand_seed=0):
 
     # Create the instance of TB disease
     tb_pars = dict(
-        #beta = dict(householdnet=0.03, maternal=0.0),
-        beta = dict(householdnet=0.5, maternal=0.0),
+        beta = dict(householdnet=0.0568, maternal=0.0),
         init_prev = 0, # Infections seeded by Rations class
         rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
         rate_LF_to_presym = 6e-3,  # TODO: double check pars
@@ -76,8 +75,6 @@ def run_RATIONS(skey, scen, rand_seed=0):
     if scen is not None and 'Connector' in scen.keys() and scen['Connector'] is not None:
         cn_pars.update(scen['Connector'])
     cn = mtb.TB_Nutrition_Connector(cn_pars)
-
-    # -------- Interventions -------
 
     # Most of the RATIONS trial is handled by the RATIONSTrial intervention
     rations_pars = dict()
@@ -111,25 +108,28 @@ def run_RATIONS(skey, scen, rand_seed=0):
         connectors=cn, 
         interventions=intvs,
         analyzers=azs,
-
-        copy_inputs=False # No need to create a copy of the inputs
     )
-    sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
+    sim.pars.verbose = 0 #sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
+    return sim
+
+def run_RATIONS(skey, scen, rand_seed=0):
+
+    sim = build_RATIONS(skey, scen, rand_seed)
     sim.run() # Run the sim
-
-    #sim.diseases['tb'].log.line_list.to_csv('linelist.csv')
 
     # Build a dictionary of results
     ret = {}
-    rtr = RATIONS_trial.results
+    rtr = sim.interventions['rationstrial'].results
     dat = [
         (rtr.incident_cases_ctrl.cumsum(), 'Incident Cases', 'Control'),
         (rtr.incident_cases_intv.cumsum(), 'Incident Cases', 'Intervention'),
         (rtr.coprevalent_cases_ctrl.cumsum(), 'Co-Prevalent Cases', 'Control'),
         (rtr.coprevalent_cases_intv.cumsum(), 'Co-Prevalent Cases', 'Intervention'),
-        (rtr.new_hhs_enrolled_ctrl.cumsum(), 'New HHS Enrolled', 'Control'),
-        (rtr.new_hhs_enrolled_intv.cumsum(), 'New HHS Enrolled', 'Intervention'),
+        (rtr.new_hhs_enrolled_ctrl.cumsum(), 'HHS Enrolled', 'Control'),
+        (rtr.new_hhs_enrolled_intv.cumsum(), 'HHS Enrolled', 'Intervention'),
+        (rtr.person_years_ctrl.cumsum(), 'Person Years', 'Control'),
+        (rtr.person_years_intv.cumsum(), 'Person Years', 'Intervention'),
     ]
 
     dfs = []
@@ -161,7 +161,7 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
             cfgs.append({'skey':skey, 'scen':scen, 'rand_seed':rs})
 
     T = sc.tic()
-    results += sc.parallelize(run_RATIONS, iterkwargs=cfgs, die=False, serial=debug)
+    results += sc.parallelize(run_RATIONS, iterkwargs=cfgs, die=True, serial=debug)
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
     # Aggregate the results
@@ -170,8 +170,6 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
         df_list = [r[k] for r in results]
         dfs[k] = pd.concat(df_list)
         dfs[k].to_csv(os.path.join(resdir, f'{k}.csv'))
-
-
 
     return dfs
 
@@ -186,27 +184,31 @@ if __name__ == '__main__':
     from functools import partial
     scens = {
         'Baseline': None,
-        'Nutrition-->TB activation link': {
+        'Rel trans het + Nutrition-->TB activation': {
+            'Skip': False,
+            'TB': dict(
+                reltrans_het = ss.gamma(a=0.1, scale=2), # mean = a*scale (keep as 1)
+            ),
             'Connector': dict(
-                rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.5),
+                rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
+            ),
+        },
+        'Nutrition-->TB activation link': {
+            'Skip': False,
+            'Connector': dict(
+                rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
                 rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
                 ),
         },
         'Nutrition-->TB clearance link': {
+            'Skip': False,
             'Connector': dict(
                 rr_activation_func = mtb.TB_Nutrition_Connector.ones_rr,
                 rr_clearance_func = partial(clearance_rr_func, rate_ratio=10),
                 ),
         },
-        'Relative sus & trans het + nutrition-->TB activation': {
-            'TB': dict(
-                reltrans_het = ss.gamma(a=0.5, scale=2), # mean = a*scale (keep as 1)
-            ),
-            'Connector': dict(
-                rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.5),
-            ),
-        },
         'Increase index treatment seeking delays': {
+            'Skip': True,
             'TB': None,
             'Malnutrition': None,
             'Connector': None,
@@ -214,6 +216,7 @@ if __name__ == '__main__':
             'Simulation': None,
         },
     }
+    scens = {skey:scen for skey, scen in scens.items() if scen is None or 'Skip' not in scen or not scen['Skip']}
 
     ret = run_scenarios(scens)
 

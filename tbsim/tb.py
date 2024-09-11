@@ -24,9 +24,9 @@ class TB(ss.Infection):
         super().__init__(**kwargs)
 
         self.default_pars(
-            init_prev = ss.bernoulli(0.01),   # Initial prevalence - TODO: Check if there is one
-            beta = 0.25, # Transmission rate  - TODO: Check if there is one
-            p_latent_fast = ss.bernoulli(0.1), # Probability of latent fast as opposed to latent slow
+            init_prev = ss.bernoulli(0.01),     # Initial prevalence - TODO: Check if there is one
+            beta = 0.25,                        # Transmission rate
+            p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
 
             rate_LS_to_presym = 3e-5,           # Latent Slow to Active Pre-Symptomatic (per day)
             rate_LF_to_presym = 6e-3,           # Latent Fast to Active Pre-Symptomatic (per day)
@@ -125,16 +125,14 @@ class TB(ss.Infection):
     def set_prognoses(self, uids, from_uids=None):
         super().set_prognoses(uids, from_uids)
 
-        p = self.pars # Shortcut
-        ti = self.sim.ti
-        dt = self.sim.dt
+        p = self.pars
 
         # Carry out state changes upon new infection
         self.susceptible[uids] = False
         self.infected[uids] = True # Not needed, but useful for reporting
 
         # Set base transmission heterogeneity
-        self.reltrans_het[uids] = self.pars.reltrans_het(uids)
+        self.reltrans_het[uids] = p.reltrans_het.rvs(uids)
 
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
@@ -146,12 +144,13 @@ class TB(ss.Infection):
         self.active_tb_state[exptb_uids] = TBS.ACTIVE_EXPTB
 
         # Of those not going exptb, choose smear positive or smear negative
-        smpos_uids, smneg_uids = p.p_smpos.filter(not_exptb_uids, both=True)
-        self.active_tb_state[smpos_uids] = TBS.ACTIVE_SMPOS
-        self.active_tb_state[smneg_uids] = TBS.ACTIVE_SMNEG
+        if len(not_exptb_uids):
+            smpos_uids, smneg_uids = p.p_smpos.filter(not_exptb_uids, both=True)
+            self.active_tb_state[smpos_uids] = TBS.ACTIVE_SMPOS
+            self.active_tb_state[smneg_uids] = TBS.ACTIVE_SMNEG
 
         # Update result count of new infections 
-        self.results['new_infections'][ti] += len(uids)
+        self.results['new_infections'][self.sim.ti] += len(uids)
         return
 
     def update_pre(self):
@@ -169,11 +168,12 @@ class TB(ss.Infection):
 
         # Pre symp --> Active
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
-        new_active_uids = self.p_presym_to_active.filter(presym_uids)
-        if len(new_active_uids):
-            active_state = self.active_tb_state[new_active_uids] 
-            self.state[new_active_uids] = active_state
-            self.ti_active[new_active_uids] = ti
+        if len(presym_uids):
+            new_active_uids = self.p_presym_to_active.filter(presym_uids)
+            if len(new_active_uids):
+                active_state = self.active_tb_state[new_active_uids] 
+                self.state[new_active_uids] = active_state
+                self.ti_active[new_active_uids] = ti
 
         # Active --> Susceptible via natural recovery or as accelerated by treatment
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids
