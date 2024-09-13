@@ -1,3 +1,6 @@
+from os.path import dirname, join as joinpath
+DATADIR = joinpath(dirname(__file__), 'data')
+
 from .tb import TB, TBS
 from .malnutrition import Malnutrition
 from .config import *

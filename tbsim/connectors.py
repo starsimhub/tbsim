@@ -15,7 +15,7 @@ class TB_Nutrition_Connector(ss.Connector):
         super().__init__(label='TB-Malnutrition', requires=[TB, Malnutrition])
 
         self.default_pars(
-            rr_activation_func = self.ones_rr, #self.supplementation_rr, self.longroth_bmi_rr,
+            rr_activation_func = self.ones_rr, #self.supplementation_rr, self.lonnroth_bmi_rr,
             rr_clearance_func = self.ones_rr,
             relsus_func = self.compute_relsus,
         )
@@ -35,10 +35,21 @@ class TB_Nutrition_Connector(ss.Connector):
         return rr
 
     @staticmethod
-    def longroth_bmi_rr(tb, mn, uids):
-        rr = np.ones_like(uids)
-        bmi = mn.weight[uids] / mn.height[uids]**2
-        rr[bmi < 18] = 2
+    def lonnroth_bmi_rr(tb, mn, uids, scale=2, slope=3, bmi50=25):
+        bmi = 10_000 * mn.weight(uids) / mn.height(uids)**2
+        #tb_incidence_per_100k_year = 10**(-0.05*(bmi-15) + 2) # incidence rate of 100 at BMI of 15
+        # How to go from incidence rate to relative risk?
+        # --> How about a sigmoid?
+        x = -0.05*(bmi-15) + 2 # Log linear relationship from lonnroth et al.
+        x0 = -0.05*(bmi50-15) + 2 # Center on 25
+        rr = scale / (1+10**(-slope * (x-x0) ))
+
+        '''
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.scatter(bmi, rr)
+        '''
+
         return rr
 
     @staticmethod

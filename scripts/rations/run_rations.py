@@ -43,7 +43,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
 
     # Create the instance of TB disease
     tb_pars = dict(
-        beta = dict(householdnet=0.0568, maternal=0.0),
+        beta = dict(householdnet=0.045, maternal=0.0), # 0.0568
         init_prev = 0, # Infections seeded by Rations class
         rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
         rate_LF_to_presym = 6e-3,  # TODO: double check pars
@@ -183,9 +183,20 @@ if __name__ == '__main__':
     # Define the scenarios
     from functools import partial
     scens = {
-        'Baseline': None,
-        'Rel trans het + Nutrition-->TB activation': {
+        'Baseline': {
+            'Skip': True,
+        },
+
+        'Lönnroth Nutrition-->TB activation link': {
             'Skip': False,
+            'Connector': dict(
+                rr_activation_func = partial(mtb.TB_Nutrition_Connector.lonnroth_bmi_rr, scale=3, slope=3, bmi50=20),
+                rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
+            ),
+        },
+
+        'Rel trans het + Nutrition-->TB activation': {
+            'Skip': True,
             'TB': dict(
                 reltrans_het = ss.gamma(a=0.1, scale=2), # mean = a*scale (keep as 1)
             ),
@@ -194,14 +205,14 @@ if __name__ == '__main__':
             ),
         },
         'Nutrition-->TB activation link': {
-            'Skip': False,
+            'Skip': True,
             'Connector': dict(
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
                 rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
                 ),
         },
         'Nutrition-->TB clearance link': {
-            'Skip': False,
+            'Skip': True,
             'Connector': dict(
                 rr_activation_func = mtb.TB_Nutrition_Connector.ones_rr,
                 rr_clearance_func = partial(clearance_rr_func, rate_ratio=10),

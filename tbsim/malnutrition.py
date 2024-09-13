@@ -2,9 +2,12 @@
 Define non-communicable disease (Malnutrition) model
 """
 
+import os
 import numpy as np
+import pandas as pd
 import starsim as ss
 from scipy.stats import norm
+from tbsim import DATADIR
 
 __all__ = ['Malnutrition']
 
@@ -20,7 +23,7 @@ class Malnutrition(ss.Disease):
     @staticmethod
     def dweight_loc(self, sim, uids):
         mu = np.zeros(len(uids))
-        mu[self.receiving_macro] = 0.1*sim.dt # Upwards drift in percentile for those receiving macro supplementation
+        mu[self.receiving_macro] = 1.0*sim.dt # Upwards drift in percentile for those receiving macro supplementation
         return mu
 
     @staticmethod
@@ -28,26 +31,46 @@ class Malnutrition(ss.Disease):
         std = np.full(len(uids), fill_value=0.01*sim.dt)
         return std
 
-    @property
-    def weight(self):
+    def weight(self, uids=None):
+        weight = self.lms(self.weight_percentile, uids, 'Weight')
+        return weight
+
+    def height(self, uids=None):
+        height = self.lms(self.height_percentile, uids, 'Height')
+        return height
+
+    def lms(self, percentile, uids=None, metric='Weight'):
         # Return weight given a percentile using Cole's lambda, mu, and sigma (LMS) method 
 
-        # Parameters should be by age and sex, guessing
-        mu = 65 #13.6
-        sigma = 0.18 #0.147
-        lam = 0.85 #0.3
+        assert metric in ['Weight', 'Height', 'Length', 'BMI']
 
-        # https://indianpediatrics.net/jan2014/jan-37-43.htm
-        #Z = 1/(sigma*lam) * ((WEIGHT/mu)**lam - 1) 
+        if uids is None:
+            uids = self.sim.people.auids
 
-        p = self.weight_percentile
-        Z = norm().ppf(p) # Convert percentile to z-score
-        weight = mu * (lam*sigma*Z + 1)**(1/lam)
-        # if L=0, w = mu * np.exp(sigma * Z)
+        ret = np.zeros(len(uids))
 
-        # https://iris.who.int/bitstream/handle/10665/44026/9789241547635_eng.pdf?sequence=1
+        ppl = self.sim.people
+        female = ppl.female[uids]
 
-        return weight
+        for sex, fem in zip(['Female', 'Male'], [female, ~female]):
+            u = uids[fem]
+            age = ppl.age[u] * 12 # in months
+
+            age_bins = self.LMS_data.loc[sex]['Age']
+            lam = np.interp(age, age_bins, self.LMS_data.loc[sex][f'{metric}_L'])
+            mu = np.interp(age, age_bins, self.LMS_data.loc[sex][f'{metric}_M'])
+            sigma = np.interp(age, age_bins, self.LMS_data.loc[sex][f'{metric}_S'])
+
+            # https://indianpediatrics.net/jan2014/jan-37-43.htm
+            #Z = 1/(sigma*lam) * ((WEIGHT/mu)**lam - 1) 
+
+            p = percentile[u]
+            Z = norm().ppf(p) # Convert percentile to z-score
+            ret[fem] = mu * (lam*sigma*Z + 1)**(1/lam) # if lam=0, w = mu * np.exp(sigma * Z)
+
+            # https://iris.who.int/bitstream/handle/10665/44026/9789241547635_eng.pdf?sequence=1
+
+        return ret
 
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
@@ -56,6 +79,9 @@ class Malnutrition(ss.Disease):
             init_prev = 0.001,  # Initial prevalence 
         )
         self.update_pars(pars, **kwargs)
+
+        anthro_path = os.path.join(DATADIR, 'anthropometry.csv')
+        self.LMS_data = pd.read_csv(anthro_path).set_index('Sex')
 
         # Adding Malnutrition states to handle the Individual Properties related to this disease 
         self.add_states(
