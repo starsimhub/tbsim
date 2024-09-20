@@ -2,21 +2,21 @@ import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
 
-#from enum import Enum
+from enum import IntEnum
 
 __all__ = ['TB', 'TBS']
 
 DAYS_PER_YEAR = 365
 
-class TBS(): # Enum
-    NONE            = np.nan # No TB
-    LATENT_SLOW     = 0.0    # Latent TB, slow progression
-    LATENT_FAST     = 1.0    # Latent TB, fast progression
-    ACTIVE_PRESYMP  = 2.0    # Active TB, pre-symptomatic
-    ACTIVE_SMPOS    = 3.0    # Active TB, smear positive
-    ACTIVE_SMNEG    = 4.0    # Active TB, smear negative
-    ACTIVE_EXPTB    = 5.0    # Active TB, extra-pulmonary
-    DEAD            = 8.0    # TB death
+class TBS(IntEnum):
+    NONE            = -1    # No TB
+    LATENT_SLOW     = 0     # Latent TB, slow progression
+    LATENT_FAST     = 1     # Latent TB, fast progression
+    ACTIVE_PRESYMP  = 2     # Active TB, pre-symptomatic
+    ACTIVE_SMPOS    = 3     # Active TB, smear positive
+    ACTIVE_SMNEG    = 4     # Active TB, smear negative
+    ACTIVE_EXPTB    = 5     # Active TB, extra-pulmonary
+    DEAD            = 8     # TB death
 
 
 class TB(ss.Infection):
@@ -24,27 +24,26 @@ class TB(ss.Infection):
         super().__init__(**kwargs)
 
         self.default_pars(
-            init_prev = ss.bernoulli(0.01),     # Initial prevalence - TODO: Check if there is one
+            init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
 
-            rate_LS_to_presym = 3e-5,           # Latent Slow to Active Pre-Symptomatic (per day)
-            rate_LF_to_presym = 6e-3,           # Latent Fast to Active Pre-Symptomatic (per day)
-            rate_presym_to_active = 3e-2,       # Pre-symptomatic to symptomatic (per day)
-            rate_active_to_clear = 2.4e-4,      # Active infection to natural clearance (per day)
-            rate_exptb_to_dead = 0.15 * 4.5e-4, # Extra-Pulmonary TB to Dead (per day)
-            rate_smpos_to_dead = 4.5e-4,        # Smear Positive Pulmonary TB to Dead (per day)
-            rate_smneg_to_dead = 0.3 * 4.5e-4,  # Smear Negative Pulmonary TB to Dead (per day)
+            rate_LS_to_presym       = 3e-5,                 # Latent Slow to Active Pre-Symptomatic (per day)
+            rate_LF_to_presym       = 6e-3,                 # Latent Fast to Active Pre-Symptomatic (per day)
+            rate_presym_to_active   = 3e-2,                 # Pre-symptomatic to symptomatic (per day)
+            rate_active_to_clear    = 2.4e-4,               # Active infection to natural clearance (per day)
+            rate_exptb_to_dead      = 0.15 * 4.5e-4,        # Extra-Pulmonary TB to Dead (per day)
+            rate_smpos_to_dead      = 4.5e-4,               # Smear Positive Pulmonary TB to Dead (per day)
+            rate_smneg_to_dead      = 0.3 * 4.5e-4,         # Smear Negative Pulmonary TB to Dead (per day)
             rate_treatment_to_clear = 2/12 / DAYS_PER_YEAR, # 2 months (per day, for consistency)
 
-            p_exptb = ss.bernoulli(0.1),
-            p_smpos = ss.bernoulli(0.65 / (0.65+0.25)), # Amongst those without extrapulminary TB
+            active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
-            # Relative transmissibility of each state, TODO: VALUES and list sources
-            rel_trans_presymp = 0.1,
-            rel_trans_smpos   = 1.0,
-            rel_trans_smneg   = 0.3,
-            rel_trans_exptb   = 0.05,
+            # Relative transmissibility of each state, TODO: Update values and list sources
+            rel_trans_presymp   = 0.1,
+            rel_trans_smpos     = 1.0,
+            rel_trans_smneg     = 0.3,
+            rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
 
             reltrans_het = ss.constant(v=1.0),
@@ -139,15 +138,8 @@ class TB(ss.Infection):
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
 
-        # Determine which agents will have extrapulminary TB
-        exptb_uids, not_exptb_uids = p.p_exptb.filter(uids, both=True)
-        self.active_tb_state[exptb_uids] = TBS.ACTIVE_EXPTB
-
-        # Of those not going exptb, choose smear positive or smear negative
-        if len(not_exptb_uids):
-            smpos_uids, smneg_uids = p.p_smpos.filter(not_exptb_uids, both=True)
-            self.active_tb_state[smpos_uids] = TBS.ACTIVE_SMPOS
-            self.active_tb_state[smneg_uids] = TBS.ACTIVE_SMNEG
+        # Determine active TB state
+        self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
         # Update result count of new infections 
         self.results['new_infections'][self.sim.ti] += len(uids)

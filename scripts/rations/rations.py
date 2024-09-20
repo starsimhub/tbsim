@@ -115,7 +115,7 @@ class RATIONSTrial(ss.Intervention):
         p = np.ones_like(uids) 
         tb = sim.diseases['tb']
         dt = sim.dt
-        frac_pulmonary = 1-tb.pars.p_exptb.pars['p']
+        frac_pulmonary = 0.65 + 0.25
 
         years = dt
         for cid, cdata in cdf.iterrows():
