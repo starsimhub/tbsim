@@ -65,8 +65,8 @@ Contributions to the TBSim project are welcome! Please read [CONTRIBUTING.md](ht
 
 ## Authors
 
--  **Daniel Klein** - [Daniel-Klein](https://github.com/daniel-klein)
--  **Minerva Enriquez** - [MEnriquez-IDM](https://github.com/MEnriquez-IDM)
+-  **Daniel Klein** - [daniel-klein](https://github.com/daniel-klein)
+-  **Minerva Enriquez** - [menriquez-idm](https://github.com/MEnriquez-IDM)
 -  **Stewart Chang** - [stchang-idm](https://github.com/stchang-idm)
 -  **Deven Gokhale** - [gokhale616](https://github.com/gokhale616)
 -  **Mike Famulare** - [famulare](https://github.com/famulare)
