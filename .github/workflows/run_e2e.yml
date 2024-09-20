@@ -60,7 +60,7 @@ jobs:
         pip freeze
 
     - name: Run e2e tests
-      working-directory: tests/e2e
+      working-directory: tests
       run: |
         python run_single.py
 
@@ -74,4 +74,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: run-artifacts
-        path: /home/runner/work/tbsim/tbsim/tests/e2e/
+        path: /home/runner/work/tbsim/tbsim/tests/

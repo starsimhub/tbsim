@@ -46,15 +46,15 @@ The steps described below will allow you to use the latest unreleased features o
 
 ### Running a sample simulation
 
-1. Navigate to the project directory **tests\e2e**
-2. Run the main script:
+1. Navigate to the project directory **_tests_**
+2. Run the script:
    ```bash
    python run_single.py
    ```
 3. running this script should result in basic charts being displayed.
 
 ## Usage 
-- Usage examples are available in the **tests\e2e** folder.
+- Usage examples are available in the **[scripts\general](https://github.com/starsimhub/tbsim/tree/main/scripts/general)** folder.
 
 ## Documentation: 
 _TBSim_ is based on Starsim, please refer to [Starsim documentation](https://docs.idmod.org/projects/starsim/en/latest/) for additional information.
@@ -65,8 +65,11 @@ Contributions to the TBSim project are welcome! Please read [CONTRIBUTING.md](ht
 
 ## Authors
 
--  **Daniel Klein** - [Daniel-Klein](https://github.com/daniel-klein)
--  **Minerva Enriquez** - [MEnriquez-IDM](https://github.com/MEnriquez-IDM)
+-  **Daniel Klein** - [daniel-klein](https://github.com/daniel-klein)
+-  **Minerva Enriquez** - [menriquez-idm](https://github.com/MEnriquez-IDM)
+-  **Stewart Chang** - [stchang-idm](https://github.com/stchang-idm)
+-  **Deven Gokhale** - [gokhale616](https://github.com/gokhale616)
+-  **Mike Famulare** - [famulare](https://github.com/famulare)
 
 ## License
 
