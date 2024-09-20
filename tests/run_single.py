@@ -44,9 +44,9 @@ def make_tb_nut():
     
     # TODO: Add a set of common TB interventions
     # Create a TB vaccine product   
-    tb_vaccine = ss.Product(name="TB Vaccine")
+    tb_vaccine = None # ss.Product(name="TB Vaccine")
     # Create a routine TB vaccination intervention
-    routine_vx = mtb.TBVaccinationCampaign(year=1997, target_state=1.0, product=tb_vaccine, prob=0.9)
+    routine_vx = None # mtb.TBVaccinationCampaign(year=1997, target_state=1.0, product=tb_vaccine, prob=0.9)
     
     # TODO: Add a set of common nutrition interventions - we may need to remove dependencies from Harlem scenarios. 
 
@@ -70,6 +70,6 @@ def make_tb_nut():
 if __name__ == '__main__':  
     sim_tbn = make_tb_nut()
     sim_tbn.run()
-    mtb.plot_sim(sim_tbn)
+    # mtb.plot_sim(sim_tbn)
     #plt.show()
     plt.close()
