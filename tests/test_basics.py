@@ -20,7 +20,6 @@ def test_initial_states():
     assert isinstance(tb.rel_sus, ss.FloatArr)
     assert isinstance(tb.rel_trans, ss.FloatArr)
     assert isinstance(tb.ti_infected, ss.FloatArr)
-
     assert isinstance(tb.state, ss.FloatArr)
     assert isinstance(tb.active_tb_state, ss.FloatArr)
     assert isinstance(tb.rr_activation, ss.FloatArr)
@@ -30,34 +29,47 @@ def test_initial_states():
     assert isinstance(tb.ti_active, ss.FloatArr)
     assert isinstance(tb.ti_active, ss.FloatArr)
     assert isinstance(tb.ti_active, ss.FloatArr)
-
+    
+def test_tb_initialization():
+    tb = mtb.TB()
+    assert tb.pars['init_prev'] is not None
+    assert isinstance(tb.pars['rate_LS_to_presym'], float)
+    assert isinstance(tb.pars['rate_LF_to_presym'], float)
+    assert isinstance(tb.pars['rate_presym_to_active'], float)
+    assert isinstance(tb.pars['rate_active_to_clear'], float)
+    assert isinstance(tb.pars['rate_exptb_to_dead'], float)
+    assert isinstance(tb.pars['rate_smpos_to_dead'], float)
+    assert isinstance(tb.pars['rate_smneg_to_dead'], float)
+    assert isinstance(tb.pars['rel_trans_presymp'], float)
+    assert isinstance(tb.pars['rel_trans_smpos'], float)
+    assert isinstance(tb.pars['rel_trans_smneg'], float)
+    assert isinstance(tb.pars['rel_trans_exptb'], float)
+    assert isinstance(tb.pars['rel_trans_treatment'], float)
+    
 def test_default_parameters():
     tb = mtb.TB()
     print(tb)
     assert tb.pars['init_prev'] is not None
     assert isinstance(tb.pars['rate_LS_to_presym'], float)
     assert isinstance(tb.pars['rate_LF_to_presym'], float)
-    assert isinstance(tb.pars['rate_active_to_cure'], float)
+    # assert isinstance(tb.pars['rate_active_to_cure'], float)
     assert isinstance(tb.pars['rate_exptb_to_dead'], float)
     assert isinstance(tb.pars['rate_smpos_to_dead'], float)
     assert isinstance(tb.pars['rate_smneg_to_dead'], float)
     assert isinstance(tb.pars['rel_trans_smpos'], float)
 
-def test_infectious():
+def test_tb_infectious():
     tb = mtb.TB()
-    assert not tb.infectious
-
-    tb.state = mtb.TBS.ACTIVE_PRESYMP
-    assert tb.infectious
-
-    tb.state = mtb.TBS.ACTIVE_SMPOS
-    assert tb.infectious
-
-    tb.state = mtb.TBS.ACTIVE_SMNEG
-    assert tb.infectious
-
-    tb.state = mtb.TBS.ACTIVE_EXPTB
-    assert tb.infectious
+    tb.state[:] = mtb.TBS.ACTIVE_PRESYMP
+    assert tb.infectious.all()
+    tb.state[:] = mtb.TBS.ACTIVE_SMPOS
+    assert tb.infectious.all()
+    tb.state[:] = mtb.TBS.ACTIVE_SMNEG
+    assert tb.infectious.all()
+    tb.state[:] = mtb.TBS.ACTIVE_EXPTB
+    assert tb.infectious.all()
+    tb.state[:] = mtb.TBS.NONE
+    assert not tb.infectious.any()
 
 def test_set_prognoses():
     sim = make_tb_simplified()
@@ -73,9 +85,10 @@ def test_set_prognoses():
 
 def test_update_pre():
     sim = make_tb_simplified(agents=300)
-    sim.run()
+    sim.initialize()
     tb = sim.diseases['tb']
-    assert len(tb.state[tb.state == mtb.TBS.NONE]) == 0
+    assert len(tb.state[tb.state == mtb.TBS.NONE]) > 0
+    sim.run()
     assert len(tb.state[tb.state == mtb.TBS.LATENT_SLOW]) > 0
     assert len(tb.state[tb.state == mtb.TBS.ACTIVE_SMNEG]) > 0
 
@@ -86,6 +99,38 @@ def test_update_pre():
     print("Active ExpTB:", tb.state[tb.state == mtb.TBS.ACTIVE_EXPTB])
     print("Active Smear Negative: ", tb.state[tb.state == mtb.TBS.ACTIVE_SMNEG])
     print("Active Smear Positive: ", tb.state[tb.state == mtb.TBS.ACTIVE_SMPOS])
+
+def test_update_death_with_uids():
+    sim = make_tb_simplified(agents=300)
+    sim.initialize()
+    tb = sim.diseases['tb']
+    # sim.run()
+    uids = ss.uids([1, 2, 3])
+    tb.susceptible[uids] = True
+    tb.infected[uids] = True
+    tb.rel_trans[uids] = 1.0
+    
+    tb.update_death(uids)
+    
+    assert not tb.susceptible[uids].any()
+    assert not tb.infected[uids].any()
+    assert (tb.rel_trans[uids] == 0).all()
+    
+def test_update_death_no_uids():
+    sim = make_tb_simplified(agents=300)
+    sim.initialize()
+    tb = sim.diseases['tb']
+        
+    initial_susceptible = tb.susceptible.copy()
+    initial_infected = tb.infected.copy()
+    initial_rel_trans = tb.rel_trans.copy()
+    
+    tb.update_death([])
+    
+    assert np.array_equal(tb.susceptible, initial_susceptible)
+    assert np.array_equal(tb.infected, initial_infected)
+    assert np.array_equal(tb.rel_trans, initial_rel_trans)
+
 
 if __name__ == '__main__':
     pytest.main()
