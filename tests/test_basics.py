@@ -131,6 +131,53 @@ def test_update_death_no_uids():
     assert np.array_equal(tb.infected, initial_infected)
     assert np.array_equal(tb.rel_trans, initial_rel_trans)
 
+@pytest.fixture
+def tb():
+    sim = make_tb_simplified(agents=300)
+    sim.initialize()
+    tb = sim.diseases['tb']
+    return tb
 
+# When no individuals have active TB, no treatment should be started
+def test_start_treatment_no_active_tb(tb):
+    uids = ss.uids([1, 2, 3])
+    tb.state[uids] = mtb.TBS.LATENT_SLOW  # No active TB
+    num_treated = tb.start_treatment(uids)
+    assert num_treated == 0
+    assert not tb.on_treatment[uids].any()
+    assert (tb.rr_death[uids] == 1).all()  # Default value
+
+#When all individuals have active TB, treatment should be started for all.
+def test_start_treatment_with_active_tb(tb):
+    uids = ss.uids([1, 2, 3])
+    tb.state[uids] = mtb.TBS.ACTIVE_SMPOS  # Active TB
+    num_treated = tb.start_treatment(uids)
+    assert num_treated == len(uids)
+    assert tb.on_treatment[uids].all()
+    assert (tb.rr_death[uids] == 0).all()
+    
+# When there is a mix of individuals with and without active TB, only those with active TB should start treatment.
+def test_start_treatment_mixed_states(tb):
+    uids_active = ss.uids([1, 2])
+    uids_non_active = ss.uids([3, 4])
+    tb.state[uids_active] = mtb.TBS.ACTIVE_SMPOS  # Active TB
+    tb.state[uids_non_active] = mtb.TBS.LATENT_SLOW  # No active TB
+    all_uids = uids_active + uids_non_active
+    num_treated = tb.start_treatment(all_uids)
+    assert num_treated == len(uids_active)
+    assert tb.on_treatment[uids_active].all()
+    assert not tb.on_treatment[uids_non_active].any()
+    assert (tb.rr_death[uids_active] == 0).all()
+    assert (tb.rr_death[uids_non_active] == 1).all()  # Default value
+
+#When individuals have active extrapulmonary TB, treatment should be started for al
+def test_start_treatment_exptb(tb):
+    uids = ss.uids([1, 2, 3])
+    tb.state[uids] = mtb.TBS.ACTIVE_EXPTB  # Active extrapulmonary TB
+    num_treated = tb.start_treatment(uids)
+    assert num_treated == len(uids)
+    assert tb.on_treatment[uids].all()
+    assert (tb.rr_death[uids] == 0).all()
+    
 if __name__ == '__main__':
     pytest.main()
