@@ -51,27 +51,29 @@ jobs:
       with:
         repository: 'starsimhub/starsim'
         path: 'starsim'
-      
+    
     # Step 2.2: Install starsim
     - name: Install starsim
       run: |
         cd starsim
         pip install -e .
         pip freeze
-
-    - name: Run e2e tests
-      working-directory: tests
+        
+    # Step 2.3: Install test requirements
+    - name: Install test requirements
+      working-directory: ./tests
       run: |
-        python run_single.py
+        pip install -r requirements.txt
+        pip freeze
 
-    - name: Run Additional Tests
-      if: ${{ github.event.inputs.run_additional_tests != 'None' }}
-      run: |
-        echo Starting requested script: ${{ github.event.inputs.run_additional_tests }}....
-        python ${{ github.event.inputs.run_additional_tests }}   
-          
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+    # Run tests
+    - name: Run Tests
+      working-directory: ./tests
+      run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml 
+      
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: failure()
       with:
-        name: run-artifacts
-        path: /home/runner/work/tbsim/tbsim/tests/
+          name: test_results
+          path: tests/test-results.xml

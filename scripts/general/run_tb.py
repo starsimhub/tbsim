@@ -52,11 +52,11 @@ if __name__ == '__main__':
     sim_tb = make_tb()
     sim_tb.run()
     sim_tb.diseases['tb'].plot()
-    mtb.plot_sim(sim_tb)
+    # mtb.plot_sim(sim_tb)
     plt.show()
 
     sim_tb = make_tb_simplified(agents=1500, start=2000, end=2020, dt=7/365)
     sim_tb.run()
     sim_tb.diseases['tb'].plot()
-    mtb.plot_sim(sim_tb)
+    # mtb.plot_sim(sim_tb)
     plt.show()
