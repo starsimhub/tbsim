@@ -51,14 +51,21 @@ jobs:
       with:
         repository: 'starsimhub/starsim'
         path: 'starsim'
-      
+    
     # Step 2.2: Install starsim
     - name: Install starsim
       run: |
         cd starsim
         pip install -e .
         pip freeze
-    
+        
+    # Step 2.3: Install test requirements
+    - name: Install test requirements
+      working-directory: ./tests
+      run: |
+        pip install -r requirements.txt
+        pip freeze
+
     # Run tests
     - name: Run Tests
       working-directory: ./tests
