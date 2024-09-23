@@ -178,6 +178,42 @@ def test_start_treatment_exptb(tb):
     assert num_treated == len(uids)
     assert tb.on_treatment[uids].all()
     assert (tb.rr_death[uids] == 0).all()
+
+def test_set_prognoses_susceptible_to_infected(tb):
+    uids = ss.uids([1, 2, 3])
+    tb.susceptible[uids] = True
+    tb.infected[uids] = False
     
+    tb.set_prognoses(uids)
+    
+    assert not tb.susceptible[uids].any()
+    assert tb.infected[uids].all()
+    
+def test_set_prognoses_reltrans_het(tb):
+    uids = ss.uids([1, 2, 3])
+    tb.pars.reltrans_het.rvs = lambda uids: np.array([0.5, 0.7, 0.9])
+    
+    tb.set_prognoses(uids)
+    
+    assert np.array_equal(tb.reltrans_het[uids], np.array([0.5, 0.7, 0.9]))       
+
+# Determining the active TB state.
+def test_set_prognoses_active_tb_state(tb):
+    uids = ss.uids([1, 2, 3])
+    tb.pars.active_state.rvs = lambda uids: np.array([mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB])
+    
+    tb.set_prognoses(uids)
+    
+    assert np.array_equal(tb.active_tb_state[uids], np.array([mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB]))
+
+# Updating the result count of new infections.
+def test_set_prognoses_new_infections_count(tb):
+    uids = ss.uids([1, 2, 3])
+    initial_count = tb.results['new_infections'][tb.sim.ti]
+    
+    tb.set_prognoses(uids)
+    
+    assert tb.results['new_infections'][tb.sim.ti] == initial_count + len(uids)
+
 if __name__ == '__main__':
     pytest.main()
