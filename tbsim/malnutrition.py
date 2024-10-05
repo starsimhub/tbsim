@@ -74,7 +74,7 @@ class Malnutrition(ss.Disease):
 
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
-        self.default_pars(
+        self.define_pars(
             beta = 1.0,         # Transmission rate  - TODO: Check if there is one
             init_prev = 0.001,  # Initial prevalence 
         )
@@ -84,7 +84,7 @@ class Malnutrition(ss.Disease):
         self.LMS_data = pd.read_csv(anthro_path).set_index('Sex')
 
         # Adding Malnutrition states to handle the Individual Properties related to this disease 
-        self.add_states(
+        self.define_states(
             # Hooks to the RATIONS trial
             ss.BoolArr('receiving_macro', default=False), # Determines weight trend
             ss.BoolArr('receiving_micro', default=False), # Determines micro trend
@@ -162,22 +162,27 @@ class Malnutrition(ss.Disease):
         """
         super().init_results()
         npts = self.sim.npts
-        self.results += [
-            # ss.Result(self.name, 'prev_macro_standard_or_above', npts, dtype=float),
-            # ss.Result(self.name, 'prev_macro_slightly_below', npts, dtype=float),
-            # ss.Result(self.name, 'prev_macro_marginal', npts, dtype=float),
-            # ss.Result(self.name, 'prev_macro_unsatisfactory', npts, dtype=float),
+        # self.results += [
+        #     # ss.Result(self.name, 'prev_macro_standard_or_above', npts, dtype=float),
+        #     # ss.Result(self.name, 'prev_macro_slightly_below', npts, dtype=float),
+        #     # ss.Result(self.name, 'prev_macro_marginal', npts, dtype=float),
+        #     # ss.Result(self.name, 'prev_macro_unsatisfactory', npts, dtype=float),
 
-            # ss.Result(self.name, 'prev_micro_normal', npts, dtype=float),
-            # ss.Result(self.name, 'prev_micro_deficient', npts, dtype=float),
+        #     # ss.Result(self.name, 'prev_micro_normal', npts, dtype=float),
+        #     # ss.Result(self.name, 'prev_micro_deficient', npts, dtype=float),
             
-            # ss.Result(self.name, 'prev_normal_weight', npts, dtype=float),
-            # ss.Result(self.name, 'prev_mild_thinness', npts, dtype=float),
-            # ss.Result(self.name, 'prev_moderate_thinness', npts, dtype=float),
-            # ss.Result(self.name, 'prev_severe_thinness', npts, dtype=float),
+        #     # ss.Result(self.name, 'prev_normal_weight', npts, dtype=float),
+        #     # ss.Result(self.name, 'prev_mild_thinness', npts, dtype=float),
+        #     # ss.Result(self.name, 'prev_moderate_thinness', npts, dtype=float),
+        #     # ss.Result(self.name, 'prev_severe_thinness', npts, dtype=float),
 
-            ss.Result(self.name, 'people_alive', npts, dtype=float),
-        ]
+        #     ss.Result(self.name, 'people_alive', npts, dtype=float),
+        # ]
+        
+        self.define_results(
+            ss.Result('people_alive', dtype=float, label='People alive'),
+        )
+        
         return
 
     def update_results(self):

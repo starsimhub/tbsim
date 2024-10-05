@@ -16,7 +16,7 @@ import os
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = False # NOTE: Debug runs in serial
+debug = True # NOTE: Debug runs in serial
 default_n_rand_seeds = [25, 1][debug]
 
 resdir = cfg.create_res_dir()
@@ -195,15 +195,6 @@ if __name__ == '__main__':
             ),
         },
 
-        'Rel trans het + Nutrition-->TB activation': {
-            'Skip': True,
-            'TB': dict(
-                reltrans_het = ss.gamma(a=0.1, scale=2), # mean = a*scale (keep as 1)
-            ),
-            'Connector': dict(
-                rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
-            ),
-        },
         'Nutrition-->TB activation link': {
             'Skip': True,
             'Connector': dict(

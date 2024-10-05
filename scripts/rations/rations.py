@@ -60,7 +60,7 @@ class RATIONSTrial(ss.Intervention):
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         
-        self.add_states( # For individual people
+        self.define_states( # For individual people
             ss.FloatArr('cid'),  # Cluster ID
             ss.FloatArr('hhid'), # Household id
             ss.BoolArr('arm', default=Arm.CONTROL),
@@ -71,7 +71,7 @@ class RATIONSTrial(ss.Intervention):
             ss.FloatArr('ti_enrolled'),
         )
 
-        self.default_pars(
+        self.define_pars(
             n_clusters = 28,
             n_hhs = 2_800,
 

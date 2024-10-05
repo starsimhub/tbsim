@@ -47,7 +47,6 @@ def make_tb_nut():
     sim_pars = dict(
         dt = 7/365,
         start = 1980,
-        end = 2020,
         )
     # initialize the simulation
     sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
@@ -63,7 +62,7 @@ def make_tb_nut_02(agents=1000, start=1980, end=2020, dt=7/365):
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
     dems = [ss.Pregnancy(pars={'fertility_rate': 15}), ss.Deaths(pars={'death_rate': 10})]
     cn = mtb.TB_Nutrition_Connector({})
-    sim_pars = {'dt': dt, 'start': start, 'end': end}
+    sim_pars = {'dt': dt, 'start': start}
     sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
     sim.pars.verbose = sim.pars.dt / 5
     return sim
@@ -71,10 +70,8 @@ def make_tb_nut_02(agents=1000, start=1980, end=2020, dt=7/365):
 if __name__ == '__main__':  
     sim_tbn = make_tb_nut()
     sim_tbn.run()
-    mtb.plot_sim(sim_tbn)
     plt.show()
 
     sim_tbn = make_tb_nut_02(agents=1500)
     sim_tbn.run()
-    mtb.plot_sim(sim_tbn)
     plt.show()

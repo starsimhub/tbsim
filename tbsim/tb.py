@@ -23,7 +23,7 @@ class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
 
-        self.default_pars(
+        self.define_pars(
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
@@ -48,9 +48,9 @@ class TB(ss.Infection):
 
             reltrans_het = ss.constant(v=1.0),
         )
-        self.update_pars(pars, **kwargs)
+        # self.update_pars(pars, **kwargs)  #TODO: Chech if this is still needed after change from starsim to starsim2
         
-        self.add_states(
+        self.define_states(
             # Initialize states specific to TB:
             ss.FloatArr('state', default=TBS.NONE),             # One state to rule them all?
             ss.FloatArr('active_tb_state', default=TBS.NONE),   # Form of active TB (SmPos, SmNeg, or ExpTB)
@@ -241,9 +241,17 @@ class TB(ss.Infection):
     def init_results(self):
         """ Initialize results """
         super().init_results()
-        for rkey in ['latent_slow', 'latent_fast', 'active_presymp', 'active_smpos', 'active_smneg', 'active_exptb']:
-            self.results += ss.Result(self.name, f'n_{rkey}', self.sim.npts, dtype=int)
-        self.results += ss.Result(self.name, 'new_deaths', self.sim.npts, dtype=int)
+        
+        self.define_results(
+            ss.Result('n_latent_slow',   dtype=int, label='Latent Slow'),
+            ss.Result('n_latent_fast',   dtype=int, label='Latent Fast'),
+            ss.Result('n_active_presymp', dtype=int, label='Active Pre-Symptomatic'), 
+            ss.Result('n_active_smpos',  dtype=int, label='Active Smear Positive'),
+            ss.Result('n_active_smneg',  dtype=int, label='Active Smear Negative'),
+            ss.Result('n_active_exptb',  dtype=int, label='Active Extra-Pulmonary'),
+            ss.Result('new_deaths',    dtype=int, label='New Deaths'),
+            ss.Result('cum_deaths',      dtype=int, label='Cumulative Deaths')
+        )
         return
 
     def update_results(self):

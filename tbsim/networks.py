@@ -9,7 +9,7 @@ class HouseholdNet(ss.Network):
         super().__init__(**kwargs)
 
         self.hhs = [] if hhs is None else hhs
-        self.default_pars()
+        self.define_pars()
         self.update_pars(pars, **kwargs)
         return
 

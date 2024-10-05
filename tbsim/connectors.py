@@ -14,7 +14,7 @@ class TB_Nutrition_Connector(ss.Connector):
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='TB-Malnutrition', requires=[TB, Malnutrition])
 
-        self.default_pars(
+        self.define_pars(
             rr_activation_func = self.ones_rr, #self.supplementation_rr, self.lonnroth_bmi_rr,
             rr_clearance_func = self.ones_rr,
             relsus_func = self.compute_relsus,
