@@ -17,6 +17,7 @@ jobs:
         run: |
           ls -l
           pip install -e .
+          pip install --upgrade setuptools
           pip freeze      
           
       # Step 2.1: Checkout starsimhub/starsim repository
