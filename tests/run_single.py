@@ -57,9 +57,8 @@ def make_tb_nut():
     sim_pars = dict(
         dt = 7/365,
         start = 1980,
-        end = 2020,
         )
-    sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=routine_vx)
+    sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=routine_vx, dur=15)
     sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
     #
@@ -70,6 +69,6 @@ def make_tb_nut():
 if __name__ == '__main__':  
     sim_tbn = make_tb_nut()
     sim_tbn.run()
-    # mtb.plot_sim(sim_tbn)
-    #plt.show()
+    sim_tbn.diseases['tb'].plot()
+    plt.show()
     plt.close()
