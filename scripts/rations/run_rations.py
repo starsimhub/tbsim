@@ -107,8 +107,9 @@ def build_RATIONS(skey, scen, rand_seed=0):
         connectors=cn, 
         interventions=intvs,
         analyzers=azs,
+        dur = 15
     )
-    sim.pars.verbose = 0 #sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
+    sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
     return sim
 
