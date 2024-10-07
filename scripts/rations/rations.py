@@ -131,14 +131,14 @@ class RATIONSTrial(ss.Intervention):
     def init_results(self):
         super().init_results()
         self.define_results(
-            ss.Result('new_hhs_enrolled_ctrl', dtype=int, label='New households enrolled (control)'),
-            ss.Result('incident_cases_ctrl', dtype=int, label='Incident cases (control)'),
-            ss.Result('coprevalent_cases_ctrl', dtype=int, label='Coprevalent cases (control)'),
-            ss.Result('person_years_ctrl', dtype=int, label='Person-years (control)'),
-            ss.Result('new_hhs_enrolled_intv', dtype=int, label='New households enrolled (intervention)'),
-            ss.Result('incident_cases_intv', dtype=int, label='Incident cases (intervention)'),
-            ss.Result('coprevalent_cases_intv', dtype=int, label='Coprevalent cases (intervention)'),
-            ss.Result('person_years_intv', dtype=int, label='Person-years (intervention)'),
+            ss.Result(module=self.name, name='new_hhs_enrolled_ctrl', dtype=int, label='New households enrolled (control)'),
+            ss.Result(module=self.name, name='incident_cases_ctrl', dtype=int, label='Incident cases (control)'),
+            ss.Result(module=self.name, name='coprevalent_cases_ctrl', dtype=int, label='Coprevalent cases (control)'),
+            ss.Result(module=self.name, name='person_years_ctrl', dtype=int, label='Person-years (control)'),
+            ss.Result(module=self.name, name='new_hhs_enrolled_intv', dtype=int, label='New households enrolled (intervention)'),
+            ss.Result(module=self.name, name='incident_cases_intv', dtype=int, label='Incident cases (intervention)'),
+            ss.Result(module=self.name, name='coprevalent_cases_intv', dtype=int, label='Coprevalent cases (intervention)'),
+            ss.Result(module=self.name, name='person_years_intv', dtype=int, label='Person-years (intervention)'),
             )
         return
 
@@ -198,12 +198,12 @@ class RATIONSTrial(ss.Intervention):
         return
 
 
-    def apply(self, sim):
-        super().apply(sim)
+    def step(self):
+        super().step()
 
         tb = self.sim.diseases['tb']
         nut = self.sim.diseases['malnutrition']
-        ti, dt = self.sim.ti, self.sim.dt
+        ti, dt = self.sim.ti, self.sim.dt    #TODO: Check how do we get this value now.
 
         # INCIDENCE FROM COMMUNITY
         if self.pars.x_community_incidence_rate > 0:
