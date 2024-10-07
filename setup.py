@@ -36,6 +36,7 @@ install_requires=[
     'seaborn',
     'pytest',
 ]
+tbsim_version = version
 if tbsim_version and tbsim_version < "1.0.0":
     install_requires.append("starsim==1.0.3")
 else:
