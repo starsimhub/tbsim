@@ -24,7 +24,22 @@ CLASSIFIERS = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
-
+install_requires=[
+    'numpy',
+    'scipy',
+    'pandas>=2.0.0',
+    'sciris>=3.1.0',
+    'matplotlib',
+    'numba',
+    'wheel',
+    'setuptools',
+    'seaborn',
+    'pytest',
+]
+if tbsim_version and tbsim_version < "1.0.0":
+    install_requires.append("starsim==1.0.3")
+else:
+    install_requires.append("starsim>=2.0.0")
 setup(
     name="tbsim",
     version=version,
@@ -37,17 +52,5 @@ setup(
     classifiers=CLASSIFIERS,
     packages=find_packages(),
     include_package_data=True,
-    install_requires=[
-        'numpy',
-        'scipy',
-        'pandas>=2.0.0',
-        'sciris>=3.1.0',
-        'matplotlib',
-        'numba',
-        'starsim',
-        'wheel',
-        'setuptools',
-        'seaborn',
-        'pytest',
-    ],
+    install_requires=install_requires,
 )
