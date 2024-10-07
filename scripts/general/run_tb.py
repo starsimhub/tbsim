@@ -33,7 +33,7 @@ def make_tb():
         dt = 7/365,
         start = 1990,
         )
-    sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=sim_pars, demographics=dems)   # initialize the simulation
+    sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=sim_pars, demographics=dems, dur=15)   # initialize the simulation
     sim.pars.verbose = sim.pars.dt / 5      # Print status every 5 years instead of every 10 steps
     return sim
 
@@ -41,8 +41,8 @@ def make_tb_simplified(agents=1000, start=2000, dt=7/365):
     pop = ss.People(n_agents=agents)
     tb = mtb.TB(dict(beta = 0.001, init_prev = 0.25))
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur = 0))
-    dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))]
-    sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt = dt, start = start, ), demographics=dems)
+    dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=15))]
+    sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt = dt, start = start, ), demographics=dems, dur=10)
     sim.pars.verbose = sim.pars.dt / 5
     return sim
 
