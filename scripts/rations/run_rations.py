@@ -16,7 +16,7 @@ import os
 warnings.filterwarnings("ignore", "is_categorical_dtype")
 warnings.filterwarnings("ignore", "use_inf_as_na")
 
-debug = True # NOTE: Debug runs in serial
+debug = False # NOTE: Debug runs in serial
 default_n_rand_seeds = [25, 1][debug]
 
 resdir = cfg.create_res_dir()
@@ -94,7 +94,6 @@ def build_RATIONS(skey, scen, rand_seed=0):
     sim_pars = dict(
         dt = 7/365,
         start = 2019, # Dates don't matter
-        end = 2030, # Long enough that all pre-symptomatic period end + 2y
         rand_seed = rand_seed,
     )
     if scen is not None and 'Simulation' in scen.keys() and scen['Simulation'] is not None:
@@ -135,7 +134,7 @@ def run_RATIONS(skey, scen, rand_seed=0):
     dfs = []
     for d in dat:
         dfs.append(
-            pd.DataFrame({'Values': d[0]}, index=pd.MultiIndex.from_product([sim.results.yearvec, [d[1]], [d[2]]], names=['Year', 'Channel', 'Arm']))
+            pd.DataFrame({'Values': d[0]}, index=pd.MultiIndex.from_product([sim.results.timevec, [d[1]], [d[2]]], names=['Year', 'Channel', 'Arm']))
         )
     df = pd.concat(dfs)
     df['Seed'] = rand_seed

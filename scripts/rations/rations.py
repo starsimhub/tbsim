@@ -128,13 +128,18 @@ class RATIONSTrial(ss.Intervention):
             p[in_cluster_and_sus] = self.pars.x_community_incidence_rate * ptb_cases_to_seed / len(in_cluster_and_sus)
         return p
 
-    def init_pre(self, sim):
-        super().init_pre(sim)
-        for arm in ['ctrl', 'intv']:
-            self.results += ss.Result(self.name, f'new_hhs_enrolled_{arm}', self.sim.npts, dtype=int)
-            self.results += ss.Result(self.name, f'incident_cases_{arm}', self.sim.npts, dtype=int)
-            self.results += ss.Result(self.name, f'coprevalent_cases_{arm}', self.sim.npts, dtype=int)
-            self.results += ss.Result(self.name, f'person_years_{arm}', self.sim.npts, dtype=int)
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('new_hhs_enrolled_ctrl', dtype=int, label='New households enrolled (control)'),
+            ss.Result('incident_cases_ctrl', dtype=int, label='Incident cases (control)'),
+            ss.Result('coprevalent_cases_ctrl', dtype=int, label='Coprevalent cases (control)'),
+            ss.Result('person_years_ctrl', dtype=int, label='Person-years (control)'),
+            ss.Result('new_hhs_enrolled_intv', dtype=int, label='New households enrolled (intervention)'),
+            ss.Result('incident_cases_intv', dtype=int, label='Incident cases (intervention)'),
+            ss.Result('coprevalent_cases_intv', dtype=int, label='Coprevalent cases (intervention)'),
+            ss.Result('person_years_intv', dtype=int, label='Person-years (intervention)'),
+            )
         return
 
     def init_post(self):

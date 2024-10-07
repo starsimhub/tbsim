@@ -73,7 +73,7 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     sim.run()
 
     df = pd.DataFrame( {
-        'year': sim.yearvec,
+        'year': sim.timevec,
         #'pph.mother_died.cumsum': sim.results.pph.mother_died.cumsum(),
         #'Births': sim.results.pph.births.cumsum(),
         'Deaths': sim.results.deaths.cumulative,

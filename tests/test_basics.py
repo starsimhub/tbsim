@@ -3,12 +3,12 @@ import numpy as np
 import starsim as ss
 import tbsim as mtb
 
-def make_tb_simplified(agents=20, start=2000, end=2020, dt=7/365):
+def make_tb_simplified(agents=20, start=2000, dt=7/365):
     pop = ss.People(n_agents=agents)
     tb = mtb.TB(pars={'beta': 0.01, 'init_prev': 0.25})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))]
-    sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start, end=end), demographics=dems)
+    sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start), demographics=dems)
     sim.pars.verbose = sim.pars.dt / 5
     return sim
 

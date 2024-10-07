@@ -94,21 +94,6 @@ class Malnutrition(ss.Disease):
             ss.FloatArr('height_percentile', default=ss.uniform()), # Percentile, stays fixed
             ss.FloatArr('weight_percentile', default=ss.uniform()), # Percentile, increases when receiving micro, then declines?
             ss.FloatArr('micro', default=ss.uniform()), # Continuous? Normal distribution around zero. Z-score, sigmoid thing. Half-life.
-
-            # With downstream implications via the connector to:
-            # * LS progression rate
-            # * LF progression rate
-            # * Susceptibility
-            # * Other TB stuff?
-
-            # via functions that look like...
-            # * Longroth: BMI --> (rel_sus, progression)
-            # * weight_trend --> (rel_sus, progression)
-            # * weight_trend + micro --> (rel_sus, progression)
-
-            # Dose response mapping (continuous instead of discrete states)
-            # Time in exposure/risk state, more precisely with continuous state
-            # Recent change vs long term
         )
 
         self.dweight = ss.normal(loc=self.dweight_loc, scale=self.dweight_scale)
@@ -162,23 +147,6 @@ class Malnutrition(ss.Disease):
         """
         super().init_results()
         npts = self.sim.npts
-        # self.results += [
-        #     # ss.Result(self.name, 'prev_macro_standard_or_above', npts, dtype=float),
-        #     # ss.Result(self.name, 'prev_macro_slightly_below', npts, dtype=float),
-        #     # ss.Result(self.name, 'prev_macro_marginal', npts, dtype=float),
-        #     # ss.Result(self.name, 'prev_macro_unsatisfactory', npts, dtype=float),
-
-        #     # ss.Result(self.name, 'prev_micro_normal', npts, dtype=float),
-        #     # ss.Result(self.name, 'prev_micro_deficient', npts, dtype=float),
-            
-        #     # ss.Result(self.name, 'prev_normal_weight', npts, dtype=float),
-        #     # ss.Result(self.name, 'prev_mild_thinness', npts, dtype=float),
-        #     # ss.Result(self.name, 'prev_moderate_thinness', npts, dtype=float),
-        #     # ss.Result(self.name, 'prev_severe_thinness', npts, dtype=float),
-
-        #     ss.Result(self.name, 'people_alive', npts, dtype=float),
-        # ]
-        
         self.define_results(
             ss.Result('people_alive', dtype=float, label='People alive'),
         )
@@ -191,19 +159,5 @@ class Malnutrition(ss.Disease):
         alive = self.sim.people.alive    # People alive at current time index
         n_agents = self.sim.pars['n_agents']
         n_alive = alive.count()
-        
-        ##self.results.prev_macro_standard_or_above[ti] = np.count_nonzero((self.macro_state==MacroNutrients.STANDARD_OR_ABOVE) & alive)/n_alive
-        #self.results.prev_macro_slightly_below[ti] = np.count_nonzero((self.macro_state==MacroNutrients.SLIGHTLY_BELOW_STANDARD) & alive)/n_alive
-        #self.results.prev_macro_marginal[ti] = np.count_nonzero((self.macro_state==MacroNutrients.MARGINAL) & alive)/n_alive
-        #self.results.prev_macro_unsatisfactory[ti] = np.count_nonzero((self.macro_state==MacroNutrients.UNSATISFACTORY) & alive)/n_alive
-
-        #self.results.prev_micro_normal[ti] = np.count_nonzero((self.micro_state==MicroNutrients.NORMAL) & alive)/n_alive
-        #self.results.prev_micro_deficient[ti] = np.count_nonzero((self.micro_state==MicroNutrients.DEFICIENT) & alive)/n_alive
         self.results.people_alive[ti] = alive.count()/n_agents
-
-
-        #self.results.prev_normal_weight[ti] = np.count_nonzero((self.bmi_state == ne.eBmiStatus.NORMAL_WEIGHT) & alive) / n_alive
-        #self.results.prev_mild_thinness[ti] = np.count_nonzero((self.bmi_state == ne.eBmiStatus.MILD_THINNESS) & alive) / n_alive
-        #self.results.prev_moderate_thinness[ti] = np.count_nonzero((self.bmi_state == ne.eBmiStatus.MODERATE_THINNESS) & alive) / n_alive
-        #self.results.prev_severe_thinness[ti] = np.count_nonzero((self.bmi_state == ne.eBmiStatus.SEVERE_THINNESS) & alive) / n_alive
         return
