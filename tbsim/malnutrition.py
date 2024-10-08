@@ -148,7 +148,7 @@ class Malnutrition(ss.Disease):
         super().init_results()
         npts = self.sim.npts
         self.define_results(
-            ss.Result('people_alive', dtype=float, label='People alive'),
+            ss.Result('people_alive', dtype=float, shape=self.npts, label='People alive'),
         )
         
         return
