@@ -134,7 +134,7 @@ class Malnutrition(ss.Disease):
 
     def update_pre(self):
         ti = self.sim.ti
-        dt = self.sim.dt
+        dt = self.sim.pars['dt']
 
         uids = self.sim.people.auids # All alive uids
 
