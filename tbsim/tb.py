@@ -48,7 +48,7 @@ class TB(ss.Infection):
 
             reltrans_het = ss.constant(v=1.0),
         )
-        # self.update_pars(pars, **kwargs)  #TODO: Chech if this is still needed after change from starsim to starsim2
+        self.update_pars(pars, **kwargs)  #TODO: Chech if this is still needed after change from starsim to starsim2
         
         self.define_states(
             # Initialize states specific to TB:
@@ -226,11 +226,11 @@ class TB(ss.Infection):
         self.rr_death[tx_uids] = 0 # People on treatment don't die...
         return len(tx_uids)
 
-    def update_death(self, uids):
+    def step_die(self, uids):
         if len(uids) == 0:
             return # Nothing to do
 
-        super().update_death(uids)
+        super().step_die(uids)
         # Make sure these agents do not transmit or get infected after death
         self.susceptible[uids] = False
         self.infected[uids] = False
