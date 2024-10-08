@@ -10,5 +10,12 @@
     "python.testing.unittestEnabled": false,
     "python.testing.pytestArgs": [
         "tests"
+    ],
+    "cSpell.words": [
+        "dems",
+        "intvs",
+        "starsim",
+        "tbsim",
+        "uids"
     ]
 }

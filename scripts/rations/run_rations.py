@@ -109,7 +109,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
         interventions=intvs,
         analyzers=azs,
     )
-    sim.pars.verbose = 0 #sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
+    sim.pars.verbose = [0, sim.pars.dt / 5][debug] # Print status every 5 years instead of every 10 steps
 
     return sim
 
@@ -209,7 +209,7 @@ if __name__ == '__main__':
             'Connector': dict(
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
                 rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
-                ),
+            ),
         },
         'Nutrition-->TB clearance link': {
             'Skip': True,
