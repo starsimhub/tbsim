@@ -77,6 +77,7 @@ class Malnutrition(ss.Disease):
         self.define_pars(
             beta = 1.0,         # Transmission rate  - TODO: Check if there is one
             init_prev = 0.001,  # Initial prevalence 
+            dist = [],
         )
         self.update_pars(pars, **kwargs)
 
@@ -91,27 +92,24 @@ class Malnutrition(ss.Disease):
 
             # Internal state
             # PROBLEM: Correlation between weight and height
-            ss.FloatArr('height_percentile', default=ss.uniform()), # Percentile, stays fixed
-            ss.FloatArr('weight_percentile', default=ss.uniform()), # Percentile, increases when receiving micro, then declines?
-            ss.FloatArr('micro', default=ss.uniform()), # Continuous? Normal distribution around zero. Z-score, sigmoid thing. Half-life.
-            # With downstream implications via the connector to:
-            # * LS progression rate
-            # * LF progression rate
-            # * Susceptibility
-            # * Other TB stuff?
-
-            # via functions that look like...
-            # * Longroth: BMI --> (rel_sus, progression)
-            # * weight_trend --> (rel_sus, progression)
-            # * weight_trend + micro --> (rel_sus, progression)
-
-            # Dose response mapping (continuous instead of discrete states)
-            # Time in exposure/risk state, more precisely with continuous state
-            # Recent change vs long term
+            ss.FloatArr('height_percentile', default=0.0), # Percentile, stays fixed
+            ss.FloatArr('weight_percentile', default=0.0), # Percentile, increases when receiving micro, then declines?
+            ss.FloatArr('micro', default=0.0), # Continuous? Normal distribution around zero. Z-score, sigmoid thing. Half-life.
         )
-
         self.dweight = ss.normal(loc=self.dweight_loc, scale=self.dweight_scale)
 
+        #  PLEASE NOTE: The following code is a workaround for a bug in the current version of StarSim
+        dst = self.pars.dist
+        if len(dst) == 0:
+            for i in range(3):
+                print(i)
+                np.random.seed(i)
+                dst.append( ss.uniform())
+            
+        self.height_percentile = dst[0]
+        self.weight_percentile = dst[1]
+        self.micro = dst[2]
+        
         return
 
     def set_initial_states(self, sim):

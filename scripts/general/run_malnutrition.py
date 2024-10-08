@@ -2,6 +2,7 @@ import tbsim as mtb
 import starsim as ss
 import matplotlib.pyplot as plt
 import numpy as np
+
 def make_malnutrition():
     # --------- Disease ----------
     nut_pars = dict()
@@ -16,25 +17,23 @@ def make_malnutrition():
         dt = 0.5,
         start = 1990
         )
-    sim = ss.Sim(people=pop, diseases=nut, pars=sim_pars)
+    sim = ss.Sim(people=pop, diseases=nut, pars=sim_pars, dur=10)
     return sim
 
-def make_malnutrition_02(agents=10000, start=1990, end=2000, dt=0.5):
-    print("Running make_malnutrition_02 with agents=%d, start=%d, end=%d, dt=%f" % (agents, start, end, dt))
-    return ss.Sim(people=ss.People(n_agents=agents), diseases=mtb.Malnutrition({}), pars=dict(dt=dt, start=start, end=end))
+def make_malnutrition_02(agents=100, start=1990, dt=0.5, dur=10):
+    print("Running make_malnutrition_02 with agents=%d, start=%d, dur=%d, dt=%f" % (agents, start, dur, dt))
+    return ss.Sim(people=ss.People(n_agents=agents), diseases=mtb.Malnutrition({}), pars=dict(dt=dt, start=start, dur=dur))
 
 
 if __name__ == '__main__':
     # Make Malnutrition simulation
-    np.random.seed(0)
     sim_n = make_malnutrition()
     sim_n.run()
-    mtb.plot_sim(sim_n)
+    sim_n.diseases['malnutrition'].plot()
     plt.show()
     
-    # # Same concept, simpler parameters
-    # np.random.seed(1)
-    # sim_n = make_malnutrition_02(agents=80000, start=2000, end=2020, dt=0.25)
-    # sim_n.run()
-    # mtb.plot_sim(sim_n)
-    # plt.show()
+    # Same concept, simpler parameters
+    sim_n = make_malnutrition_02(agents=80000, start=2000, dur=15, dt=0.25)
+    sim_n.run()
+    sim_n.diseases['malnutrition'].plot()
+    plt.show()
