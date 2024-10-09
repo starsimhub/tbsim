@@ -14,13 +14,15 @@ def make_malnutrition():
     
     # -------- simulation -------
     sim_pars = dict(
-        dt = 0.5,
-        start = 1990
-        )
-    sim = ss.Sim(people=pop, diseases=nut, pars=sim_pars, dur=10)
+        dt=7/365,
+        start=1990,
+        stop=2020,  # we dont use dur, as duration gets calculated internally.
+    )
+    sim = ss.Sim(people=pop, diseases=nut, pars=sim_pars)
     return sim
 
-def make_malnutrition_02(agents=100, start=1990, dt=0.5, dur=10):
+
+def make_malnutrition_02(agents=100, start=1990, dt=0.5, dur=13.5):  # dur is in years and removes the need for "stop"
     print("Running make_malnutrition_02 with agents=%d, start=%d, dur=%d, dt=%f" % (agents, start, dur, dt))
     return ss.Sim(people=ss.People(n_agents=agents), diseases=mtb.Malnutrition({}), pars=dict(dt=dt, start=start, dur=dur))
 
