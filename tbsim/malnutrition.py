@@ -92,24 +92,12 @@ class Malnutrition(ss.Disease):
 
             # Internal state
             # PROBLEM: Correlation between weight and height
-            ss.FloatArr('height_percentile', default=0.0), # Percentile, stays fixed
-            ss.FloatArr('weight_percentile', default=0.0), # Percentile, increases when receiving micro, then declines?
-            ss.FloatArr('micro', default=0.0), # Continuous? Normal distribution around zero. Z-score, sigmoid thing. Half-life.
+            ss.FloatArr('height_percentile', default=ss.uniform(name='height_percentile')), # Percentile, stays fixed
+            ss.FloatArr('weight_percentile', default=ss.uniform(name='weight_percentile')), # Percentile, increases when receiving micro, then declines?
+            ss.FloatArr('micro', default=ss.uniform(name='micro')), # Continuous? Normal distribution around zero. Z-score, sigmoid thing. Half-life.
         )
         self.dweight = ss.normal(loc=self.dweight_loc, scale=self.dweight_scale)
 
-        #  PLEASE NOTE: The following code is a workaround for a bug in the current version of StarSim
-        dst = self.pars.dist
-        if len(dst) == 0:
-            for i in range(3):
-                print(i)
-                np.random.seed(i)
-                dst.append( ss.uniform())
-            
-        self.height_percentile = dst[0]
-        self.weight_percentile = dst[1]
-        self.micro = dst[2]
-        
         return
 
     def set_initial_states(self, sim):
