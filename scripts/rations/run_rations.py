@@ -94,6 +94,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
     sim_pars = dict(
         dt = 7/365,
         start = 2019, # Dates don't matter
+        stop = 2030,
         rand_seed = rand_seed,
     )
     if scen is not None and 'Simulation' in scen.keys() and scen['Simulation'] is not None:
@@ -107,7 +108,6 @@ def build_RATIONS(skey, scen, rand_seed=0):
         connectors=cn, 
         interventions=intvs,
         analyzers=azs,
-        dur = 15
     )
     sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
 
@@ -195,6 +195,15 @@ if __name__ == '__main__':
             ),
         },
 
+        'Rel trans het + Nutrition-->TB activation': {
+            'Skip': True,
+            'TB': dict(
+                reltrans_het = ss.gamma(a=0.1, scale=2), # mean = a*scale (keep as 1)
+            ),
+            'Connector': dict(
+                rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
+            ),
+        },
         'Nutrition-->TB activation link': {
             'Skip': True,
             'Connector': dict(
