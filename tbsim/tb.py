@@ -48,7 +48,7 @@ class TB(ss.Infection):
 
             reltrans_het = ss.constant(v=1.0),
         )
-        self.update_pars(pars, **kwargs)  #TODO: Chech if this is still needed after change from starsim to starsim2
+        self.update_pars(pars, **kwargs) 
         
         self.define_states(
             # Initialize states specific to TB:
