@@ -81,7 +81,7 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         rate *= self.rr_activation[uids]
 
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * sim.dt) # or just rate * dt
+        prob = 1-np.exp(-DAYS_PER_YEAR * rate * self.dt) # or just rate * dt
         return prob
 
     @staticmethod
@@ -89,7 +89,7 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * sim.dt) # or just rate * dt
+        prob = 1-np.exp(-DAYS_PER_YEAR * rate * self.dt) # or just rate * dt
         return prob
 
     @staticmethod
@@ -99,7 +99,7 @@ class TB(ss.Infection):
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
         rate *= self.rr_clearance[uids]
 
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * sim.dt) # or just rate * dt
+        prob = 1-np.exp(-DAYS_PER_YEAR * rate * self.dt) # or just rate * dt
         return prob
 
     @staticmethod
@@ -111,7 +111,7 @@ class TB(ss.Infection):
 
         rate *= self.rr_death[uids]
 
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * sim.dt) # or just rate * dt
+        prob = 1-np.exp(-DAYS_PER_YEAR * rate * self.dt) # or just rate * dt
         return prob
 
     @property
@@ -145,11 +145,11 @@ class TB(ss.Infection):
         self.results['new_infections'][self.sim.ti] += len(uids)
         return
 
-    def update_pre(self):
+    def step(self):
         # Make all the updates from the SIR model 
-        super().update_pre()
+        super().step()
         p = self.pars
-        ti = self.sim.ti
+        ti = self.ti
 
         # Latent --> active pre-symptomatic
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
-from examples.harlem.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
+from scripts.harlem.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
 import os 
 
 
