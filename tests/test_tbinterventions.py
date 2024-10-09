@@ -33,5 +33,5 @@ def test_campaign_apply():
     pass
 
 if __name__ == '__main__':
-    sim = ss.Sim(people=ss.People(n_agents=500), networks=ss.RandomNet(), diseases=mtb.TB(), pars=dict(start=1900 ))
+    sim = ss.Sim(people=ss.People(n_agents=500), networks=ss.RandomNet(), diseases=mtb.TB(), pars=dict(start=1990, stop = 2021, dt=0.5))
     pytest.main()
