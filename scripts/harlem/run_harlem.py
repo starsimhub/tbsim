@@ -1,3 +1,8 @@
+# WARNING: This Script won't work as is. It needs to be adapted to the new TB, Malnutrition and starsim 2.0 API.
+
+# Otherwise, you can try the following configuration:
+# Starsim "v1.0.2" tag works with the TBsim "Harlem" tag for the run_harlem_scenarios.py
+
 import starsim as ss
 import tbsim as mtb
 import numpy as np
@@ -112,7 +117,7 @@ def run_harlem(rand_seed=0):
         dt = 7/365,
         #start = 1935, # Start early to burn-in
         start = 1941,
-        end = 1947,
+        stop = 1947,
         rand_seed = rand_seed,
         )
     # initialize the simulation
