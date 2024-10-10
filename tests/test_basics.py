@@ -3,12 +3,12 @@ import numpy as np
 import starsim as ss
 import tbsim as mtb
 
-def make_tb_simplified(agents=20, start=2000, dt=7/365):
+def make_tb_simplified(agents=20, start=2000, stop=2020, dt=7/365):
     pop = ss.People(n_agents=agents)
     tb = mtb.TB(pars={'beta': 0.01, 'init_prev': 0.25})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))]
-    sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start), demographics=dems, dur=10)
+    sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start, stop=stop), demographics=dems)
     sim.pars.verbose = sim.pars.dt / 5
     return sim
 
@@ -85,11 +85,13 @@ def test_set_prognoses():
 
 def test_update_pre():
     sim = make_tb_simplified(agents=300)
-    sim.run()
+    sim.init()
     tb = sim.diseases['tb']
-    assert tb.state[tb.state == mtb.TBS.LATENT_SLOW].itemsize > 0
-    assert tb.state[tb.state == mtb.TBS.ACTIVE_SMNEG].itemsize > 0
-
+    assert len(tb.state[tb.state == mtb.TBS.NONE]) > 0
+    sim.run()
+    assert len(tb.state[tb.state == mtb.TBS.LATENT_SLOW]) > 0
+    assert len(tb.state[tb.state == mtb.TBS.ACTIVE_SMNEG]) > 0
+    
     print("none", tb.state[tb.state == mtb.TBS.NONE])
     print("Slow:", tb.state[tb.state == mtb.TBS.LATENT_SLOW])
     print("Fast:", tb.state[tb.state == mtb.TBS.LATENT_FAST])
