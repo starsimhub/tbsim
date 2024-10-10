@@ -9,7 +9,8 @@ import starsim as ss
 from scipy.stats import norm
 from tbsim import DATADIR
 
-__all__ = ['Malnutrition']
+__all__ = ["Malnutrition"]
+
 
 class Malnutrition(ss.Disease):
     """
@@ -77,7 +78,6 @@ class Malnutrition(ss.Disease):
         self.define_pars(
             beta = 1.0,         # Transmission rate  - TODO: Check if there is one
             init_prev = 0.001,  # Initial prevalence 
-            dist = [],
         )
         self.update_pars(pars, **kwargs)
 
@@ -157,7 +157,7 @@ class Malnutrition(ss.Disease):
             # ss.Result(self.name, 'prev_mild_thinness', npts, dtype=float),
             # ss.Result(self.name, 'prev_moderate_thinness', npts, dtype=float),
             # ss.Result(self.name, 'prev_severe_thinness', npts, dtype=float),
-            ss.Result(module=self.name, name='people_alive', shape=self.npts, dtype=float, label='People alive'),
+            ss.Result(name='people_alive', dtype=float, label='People alive'),
         )
         return
 
