@@ -7,6 +7,7 @@ __pycache__/
 *$py.class
 # VS Code settings
 .vscode/
+.vs/
 
 # C extensions
 *.so
@@ -22,6 +23,7 @@ eggs/
 lib/
 lib64/
 parts/
+results/
 sdist/
 var/
 wheels/
