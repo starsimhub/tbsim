@@ -23,11 +23,6 @@ class TB_Nutrition_Connector(ss.Connector):
 
         return
 
-    def init_vals(self):
-        super().init_vals()
-        self.update() # needed?
-        return
-
     @staticmethod
     def supplementation_rr(tb, mn, uids, rate_ratio=0.5):
         rr = np.ones_like(uids)
