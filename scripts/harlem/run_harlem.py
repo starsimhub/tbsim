@@ -1,7 +1,9 @@
-# WARNING: This Script won't work as is. It needs to be adapted to the new TB, Malnutrition and starsim 2.0 API.
+# WARNING: This script is not functional in its current form. 
+# It needs to be updated to align with the new APIs for TB, Malnutrition, and Starsim 2.0.
 
-# Otherwise, you can try the following configuration:
-# Starsim "v1.0.2" tag works with the TBsim "Harlem" tag for the run_harlem_scenarios.py
+# Alternatively, you can use the following configuration:
+# The "v1.0.2" tag of Starsim is compatible with the "Harlem" tag of TBsim 
+# for running the 'run_harlem.py' script.
 
 import starsim as ss
 import tbsim as mtb
