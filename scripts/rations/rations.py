@@ -112,7 +112,7 @@ class RATIONSTrial(ss.Intervention):
         Compute the bernoulli probability of each agent becoming infected from
         the community. Uses RATIONS cluster incidence data from the "cdf" dataframe.
         '''
-        p = np.ones_like(uids) 
+        p = np.ones(len(uids))
         tb = sim.diseases['tb']
         dt = self.dt 
         frac_pulmonary = 0.65 + 0.25
