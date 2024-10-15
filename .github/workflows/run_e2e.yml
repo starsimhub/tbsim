@@ -8,7 +8,7 @@ on:
         required: true
         default: 'main' # Set a default branch
       run_additional_tests:
-        description: 'Run additional test i.e. scripts\general\run_scenarios.py'
+        description: 'Run additional test i.e. scripts/general/run_scenarios.py'
         required: false
         default: 'None'
         type: string
@@ -63,8 +63,8 @@ jobs:
     # Run tests
     - name: Run Tests
       run: |
-        python scripts\general\run_tb.py
-        python scripts\general\run_malnutrition.py
+        python scripts/general/run_tb.py
+        python scripts/general/run_malnutrition.py
         
         
     - name: Run Additional Tests
