@@ -145,7 +145,7 @@ class TB(ss.Infection):
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
         # Update result count of new infections 
-        self.results['new_infections'][self.sim.ti] += len(uids)
+        self.results['new_infections'][self.ti] += len(uids)
         return
 
     def step(self):
@@ -260,7 +260,7 @@ class TB(ss.Infection):
     def update_results(self):
         super().update_results()
         res = self.results
-        ti = self.sim.ti
+        ti = self.ti
 
         res.n_latent_slow[ti] = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti] = np.count_nonzero(self.state == TBS.LATENT_FAST)
