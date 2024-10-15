@@ -1,4 +1,4 @@
-name: Run 
+name: Run e2e scripts
 
 on:
   workflow_dispatch:
