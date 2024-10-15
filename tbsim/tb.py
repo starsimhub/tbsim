@@ -6,8 +6,6 @@ from enum import IntEnum
 
 __all__ = ['TB', 'TBS']
 
-DAYS_PER_YEAR = 365
-
 class TBS(IntEnum):
     NONE            = -1    # No TB
     LATENT_SLOW     = 0     # Latent TB, slow progression
@@ -35,7 +33,7 @@ class TB(ss.Infection):
             rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
             rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
             rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = ss.perday(2/12 / DAYS_PER_YEAR), # 2 months (per day, for consistency)
+            rate_treatment_to_clear = ss.peryear(2/12),                # 2 months
 
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
@@ -86,7 +84,7 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         rate *= self.rr_activation[uids]
 
-        prob = 1-np.exp(-rate) #np.clip(rate, 0, 1) # 1-np.exp(-DAYS_PER_YEAR * rate * self.dt)
+        prob = 1-np.exp(-rate)
         return prob
 
     @staticmethod
