@@ -175,12 +175,9 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
 
 if __name__ == '__main__':
     # Define the scenarios
-    from functools import partial
     from scripts.rations.scenarios import scens
-    
-    scens = scens
+   
     scens = {skey:scen for skey, scen in scens.items() if scen is None or 'Skip' not in scen or not scen['Skip']}
-
     ret = run_scenarios(scens)
 
     # Create plots
