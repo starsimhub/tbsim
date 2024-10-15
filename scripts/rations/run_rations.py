@@ -37,7 +37,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
     pop = ss.People(n_agents = 1400 + 4724 + 1400 + 5621)
 
     # Create networks
-    nets = mtb.HouseholdNet()
+    nets = mtb.HouseholdNet(add_newborns=False) # Optionally add newborns to households here
 
     # Create the instance of TB disease
     tb_pars = dict(
@@ -206,14 +206,14 @@ if __name__ == '__main__':
             ),
         },
         'Nutrition-->TB activation link': {
-            'Skip': True,
+            'Skip': False,
             'Connector': dict(
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
                 rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
             ),
         },
         'Nutrition-->TB clearance link': {
-            'Skip': True,
+            'Skip': False,
             'Connector': dict(
                 rr_activation_func = mtb.TB_Nutrition_Connector.ones_rr,
                 rr_clearance_func = partial(clearance_rr_func, rate_ratio=10),

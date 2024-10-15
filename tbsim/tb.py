@@ -246,14 +246,14 @@ class TB(ss.Infection):
         super().init_results()
         
         self.define_results(
-            ss.Result('n_latent_slow',   dtype=int, label='Latent Slow'),
-            ss.Result('n_latent_fast',   dtype=int, label='Latent Fast'),
+            ss.Result('n_latent_slow',    dtype=int, label='Latent Slow'),
+            ss.Result('n_latent_fast',    dtype=int, label='Latent Fast'),
             ss.Result('n_active_presymp', dtype=int, label='Active Pre-Symptomatic'), 
-            ss.Result('n_active_smpos',  dtype=int, label='Active Smear Positive'),
-            ss.Result('n_active_smneg',  dtype=int, label='Active Smear Negative'),
-            ss.Result('n_active_exptb',  dtype=int, label='Active Extra-Pulmonary'),
-            ss.Result('new_deaths',    dtype=int, label='New Deaths'),
-            ss.Result('cum_deaths',      dtype=int, label='Cumulative Deaths')
+            ss.Result('n_active_smpos',   dtype=int, label='Active Smear Positive'),
+            ss.Result('n_active_smneg',   dtype=int, label='Active Smear Negative'),
+            ss.Result('n_active_exptb',   dtype=int, label='Active Extra-Pulmonary'),
+            ss.Result('new_deaths',       dtype=int, label='New Deaths'),
+            ss.Result('cum_deaths',       dtype=int, label='Cumulative Deaths')
         )
         return
 
