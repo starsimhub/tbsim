@@ -1,4 +1,4 @@
-name: Run e2e scenarios
+name: Run 
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
         required: true
         default: 'main' # Set a default branch
       run_additional_tests:
-        description: 'Run additional test i.e. examples\general\run_this_test.py'
+        description: 'Run additional test i.e. scripts\general\run_scenarios.py'
         required: false
         default: 'None'
         type: string
@@ -19,6 +19,7 @@ on:
   push:
     paths:
       - '**.yml'
+      - '**.py'
 jobs:
   run-tests:
     runs-on: ubuntu-latest
@@ -53,27 +54,24 @@ jobs:
         path: 'starsim'
     
     # Step 2.2: Install starsim
-    - name: Install starsim
+    - name: Install starsim with the latest checked in code in Main branch
       run: |
         cd starsim
         pip install -e .
         pip freeze
         
-    # Step 2.3: Install test requirements
-    - name: Install test requirements
-      working-directory: ./tests
-      run: |
-        pip install -r requirements.txt
-        pip freeze
-
     # Run tests
     - name: Run Tests
-      working-directory: ./tests
-      run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml 
+      run: |
+        python scripts\general\run_tb.py
+        python scripts\general\run_malnutrition.py
+        
+        
+    - name: Run Additional Tests
+      if: ${{ github.event.inputs.run_additional_tests != 'None' }}
+      working-directory: tests/e2e
+      run: |
+        echo Starting requested script: ${{ github.event.inputs.run_additional_tests }}....
+        python ${{ github.event.inputs.run_additional_tests }}   
       
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-          name: test_results
-          path: tests/test-results.xml
+
