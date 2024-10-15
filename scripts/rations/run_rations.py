@@ -189,7 +189,7 @@ if __name__ == '__main__':
         },
 
         'Lönnroth Nutrition-->TB activation link': {
-            'Skip': True,
+            'Skip': False,
             'Connector': dict(
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.lonnroth_bmi_rr, scale=3, slope=3, bmi50=20),
                 rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
@@ -197,9 +197,9 @@ if __name__ == '__main__':
         },
 
         'Rel trans het + Nutrition-->TB activation': {
-            'Skip': True,
+            'Skip': False,
             'TB': dict(
-                reltrans_het = ss.gamma(a=0.1, scale=2), # mean = a*scale (keep as 1)
+                reltrans_het = ss.gamma(a=0.5, scale=2), # mean = a*scale (keep the product equal to 1)
             ),
             'Connector': dict(
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
@@ -220,7 +220,7 @@ if __name__ == '__main__':
                 ),
         },
         'Increase index treatment seeking delays': {
-            'Skip': True,
+            'Skip': False,
             'TB': None,
             'Malnutrition': None,
             'Connector': None,
