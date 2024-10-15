@@ -7,13 +7,13 @@ on:
         description: 'Branch to test'
         required: true
         default: 'main' # Set a default branch
-      run_additional_tests:
-        description: 'Run additional test i.e. scripts/general/run_scenarios.py'
+      run_additional_scripts:
+        description: 'Run scripts i.e. scripts/general/run_scenarios.py'
         required: false
         default: 'None'
         type: string
       skip_default_scripts:
-        description: 'When run manually, skip workflow default scripts'
+        description: 'Skip workflow default scripts'
         required: true
         default: false
         type: boolean
@@ -66,12 +66,11 @@ jobs:
         pip freeze
 
     # Step 3.1 Run custom scripts
-    - name: Run Manually Requested Tests
-      if: ${{ github.event.inputs.run_additional_tests != 'None' }}
-      working-directory: tests/e2e
+    - name: Run requested script
+      if: ${{ github.event.inputs.run_additional_scripts != 'None' }}
       run: |
-        echo Starting requested script: ${{ github.event.inputs.run_additional_tests }}....
-        python ${{ github.event.inputs.run_additional_tests }}   
+        echo Starting requested script: ${{ github.event.inputs.run_additional_scripts }}....
+        python ${{ github.event.inputs.run_additional_scripts }}   
 
     # Step 3.2 Run basic scripts
     - name: Run scripts to validate simulations with Malnutrition and TB
