@@ -9,7 +9,8 @@ import starsim as ss
 from scipy.stats import norm
 from tbsim import DATADIR
 
-__all__ = ['Malnutrition']
+__all__ = ["Malnutrition"]
+
 
 class Malnutrition(ss.Disease):
     """
@@ -23,12 +24,12 @@ class Malnutrition(ss.Disease):
     @staticmethod
     def dweight_loc(self, sim, uids):
         mu = np.zeros(len(uids))
-        mu[self.receiving_macro] = 1.0*sim.dt # Upwards drift in percentile for those receiving macro supplementation
+        mu[self.receiving_macro] = 1.0*self.dt # Upwards drift in percentile for those receiving macro supplementation
         return mu
 
     @staticmethod
     def dweight_scale(self, sim, uids):
-        std = np.full(len(uids), fill_value=0.01*sim.dt)
+        std = np.full(len(uids), fill_value=0.01*self.dt)
         return std
 
     def weight(self, uids=None):
@@ -74,7 +75,7 @@ class Malnutrition(ss.Disease):
 
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
-        self.default_pars(
+        self.define_pars(
             beta = 1.0,         # Transmission rate  - TODO: Check if there is one
             init_prev = 0.001,  # Initial prevalence 
         )
@@ -84,33 +85,17 @@ class Malnutrition(ss.Disease):
         self.LMS_data = pd.read_csv(anthro_path).set_index('Sex')
 
         # Adding Malnutrition states to handle the Individual Properties related to this disease 
-        self.add_states(
+        self.define_states(
             # Hooks to the RATIONS trial
             ss.BoolArr('receiving_macro', default=False), # Determines weight trend
             ss.BoolArr('receiving_micro', default=False), # Determines micro trend
 
             # Internal state
             # PROBLEM: Correlation between weight and height
-            ss.FloatArr('height_percentile', default=ss.uniform()), # Percentile, stays fixed
-            ss.FloatArr('weight_percentile', default=ss.uniform()), # Percentile, increases when receiving micro, then declines?
-            ss.FloatArr('micro', default=ss.uniform()), # Continuous? Normal distribution around zero. Z-score, sigmoid thing. Half-life.
-
-            # With downstream implications via the connector to:
-            # * LS progression rate
-            # * LF progression rate
-            # * Susceptibility
-            # * Other TB stuff?
-
-            # via functions that look like...
-            # * Longroth: BMI --> (rel_sus, progression)
-            # * weight_trend --> (rel_sus, progression)
-            # * weight_trend + micro --> (rel_sus, progression)
-
-            # Dose response mapping (continuous instead of discrete states)
-            # Time in exposure/risk state, more precisely with continuous state
-            # Recent change vs long term
+            ss.FloatArr('height_percentile', default=ss.uniform(name='height_percentile')), # Percentile, stays fixed
+            ss.FloatArr('weight_percentile', default=ss.uniform(name='weight_percentile')), # Percentile, increases when receiving micro, then declines?
+            ss.FloatArr('micro', default=ss.uniform(name='micro')), # Continuous? Normal distribution around zero. Z-score, sigmoid thing. Half-life.
         )
-
         self.dweight = ss.normal(loc=self.dweight_loc, scale=self.dweight_scale)
 
         return
@@ -133,10 +118,7 @@ class Malnutrition(ss.Disease):
         pass
     '''
 
-    def update_pre(self):
-        ti = self.sim.ti
-        dt = self.sim.dt
-
+    def step(self):
         uids = self.sim.people.auids # All alive uids
 
         # Random walks
@@ -162,7 +144,7 @@ class Malnutrition(ss.Disease):
         """
         super().init_results()
         npts = self.sim.npts
-        self.results += [
+        self.define_results(
             # ss.Result(self.name, 'prev_macro_standard_or_above', npts, dtype=float),
             # ss.Result(self.name, 'prev_macro_slightly_below', npts, dtype=float),
             # ss.Result(self.name, 'prev_macro_marginal', npts, dtype=float),
@@ -175,9 +157,8 @@ class Malnutrition(ss.Disease):
             # ss.Result(self.name, 'prev_mild_thinness', npts, dtype=float),
             # ss.Result(self.name, 'prev_moderate_thinness', npts, dtype=float),
             # ss.Result(self.name, 'prev_severe_thinness', npts, dtype=float),
-
-            ss.Result(self.name, 'people_alive', npts, dtype=float),
-        ]
+            ss.Result(name='people_alive', dtype=float, label='People alive'),
+        )
         return
 
     def update_results(self):

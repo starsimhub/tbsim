@@ -6,8 +6,6 @@ from enum import IntEnum
 
 __all__ = ['TB', 'TBS']
 
-DAYS_PER_YEAR = 365
-
 class TBS(IntEnum):
     NONE            = -1    # No TB
     LATENT_SLOW     = 0     # Latent TB, slow progression
@@ -23,23 +21,23 @@ class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
 
-        self.default_pars(
+        self.define_pars(
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
 
-            rate_LS_to_presym       = 3e-5,                 # Latent Slow to Active Pre-Symptomatic (per day)
-            rate_LF_to_presym       = 6e-3,                 # Latent Fast to Active Pre-Symptomatic (per day)
-            rate_presym_to_active   = 3e-2,                 # Pre-symptomatic to symptomatic (per day)
-            rate_active_to_clear    = 2.4e-4,               # Active infection to natural clearance (per day)
-            rate_exptb_to_dead      = 0.15 * 4.5e-4,        # Extra-Pulmonary TB to Dead (per day)
-            rate_smpos_to_dead      = 4.5e-4,               # Smear Positive Pulmonary TB to Dead (per day)
-            rate_smneg_to_dead      = 0.3 * 4.5e-4,         # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = 2/12 / DAYS_PER_YEAR, # 2 months (per day, for consistency)
+            rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
+            rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
+            rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
+            rate_active_to_clear    = ss.perday(2.4e-4),               # Active infection to natural clearance (per day)
+            rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
+            rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
+            rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
+            rate_treatment_to_clear = ss.peryear(2/12),                # 2 months
 
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
-            # Relative transmissibility of each state, TODO: Update values and list sources
+            # Relative transmissibility of each state
             rel_trans_presymp   = 0.1,
             rel_trans_smpos     = 1.0,
             rel_trans_smneg     = 0.3,
@@ -48,16 +46,21 @@ class TB(ss.Infection):
 
             reltrans_het = ss.constant(v=1.0),
         )
-        self.update_pars(pars, **kwargs)
-        
-        self.add_states(
+        self.update_pars(pars, **kwargs) 
+
+        # Validate rates
+        for k, v in self.pars.items():
+            if k[:5] == 'rate_':
+                assert isinstance(v, ss.rate), 'Rate parameters for TB must be TimePars, e.g. ss.perday(x)'
+
+        self.define_states(
             # Initialize states specific to TB:
             ss.FloatArr('state', default=TBS.NONE),             # One state to rule them all?
             ss.FloatArr('active_tb_state', default=TBS.NONE),   # Form of active TB (SmPos, SmNeg, or ExpTB)
             ss.FloatArr('rr_activation', default=1.0),          # Multiplier on the latent-to-presymp rate
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
-            ss.BoolArr('on_treatment', default=False),
+            ss.State('on_treatment', default=False),
 
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
@@ -81,7 +84,7 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         rate *= self.rr_activation[uids]
 
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * sim.dt) # or just rate * dt
+        prob = 1-np.exp(-rate)
         return prob
 
     @staticmethod
@@ -89,7 +92,7 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * sim.dt) # or just rate * dt
+        prob = 1-np.exp(-rate)
         return prob
 
     @staticmethod
@@ -99,7 +102,7 @@ class TB(ss.Infection):
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
         rate *= self.rr_clearance[uids]
 
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * sim.dt) # or just rate * dt
+        prob = 1-np.exp(-rate)
         return prob
 
     @staticmethod
@@ -111,7 +114,7 @@ class TB(ss.Infection):
 
         rate *= self.rr_death[uids]
 
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * sim.dt) # or just rate * dt
+        prob = 1-np.exp(-rate)
         return prob
 
     @property
@@ -142,14 +145,14 @@ class TB(ss.Infection):
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
         # Update result count of new infections 
-        self.results['new_infections'][self.sim.ti] += len(uids)
+        self.results['new_infections'][self.ti] += len(uids)
         return
 
-    def update_pre(self):
+    def step(self):
         # Make all the updates from the SIR model 
-        super().update_pre()
+        super().step()
         p = self.pars
-        ti = self.sim.ti
+        ti = self.ti
 
         # Latent --> active pre-symptomatic
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
@@ -226,11 +229,11 @@ class TB(ss.Infection):
         self.rr_death[tx_uids] = 0 # People on treatment don't die...
         return len(tx_uids)
 
-    def update_death(self, uids):
+    def step_die(self, uids):
         if len(uids) == 0:
             return # Nothing to do
 
-        super().update_death(uids)
+        super().step_die(uids)
         # Make sure these agents do not transmit or get infected after death
         self.susceptible[uids] = False
         self.infected[uids] = False
@@ -241,15 +244,23 @@ class TB(ss.Infection):
     def init_results(self):
         """ Initialize results """
         super().init_results()
-        for rkey in ['latent_slow', 'latent_fast', 'active_presymp', 'active_smpos', 'active_smneg', 'active_exptb']:
-            self.results += ss.Result(self.name, f'n_{rkey}', self.sim.npts, dtype=int)
-        self.results += ss.Result(self.name, 'new_deaths', self.sim.npts, dtype=int)
+        
+        self.define_results(
+            ss.Result('n_latent_slow',    dtype=int, label='Latent Slow'),
+            ss.Result('n_latent_fast',    dtype=int, label='Latent Fast'),
+            ss.Result('n_active_presymp', dtype=int, label='Active Pre-Symptomatic'), 
+            ss.Result('n_active_smpos',   dtype=int, label='Active Smear Positive'),
+            ss.Result('n_active_smneg',   dtype=int, label='Active Smear Negative'),
+            ss.Result('n_active_exptb',   dtype=int, label='Active Extra-Pulmonary'),
+            ss.Result('new_deaths',       dtype=int, label='New Deaths'),
+            ss.Result('cum_deaths',       dtype=int, label='Cumulative Deaths')
+        )
         return
 
     def update_results(self):
         super().update_results()
         res = self.results
-        ti = self.sim.ti
+        ti = self.ti
 
         res.n_latent_slow[ti] = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti] = np.count_nonzero(self.state == TBS.LATENT_FAST)

@@ -2,14 +2,16 @@ import starsim as ss
 import numpy as np
 import networkx as nx
 
-__all__ = ['HouseholdNet', 'HouseholdNewborns']
+__all__ = ['HouseholdNet']
 
 class HouseholdNet(ss.Network):
     def __init__(self, hhs=None, pars=None, **kwargs):
         super().__init__(**kwargs)
 
         self.hhs = [] if hhs is None else hhs
-        self.default_pars()
+        self.define_pars(
+            add_newborns = False,
+        )
         self.update_pars(pars, **kwargs)
         return
 
@@ -41,72 +43,50 @@ class HouseholdNet(ss.Network):
         self.edges.p2 = ss.uids(self.edges.p2)
 
         return
-    
-    def update(self):
-        """
-        Converts newborns added by HouseholdNewborns to full household member by
-        updating beta for edges adjacent to the newborn. Only works in
-        conjunction with HouseholdNewborns as a replacement for Pregnancy.
-        """
-        super().update()
 
-        newborns = ((self.sim.people.age > 0) & (self.sim.people.age < self.sim.dt)).uids
-        if len(newborns) == 0:
+    def step(self):
+        """ Adds newborns to the trial population, including hhid, arm, and household contacts """
+        super().step()
+
+        if not self.pars.add_newborns:
             return
 
-        # Activate household contacts by setting beta to 1
-        hn = self.sim.networks['householdnet']
-        for infant_uid in newborns:
-            hn.edges.beta[hn.edges.p2 == infant_uid] = 1.0
+        newborn_uids = ss.uids((self.sim.people.age > 0) & (self.sim.people.age < self.dt))
+        if len(newborn_uids) == 0:
+            return
 
-        return
-    
-    def add_members(self, newborn_mother_dyads):
-        p1s = []
-        p2s = []
-        for newborn_uid, mother_uid in newborn_mother_dyads:
-            for contact in self.find_contacts(mother_uid):
-                p1s.append(contact)
-                p2s.append(newborn_uid)
+        mother_uids = self.sim.people.parent[newborn_uids]
 
-        self.edges.p1 = ss.uids(np.concatenate([self.edges.p1, p1s]))
-        self.edges.p2 = ss.uids(np.concatenate([self.edges.p2, p2s]))
-
-        # Beta is zero while prenatal
-        self.edges.beta = np.concatenate([self.edges.beta, np.zeros_like(p1s)])#.astype(ss.dtypes.float)
-
-
-
-class HouseholdNewborns(ss.Pregnancy):
-    """
-    A class that represents the generation of newborns in a household network. Inherits from starsim.Pregnancy.
-    Attributes:
-        sim (Simulation): The simulation object.
-    """
-
-    def make_embryos(self, conceive_uids, targetNetworkName='householdnet'):
-        """
-        Generates newborns based on the given conceive UIDs.
-        Args:
-            conceive_uids (list): A list of UIDs representing the individuals who conceived.
-            targetNetworkName (str, optional): The name of the target network. Defaults to 'householdnet'.
-        Returns:
-            list: A list of UIDs representing the newborns.
-        """
-
-        newborn_uids = super().make_embryos(conceive_uids)
+        if self.ti == 0:
+            # Filter out agents that were part of the initial population rather than born
+            keep = (mother_uids >= 0)
+            newborn_uids = newborn_uids[keep]
+            mother_uids = mother_uids[keep]
 
         if len(newborn_uids) == 0:
-            return newborn_uids
+            return # Nothing to do
 
-        # Assign household ID, study arm, and nutrition status to newborns
         rations = self.sim.interventions.rationstrial
-        rations.hhid[newborn_uids] = rations.hhid[conceive_uids]
-        rations.arm[newborn_uids] = rations.arm[conceive_uids]
 
         # Connect to networks
-        hn = self.sim.networks[targetNetworkName]
-        dyads = zip(newborn_uids, conceive_uids)
-        hn.add_members(dyads)
+        p1s, p2s = [], []
+        for newborn_uid, mother_uid in zip(newborn_uids, mother_uids):
+            #contacts = self.find_contacts(mother_uid) # Do not use find_contacts because mother could have died (so no contacts)
+            contacts = ss.uids(rations.hhid == rations.hhid[mother_uid]) # Fortunately, we can still retrieve the hhid of the mother, even if dead
+            if len(contacts) > 0:
+                # Ut oh, baby might be the only agent in the house!
+                p1s.append(contacts)
+                p2s.append([newborn_uid] * len(contacts))
 
-        return newborn_uids
+        p1 = ss.uids.cat(p1s)
+        p2 = ss.uids.cat(p2s)
+
+        self.edges.p1   = ss.uids.cat([self.edges.p1, p1])
+        self.edges.p2   = ss.uids.cat([self.edges.p2, p2])
+        self.edges.beta = ss.uids.cat([self.edges.beta, np.ones_like(p1)])
+
+        # Set HHID and arm (works even if mother has died)
+        rations.hhid[newborn_uids] = rations.hhid[mother_uids]
+        rations.arm[newborn_uids] = rations.arm[mother_uids]
+
+        return

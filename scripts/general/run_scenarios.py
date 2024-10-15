@@ -65,7 +65,7 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     sim_pars = dict(
         dt = 7/365,
         start = 1980,
-        end = 2020,
+        stop = 2020,
         )
     # initialize the simulation
     sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
@@ -73,7 +73,7 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     sim.run()
 
     df = pd.DataFrame( {
-        'year': sim.yearvec,
+        'year': sim.timevec,
         #'pph.mother_died.cumsum': sim.results.pph.mother_died.cumsum(),
         #'Births': sim.results.pph.births.cumsum(),
         'Deaths': sim.results.deaths.cumulative,
@@ -103,8 +103,9 @@ def run_scenarios(n_agents=default_n_agents, n_seeds=default_n_rand_seeds):
     print('Timings:', times)
 
     df = pd.concat(results)
-    df.to_csv(os.path.join(cfg.RESULTS_DIRECTORY, f"result_{cfg.FILE_POSTFIX}.csv"))
-    return df
+    filename = os.path.join(cfg.create_res_dir("results"), "results.csv")
+    df.to_csv(filename)
+    return df, filename
 
 
 
@@ -122,9 +123,8 @@ if __name__ == '__main__':
         df = pd.read_csv(args.plot, index_col=0)
     else:
         print('Running scenarios')
-        df = run_scenarios(n_agents=args.n, n_seeds=args.s)
+        df, filename = run_scenarios(n_agents=args.n, n_seeds=args.s)
 
     print(df)
-    mtb.plot_scenarios(df)
-    print(f"Results directory {cfg.RESULTS_DIRECTORY} \nThis run: {cfg.FILE_POSTFIX}")
+    print(f"Results directory {filename}")
     print('Done')

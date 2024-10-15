@@ -1,10 +1,17 @@
+# WARNING: This script is not functional in its current form. 
+# It needs to be updated to align with the new APIs for TB, Malnutrition, and Starsim 2.0.
+
+# Alternatively, you can use the following configuration:
+# The "v1.0.2" tag of Starsim is compatible with the "Harlem" tag of TBsim 
+# for running the 'run_harlem.py' script.
+
 import starsim as ss
 import tbsim as mtb
 import numpy as np
 import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
-from examples.harlem.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
+from scripts.harlem.plots import plot_epi, plot_hh, plot_nut, plot_active_infections
 import os 
 
 
@@ -112,7 +119,7 @@ def run_harlem(rand_seed=0):
         dt = 7/365,
         #start = 1935, # Start early to burn-in
         start = 1941,
-        end = 1947,
+        stop = 1947,
         rand_seed = rand_seed,
         )
     # initialize the simulation
