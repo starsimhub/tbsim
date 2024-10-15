@@ -58,7 +58,7 @@ class TB_Nutrition_Connector(ss.Connector):
         rel_sus[mn.micro[uids]<0.2] = 2 # Double the susceptibility if micro is low???
         return rel_sus
 
-    def update(self):
+    def step(self):
         """ Specify how malnutrition and TB interact """
         tb = self.sim.diseases['tb']
         mn = self.sim.diseases['malnutrition']
