@@ -12,6 +12,11 @@ on:
         required: false
         default: 'None'
         type: string
+      skip_default_scripts:
+        description: 'When run manually, skip workflow default scripts'
+        required: true
+        default: false
+        type: boolean
 
   pull_request: 
     branches:
@@ -59,19 +64,22 @@ jobs:
         cd starsim
         pip install -e .
         pip freeze
-        
-    # Run tests
-    - name: Run Tests
-      run: |
-        python scripts/general/run_tb.py
-        python scripts/general/run_malnutrition.py
-        
-        
-    - name: Run Additional Tests
+
+    # Step 3.1 Run custom scripts
+    - name: Run Manually Requested Tests
       if: ${{ github.event.inputs.run_additional_tests != 'None' }}
       working-directory: tests/e2e
       run: |
         echo Starting requested script: ${{ github.event.inputs.run_additional_tests }}....
         python ${{ github.event.inputs.run_additional_tests }}   
+
+    # Step 3.2 Run basic scripts
+    - name: Run scripts to validate simulations with Malnutrition and TB
+      if: ${{ github.event.inputs.skip_default_scripts==false }}  
+      run: |
+        python scripts/general/run_tb.py
+        python scripts/general/run_malnutrition.py
+        
+        
       
 
