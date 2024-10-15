@@ -28,18 +28,18 @@ class TB(ss.Infection):
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
 
-            rate_LS_to_presym       = 3e-5,                 # Latent Slow to Active Pre-Symptomatic (per day)
-            rate_LF_to_presym       = 6e-3,                 # Latent Fast to Active Pre-Symptomatic (per day)
-            rate_presym_to_active   = 3e-2,                 # Pre-symptomatic to symptomatic (per day)
-            rate_active_to_clear    = 2.4e-4,               # Active infection to natural clearance (per day)
-            rate_exptb_to_dead      = 0.15 * 4.5e-4,        # Extra-Pulmonary TB to Dead (per day)
-            rate_smpos_to_dead      = 4.5e-4,               # Smear Positive Pulmonary TB to Dead (per day)
-            rate_smneg_to_dead      = 0.3 * 4.5e-4,         # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = 2/12 / DAYS_PER_YEAR, # 2 months (per day, for consistency)
+            rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
+            rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
+            rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
+            rate_active_to_clear    = ss.perday(2.4e-4),               # Active infection to natural clearance (per day)
+            rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
+            rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
+            rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
+            rate_treatment_to_clear = ss.perday(2/12 / DAYS_PER_YEAR), # 2 months (per day, for consistency)
 
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
-            # Relative transmissibility of each state, TODO: Update values and list sources
+            # Relative transmissibility of each state
             rel_trans_presymp   = 0.1,
             rel_trans_smpos     = 1.0,
             rel_trans_smneg     = 0.3,
@@ -49,7 +49,12 @@ class TB(ss.Infection):
             reltrans_het = ss.constant(v=1.0),
         )
         self.update_pars(pars, **kwargs) 
-        
+
+        # Validate rates
+        for k, v in self.pars.items():
+            if k[:5] == 'rate_':
+                assert isinstance(v, ss.rate), 'Rate parameters for TB must be TimePars, e.g. ss.perday(x)'
+
         self.define_states(
             # Initialize states specific to TB:
             ss.FloatArr('state', default=TBS.NONE),             # One state to rule them all?
@@ -57,7 +62,7 @@ class TB(ss.Infection):
             ss.FloatArr('rr_activation', default=1.0),          # Multiplier on the latent-to-presymp rate
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
-            ss.BoolArr('on_treatment', default=False),
+            ss.State('on_treatment', default=False),
 
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
@@ -81,7 +86,7 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         rate *= self.rr_activation[uids]
 
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * self.dt) # or just rate * dt
+        prob = 1-np.exp(-rate) #np.clip(rate, 0, 1) # 1-np.exp(-DAYS_PER_YEAR * rate * self.dt)
         return prob
 
     @staticmethod
@@ -89,7 +94,7 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * self.dt) # or just rate * dt
+        prob = 1-np.exp(-rate)
         return prob
 
     @staticmethod
@@ -99,7 +104,7 @@ class TB(ss.Infection):
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
         rate *= self.rr_clearance[uids]
 
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * self.dt) # or just rate * dt
+        prob = 1-np.exp(-rate)
         return prob
 
     @staticmethod
@@ -111,7 +116,7 @@ class TB(ss.Infection):
 
         rate *= self.rr_death[uids]
 
-        prob = 1-np.exp(-DAYS_PER_YEAR * rate * self.dt) # or just rate * dt
+        prob = 1-np.exp(-rate)
         return prob
 
     @property

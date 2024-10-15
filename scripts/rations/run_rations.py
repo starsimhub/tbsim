@@ -43,8 +43,8 @@ def build_RATIONS(skey, scen, rand_seed=0):
     tb_pars = dict(
         beta = ss.beta(0.045),
         init_prev = 0, # Infections seeded by Rations class
-        rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
-        rate_LF_to_presym = 6e-3,  # TODO: double check pars
+        rate_LS_to_presym = ss.perday(3e-5),
+        rate_LF_to_presym = ss.perday(6e-3),
         
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
@@ -64,8 +64,8 @@ def build_RATIONS(skey, scen, rand_seed=0):
 
     # Create demographics
     dems = [
-        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
+        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
     ]
 
     # Create the connector between TB and malnutrition
@@ -110,6 +110,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
     sim.pars.verbose = [0, sim.pars.dt / 5][debug] # Print status every 5 years instead of every 10 steps
 
     return sim
+
 
 def run_RATIONS(skey, scen, rand_seed=0):
 
@@ -177,6 +178,8 @@ def clearance_rr_func(tb, mn, uids, rate_ratio=2):
     rr[mn.receiving_macro[uids] & mn.receiving_micro[uids]] = rate_ratio
     return rr
 
+
+
 if __name__ == '__main__':
     # Define the scenarios
     from functools import partial
@@ -186,7 +189,7 @@ if __name__ == '__main__':
         },
 
         'Lönnroth Nutrition-->TB activation link': {
-            'Skip': False,
+            'Skip': True,
             'Connector': dict(
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.lonnroth_bmi_rr, scale=3, slope=3, bmi50=20),
                 rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
@@ -194,7 +197,7 @@ if __name__ == '__main__':
         },
 
         'Rel trans het + Nutrition-->TB activation': {
-            'Skip': False,
+            'Skip': True,
             'TB': dict(
                 reltrans_het = ss.gamma(a=0.1, scale=2), # mean = a*scale (keep as 1)
             ),
@@ -203,21 +206,21 @@ if __name__ == '__main__':
             ),
         },
         'Nutrition-->TB activation link': {
-            'Skip': False,
+            'Skip': True,
             'Connector': dict(
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
                 rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
             ),
         },
         'Nutrition-->TB clearance link': {
-            'Skip': False,
+            'Skip': True,
             'Connector': dict(
                 rr_activation_func = mtb.TB_Nutrition_Connector.ones_rr,
                 rr_clearance_func = partial(clearance_rr_func, rate_ratio=10),
                 ),
         },
         'Increase index treatment seeking delays': {
-            'Skip': False,
+            'Skip': True,
             'TB': None,
             'Malnutrition': None,
             'Connector': None,
