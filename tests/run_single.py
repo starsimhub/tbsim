@@ -3,7 +3,6 @@ import starsim as ss
 import matplotlib.pyplot as plt
 
 
-
 def make_tb_nut():
     # --------- People ----------
     n_agents = 1000

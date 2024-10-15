@@ -23,7 +23,7 @@ class TB(ss.Infection):
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
-            beta = 0.25,                        # Transmission rate
+            beta = ss.beta(0.25),               # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
 
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
@@ -44,7 +44,7 @@ class TB(ss.Infection):
             rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
 
-            reltrans_het = ss.constant(v=1.0),
+            reltrans_het = ss.constant(v=1.0),  # Individual level heterogenetiy in transmissibility
         )
         self.update_pars(pars, **kwargs) 
 
