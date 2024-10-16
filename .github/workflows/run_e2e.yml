@@ -8,12 +8,12 @@ on:
         required: true
         default: 'main' # Set a default branch
       run_additional_scripts:
-        description: 'Run scripts i.e. scripts/general/run_scenarios.py'
+        description: 'Run scripts i.e. <path>/run_scenarios.py & <path>/run_tb.py'
         required: false
         default: 'None'
         type: string
       skip_default_scripts:
-        description: 'Skip workflow default scripts'
+        description: 'Skip default scripts (tb and malnutritions sims) if set to true'
         required: true
         default: false
         type: boolean
