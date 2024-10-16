@@ -8,7 +8,7 @@ on:
         required: true
         default: 'main' # Set a default branch
       run_additional_scripts:
-        description: 'Run scripts i.e. <path>/run_scenarios.py & <path>/run_tb.py'
+        description: 'Run scripts i.e. <path>/run_scenarios.py, <path>/run_tb.py'
         required: false
         default: 'None'
         type: string
@@ -70,7 +70,13 @@ jobs:
       if: ${{ github.event.inputs.run_additional_scripts != 'None' }}
       run: |
         echo Starting requested script: ${{ github.event.inputs.run_additional_scripts }}....
-        python ${{ github.event.inputs.run_additional_scripts }}   
+        SCRIPTS="${{ github.event.inputs.run_additional_scripts }}"
+        IFS=',' read -ra SCRIPTLIST <<< "$SCRIPTS"
+        for script in "${SCRIPTLIST[@]}"; do
+          echo "::group::Running $script"
+          echo "Running $script"
+          python "$script"
+          echo "::endgroup::"
 
     # Step 3.2 Run basic scripts
     - name: Run scripts to validate simulations with Malnutrition and TB
