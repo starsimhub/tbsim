@@ -217,15 +217,19 @@ class TB(ss.Infection):
 
         return
 
+    
     def start_treatment(self, uids):
         # Begin individual on TB treatment, assuming all TB is drug susceptible
 
+        tbs = self.state[uids]    
+
         # Only treat individuals who have active TB
-        tx_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids
+        tx_uids = ss.uids((tbs == TBS.ACTIVE_PRESYMP) | (tbs == TBS.ACTIVE_SMPOS) | (tbs == TBS.ACTIVE_SMPOS) | (tbs == TBS.ACTIVE_EXPTB))
         self.on_treatment[tx_uids] = True
         self.rr_death[tx_uids] = 0 # People on treatment don't die...
         return len(tx_uids)
-
+    
+    
     def update_death(self, uids):
         if len(uids) == 0:
             return # Nothing to do
