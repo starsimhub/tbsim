@@ -74,3 +74,127 @@ class TBVaccinationCampaign(ss.Intervention):
         tb.rel_LF_prog[change_uids] = tb.rel_LF_prog[change_uids]*0.9  # *self.product.efficacy   
         
         return len(change_uids)
+    
+
+class ActiveCaseFinding(ss.Intervention):
+    """
+    Intervention that simulates active case finding in active Tb cases. In more detail, this intervention --
+    - Identifies the active TB individuals. This could be any one of the following states:
+        ACTIVE_PRESYMP  (Active TB, pre-symptomatic)
+        ACTIVE_SMPOS    (Active TB, smear positive)
+        ACTIVE_SMNEG    (Active TB, smear negative)
+        ACTIVE_EXPTB    (Active TB, extra-pulmonary)
+    - Assign test sensitivity to accurately identify as Active Tb
+    - With some coverage rate, the intervention identifies the active TB cases and assigns them to treatment.
+    - The treatment will at some rate move individuals from repective Active TB state to Susceptible state -- similar to the TB module.
+    - May need to think about how to keep track of individuals that get treated #TODO- perhaps an analyser?
+    """
+    def __init__(self, pars=None, *args, **kwargs):
+        """
+        Initialize the intervention.
+        """
+        super().__init__(*args, **kwargs)
+
+        # Updated default parameters with time-aware p_found
+        self.define_pars(
+            p_found = ss.bernoulli(p=self.cov_fun),
+            intv_range=[2000, 2003],
+            coverage=[0.1, 0.5],
+            #coverage=ss.peryear([0.1, 0.5]),
+            target_age_range=[15, 25],
+
+            # test sensitivity relative to ACTIVE_SMPOS
+            rel_sens_presymp=0.9,
+            rel_sens_smpos=1.0,
+            rel_sens_smneg=0.8,
+            rel_sens_exptb=0.1
+        )
+        
+        self.update_pars(pars, **kwargs)
+       
+        
+        # make sure that the intv_range and coverage have the same dimensions
+        assert np.shape(self.pars.intv_range) == np.shape(self.pars.coverage), "intv_range and coverage must have the same dimensions"
+            
+    @staticmethod
+    def cov_fun(self, sim, uids):
+        
+        baseline_coverage = np.interp(self.now, xp=self.pars.intv_range, fp=self.pars.coverage)
+        # print(sim.year, baseline_coverage)
+        # creates an array of coverages for the total number of uids provided to the method.
+        # bring back the individuals that were tested positive
+        # p = np.full(len(uids), fill_value=baseline_coverage*sim.dt)
+        p = np.zeros(len(uids))
+        
+        # TODO -- make rel_sens as a dictionary
+        # -- Also, make sure that coverage as rate or fraction is applied correctly 
+
+        p[sim.diseases.tb.state[uids] == 'ACTIVE_PRESYMP'] = self.pars.rel_sens_presymp * baseline_coverage * self.dt
+        p[sim.diseases.tb.state[uids] == 'ACTIVE_SMPOS']   = self.pars.rel_sens_smpos   * baseline_coverage * self.dt
+        p[sim.diseases.tb.state[uids] == 'ACTIVE_SMNEG']   = self.pars.rel_sens_smneg   * baseline_coverage * self.dt
+        p[sim.diseases.tb.state[uids] == 'ACTIVE_EXPTB']   = self.pars.rel_sens_exptb   * baseline_coverage * self.dt   
+        
+        # exclusion criterion for the intervention by age
+        too_young = sim.people.age[uids] < self.pars.target_age_range[0]
+        p[too_young] = 0
+        too_old = sim.people.age[uids] > self.pars.target_age_range[1]
+        p[too_old] = 0
+
+        return p
+    
+
+    def init_results(self):
+        
+        self.define_results(
+            ss.Result('n_aff_presym',   dtype=int, label='Treated Active Pre-Symptomatic'),
+            ss.Result('n_aff_smpos',    dtype=int, label='Treated Active Smear Positive'),
+            ss.Result('n_aff_smneg',    dtype=int, label='Treated Active Smear Negative'),
+            ss.Result('n_aff_exptb',    dtype=int, label='Treated Active Extra-Pulmonary'),
+            ss.Result('cum_aff_presym', dtype=int, label='Total Treated Active Pre-Symptomatic'),
+            ss.Result('cum_aff_smpos',  dtype=int, label='Total Treated Active Smear Positive'),
+            ss.Result('cum_aff_smneg',  dtype=int, label='Total Treated Active Smear Negative'),
+            ss.Result('cum_aff_exptb',  dtype=int, label='Total Treated Active Extra-Pulmonary')
+        )
+    
+        return
+
+    def step(self):
+        """
+        Apply the intervention
+        """
+        
+        super().step()
+
+        sim = self.sim
+        ti = self.ti
+
+        # check if the time is between the intv_range
+        # when to use sim.now vs sim.ti ?
+        if sim.now < self.pars.intv_range[0] or sim.now > self.pars.intv_range[1]:
+            return
+            
+        tb = sim.diseases['tb']
+
+        active = (tb.state==TBS.ACTIVE_PRESYMP) | (tb.state==TBS.ACTIVE_SMPOS) | (tb.state==TBS.ACTIVE_SMNEG) | (tb.state==TBS.ACTIVE_EXPTB) 
+        eligible_uids = ss.uids(active & ~tb.on_treatment)
+        
+        # apply coverage
+        found_uids = self.pars.p_found.filter(eligible_uids)
+        
+        # apply treatment
+        tb.start_treatment(found_uids)
+        
+        # append the results 
+        # self.results.n_aff_presym[ti] = len(treated_presym_uids)
+        # self.results.n_aff_smpos[ti] = len(treated_smpos_uids)
+        # self.results.n_aff_smneg[ti] = len(treated_smneg_uids)
+        # self.results.n_aff_exptb[ti] = len(treated_exptb_uids)
+        return 
+
+    def finalize_results(self):
+        super().finalize_results()    
+        self.results.cum_aff_presym = np.cumsum(self.results.n_aff_presym)
+        self.results.cum_aff_smpos = np.cumsum(self.results.n_aff_smpos)
+        self.results.cum_aff_smneg = np.cumsum(self.results.n_aff_smneg)
+        self.results.cum_aff_exptb = np.cumsum(self.results.n_aff_exptb)
+        return
