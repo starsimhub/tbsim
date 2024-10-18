@@ -65,7 +65,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
     # Create demographics
     dems = [
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
-        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
+        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women 15-49
     ]
 
     # Create the connector between TB and malnutrition
