@@ -221,11 +221,21 @@ class TB(ss.Infection):
         return
 
     def start_treatment(self, uids):
-        # Note: Only people with active TB can start treatment right?
-        rst = self.state[uids]
-        is_active = (((rst == TBS.ACTIVE_SMPOS) | (rst == TBS.ACTIVE_SMPOS) | (rst == TBS.ACTIVE_EXPTB)))
-        tx_uids =  ss.uids(is_active[is_active==True])
+        """ Start treatment for active TB """
+        if len(uids) == 0:
+            return 0  # No one to treat
 
+        rst = self.state[uids]
+        
+        #find individuals with active TB
+        is_active = np.isin(rst, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+        
+        # Get the corresponding UIDs that match the active state
+        tx_uids = uids[is_active]
+
+        if len(tx_uids) == 0:
+            return 0  # No one to treat
+        
         # Mark the individuals as being on treatment
         self.on_treatment[tx_uids] = True
 

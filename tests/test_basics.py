@@ -161,7 +161,7 @@ def test_start_treatment_mixed_states(tb):
     uids_non_active = ss.uids([3, 4])
     tb.state[uids_active] = mtb.TBS.ACTIVE_SMPOS  # Active TB
     tb.state[uids_non_active] = mtb.TBS.LATENT_SLOW  # No active TB
-    all_uids = uids_active + uids_non_active
+    all_uids = uids_active.concat(uids_non_active)
     num_treated = tb.start_treatment(all_uids)
     assert num_treated == len(uids_active)
     assert tb.on_treatment[uids_active].all()
