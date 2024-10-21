@@ -1,3 +1,10 @@
+# WARNING: This script is not functional in its current form. 
+# It needs to be updated to align with the new APIs for TB, Malnutrition, and Starsim 2.0.
+
+# Alternatively, you can use the following configuration:
+# The "v1.0.2" tag of Starsim is compatible with the "Harlem" tag of TBsim 
+# for running the 'run_harlem_scenarios.py' script.
+
 import starsim as ss
 import tbsim as mtb
 import numpy as np
@@ -210,7 +217,7 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5,
     tb_pars = dict(
         beta = dict(harlem=beta, maternal=0.0),
         init_prev = init_prev, # Infections seeded by Harlem class
-        rate_LS_to_presym = 3e-5, # Slow down LS-->Presym as this is now the rate for healthy individuals
+        rate_LS_to_presym = ss.perday(3e-5), # Slow down LS-->Presym as this is now the rate for healthy individuals
 
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
@@ -273,7 +280,7 @@ def run_harlem(scen, rand_seed=0, idx=0, n_hhs=194, p_control=0.5,
     sim_pars = dict(
         dt = 7/365,
         start = 1941,
-        end = 1947,
+        stop = 1947,
         rand_seed = rand_seed,
     )
     sim = ss.Sim(people=pop, networks=nets, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn, interventions=intvs, analyzers=azs)

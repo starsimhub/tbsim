@@ -37,16 +37,14 @@ def build_RATIONS(skey, scen, rand_seed=0):
     pop = ss.People(n_agents = 1400 + 4724 + 1400 + 5621)
 
     # Create networks
-    matnet = ss.MaternalNet() # To track newborn --> household
-    householdnet = mtb.HouseholdNet()
-    nets = [householdnet, matnet]
+    nets = mtb.HouseholdNet(add_newborns=False) # Optionally add newborns to households here
 
     # Create the instance of TB disease
     tb_pars = dict(
-        beta = dict(householdnet=0.045, maternal=0.0), # 0.0568
+        beta = ss.beta(0.045),
         init_prev = 0, # Infections seeded by Rations class
-        rate_LS_to_presym = 3e-5,  # Slow down LS-->Presym as this is now the rate for healthy individuals
-        rate_LF_to_presym = 6e-3,  # TODO: double check pars
+        rate_LS_to_presym = ss.perday(3e-5),
+        rate_LF_to_presym = ss.perday(6e-3),
         
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
@@ -66,8 +64,8 @@ def build_RATIONS(skey, scen, rand_seed=0):
 
     # Create demographics
     dems = [
-        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
         ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
+        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
     ]
 
     # Create the connector between TB and malnutrition
@@ -94,7 +92,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
     sim_pars = dict(
         dt = 7/365,
         start = 2019, # Dates don't matter
-        end = 2030, # Long enough that all pre-symptomatic period end + 2y
+        stop = 2030, # Long enough that all pre-symptomatic period end + 2y
         rand_seed = rand_seed,
     )
     if scen is not None and 'Simulation' in scen.keys() and scen['Simulation'] is not None:
@@ -112,6 +110,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
     sim.pars.verbose = [0, sim.pars.dt / 5][debug] # Print status every 5 years instead of every 10 steps
 
     return sim
+
 
 def run_RATIONS(skey, scen, rand_seed=0):
 
@@ -135,7 +134,7 @@ def run_RATIONS(skey, scen, rand_seed=0):
     dfs = []
     for d in dat:
         dfs.append(
-            pd.DataFrame({'Values': d[0]}, index=pd.MultiIndex.from_product([sim.results.yearvec, [d[1]], [d[2]]], names=['Year', 'Channel', 'Arm']))
+            pd.DataFrame({'Values': d[0]}, index=pd.MultiIndex.from_product([sim.results.timevec, [d[1]], [d[2]]], names=['Year', 'Channel', 'Arm']))
         )
     df = pd.concat(dfs)
     df['Seed'] = rand_seed
@@ -179,12 +178,14 @@ def clearance_rr_func(tb, mn, uids, rate_ratio=2):
     rr[mn.receiving_macro[uids] & mn.receiving_micro[uids]] = rate_ratio
     return rr
 
+
+
 if __name__ == '__main__':
     # Define the scenarios
     from functools import partial
     scens = {
         'Baseline': {
-            'Skip': True,
+            'Skip': False,
         },
 
         'Lönnroth Nutrition-->TB activation link': {
@@ -196,30 +197,30 @@ if __name__ == '__main__':
         },
 
         'Rel trans het + Nutrition-->TB activation': {
-            'Skip': True,
+            'Skip': False,
             'TB': dict(
-                reltrans_het = ss.gamma(a=0.1, scale=2), # mean = a*scale (keep as 1)
+                reltrans_het = ss.gamma(a=0.5, scale=2), # mean = a*scale (keep the product equal to 1)
             ),
             'Connector': dict(
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
             ),
         },
         'Nutrition-->TB activation link': {
-            'Skip': True,
+            'Skip': False,
             'Connector': dict(
                 rr_activation_func = partial(mtb.TB_Nutrition_Connector.supplementation_rr, rate_ratio=0.1),
                 rr_clearance_func = mtb.TB_Nutrition_Connector.ones_rr,
             ),
         },
         'Nutrition-->TB clearance link': {
-            'Skip': True,
+            'Skip': False,
             'Connector': dict(
                 rr_activation_func = mtb.TB_Nutrition_Connector.ones_rr,
                 rr_clearance_func = partial(clearance_rr_func, rate_ratio=10),
                 ),
         },
         'Increase index treatment seeking delays': {
-            'Skip': True,
+            'Skip': False,
             'TB': None,
             'Malnutrition': None,
             'Connector': None,

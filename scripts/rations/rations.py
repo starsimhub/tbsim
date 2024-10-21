@@ -60,7 +60,7 @@ class RATIONSTrial(ss.Intervention):
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         
-        self.add_states( # For individual people
+        self.define_states( # For individual people
             ss.FloatArr('cid'),  # Cluster ID
             ss.FloatArr('hhid'), # Household id
             ss.BoolArr('arm', default=Arm.CONTROL),
@@ -71,7 +71,7 @@ class RATIONSTrial(ss.Intervention):
             ss.FloatArr('ti_enrolled'),
         )
 
-        self.default_pars(
+        self.define_pars(
             n_clusters = 28,
             n_hhs = 2_800,
 
@@ -112,9 +112,9 @@ class RATIONSTrial(ss.Intervention):
         Compute the bernoulli probability of each agent becoming infected from
         the community. Uses RATIONS cluster incidence data from the "cdf" dataframe.
         '''
-        p = np.ones_like(uids) 
+        p = np.ones(len(uids))
         tb = sim.diseases['tb']
-        dt = sim.dt
+        dt = self.dt 
         frac_pulmonary = 0.65 + 0.25
 
         years = dt
@@ -128,13 +128,18 @@ class RATIONSTrial(ss.Intervention):
             p[in_cluster_and_sus] = self.pars.x_community_incidence_rate * ptb_cases_to_seed / len(in_cluster_and_sus)
         return p
 
-    def init_pre(self, sim):
-        super().init_pre(sim)
-        for arm in ['ctrl', 'intv']:
-            self.results += ss.Result(self.name, f'new_hhs_enrolled_{arm}', self.sim.npts, dtype=int)
-            self.results += ss.Result(self.name, f'incident_cases_{arm}', self.sim.npts, dtype=int)
-            self.results += ss.Result(self.name, f'coprevalent_cases_{arm}', self.sim.npts, dtype=int)
-            self.results += ss.Result(self.name, f'person_years_{arm}', self.sim.npts, dtype=int)
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result(name='new_hhs_enrolled_ctrl', dtype=int, label='New households enrolled (control)'),
+            ss.Result(name='incident_cases_ctrl', dtype=int, label='Incident cases (control)'),
+            ss.Result(name='coprevalent_cases_ctrl', dtype=int, label='Coprevalent cases (control)'),
+            ss.Result(name='person_years_ctrl', dtype=int, label='Person-years (control)'),
+            ss.Result(name='new_hhs_enrolled_intv', dtype=int, label='New households enrolled (intervention)'),
+            ss.Result(name='incident_cases_intv', dtype=int, label='Incident cases (intervention)'),
+            ss.Result(name='coprevalent_cases_intv', dtype=int, label='Coprevalent cases (intervention)'),
+            ss.Result(name='person_years_intv', dtype=int, label='Person-years (intervention)'),
+        )
         return
 
     def init_post(self):
@@ -193,13 +198,13 @@ class RATIONSTrial(ss.Intervention):
         return
 
 
-    def apply(self, sim):
-        super().apply(sim)
+    def step(self):
+        super().step()
 
         tb = self.sim.diseases['tb']
         nut = self.sim.diseases['malnutrition']
-        ti, dt = self.sim.ti, self.sim.dt
-
+        ti, dt = self.ti, self.dt
+        
         # INCIDENCE FROM COMMUNITY
         if self.pars.x_community_incidence_rate > 0:
             uids = tb.susceptible.uids
@@ -211,24 +216,16 @@ class RATIONSTrial(ss.Intervention):
         # forward to end of latent, beginning of active PRE-SYMPTOMATIC stage.
         # Change to ACTIVE_PRESYMP and set time of activation to current time
         # step.
-        tb.rr_activation[self.index_uids] = 1000 # Increase the rate to individuals activate on the next time step
+        tb.rr_activation[self.index_uids] = 100000 # Increase the rate to individuals activate on the next time step
+        tb.rr_clearance[self.index_uids] = 0 # Consider resetting to 1 after diagnosis
+        tb.rr_death[self.index_uids] = 0 # Consider resetting to 1 after diagnosis
 
         # INDEX CASES: Pre symp --> Active (state change has already happend in TB on this timestep)
-        new_active_uids = self.index_uids[ np.isin(tb.state[self.index_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (tb.ti_active[self.index_uids] == ti) ]
+        new_active_uids = self.index_uids[ np.isin(tb.state[self.index_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (tb.ti_active[self.index_uids] == ti-1) ] # Activated on previous step
         if len(new_active_uids):
             # Newly active, figure out time to care seeking
             dur_untreated = self.pars.dur_active_to_dx(new_active_uids)
             self.ti_dx[new_active_uids] = np.ceil(ti + dur_untreated / dt)
-
-        # INDEX CASES: Do not clear or die from active infection
-        active_uids = self.index_uids[ np.isin(tb.state[self.index_uids], [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG]) & (~np.isnan(self.ti_dx[self.index_uids])) & (ti <= self.ti_dx[self.index_uids])]
-        if len(active_uids):
-            # Individual could self cure (an exponential) prior to being diagnosed, hmm!
-            # Let's say that the index cases don't cure, instead they'll go on treatment soon enough and clear that way.
-            tb.rr_clearance[active_uids] = 0
-
-            # And let's make it so index cases do not die from TB
-            tb.rr_death[active_uids] = 0
 
         # INDEX CASES: Active --> Diagnosed and beginning immediate treatment
         dx_uids = self.index_uids[self.ti_dx[self.index_uids] == ti]

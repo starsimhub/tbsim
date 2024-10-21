@@ -53,7 +53,7 @@ class TBVaccinationCampaign(ss.Intervention):
         super().init_pre(sim)
         return
     
-    def apply(self, sim):
+    def update(self, sim):
         if sim.year < self.year[0]:
             return
         if self.product is None:
