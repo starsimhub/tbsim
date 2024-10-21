@@ -221,14 +221,22 @@ class TB(ss.Infection):
         return
 
     def start_treatment(self, uids):
-        # Begin individual on TB treatment, assuming all TB is drug susceptible
+        # Note: Only people with active TB can start treatment right?
+        rst = self.state[uids]
+        is_active = (((rst == TBS.ACTIVE_SMPOS) | (rst == TBS.ACTIVE_SMPOS) | (rst == TBS.ACTIVE_EXPTB)))
+        tx_uids =  ss.uids(is_active[is_active==True])
 
-        tbs = self.state[uids]
-
-        # Only treat individuals who have active TB
-        tx_uids = ss.uids(((tbs == TBS.ACTIVE_SMPOS) | (tbs == TBS.ACTIVE_SMPOS) | (tbs == TBS.ACTIVE_EXPTB)))
+        # Mark the individuals as being on treatment
         self.on_treatment[tx_uids] = True
-        self.rr_death[tx_uids] = 0 # People on treatment don't die...
+
+        # Adjust death and clearance rates for those starting treatment
+        self.rr_death[tx_uids] = 0  # People on treatment have zero death rate
+        self.rr_clearance[tx_uids] = self.pars.rate_treatment_to_clear  # Accelerated clearance due to treatment
+
+        # Reduce transmission rates for people on treatment
+        self.rel_trans[tx_uids] *= self.pars.rel_trans_treatment
+
+        # Return the number of individuals who started treatment
         return len(tx_uids)
 
     def step_die(self, uids):
