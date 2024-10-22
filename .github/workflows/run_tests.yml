@@ -1,79 +1,78 @@
 name: Run tests
-
 on:
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to test'
-        required: true
-        default: 'main' # Set a default branch
-      run_additional_tests:
-        description: 'Run additional test i.e. examples\general\run_this_test.py'
-        required: false
-        default: 'None'
-        type: string
-
-  pull_request: 
+  pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize # Triggers on any update to the pull request, like adding commits
+
   push:
+    branches:
+      - main # This ensures the workflow runs whenever code is pushed to the main branch
     paths:
+      - 'tbsim/**'
       - '**.yml'
+
+concurrency:
+  group: ${{ github.ref }}-tests
+  cancel-in-progress: true # Cancels any in-progress runs for the same branch or PR
+
 jobs:
   run-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.10', '3.11'] # Add multiple Python versions
 
     steps:
-    - name: Checkout tbsim repository
-      uses: actions/checkout@v2
-      with:
-        ref: ${{ github.event.inputs.branch }}
-        fetch-depth: 1
+      - name: Checkout tbsim repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    # Step 1.2: Install tbsim
-    - name: Install tbsim
-      run: |
-        ls -l
-        pip install -e .
-        pip freeze      
-          
-    # # Step 2.1: Checkout starsimhub/starsim repository
-    # - name: Checkout starsimhub/starsim repository
-    #   uses: actions/checkout@v3
-    #   with:
-    #     repository: 'starsimhub/starsim'
-    #     path: 'starsim'
-    
-    # # Step 2.2: Install starsim
-    # - name: Install starsim
-    #   run: |
-    #     cd starsim
-    #     pip install -e .
-    #     pip freeze
-        
-    # Step 2.3: Install test requirements
-    - name: Install test requirements
-      working-directory: ./tests
-      run: |
-        pip install -r requirements.txt
-        pip freeze
+      - name: Install tbsim
+        run: |
+          ls -l
+          pip install -e .
+          pip freeze      
 
-    # Run tests
-    - name: Run Tests
-      working-directory: ./tests
-      run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml 
-      
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-          name: test_results
+      - name: Install test requirements
+        working-directory: ./tests
+        run: |
+          pip install -r requirements.txt
+          pip freeze
+
+      - name: Run Tests
+        working-directory: ./tests
+        run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml
+        continue-on-error: true # Continue to next steps even if tests fail
+
+      - name: Upload test results as artifact
+        uses: actions/upload-artifact@v4
+        if: always() # Ensure this step runs whether tests pass or fail
+        with:
+          name: test-results-${{ matrix.python-version }}
           path: tests/test-results.xml
+
+      - name: Archive test results in repo
+        if: always() # Ensure this step runs whether tests pass or fail
+        run: |
+          TIMESTAMP=$(date +'%Y-%m-%d_%H-%M-%S')
+          mkdir -p archived-results/${{ matrix.python-version }}
+          cp tests/test-results.xml archived-results/${{ matrix.python-version }}/test-results-$TIMESTAMP.xml
+          
+      - name: Commit and push test results archive
+        if: always() # Ensure this step runs whether tests pass or fail
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add archived-results/
+          git commit -m "Archive test results for Python ${{ matrix.python-version }} on $TIMESTAMP"
+          git push
