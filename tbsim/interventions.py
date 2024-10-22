@@ -3,8 +3,9 @@
 import starsim as ss
 import sciris as sc
 import numpy as np
+from tbsim.tb import TBS
 
-__all__ = ['Product', 'TBVaccinationCampaign']
+__all__ = ['Product', 'TBVaccinationCampaign', 'ActiveCaseFinding']
 
 class Product(ss.Module):
     """
@@ -95,13 +96,17 @@ class ActiveCaseFinding(ss.Intervention):
         """
         super().__init__(*args, **kwargs)
 
+        self.define_states(
+            ss.State('found', default=False)
+        )
+        
         # Updated default parameters with time-aware p_found
         self.define_pars(
             p_found = ss.bernoulli(p=self.cov_fun),
             intv_range=[2000, 2003],
             coverage=[0.1, 0.5],
             #coverage=ss.peryear([0.1, 0.5]),
-            target_age_range=[15, 25],
+            target_age_range=[15, 100],
 
             # test sensitivity relative to ACTIVE_SMPOS
             rel_sens_presymp=0.9,
@@ -129,10 +134,10 @@ class ActiveCaseFinding(ss.Intervention):
         # TODO -- make rel_sens as a dictionary
         # -- Also, make sure that coverage as rate or fraction is applied correctly 
 
-        p[sim.diseases.tb.state[uids] == 'ACTIVE_PRESYMP'] = self.pars.rel_sens_presymp * baseline_coverage * self.dt
-        p[sim.diseases.tb.state[uids] == 'ACTIVE_SMPOS']   = self.pars.rel_sens_smpos   * baseline_coverage * self.dt
-        p[sim.diseases.tb.state[uids] == 'ACTIVE_SMNEG']   = self.pars.rel_sens_smneg   * baseline_coverage * self.dt
-        p[sim.diseases.tb.state[uids] == 'ACTIVE_EXPTB']   = self.pars.rel_sens_exptb   * baseline_coverage * self.dt   
+        p[sim.diseases.tb.state[uids] == TBS.ACTIVE_PRESYMP] = self.pars.rel_sens_presymp * baseline_coverage #* self.dt
+        p[sim.diseases.tb.state[uids] == TBS.ACTIVE_SMPOS]   = self.pars.rel_sens_smpos   * baseline_coverage #* self.dt
+        p[sim.diseases.tb.state[uids] == TBS.ACTIVE_SMNEG]   = self.pars.rel_sens_smneg   * baseline_coverage #* self.dt
+        p[sim.diseases.tb.state[uids] == TBS.ACTIVE_EXPTB]   = self.pars.rel_sens_exptb   * baseline_coverage #* self.dt   
         
         # exclusion criterion for the intervention by age
         too_young = sim.people.age[uids] < self.pars.target_age_range[0]
@@ -166,7 +171,7 @@ class ActiveCaseFinding(ss.Intervention):
         super().step()
 
         sim = self.sim
-        ti = self.ti
+        # ti = self.ti
 
         # check if the time is between the intv_range
         # when to use sim.now vs sim.ti ?
@@ -175,11 +180,14 @@ class ActiveCaseFinding(ss.Intervention):
             
         tb = sim.diseases['tb']
 
-        active = (tb.state==TBS.ACTIVE_PRESYMP) | (tb.state==TBS.ACTIVE_SMPOS) | (tb.state==TBS.ACTIVE_SMNEG) | (tb.state==TBS.ACTIVE_EXPTB) 
+        active = np.isin(tb.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
         eligible_uids = ss.uids(active & ~tb.on_treatment)
         
         # apply coverage
         found_uids = self.pars.p_found.filter(eligible_uids)
+        # track the found individuals 
+        # Mark the individuals as being on treatment
+        self.found[found_uids] = True
         
         # apply treatment
         tb.start_treatment(found_uids)
