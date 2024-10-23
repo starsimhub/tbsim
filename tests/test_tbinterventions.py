@@ -2,6 +2,7 @@ import pytest
 import tbsim as mtb
 import starsim as ss
 import numpy as np
+import sciris as sc
 
 @pytest.fixture
 def sample_product():
@@ -10,6 +11,16 @@ def sample_product():
 @pytest.fixture
 def sample_campaign(sample_product):
     return mtb.TBVaccinationCampaign(year=2020, product=sample_product, rate=0.015, target_gender='All', target_age=10, target_state='susceptible')
+
+def test_ACF():
+    tb = mtb.TB()
+    acf = mtb.ActiveCaseFinding(
+        intv_range=[sc.date('2020-01-01'), sc.date('2023-01-01')],
+        coverage=[ss.time_prob(x, unit='year') for x in [0.1, 0.5]],
+    )
+    sim = ss.Sim(unit='day', dt=7, start=sc.date('2019-01-01'), stop=sc.date('2024-12-31'), n_agents=1000, diseases=tb, interventions=acf)
+    sim.run()
+    return None
 
 def test_product_initialization(sample_product):
     assert sample_product.name == "TestVaccine"

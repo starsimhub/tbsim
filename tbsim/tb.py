@@ -251,7 +251,7 @@ class TB(ss.Infection):
         return len(tx_uids)
     
     
-    def update_death(self, uids):
+    def step_die(self, uids):
         if len(uids) == 0:
             return # Nothing to do
 
