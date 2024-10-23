@@ -328,5 +328,21 @@ def test_p_active_to_death( ):
     assert (tb.state[active_uids] == mtb.TBS.ACTIVE_SMPOS).any() or (tb.state[active_uids] == mtb.TBS.ACTIVE_SMNEG).any() or (tb.state[active_uids] == mtb.TBS.ACTIVE_EXPTB).any(), "Ensure at least some active TB states are set for testing"
 
 
+def test_latent_to_active_presymptomatic_transition(tb):
+    sim = make_tb_simplified(agents=500)
+    sim.init()
+    tb = sim.diseases['tb']
+    # Setup individuals in latent states
+    latent_uids = ss.uids(np.arange(50)) 
+    tb.state[latent_uids] = np.random.choice([mtb.TBS.LATENT_SLOW, mtb.TBS.LATENT_FAST], size=len(latent_uids))
+
+    # Manually execute the transition step
+    tb.step()
+
+    # Check if any latent have transitioned to pre-symptomatic
+    transitioned = tb.state[latent_uids] == mtb.TBS.ACTIVE_PRESYMP
+    print(transitioned)
+    assert transitioned.any(), "At least one latent TB should transition to pre-symptomatic."
+
 if __name__ == '__main__':
     pytest.main()
