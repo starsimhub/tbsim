@@ -328,7 +328,7 @@ def test_p_active_to_death( ):
     assert (tb.state[active_uids] == mtb.TBS.ACTIVE_SMPOS).any() or (tb.state[active_uids] == mtb.TBS.ACTIVE_SMNEG).any() or (tb.state[active_uids] == mtb.TBS.ACTIVE_EXPTB).any(), "Ensure at least some active TB states are set for testing"
 
 
-def test_latent_to_active_presymptomatic_transition(tb):
+def test_latent_to_active_presymptomatic_transition():
     sim = make_tb_simplified(agents=500)
     sim.init()
     tb = sim.diseases['tb']
@@ -343,6 +343,29 @@ def test_latent_to_active_presymptomatic_transition(tb):
     transitioned = tb.state[latent_uids] == mtb.TBS.ACTIVE_PRESYMP
     print(transitioned)
     assert transitioned.any(), "At least one latent TB should transition to pre-symptomatic."
+
+def test_presymptomatic_to_active_transition():
+    # Since we work with percentages, we make sure we have enough
+    # individuals in the pre-symptomatic state to have a good chance of transitioning
+    sim = make_tb_simplified(agents=500)
+    sim.init()
+    tb = sim.diseases['tb']
+    # Setup some individuals to pre-symptomatic
+    presym_uids = ss.uids(np.arange(250)) 
+    tb.state[presym_uids] = mtb.TBS.ACTIVE_PRESYMP
+
+    # Manually execute the transition step
+    tb.step()
+
+    # Check if any pre-symptomatic have transitioned to active
+    transitioned = (
+        (tb.state[presym_uids] == mtb.TBS.ACTIVE_SMPOS)
+        | (tb.state[presym_uids] == mtb.TBS.ACTIVE_SMNEG)
+        | (tb.state[presym_uids] == mtb.TBS.ACTIVE_EXPTB)
+    )
+    # transitioned = transitioned[transitioned] # Filter out only those that transitioned - uncomment if you want to see the True values
+    assert transitioned.any(), "At least one pre-symptomatic should transition to an active state."
+
 
 if __name__ == '__main__':
     pytest.main()
