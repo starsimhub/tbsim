@@ -197,7 +197,6 @@ class RATIONSTrial(ss.Intervention):
         # (intervention).
         return
 
-
     def step(self):
         super().step()
 
