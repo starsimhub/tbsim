@@ -1,4 +1,4 @@
-#### -------------- HELBER CLASS FOR CREATING RATIONS SIMULATIONS -------------------
+#### -------------- HELPER CLASS FOR CREATING RATIONS SIMULATIONS -------------------
 import starsim as ss
 import tbsim as mtb
 import sciris as sc

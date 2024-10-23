@@ -97,26 +97,30 @@ class ActiveCaseFinding(ss.Intervention):
 
         # check if the time is between the intv_range
         # when to use sim.now vs sim.ti ?
-        if sim.now_year < self.pars.intv_range[0] or sim.now_year > self.pars.intv_range[1]:
-            return 0
+        if sim.now_year < self.pars.intv_range[0] or sim.now_year > self.pars.intv_range[-1]:
+            return 0, 0
 
         tb = sim.diseases['tb']
 
+        # ACF ELIGIBLE by >15 and not on treatment
+        # OF THOSE, WE TEST A SUBSET...
+        # GET FOUND_UIDS... start them all on treatment
+
         active = (tb.state==TBS.ACTIVE_PRESYMP) | (tb.state==TBS.ACTIVE_SMPOS) | (tb.state==TBS.ACTIVE_SMNEG) | (tb.state==TBS.ACTIVE_EXPTB) 
         eligible_uids = ss.uids(active & ~tb.on_treatment)
-        
+
         # apply coverage
         found_uids = self.pars.p_found.filter(eligible_uids)
-        
+
         # apply treatment
         tb.start_treatment(found_uids)
-        
+
         # append the results 
         # self.results.n_aff_presym[ti] = len(treated_presym_uids)
         # self.results.n_aff_smpos[ti] = len(treated_smpos_uids)
         # self.results.n_aff_smneg[ti] = len(treated_smneg_uids)
         # self.results.n_aff_exptb[ti] = len(treated_exptb_uids)
-        return len(found_uids)
+        return len(found_uids), len(eligible_uids)
 
     def finalize_results(self):
         super().finalize_results()    
