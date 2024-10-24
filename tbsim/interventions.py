@@ -210,8 +210,3 @@ class ActiveCaseFinding(ss.Intervention):
         self.results.cum_aff_smneg = np.cumsum(self.results.n_aff_smneg)
         self.results.cum_aff_exptb = np.cumsum(self.results.n_aff_exptb)
         return
-    
-    
-
-
-
