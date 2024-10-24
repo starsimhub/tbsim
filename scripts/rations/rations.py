@@ -1,4 +1,4 @@
-#### -------------- HELBER CLASS FOR CREATING RATIONS SIMULATIONS -------------------
+#### -------------- HELPER CLASS FOR CREATING RATIONS SIMULATIONS -------------------
 import starsim as ss
 import tbsim as mtb
 import sciris as sc
@@ -196,7 +196,6 @@ class RATIONSTrial(ss.Intervention):
         # food basket for either just the index (control) or index + HH members
         # (intervention).
         return
-
 
     def step(self):
         super().step()

@@ -9,7 +9,7 @@ version = runpy.run_path(versionpath)['__version__']
 
 # # Get the documentation
 # with open(os.path.join(cwd, 'README.rst'), "r") as f:
-long_description = "Starsim TB"
+long_description = "TBsim, an agent-based TB model implemented using the Starsim framework"
 
 CLASSIFIERS = [
     "Environment :: Console",
@@ -44,7 +44,7 @@ setup(
         'sciris>=3.1.0',
         'matplotlib',
         'numba',
-        'starsim',
+        'starsim>=2.0',
         'wheel',
         'setuptools',
         'seaborn',
