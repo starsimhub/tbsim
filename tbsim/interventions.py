@@ -25,13 +25,17 @@ class ActiveCaseFinding(ss.Intervention):
         """
         super().__init__(*args, **kwargs)
 
+        self.define_states(
+            ss.State('found', default=False)
+        )
+        
         # Updated default parameters with time-aware p_found
         self.define_pars(
             p_found = ss.bernoulli(p=self.cov_fun),
             intv_range=[2000, 2003],
             coverage=[0.1, 0.5],
             #coverage=ss.peryear([0.1, 0.5]),
-            target_age_range=[15, 25],
+            target_age_range=[15, 100],
 
             # Test sensitivity
             test_sens = {
@@ -93,7 +97,7 @@ class ActiveCaseFinding(ss.Intervention):
         super().step()
 
         sim = self.sim
-        ti = self.ti
+        # ti = self.ti
 
         # check if the time is between the intv_range
         # when to use sim.now vs sim.ti ?
@@ -102,11 +106,13 @@ class ActiveCaseFinding(ss.Intervention):
 
         tb = sim.diseases['tb']
 
+
         # ACF ELIGIBLE by >15 and not on treatment
         # OF THOSE, WE TEST A SUBSET...
         # GET FOUND_UIDS... start them all on treatment
 
         active = (tb.state==TBS.ACTIVE_PRESYMP) | (tb.state==TBS.ACTIVE_SMPOS) | (tb.state==TBS.ACTIVE_SMNEG) | (tb.state==TBS.ACTIVE_EXPTB) 
+
         eligible_uids = ss.uids(active & ~tb.on_treatment)
 
         # apply coverage

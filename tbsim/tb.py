@@ -248,7 +248,7 @@ class TB(ss.Infection):
 
         # Get the corresponding UIDs that match the active state
         tx_uids = uids[is_active]
-
+        
         if len(tx_uids) == 0:
             return 0  # No one to treat
         
