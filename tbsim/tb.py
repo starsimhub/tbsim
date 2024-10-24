@@ -19,7 +19,7 @@ class TBS(IntEnum):
 
 class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
@@ -33,7 +33,7 @@ class TB(ss.Infection):
             rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
             rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
             rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = ss.peryear(2/12),                # 2 months
+            rate_treatment_to_clear = ss.peryear(12/2),                # 2 months
 
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
@@ -175,14 +175,14 @@ class TB(ss.Infection):
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
         new_clear_presymp_uids = ss.uids()
         if len(presym_uids):
+            # Pre symp --> Clear
+            new_clear_presymp_uids = self.p_presym_to_clear.filter(presym_uids)
+
             new_active_uids = self.p_presym_to_active.filter(presym_uids)
             if len(new_active_uids):
                 active_state = self.active_tb_state[new_active_uids] 
                 self.state[new_active_uids] = active_state
                 self.ti_active[new_active_uids] = ti
-
-            # Pre symp --> Clear
-            new_clear_presymp_uids = self.p_presym_to_clear.filter(presym_uids)
 
         # Active --> Susceptible via natural recovery or as accelerated by treatment (clear)
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids

@@ -25,17 +25,18 @@ class ActiveCaseFinding(ss.Intervention):
         """
         super().__init__(*args, **kwargs)
 
-        self.define_states(
-            ss.State('found', default=False)
-        )
-        
         # Updated default parameters with time-aware p_found
         self.define_pars(
-            p_found = ss.bernoulli(p=self.cov_fun),
-            intv_range=[2000, 2003],
-            coverage=[0.1, 0.5],
-            #coverage=ss.peryear([0.1, 0.5]),
-            target_age_range=[15, 100],
+            p_treat = ss.bernoulli(p=1),
+
+            date_cov = {
+                sc.date('2014-06-01'): 0.6,
+                sc.date('2015-06-01'): 0.7,
+                sc.date('2016-06-01'): 0.64,
+            },
+
+            age_min = 15,
+            age_max = None,
 
             # Test sensitivity
             test_sens = {
@@ -43,51 +44,36 @@ class ActiveCaseFinding(ss.Intervention):
                 TBS.ACTIVE_PRESYMP: 0.9,
                 TBS.ACTIVE_SMNEG: 0.8,
                 TBS.ACTIVE_EXPTB: 0.1,
-            }
+            },
         )
         self.update_pars(pars, **kwargs)
 
         # Convert datetime to float
-        self.pars.intv_range = [sc.datetoyear(t) if isinstance(t, dt.date) else t for t in self.pars.intv_range]
+        self.pars.date_cov = {sc.datetoyear(t):v if isinstance(t, dt.date) else t for t, v in self.pars.date_cov.items()}
 
-        # make sure that the intv_range and coverage have the same dimensions
-        assert np.shape(self.pars.intv_range) == np.shape(self.pars.coverage), "intv_range and coverage must have the same dimensions"
+        self.test = ss.bernoulli(p=self.p_pos_test)
+
+        return
 
     @staticmethod
-    def cov_fun(self, sim, uids):
-        
-        baseline_coverage = np.interp(self.now_year, xp=self.pars.intv_range, fp=self.pars.coverage)
-        # print(sim.year, baseline_coverage)
-        # creates an array of coverages for the total number of uids provided to the method.
-        # bring back the individuals that were tested positive
-        # p = np.full(len(uids), fill_value=baseline_coverage*sim.dt)
+    def p_pos_test(self, sim, uids):
         p = np.zeros(len(uids))
-        
+
         tb_state = sim.diseases.tb.state[uids]
         for tbs, sensitivity in self.pars.test_sens.items():
-            p[tb_state == tbs] = sensitivity * baseline_coverage
-
-        # exclusion criterion for the intervention by age
-        too_young = sim.people.age[uids] < self.pars.target_age_range[0]
-        p[too_young] = 0
-        too_old = sim.people.age[uids] > self.pars.target_age_range[1]
-        p[too_old] = 0
+            p[tb_state == tbs] = sensitivity
 
         return p
 
     def init_results(self):
 
+        npts = len(self.pars.date_cov)
         self.define_results(
-            ss.Result('n_aff_presym',   dtype=int, label='Treated Active Pre-Symptomatic'),
-            ss.Result('n_aff_smpos',    dtype=int, label='Treated Active Smear Positive'),
-            ss.Result('n_aff_smneg',    dtype=int, label='Treated Active Smear Negative'),
-            ss.Result('n_aff_exptb',    dtype=int, label='Treated Active Extra-Pulmonary'),
-            ss.Result('cum_aff_presym', dtype=int, label='Total Treated Active Pre-Symptomatic'),
-            ss.Result('cum_aff_smpos',  dtype=int, label='Total Treated Active Smear Positive'),
-            ss.Result('cum_aff_smneg',  dtype=int, label='Total Treated Active Smear Negative'),
-            ss.Result('cum_aff_exptb',  dtype=int, label='Total Treated Active Extra-Pulmonary')
+            ss.Result('n_elig',    dtype=int, shape=npts, label='Number eligible', scale=True),
+            ss.Result('n_found',   dtype=int, shape=npts, label='Number found', scale=True),
+            ss.Result('n_treated', dtype=int, shape=npts, label='Number treated', scale=True),
         )
-    
+
         return
 
     def step(self):
@@ -97,43 +83,32 @@ class ActiveCaseFinding(ss.Intervention):
         super().step()
 
         sim = self.sim
-        # ti = self.ti
 
-        # check if the time is between the intv_range
-        # when to use sim.now vs sim.ti ?
-        if sim.now_year < self.pars.intv_range[0] or sim.now_year > self.pars.intv_range[-1]:
-            return 0, 0
+        years = np.array(list(self.pars.date_cov.keys()))
+        is_active = (sim.now_year >= years) & (sim.now_year < years + self.sim.dt_year)
+        if not np.any(is_active):
+            return
 
         tb = sim.diseases['tb']
 
+        elig = ~tb.on_treatment
+        if self.pars.age_min is not None:
+            elig = elig & (sim.people.age >= self.pars.age_min)
+        if self.pars.age_max is not None:
+            elig = elig & (sim.people.age < self.pars.age_max)
 
-        # ACF ELIGIBLE by >15 and not on treatment
-        # OF THOSE, WE TEST A SUBSET...
-        # GET FOUND_UIDS... start them all on treatment
-
-        active = (tb.state==TBS.ACTIVE_PRESYMP) | (tb.state==TBS.ACTIVE_SMPOS) | (tb.state==TBS.ACTIVE_SMNEG) | (tb.state==TBS.ACTIVE_EXPTB) 
-
-        eligible_uids = ss.uids(active & ~tb.on_treatment)
-
-        # apply coverage
-        found_uids = self.pars.p_found.filter(eligible_uids)
+        found_uids = self.test.filter(elig)
 
         # apply treatment
-        tb.start_treatment(found_uids)
+        treated_uids = self.pars.p_treat.filter(found_uids)
+        tb.start_treatment(treated_uids)
 
         # append the results 
-        # self.results.n_aff_presym[ti] = len(treated_presym_uids)
-        # self.results.n_aff_smpos[ti] = len(treated_smpos_uids)
-        # self.results.n_aff_smneg[ti] = len(treated_smneg_uids)
-        # self.results.n_aff_exptb[ti] = len(treated_exptb_uids)
-        return len(found_uids), len(eligible_uids)
+        timepoint = np.where(is_active)[0][0]
+        self.results.n_elig[timepoint] = np.sum(elig)
+        self.results.n_found[timepoint] = len(found_uids)
+        self.results.n_treated[timepoint] = len(treated_uids)
 
-    def finalize_results(self):
-        super().finalize_results()    
-        self.results.cum_aff_presym = np.cumsum(self.results.n_aff_presym)
-        self.results.cum_aff_smpos = np.cumsum(self.results.n_aff_smpos)
-        self.results.cum_aff_smneg = np.cumsum(self.results.n_aff_smneg)
-        self.results.cum_aff_exptb = np.cumsum(self.results.n_aff_exptb)
         return
 
 
