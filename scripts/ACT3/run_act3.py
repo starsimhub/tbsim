@@ -1,25 +1,9 @@
-""" 
-Run simulation scenarios associated with the RATIONS trial
-"""
-
 import starsim as ss
-import tbsim as mtb
+import tbsim as tb
 import numpy as np
-import pandas as pd
-import sciris as sc
-import tbsim.config as cfg
-from scripts.rations.rations import RATIONSTrial
-from scripts.rations.plots import plot_rations, plot_epi, plot_hh, plot_nut, plot_active_infections
-import warnings
-import os 
-
-warnings.filterwarnings("ignore", "is_categorical_dtype")
-warnings.filterwarnings("ignore", "use_inf_as_na")
 
 debug = False # NOTE: Debug runs in serial
-default_n_rand_seeds = [25, 1][debug]
-
-resdir = cfg.create_res_dir()
+default_n_rand_seeds = [60, 1][debug]
 
 
 def build_RATIONS(skey, scen, rand_seed=0):
@@ -112,14 +96,15 @@ def build_RATIONS(skey, scen, rand_seed=0):
     return sim
 
 
-def run_RATIONS(skey, scen, rand_seed=0):
+def run_ACF(skey, scen, rand_seed=0):
 
-    sim = build_RATIONS(skey, scen, rand_seed)
+    sim = build_ACF(skey, scen, rand_seed)
     sim.run() # Run the sim
 
     # Build a dictionary of results
     ret = {}
-    rtr = sim.interventions['rationstrial'].results
+    act3 = sim.analyzers['act3'].results
+    '''
     dat = [
         (rtr.incident_cases_ctrl.cumsum(), 'Incident Cases', 'Control'),
         (rtr.incident_cases_intv.cumsum(), 'Incident Cases', 'Intervention'),
@@ -148,8 +133,10 @@ def run_RATIONS(skey, scen, rand_seed=0):
         ret[k] = df
 
     print(f'Finishing sim with "{skey}" seed {rand_seed} ')
+    '''
 
     return ret
+
 
 
 def run_scenarios(scens, n_seeds=default_n_rand_seeds):
@@ -157,10 +144,11 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
     cfgs = []
     for skey, scen in scens.items():
         for rs in range(n_seeds):
+            scen['Simulation']['n_agents'] = np.random.normal(loc=1200, scale=50)
             cfgs.append({'skey':skey, 'scen':scen, 'rand_seed':rs})
 
     T = sc.tic()
-    results += sc.parallelize(run_RATIONS, iterkwargs=cfgs, die=True, serial=debug)
+    results += sc.parallelize(run_ACF, iterkwargs=cfgs, die=True, serial=debug)
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
     # Aggregate the results
@@ -172,32 +160,19 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
 
     return dfs
 
-
 if __name__ == '__main__':
-    # Define the scenarios
-    from scripts.rations.scenarios import scens
-   
-    scens = {skey:scen for skey, scen in scens.items() if scen is None or 'Skip' not in scen or not scen['Skip']}
+
+    scens = {
+        'Control': {
+            'ACT3': None,
+            'TB': None,
+            'Simulation': None,
+        },
+        'Basic ACT3': {
+            'ACT3': tbsim.ActiveCaseFinding(),
+            'TB': None,
+            'Simulation': None,
+        }
+    }
+
     ret = run_scenarios(scens)
-
-    # Create plots
-    if 'results' in ret:
-        plot_rations(resdir, ret['results'])
-
-    if 'rationsanalyzer' in ret:
-        # Incidence
-        plot_active_infections(resdir, ret['rationsanalyzer'])
-
-    if 'genhhanalyzer' in ret:
-        # Household size distribution  
-        plot_hh(resdir, ret['genhhanalyzer'])
-
-    if 'gennutritionanalyzer' in ret:
-        # Nutrition
-        plot_nut(resdir, ret['gennutritionanalyzer'])
-
-    if 'rationsanalyzer' in ret:
-        # Prevalence 
-        plot_epi(resdir, ret['rationsanalyzer'])
-
-    print(f'Done, results directory is {resdir}.')
