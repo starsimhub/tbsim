@@ -1,152 +1,133 @@
 import starsim as ss
-import tbsim as tb
+import tbsim as mtb
 import numpy as np
+import pandas as pd
+import sciris as sc
+import os
 
-debug = False # NOTE: Debug runs in serial
+
+debug = True # NOTE: Debug runs in serial
 default_n_rand_seeds = [60, 1][debug]
 
 
-def build_RATIONS(skey, scen, rand_seed=0):
-    '''
-    Run a single simulation of the RATIONS trial
-    '''
-
-    # Set the global random seed in case any random numbers are used outside of Starsim
-    np.random.seed(rand_seed)
-
-    # Create the population with enough people for 1400 index cases and 4724
-    # household contacts in the control arm and 1400 index cases and 5621
-    # household contacts in the intervention arm.
-    # TODO: India-like age structure, although it doesn't really matter (yet)
-    pop = ss.People(n_agents = 1400 + 4724 + 1400 + 5621)
-
-    # Create networks
-    nets = mtb.HouseholdNet(add_newborns=False) # Optionally add newborns to households here
-
-    # Create the instance of TB disease
-    tb_pars = dict(
-        beta = ss.beta(0.045),
-        init_prev = 0, # Infections seeded by Rations class
-        rate_LS_to_presym = ss.perday(3e-5),
-        rate_LF_to_presym = ss.perday(6e-3),
-        
-        # Relative transmissibility by TB state
-        rel_trans_smpos     = 1.0,
-        rel_trans_smneg     = 0.3,
-        rel_trans_exptb     = 0.05,
-        rel_trans_presymp   = 0.10,
-    )
-    if scen is not None and 'TB' in scen.keys() and scen['TB'] is not None:
-        tb_pars.update(scen['TB'])
-    tb = mtb.TB(tb_pars)
-
-    # Create malnutrition --------
-    malnutrition_parameters = dict()
-    if scen is not None and 'Malnutrition' in scen.keys() and scen['Malnutrition'] is not None:
-        malnutrition_parameters.update(scen['Malnutrition'])
-    nut = mtb.Malnutrition(malnutrition_parameters)
-
-    # Create demographics
-    dems = [
-        ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
-        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
+def build_ACF(skey, scen, random_seed=0):
+    
+    """
+    Build the simulation object that will simulate the ACT3
+        - set a random seed
+        - start with roughly 1200 or so people 
+        TODO: Think about the age distribution of the population, Vietnam??
+        - define demographics 
+        - right now use random nets and define a network of individuals 
+        - define the tb parameters 
+        - define the interevention
+        - make room of the analyzers, currently set it to None 
+        TODO: add analyzers to do stuff
+        - Age distribution of incidence and prevalence? 
+        Define the parameters for simulation 
+            - Set to start and stop?
+            - Set the time step? 
+    """
+    
+    # this needs to be run based on scenarios -- 
+    # will come back to this - default is ON! 
+    # TODO: need a spot to pass on the scenarios thereby updating the
+    # simulation parameters
+    np.random.seed(random_seed)
+    
+    # TODO: Need to pick the right simulation scene to pass to the build.
+    # Retrieve intervention, TB, and simulation-related parameters from scen and skey
+    # for TB
+    # Create the people, networks, and demographics
+    pop = ss.People(n_agents=np.round(np.random.normal(loc=1200, scale=50)))
+    demog = [
+        ss.Deaths(pars=dict(death_rate=10)),
+        # is pregnanacy really required? or can I just have births here?
+        ss.Pregnancy(pars=dict(fertility_rate=45))
     ]
+    nets = ss.RandomNet(n_contacts = ss.poisson(lam=5), dur = 0)
+    
+    # Modify the defaults to if necesary based on the input scenario 
+    # for the TB module
+    tb = scen.get('TB') or mtb.TB(
+        # setting the default TB parameters if TB input is not provided 
+        # TODO: If these are are the same in the TB module maybe setting it to mtb.TB() should suffice?
+        beta=ss.beta(0.045),
+        init_prev=0.1,
+        rate_LS_to_presym=ss.perday(3e-5),
+        rate_LF_to_presym=ss.perday(6e-3),
+        rel_trans_smpos=1.0,
+        rel_trans_smneg=0.3,
+        rel_trans_exptb=0.05,
+        rel_trans_presymp=0.10
+        )        
+    
+    # for the intervention 
+    intv = scen.get('ACT3') or mtb.ActiveCaseFinding()
 
-    # Create the connector between TB and malnutrition
-    cn_pars = {}
-    if scen is not None and 'Connector' in scen.keys() and scen['Connector'] is not None:
-        cn_pars.update(scen['Connector'])
-    cn = mtb.TB_Nutrition_Connector(cn_pars)
-
-    # Most of the RATIONS trial is handled by the RATIONSTrial intervention
-    rations_pars = dict()
-    if scen is not None and 'RATIONS' in scen.keys() and scen['RATIONS'] is not None:
-        rations_pars.update(scen['RATIONS'])
-    RATIONS_trial = RATIONSTrial(rations_pars)
-    intvs = [RATIONS_trial]
-
-    # Create analyzers
-    azs = None #[
-        #mtb.RationsAnalyzer(),
-        #mtb.GenHHAnalyzer(),
-        #mtb.GenNutritionAnalyzer(track_years_arr=[2017, 2018], group_by=['Arm', 'Macro', 'Micro'])
-    #]
-
-    # Create the simulation parameters and simulation
-    sim_pars = dict(
-        dt = 7/365,
-        start = 2019, # Dates don't matter
-        stop = 2030, # Long enough that all pre-symptomatic period end + 2y
-        rand_seed = rand_seed,
-    )
-    if scen is not None and 'Simulation' in scen.keys() and scen['Simulation'] is not None:
-        sim_pars.update(scen['Simulation'])
-
-    sim = ss.Sim(people=pop, 
-        networks=nets, 
-        diseases=[tb, nut], 
-        pars=sim_pars, 
-        demographics=dems, 
-        connectors=cn, 
-        interventions=intvs,
-        analyzers=azs,
-    )
-    sim.pars.verbose = [0, sim.pars.dt / 5][debug] # Print status every 5 years instead of every 10 steps
-
+    # for the simulation parameters
+    sim_input = scen.get('Simulation') or {
+        # default simulation parameters
+        'unit': 'day', 'dt': 7, 
+        'start': sc.date('2013-01-01'), 'stop': sc.date('2016-12-31')
+        }
+    
+    anz = None
+    # some scenarios can also alter the simulation parameters 
+    # TODO: 
+        # What happens when when you reun ACT3 for longer? 
+        # What happens when you run ACT3 more frequently?
+    sim = ss.Sim(
+        **sim_input,
+        people=pop, networks=nets, diseases=[tb], demographics=demog, interventions=[intv], analyzers=anz 
+        )
+    
+    # Print status every 5 years instead of every 10 steps
+    sim.pars.verbose = [0, sim.pars.dt / 5][debug] 
+    
     return sim
+    
 
+def run_ACF(skey=None, scen=None, rand_seed=0):
 
-def run_ACF(skey, scen, rand_seed=0):
+    """
+    Run the pick simulation for the ACT3 under a single scenario - pick out the results
+    """
 
     sim = build_ACF(skey, scen, rand_seed)
-    sim.run() # Run the sim
+    sim.run()
 
-    # Build a dictionary of results
-    ret = {}
-    act3 = sim.analyzers['act3'].results
-    '''
-    dat = [
-        (rtr.incident_cases_ctrl.cumsum(), 'Incident Cases', 'Control'),
-        (rtr.incident_cases_intv.cumsum(), 'Incident Cases', 'Intervention'),
-        (rtr.coprevalent_cases_ctrl.cumsum(), 'Co-Prevalent Cases', 'Control'),
-        (rtr.coprevalent_cases_intv.cumsum(), 'Co-Prevalent Cases', 'Intervention'),
-        (rtr.new_hhs_enrolled_ctrl.cumsum(), 'HHS Enrolled', 'Control'),
-        (rtr.new_hhs_enrolled_intv.cumsum(), 'HHS Enrolled', 'Intervention'),
-        (rtr.person_years_ctrl.cumsum(), 'Person Years', 'Control'),
-        (rtr.person_years_intv.cumsum(), 'Person Years', 'Intervention'),
-    ]
-
-    dfs = []
-    for d in dat:
-        dfs.append(
-            pd.DataFrame({'Values': d[0]}, index=pd.MultiIndex.from_product([sim.results.timevec, [d[1]], [d[2]]], names=['Year', 'Channel', 'Arm']))
+    tb_res = pd.DataFrame({
+        'time': sim.results.timevec,
+        'on_treatment': sim.results.tb, 
+        'prevalence': sim.results.tb.prevalence,
+        'active_presymp': sim.results.tb.n_active_presymp,
+        'active_smpos': sim.results.tb.n_active_presymp,
+        'active_presymp': sim.results.tb.n_active_presymp}
         )
-    df = pd.concat(dfs)
-    df['Seed'] = rand_seed
-    df['Scenario'] = skey
-    ret['results'] = df.reset_index()
-
-    for k, az in sim.analyzers.items():
-        df = az.df
-        df['Seed'] = rand_seed
-        df['Scenario'] = skey
-        ret[k] = df
-
-    print(f'Finishing sim with "{skey}" seed {rand_seed} ')
-    '''
-
-    return ret
-
-
+    
+    acf_res = pd.DataFrame({
+        'time': sim.results.timevec,
+        'n_elig': sim.results.activecasefinding[0].n_elig,
+        'n_found': sim.results.interventions[0].n_found
+        })
+        
+    return tb_res, acf_res
+    
+    
 
 def run_scenarios(scens, n_seeds=default_n_rand_seeds):
     results = []
     cfgs = []
+    
+    # Iterate over scenarios and random seeds
     for skey, scen in scens.items():
         for rs in range(n_seeds):
-            scen['Simulation']['n_agents'] = np.random.normal(loc=1200, scale=50)
-            cfgs.append({'skey':skey, 'scen':scen, 'rand_seed':rs})
+            # Append configuration for parallel execution
+            # scen['Simulation']['n_agents'] = np.random.normal(loc=1200, scale=50)
+            cfgs.append({'skey': skey, 'scen': scen, 'rand_seed': rs})
 
+    # Run simulations in parallel
     T = sc.tic()
     results += sc.parallelize(run_ACF, iterkwargs=cfgs, die=True, serial=debug)
     print(f'That took: {sc.toc(T, output=True):.1f}s')
@@ -159,20 +140,23 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
         dfs[k].to_csv(os.path.join(resdir, f'{k}.csv'))
 
     return dfs
-
+    
+   
 if __name__ == '__main__':
-
+    
     scens = {
         'Control': {
-            'ACT3': None,
+            # turn off the tretament for the control scenario
+            'ACT3': mtb.ActiveCaseFinding(p_treat=ss.bernoulli(p=0.0)),
             'TB': None,
-            'Simulation': None,
+            'Simulation': None
         },
         'Basic ACT3': {
-            'ACT3': tbsim.ActiveCaseFinding(),
+            # default has been set to basic ACT3
+            'ACT3': None,
             'TB': None,
-            'Simulation': None,
+            'Simulation': None
         }
     }
 
-    ret = run_scenarios(scens)
+    run_scenarios(scens)

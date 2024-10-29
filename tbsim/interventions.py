@@ -49,7 +49,10 @@ class ActiveCaseFinding(ss.Intervention):
         self.update_pars(pars, **kwargs)
 
         # Convert datetime to float
-        self.pars.date_cov = {sc.datetoyear(t):v if isinstance(t, dt.date) else t for t, v in self.pars.date_cov.items()}
+        self.pars.date_cov = {
+            sc.datetoyear(t):v if isinstance(t, dt.date) else t 
+            for t, v in self.pars.date_cov.items()
+            }
 
         self.test = ss.bernoulli(p=self.p_pos_test)
 
@@ -69,9 +72,13 @@ class ActiveCaseFinding(ss.Intervention):
 
         npts = len(self.pars.date_cov)
         self.define_results(
-            ss.Result('n_elig',    dtype=int, shape=npts, label='Number eligible', scale=True),
-            ss.Result('n_found',   dtype=int, shape=npts, label='Number found', scale=True),
-            ss.Result('n_treated', dtype=int, shape=npts, label='Number treated', scale=True),
+            ss.Result('n_elig',    
+                      dtype=int, shape=npts, 
+                      label='Number eligible', scale=True),
+            ss.Result('n_found',   dtype=int, shape=npts, 
+                      label='Number found',scale=True),
+            ss.Result('n_treated', dtype=int, shape=npts, 
+                      label='Number treated', scale=True),
         )
 
         return
@@ -85,7 +92,10 @@ class ActiveCaseFinding(ss.Intervention):
         sim = self.sim
 
         years = np.array(list(self.pars.date_cov.keys()))
-        is_active = (sim.now_year >= years) & (sim.now_year < years + self.sim.dt_year)
+        is_active = (
+            (sim.now_year >= years) & (sim.now_year < years + self.sim.dt_year)
+            )
+        
         if not np.any(is_active):
             return
 
