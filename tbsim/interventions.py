@@ -72,13 +72,10 @@ class ActiveCaseFinding(ss.Intervention):
 
         npts = len(self.pars.date_cov)
         self.define_results(
-            ss.Result('n_elig',    
-                      dtype=int, shape=npts, 
-                      label='Number eligible', scale=True),
-            ss.Result('n_found',   dtype=int, shape=npts, 
-                      label='Number found',scale=True),
-            ss.Result('n_treated', dtype=int, shape=npts, 
-                      label='Number treated', scale=True),
+            ss.Result('time', dtype=float, shape=npts, label='Time', scale=True),
+            ss.Result('n_elig', dtype=int, shape=npts, label='Number eligible', scale=True),
+            ss.Result('n_found', dtype=int, shape=npts, label='Number found',scale=True),
+            ss.Result('n_treated', dtype=int, shape=npts, label='Number treated', scale=True),
         )
 
         return
@@ -92,6 +89,7 @@ class ActiveCaseFinding(ss.Intervention):
         sim = self.sim
 
         years = np.array(list(self.pars.date_cov.keys()))
+        # the years when the intervention is active
         is_active = (
             (sim.now_year >= years) & (sim.now_year < years + self.sim.dt_year)
             )
@@ -115,6 +113,7 @@ class ActiveCaseFinding(ss.Intervention):
 
         # append the results 
         timepoint = np.where(is_active)[0][0]
+        self.results.time[timepoint] = sim.now_year
         self.results.n_elig[timepoint] = np.sum(elig)
         self.results.n_found[timepoint] = len(found_uids)
         self.results.n_treated[timepoint] = len(treated_uids)

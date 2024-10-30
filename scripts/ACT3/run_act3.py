@@ -6,9 +6,14 @@ import sciris as sc
 import os
 
 
-debug = True # NOTE: Debug runs in serial
+debug = False # NOTE: Debug runs in serial
 default_n_rand_seeds = [60, 1][debug]
 
+# TODO: Need to update the path to the results directory
+# Check if the results directory exists, if not, create it
+resdir = os.path.join('./', 'results', 'ACT3')
+if not os.path.exists(resdir):
+    os.makedirs(resdir)
 
 def build_ACF(skey, scen, random_seed=0):
     
@@ -34,7 +39,7 @@ def build_ACF(skey, scen, random_seed=0):
     # TODO: need a spot to pass on the scenarios thereby updating the
     # simulation parameters
     np.random.seed(random_seed)
-    
+
     # TODO: Need to pick the right simulation scene to pass to the build.
     # Retrieve intervention, TB, and simulation-related parameters from scen and skey
     # for TB
@@ -83,12 +88,12 @@ def build_ACF(skey, scen, random_seed=0):
         )
     
     # Print status every 5 years instead of every 10 steps
-    sim.pars.verbose = [0, sim.pars.dt / 5][debug] 
+    #sim.pars.verbose = [1e-6, 1e-6][debug] 
     
     return sim
     
 
-def run_ACF(skey=None, scen=None, rand_seed=0):
+def run_ACF(skey, scen, rand_seed=0):
 
     """
     Run the pick simulation for the ACT3 under a single scenario - pick out the results
@@ -99,23 +104,35 @@ def run_ACF(skey=None, scen=None, rand_seed=0):
 
     tb_res = pd.DataFrame({
         'time': sim.results.timevec,
-        'on_treatment': sim.results.tb, 
+        'on_treatment': sim.results.tb.n_on_treatment, 
         'prevalence': sim.results.tb.prevalence,
         'active_presymp': sim.results.tb.n_active_presymp,
-        'active_smpos': sim.results.tb.n_active_presymp,
-        'active_presymp': sim.results.tb.n_active_presymp}
+        'active_smpos': sim.results.tb.n_active_smpos,
+        'active_exptb': sim.results.tb.n_active_exptb}
         )
     
+    # redfine the time in years
+    tb_res = tb_res.assign(
+        time_year = lambda x: x['time'].apply(sc.datetoyear))
+    
+    
     acf_res = pd.DataFrame({
-        'time': sim.results.timevec,
-        'n_elig': sim.results.activecasefinding[0].n_elig,
-        'n_found': sim.results.interventions[0].n_found
+        'time_year': sim.results.activecasefinding.time,
+        'n_elig': sim.results.activecasefinding.n_elig,
+        'n_found': sim.results.activecasefinding.n_found,
+        'n_treated': sim.results.activecasefinding.n_treated
         })
-        
-    return tb_res, acf_res
-    
-    
 
+    # add the scenarios label to the results
+    tb_res['scenario'] = skey
+    acf_res['scenario'] = skey
+
+    tb_res['rand_seed'] = rand_seed
+    acf_res['rand_seed'] = rand_seed
+
+    return {'TB': tb_res, 'ACT3': acf_res}
+    
+    
 def run_scenarios(scens, n_seeds=default_n_rand_seeds):
     results = []
     cfgs = []
@@ -129,16 +146,21 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
 
     # Run simulations in parallel
     T = sc.tic()
+    
     results += sc.parallelize(run_ACF, iterkwargs=cfgs, die=True, serial=debug)
+    
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
-    # Aggregate the results
+    # separate the results for each component of the simulation (TB and ACT3)
     dfs = {}
+    
     for k in results[0].keys():
-        df_list = [r[k] for r in results]
+        df_list = [r.get(k) 
+                   for r in results 
+                   if r.get(k) is not None
+                   ]
         dfs[k] = pd.concat(df_list)
         dfs[k].to_csv(os.path.join(resdir, f'{k}.csv'))
-
     return dfs
     
    
