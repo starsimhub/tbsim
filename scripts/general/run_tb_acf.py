@@ -3,7 +3,6 @@ import starsim as ss
 import matplotlib.pyplot as plt
 
 
-
 def make_tb_simplified(agents=1000, start=2000, dt=7/365):
     # input modules for the simulation
     pop = ss.People(n_agents=agents)
@@ -18,7 +17,7 @@ def make_tb_simplified(agents=1000, start=2000, dt=7/365):
     return sim
 
 if __name__ == '__main__':
-   
+
     sim_tb = make_tb_simplified(agents=1500, start=2000, dt=7/365)
     sim_tb.run()
     sim_tb.diseases['tb'].plot()

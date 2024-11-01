@@ -248,10 +248,10 @@ class TB(ss.Infection):
 
         # Get the corresponding UIDs that match the active state
         tx_uids = uids[is_active]
-        
+
         if len(tx_uids) == 0:
             return 0  # No one to treat
-        
+
         # Mark the individuals as being on treatment
         self.on_treatment[tx_uids] = True
 
@@ -288,7 +288,7 @@ class TB(ss.Infection):
             ss.Result('n_active_smneg',   dtype=int, label='Active Smear Negative'),
             ss.Result('n_active_exptb',   dtype=int, label='Active Extra-Pulmonary'),
             ss.Result('new_deaths',       dtype=int, label='New Deaths'),
-            ss.Result('cum_deaths',       dtype=int, label='Cumulative Deaths')
+            ss.Result('cum_deaths',       dtype=int, label='Cumulative Deaths'),
         )
         return
 
@@ -297,12 +297,12 @@ class TB(ss.Infection):
         res = self.results
         ti = self.ti
 
-        res.n_latent_slow[ti] = np.count_nonzero(self.state == TBS.LATENT_SLOW)
-        res.n_latent_fast[ti] = np.count_nonzero(self.state == TBS.LATENT_FAST)
+        res.n_latent_slow[ti]    = np.count_nonzero(self.state == TBS.LATENT_SLOW)
+        res.n_latent_fast[ti]    = np.count_nonzero(self.state == TBS.LATENT_FAST)
         res.n_active_presymp[ti] = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
-        res.n_active_smpos[ti] = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
-        res.n_active_smneg[ti] = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
-        res.n_active_exptb[ti] = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
+        res.n_active_smpos[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
+        res.n_active_smneg[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
+        res.n_active_exptb[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
         return
 
     def finalize_results(self):

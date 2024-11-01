@@ -52,7 +52,7 @@ def build_ACF(skey, scen, random_seed=0):
     ]
     nets = ss.RandomNet(n_contacts = ss.poisson(lam=5), dur = 0)
     
-    # Modify the defaults to if necesary based on the input scenario 
+    # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
     tb = scen.get('TB') or mtb.TB(
         # setting the default TB parameters if TB input is not provided 
@@ -65,8 +65,8 @@ def build_ACF(skey, scen, random_seed=0):
         rel_trans_smneg=0.3,
         rel_trans_exptb=0.05,
         rel_trans_presymp=0.10
-        )        
-    
+    ) 
+
     # for the intervention 
     intv = scen.get('ACT3') or mtb.ActiveCaseFinding()
 
@@ -75,26 +75,25 @@ def build_ACF(skey, scen, random_seed=0):
         # default simulation parameters
         'unit': 'day', 'dt': 7, 
         'start': sc.date('2013-01-01'), 'stop': sc.date('2016-12-31')
-        }
-    
+    }
+
     anz = None
     # some scenarios can also alter the simulation parameters 
     # TODO: 
-        # What happens when when you reun ACT3 for longer? 
+        # What happens when when you rerun ACT3 for longer? 
         # What happens when you run ACT3 more frequently?
     sim = ss.Sim(
         **sim_input,
         people=pop, networks=nets, diseases=[tb], demographics=demog, interventions=[intv], analyzers=anz 
         )
-    
+
     # Print status every 5 years instead of every 10 steps
     #sim.pars.verbose = [1e-6, 1e-6][debug] 
-    
+
     return sim
-    
+
 
 def run_ACF(skey, scen, rand_seed=0):
-
     """
     Run the pick simulation for the ACT3 under a single scenario - pick out the results
     """
@@ -108,20 +107,19 @@ def run_ACF(skey, scen, rand_seed=0):
         'prevalence': sim.results.tb.prevalence,
         'active_presymp': sim.results.tb.n_active_presymp,
         'active_smpos': sim.results.tb.n_active_smpos,
-        'active_exptb': sim.results.tb.n_active_exptb}
-        )
-    
+        'active_exptb': sim.results.tb.n_active_exptb,
+    })
+
     # redfine the time in years
     tb_res = tb_res.assign(
         time_year = lambda x: x['time'].apply(sc.datetoyear))
-    
-    
+
     acf_res = pd.DataFrame({
         'time_year': sim.results.activecasefinding.time,
         'n_elig': sim.results.activecasefinding.n_elig,
         'n_found': sim.results.activecasefinding.n_found,
-        'n_treated': sim.results.activecasefinding.n_treated
-        })
+        'n_treated': sim.results.activecasefinding.n_treated,
+    })
 
     # add the scenarios label to the results
     tb_res['scenario'] = skey
@@ -131,12 +129,12 @@ def run_ACF(skey, scen, rand_seed=0):
     acf_res['rand_seed'] = rand_seed
 
     return {'TB': tb_res, 'ACT3': acf_res}
-    
-    
+
+
 def run_scenarios(scens, n_seeds=default_n_rand_seeds):
     results = []
     cfgs = []
-    
+
     # Iterate over scenarios and random seeds
     for skey, scen in scens.items():
         for rs in range(n_seeds):
@@ -146,14 +144,13 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
 
     # Run simulations in parallel
     T = sc.tic()
-    
+
     results += sc.parallelize(run_ACF, iterkwargs=cfgs, die=True, serial=debug)
-    
+
     print(f'That took: {sc.toc(T, output=True):.1f}s')
 
     # separate the results for each component of the simulation (TB and ACT3)
     dfs = {}
-    
     for k in results[0].keys():
         df_list = [r.get(k) 
                    for r in results 
@@ -162,13 +159,13 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
         dfs[k] = pd.concat(df_list)
         dfs[k].to_csv(os.path.join(resdir, f'{k}.csv'))
     return dfs
-    
-   
+
+
 if __name__ == '__main__':
-    
+
     scens = {
         'Control': {
-            # turn off the tretament for the control scenario
+            # Turn off the tretatment for the control scenario
             'ACT3': mtb.ActiveCaseFinding(p_treat=ss.bernoulli(p=0.0)),
             'TB': None,
             'Simulation': None

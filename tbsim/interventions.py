@@ -52,7 +52,7 @@ class ActiveCaseFinding(ss.Intervention):
         self.pars.date_cov = {
             sc.datetoyear(t):v if isinstance(t, dt.date) else t 
             for t, v in self.pars.date_cov.items()
-            }
+        }
 
         self.test = ss.bernoulli(p=self.p_pos_test)
 
@@ -65,11 +65,9 @@ class ActiveCaseFinding(ss.Intervention):
         tb_state = sim.diseases.tb.state[uids]
         for tbs, sensitivity in self.pars.test_sens.items():
             p[tb_state == tbs] = sensitivity
-
         return p
 
     def init_results(self):
-
         npts = len(self.pars.date_cov)
         self.define_results(
             ss.Result('time', dtype=float, shape=npts, label='Time', scale=True),
@@ -77,41 +75,39 @@ class ActiveCaseFinding(ss.Intervention):
             ss.Result('n_found', dtype=int, shape=npts, label='Number found',scale=True),
             ss.Result('n_treated', dtype=int, shape=npts, label='Number treated', scale=True),
         )
-
         return
 
     def step(self):
-        """
-        Apply the intervention
-        """
-        super().step()
+        """ Apply the intervention """
 
+        super().step()
         sim = self.sim
 
+        # Determine when the intervention is active and return if nothing to do
         years = np.array(list(self.pars.date_cov.keys()))
-        # the years when the intervention is active
         is_active = (
             (sim.now_year >= years) & (sim.now_year < years + self.sim.dt_year)
-            )
-        
+        )
         if not np.any(is_active):
             return
 
         tb = sim.diseases['tb']
 
+        # Filter by treatment and age
         elig = ~tb.on_treatment
         if self.pars.age_min is not None:
             elig = elig & (sim.people.age >= self.pars.age_min)
         if self.pars.age_max is not None:
             elig = elig & (sim.people.age < self.pars.age_max)
 
+        # Perform the test on the eligible individuals to find cases
         found_uids = self.test.filter(elig)
 
-        # apply treatment
+        # Apply treatment to the found cases
         treated_uids = self.pars.p_treat.filter(found_uids)
         tb.start_treatment(treated_uids)
 
-        # append the results 
+        # Update the results 
         timepoint = np.where(is_active)[0][0]
         self.results.time[timepoint] = sim.now_year
         self.results.n_elig[timepoint] = np.sum(elig)
