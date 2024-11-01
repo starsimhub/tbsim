@@ -170,3 +170,4 @@ cython_debug/
 # data files
 *.csv
 *.png
+*.xlsx
