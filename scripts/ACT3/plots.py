@@ -13,10 +13,8 @@ runpy.run_path('scripts/ACT3/run_act3.py')
 os.makedirs('results/ACT3/figs', exist_ok=True)
 figs_path = os.path.join('results', 'ACT3', 'figs')
 
-# load tb results data 
-tb_results = pd.read_csv('results/ACT3/TB.csv', index_col=0)
 
-def plot_scenarios(path = figs_path, results= tb_results):
+def plot_scenarios(results, path = figs_path):
     
     # process results to make ready for plotting
     # maybe have a different function to process the data? 
@@ -55,7 +53,7 @@ def plot_scenarios(path = figs_path, results= tb_results):
 
     sc.savefig('act3_scene.png', folder=path)
 
-plot_scenarios()
+
 
 
 
