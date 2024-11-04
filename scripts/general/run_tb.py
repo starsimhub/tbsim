@@ -37,7 +37,6 @@ def make_tb(sim_pars=None):
     return sim
 
 if __name__ == '__main__':
-
     sim_tb = make_tb()
     sim_tb.run()
     sim_tb.diseases['tb'].plot()
