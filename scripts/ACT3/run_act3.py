@@ -19,19 +19,6 @@ def build_ACF(skey, scen, rand_seed=0):
     
     """
     Build the simulation object that will simulate the ACT3
-        - set a random seed
-        - start with roughly 1200 or so people 
-        TODO: Think about the age distribution of the population, Vietnam??
-        - define demographics 
-        - right now use random nets and define a network of individuals 
-        - define the tb parameters 
-        - define the interevention
-        - make room of the analyzers, currently set it to None 
-        TODO: add analyzers to do stuff
-        - Age distribution of incidence and prevalence? 
-        Define the parameters for simulation 
-            - Set to start and stop?
-            - Set the time step? 
     """
     
     # random seed passed during drwaing of a population
