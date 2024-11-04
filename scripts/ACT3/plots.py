@@ -7,17 +7,16 @@ import sciris as sc
 import matplotlib.pyplot as plt
 
 # source the script to run scenarios 
-runpy.run_path('scripts/ACT3/run_act3.py')   
+runpy.run_path('scripts/ACT3/run_act3.py')
 
 # if pltdir does not exist, create it
-os.makedirs('results/ACT3/figs', exist_ok=True)
 figs_path = os.path.join('results', 'ACT3', 'figs')
+os.makedirs(figs_path, exist_ok=True)
 
 # load tb results data 
 tb_results = pd.read_csv('results/ACT3/TB.csv', index_col=0)
 
 def plot_scenarios(path = figs_path, results= tb_results):
-    
     # process results to make ready for plotting
     # maybe have a different function to process the data? 
     tb_results_agg = (
@@ -56,11 +55,3 @@ def plot_scenarios(path = figs_path, results= tb_results):
     sc.savefig('act3_scene.png', folder=path)
 
 plot_scenarios()
-
-
-
-    
-
-
-
-
