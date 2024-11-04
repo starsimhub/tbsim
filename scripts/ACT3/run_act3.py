@@ -6,16 +6,16 @@ import sciris as sc
 import os
 
 
-debug = False # NOTE: Debug runs in serial
+debug = False #NOTE: Debug runs in serial
 default_n_rand_seeds = [60, 1][debug]
 
-# TODO: Need to update the path to the results directory
-# Check if the results directory exists, if not, create it
-resdir = os.path.join('./', 'results', 'ACT3')
-if not os.path.exists(resdir):
-    os.makedirs(resdir)
 
-def build_ACF(skey, scen, random_seed=0):
+# Check if the results directory exists, if not, create it
+resdir = os.path.join('results', 'ACT3')
+
+os.makedirs(resdir, exist_ok=True)
+
+def build_ACF(skey, scen, rand_seed=0):
     
     """
     Build the simulation object that will simulate the ACT3
@@ -34,29 +34,22 @@ def build_ACF(skey, scen, random_seed=0):
             - Set the time step? 
     """
     
-    # this needs to be run based on scenarios -- 
-    # will come back to this - default is ON! 
-    # TODO: need a spot to pass on the scenarios thereby updating the
-    # simulation parameters
-    np.random.seed(random_seed)
+    # random seed passed during drwaing of a population
+    np.random.seed(rand_seed)
 
-    # TODO: Need to pick the right simulation scene to pass to the build.
     # Retrieve intervention, TB, and simulation-related parameters from scen and skey
     # for TB
     # Create the people, networks, and demographics
-    pop = ss.People(n_agents=np.round(np.random.normal(loc=1200, scale=50)))
+    pop = ss.People(n_agents=np.round(np.random.normal(loc=1000, scale=50)))
     demog = [
         ss.Deaths(pars=dict(death_rate=10)),
-        # is pregnanacy really required? or can I just have births here?
         ss.Pregnancy(pars=dict(fertility_rate=45))
     ]
     nets = ss.RandomNet(n_contacts = ss.poisson(lam=5), dur = 0)
     
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
-    tb = scen.get('TB') or mtb.TB(
-        # setting the default TB parameters if TB input is not provided 
-        # TODO: If these are are the same in the TB module maybe setting it to mtb.TB() should suffice?
+    tb_pars = dict(
         beta=ss.beta(0.045),
         init_prev=0.1,
         rate_LS_to_presym=ss.perday(3e-5),
@@ -65,30 +58,44 @@ def build_ACF(skey, scen, random_seed=0):
         rel_trans_smneg=0.3,
         rel_trans_exptb=0.05,
         rel_trans_presymp=0.10
-    ) 
+    )
+    
+    if scen is not None and 'TB' in scen.keys() and scen['TB'] is not None:
+        tb_pars.update(scen['TB'])
 
+    tb = mtb.TB(tb_pars)    
+    
     # for the intervention 
-    intv = scen.get('ACT3') or mtb.ActiveCaseFinding()
+    intv_pars = {}
+    if scen is not None and 'ACT3' in scen.keys() and scen['ACT3'] is not None:
+        intv_pars.update(scen['ACT3'])
+    
+    intv = mtb.ActiveCaseFinding(intv_pars)    
 
     # for the simulation parameters
-    sim_input = scen.get('Simulation') or {
+    sim_pars = dict(
         # default simulation parameters
-        'unit': 'day', 'dt': 7, 
-        'start': sc.date('2013-01-01'), 'stop': sc.date('2016-12-31')
-    }
+        unit='day', dt=14, 
+        start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'), 
+        rand_seed=rand_seed
+        )
+    
+    if scen is not None and 'Simulation' in scen.keys() and scen['Simulation'] is not None:
+        sim_pars.update(scen['Simulation'])
 
+    
     anz = None
     # some scenarios can also alter the simulation parameters 
     # TODO: 
         # What happens when when you rerun ACT3 for longer? 
         # What happens when you run ACT3 more frequently?
     sim = ss.Sim(
-        **sim_input,
-        people=pop, networks=nets, diseases=[tb], demographics=demog, interventions=[intv], analyzers=anz 
+        people=pop, networks=nets, diseases=tb, demographics=demog, interventions=intv, 
+        analyzers=anz, pars=sim_pars
         )
 
-    # Print status every 5 years instead of every 10 steps
-    #sim.pars.verbose = [1e-6, 1e-6][debug] 
+    # Print status every 1 year outside of debug mode
+    sim.pars.verbose = [0, sim.pars.dt/365][debug] 
 
     return sim
 
@@ -112,7 +119,8 @@ def run_ACF(skey, scen, rand_seed=0):
 
     # redfine the time in years
     tb_res = tb_res.assign(
-        time_year = lambda x: x['time'].apply(sc.datetoyear))
+        time_year = lambda x: x['time'].apply(sc.datetoyear)
+        )
 
     acf_res = pd.DataFrame({
         'time_year': sim.results.activecasefinding.time,
@@ -139,7 +147,6 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
     for skey, scen in scens.items():
         for rs in range(n_seeds):
             # Append configuration for parallel execution
-            # scen['Simulation']['n_agents'] = np.random.normal(loc=1200, scale=50)
             cfgs.append({'skey': skey, 'scen': scen, 'rand_seed': rs})
 
     # Run simulations in parallel
@@ -166,13 +173,13 @@ if __name__ == '__main__':
     scens = {
         'Control': {
             # Turn off the tretatment for the control scenario
-            'ACT3': mtb.ActiveCaseFinding(p_treat=ss.bernoulli(p=0.0)),
+            'ACT3': dict(p_treat=ss.bernoulli(p=0.0)),
             'TB': None,
             'Simulation': None
         },
         'Basic ACT3': {
             # default has been set to basic ACT3
-            'ACT3': None,
+            'ACT3': dict(p_treat=ss.bernoulli(p=1.0)),
             'TB': None,
             'Simulation': None
         }
