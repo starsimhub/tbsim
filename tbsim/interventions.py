@@ -3,8 +3,119 @@
 import starsim as ss
 import sciris as sc
 import numpy as np
+from tbsim import TBS
+import datetime as dt
 
-__all__ = ['Product', 'TBVaccinationCampaign']
+__all__ = ['ActiveCaseFinding', 'Product', 'TBVaccinationCampaign']
+
+class ActiveCaseFinding(ss.Intervention):
+    """
+    Intervention that simulates active case finding in active Tb cases. In more detail, this intervention --
+    - Identifies the active TB individuals. This could be any one of the following states:
+        ACTIVE_PRESYMP  (Active TB, pre-symptomatic)
+        ACTIVE_SMPOS    (Active TB, smear positive)
+        ACTIVE_SMNEG    (Active TB, smear negative)
+        ACTIVE_EXPTB    (Active TB, extra-pulmonary)
+    - Assign test sensitivity to accurately identify as Active Tb
+    - With some coverage rate, the intervention identifies the active TB cases and assigns them to treatment.
+    """
+    def __init__(self, pars=None, *args, **kwargs):
+        """
+        Initialize the intervention.
+        """
+        super().__init__(*args, **kwargs)
+
+        # Updated default parameters with time-aware p_found
+        self.define_pars(
+            p_treat = ss.bernoulli(p=1),
+
+            date_cov = {
+                sc.date('2014-06-01'): 0.6,
+                sc.date('2015-06-01'): 0.7,
+                sc.date('2016-06-01'): 0.64,
+            },
+
+            age_min = 15,
+            age_max = None,
+
+            # Test sensitivity
+            test_sens = {
+                TBS.ACTIVE_SMPOS: 1,
+                TBS.ACTIVE_PRESYMP: 0.9,
+                TBS.ACTIVE_SMNEG: 0.8,
+                TBS.ACTIVE_EXPTB: 0.1,
+            },
+        )
+        self.update_pars(pars, **kwargs)
+
+        # Convert datetime to float
+        self.pars.date_cov = {
+            sc.datetoyear(t):v if isinstance(t, dt.date) else t 
+            for t, v in self.pars.date_cov.items()
+        }
+
+        self.test = ss.bernoulli(p=self.p_pos_test)
+
+        return
+
+    @staticmethod
+    def p_pos_test(self, sim, uids):
+        p = np.zeros(len(uids))
+
+        tb_state = sim.diseases.tb.state[uids]
+        for tbs, sensitivity in self.pars.test_sens.items():
+            p[tb_state == tbs] = sensitivity
+        return p
+
+    def init_results(self):
+        npts = len(self.pars.date_cov)
+        self.define_results(
+            ss.Result('time', dtype=float, shape=npts, label='Time', scale=True),
+            ss.Result('n_elig', dtype=int, shape=npts, label='Number eligible', scale=True),
+            ss.Result('n_found', dtype=int, shape=npts, label='Number found',scale=True),
+            ss.Result('n_treated', dtype=int, shape=npts, label='Number treated', scale=True),
+        )
+        return
+
+    def step(self):
+        """ Apply the intervention """
+
+        super().step()
+        sim = self.sim
+
+        # Determine when the intervention is active and return if nothing to do
+        years = np.array(list(self.pars.date_cov.keys()))
+        is_active = (
+            (sim.now_year >= years) & (sim.now_year < years + self.sim.dt_year)
+        )
+        if not np.any(is_active):
+            return
+
+        tb = sim.diseases['tb']
+
+        # Filter by treatment and age
+        elig = ~tb.on_treatment
+        if self.pars.age_min is not None:
+            elig = elig & (sim.people.age >= self.pars.age_min)
+        if self.pars.age_max is not None:
+            elig = elig & (sim.people.age < self.pars.age_max)
+
+        # Perform the test on the eligible individuals to find cases
+        found_uids = self.test.filter(elig)
+
+        # Apply treatment to the found cases
+        treated_uids = self.pars.p_treat.filter(found_uids)
+        tb.start_treatment(treated_uids)
+
+        # Update the results 
+        timepoint = np.where(is_active)[0][0]
+        self.results.time[timepoint] = sim.now_year
+        self.results.n_elig[timepoint] = np.sum(elig)
+        self.results.n_found[timepoint] = len(found_uids)
+        self.results.n_treated[timepoint] = len(treated_uids)
+
+        return
+
 
 class Product(ss.Module):
     """

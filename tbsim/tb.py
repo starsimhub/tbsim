@@ -19,7 +19,7 @@ class TBS(IntEnum):
 
 class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
@@ -33,7 +33,7 @@ class TB(ss.Infection):
             rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
             rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
             rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = ss.peryear(2/12),                # 2 months
+            rate_treatment_to_clear = ss.peryear(12/2),                # 2 months
 
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
@@ -69,6 +69,7 @@ class TB(ss.Infection):
         )
 
         self.p_latent_to_presym = ss.bernoulli(p=self.p_latent_to_presym)
+        self.p_presym_to_clear = ss.bernoulli(p=self.p_presym_to_clear)
         self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
@@ -84,6 +85,15 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         rate *= self.rr_activation[uids]
 
+        prob = 1-np.exp(-rate)
+        return prob
+
+    @staticmethod
+    def p_presym_to_clear(self, sim, uids):
+        # Could be more complex function of time in state, but exponential for now
+        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
+        rate = np.zeros(len(uids))
+        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
         prob = 1-np.exp(-rate)
         return prob
 
@@ -163,16 +173,21 @@ class TB(ss.Infection):
 
         # Pre symp --> Active
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
+        new_clear_presymp_uids = ss.uids()
         if len(presym_uids):
+            # Pre symp --> Clear
+            new_clear_presymp_uids = self.p_presym_to_clear.filter(presym_uids)
+
             new_active_uids = self.p_presym_to_active.filter(presym_uids)
             if len(new_active_uids):
                 active_state = self.active_tb_state[new_active_uids] 
                 self.state[new_active_uids] = active_state
                 self.ti_active[new_active_uids] = ti
 
-        # Active --> Susceptible via natural recovery or as accelerated by treatment
+        # Active --> Susceptible via natural recovery or as accelerated by treatment (clear)
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids
-        new_clear_uids = self.p_active_to_clear.filter(active_uids)
+        new_clear_active_uids = self.p_active_to_clear.filter(active_uids)
+        new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
             # Set state and reset timers
             self.susceptible[new_clear_uids] = True
@@ -181,6 +196,7 @@ class TB(ss.Infection):
             self.active_tb_state[new_clear_uids] = TBS.NONE
             self.ti_presymp[new_clear_uids] = np.nan
             self.ti_active[new_clear_uids] = np.nan
+            self.on_treatment[new_clear_uids] = False
 
         # Active --> Death
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
@@ -226,22 +242,21 @@ class TB(ss.Infection):
             return 0  # No one to treat
 
         rst = self.state[uids]
-        
+
         #find individuals with active TB
-        is_active = np.isin(rst, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
-        
+        is_active = np.isin(rst, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+
         # Get the corresponding UIDs that match the active state
         tx_uids = uids[is_active]
 
         if len(tx_uids) == 0:
             return 0  # No one to treat
-        
+
         # Mark the individuals as being on treatment
         self.on_treatment[tx_uids] = True
 
         # Adjust death and clearance rates for those starting treatment
         self.rr_death[tx_uids] = 0  # People on treatment have zero death rate
-        self.rr_clearance[tx_uids] = self.pars.rate_treatment_to_clear  # Accelerated clearance due to treatment
 
         # Reduce transmission rates for people on treatment
         self.rel_trans[tx_uids] *= self.pars.rel_trans_treatment
@@ -273,7 +288,7 @@ class TB(ss.Infection):
             ss.Result('n_active_smneg',   dtype=int, label='Active Smear Negative'),
             ss.Result('n_active_exptb',   dtype=int, label='Active Extra-Pulmonary'),
             ss.Result('new_deaths',       dtype=int, label='New Deaths'),
-            ss.Result('cum_deaths',       dtype=int, label='Cumulative Deaths')
+            ss.Result('cum_deaths',       dtype=int, label='Cumulative Deaths'),
         )
         return
 
@@ -282,12 +297,12 @@ class TB(ss.Infection):
         res = self.results
         ti = self.ti
 
-        res.n_latent_slow[ti] = np.count_nonzero(self.state == TBS.LATENT_SLOW)
-        res.n_latent_fast[ti] = np.count_nonzero(self.state == TBS.LATENT_FAST)
+        res.n_latent_slow[ti]    = np.count_nonzero(self.state == TBS.LATENT_SLOW)
+        res.n_latent_fast[ti]    = np.count_nonzero(self.state == TBS.LATENT_FAST)
         res.n_active_presymp[ti] = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
-        res.n_active_smpos[ti] = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
-        res.n_active_smneg[ti] = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
-        res.n_active_exptb[ti] = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
+        res.n_active_smpos[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
+        res.n_active_smneg[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
+        res.n_active_exptb[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
         return
 
     def finalize_results(self):
