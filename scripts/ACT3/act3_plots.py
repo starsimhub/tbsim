@@ -1,4 +1,3 @@
-import runpy
 import os
 import seaborn as sns
 import pandas as pd
@@ -6,8 +5,6 @@ import numpy as np
 import sciris as sc
 import matplotlib.pyplot as plt
 
-# source the script to run scenarios 
-runpy.run_path('scripts/ACT3/run_act3.py')
 
 # if pltdir does not exist, create it
 figs_path = os.path.join('results', 'ACT3', 'figs')
@@ -52,4 +49,3 @@ def plot_scenarios(results, path=figs_path):
 
     sc.savefig('act3_scene.png', folder=path)
 
-plot_scenarios()

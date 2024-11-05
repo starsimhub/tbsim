@@ -3,7 +3,7 @@ import tbsim as mtb
 import numpy as np
 import pandas as pd
 import sciris as sc
-import plots
+import act3_plots as aplt
 import os
 
 
@@ -174,4 +174,4 @@ if __name__ == '__main__':
     df_result = run_scenarios(scens)
 
     # plot the results
-    plots.plot_scenarios(results=df_result.get('TB'))
+    aplt.plot_scenarios(results=df_result.get('TB'))

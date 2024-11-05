@@ -18,6 +18,7 @@ class ActiveCaseFinding(ss.Intervention):
         ACTIVE_EXPTB    (Active TB, extra-pulmonary)
     - Assign test sensitivity to accurately identify as Active Tb
     - With some coverage rate, the intervention identifies the active TB cases and assigns them to treatment.
+    - People who are found under active case finding are treated with a certain probability.
     """
     def __init__(self, pars=None, *args, **kwargs):
         """
