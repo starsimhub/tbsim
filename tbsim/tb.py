@@ -145,9 +145,11 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         rate[self.state[uids] == TBS.LATENT_SLOW] = self.pars.rate_LS_to_presym
 
-        if age.min() < 15:                      # Get the minimum age of the individuals           
+        if age.min() < 15 and age.min()>0:                      # Get the minimum age of the individuals           
+            
             ls_indices = np.where(self.state[uids] == TBS.LATENT_SLOW)[0]
             ls_rates = [self.get_age_specific_rate('rate_LS_to_presym', age[i]) for i in ls_indices ]
+            
             rate[self.state[uids] == TBS.LATENT_SLOW] = ls_rates
 
             lf_indices = np.where(self.state[uids] == TBS.LATENT_FAST)[0]
@@ -177,7 +179,7 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
         rate[self.state[uids] == TBS.ACTIVE_PRESYMP] = self.pars.rate_presym_to_active  
         
-        if age.min() < 15:  # This conditional could also be used to turn off age-specific rates
+        if age.min() < 15 and age.min()>0:  # This conditional could also be used to turn off age-specific rates
             indices = np.where(self.state[uids] == TBS.ACTIVE_PRESYMP)[0]
             rates = [self.get_age_specific_rate('rate_presym_to_active', age[i]) for i in indices ]
             rate[:] = rates
@@ -193,7 +195,7 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Active - on treatment have a different clearance rate
 
-        if age.min() < 15:
+        if age.min() < 15 and age.min()>0:
             # Active to Clear
             indices = np.where(np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))[0]
             rates = [self.get_age_specific_rate('rate_active_to_clear', age[i]) for i in indices ]
@@ -216,7 +218,7 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
         rate[self.state[uids] == TBS.ACTIVE_EXPTB] = self.pars.rate_exptb_to_dead
         
-        if age.min() < 15:  # This conditional could also be used to turn off age-specific rates
+        if age.min() < 15 and age.min()>0:  # This conditional could also be used to turn off age-specific rates
 
             smpos_indices = np.where(self.state[uids] == TBS.ACTIVE_SMPOS)[0]
             smpos_rates = [self.get_age_specific_rate('rate_smpos_to_dead', age[i]) for i in smpos_indices ]
