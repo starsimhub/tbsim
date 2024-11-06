@@ -26,8 +26,8 @@ class TB(ss.Infection):
     def init_age_range(self, unit, dt):
         # Age groups (example ranges)
         self.AGE_GROUPS = {
-            'children': (0, 14),
-            'adolescents': (15, 24),
+            'children': (0, 15),
+            'adolescents': (15, 25),
             'adults': (25, 200)
         }
 
@@ -72,6 +72,7 @@ class TB(ss.Infection):
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
+            by_age = False,                      # Whether to use age-specific rates
 
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -108,7 +109,6 @@ class TB(ss.Infection):
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
             ss.State('on_treatment', default=False),
-            ss.FloatArr('age', default=-1.0),                   # Age attribute for each individual
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
 
@@ -124,37 +124,30 @@ class TB(ss.Infection):
         self.init_age_range(self.unit, self.dt)
         return
 
-    def age_group(self, age):
-        #         Determine the age group for a given age.
+    def get_age_specific_rate(self, rate_type, age):
+        # Determine the age group and retrieve the age-specific rate in one step
         for group, (min_age, max_age) in TB.AGE_GROUPS.items():
             if min_age <= age <= max_age:
-                return group
-        return 'adults'  # Default to 'adults' if age does not fit in any group
-
-    def get_age_specific_rate(self, rate_type, age):
-        # Get the age-specific progression rate based on the individual's age group.
-        age_group = self.age_group(age)
-        return self.AGE_SPECIFIC_RATES[age_group].get(rate_type)
+                return self.AGE_SPECIFIC_RATES[group].get(rate_type)
+        # Default to 'adults' if age does not fit any group
+        return self.AGE_SPECIFIC_RATES['adults'].get(rate_type)
     
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
-        # Calculate the probability of transitioning from latent to presymptomatic TB based on age-specific rates.
+        # Could be more complex function of time in state, but exponential for now
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
-        age = sim.people.age[uids]       # Get ages of individuals on the simulation for the given UIDs
         rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
-        rate[self.state[uids] == TBS.LATENT_SLOW] = self.pars.rate_LS_to_presym
-
-        if age.min() < 15 and age.min()>0:                      # Get the minimum age of the individuals           
-            
-            ls_indices = np.where(self.state[uids] == TBS.LATENT_SLOW)[0]
-            ls_rates = [self.get_age_specific_rate('rate_LS_to_presym', age[i]) for i in ls_indices ]
-            
-            rate[self.state[uids] == TBS.LATENT_SLOW] = ls_rates
-
-            lf_indices = np.where(self.state[uids] == TBS.LATENT_FAST)[0]
-            lf_rates = [self.get_age_specific_rate('rate_LF_to_presym', age[i]) for i in lf_indices ]
-            rate[self.state[uids] == TBS.LATENT_FAST] = lf_rates
+        
+        if self.pars.by_age:  # If using age-specific rates
+            age = sim.people.age[uids]       # Get ages of individuals on the simulation for the given UIDs
+            for age_group, (min_age, max_age) in self.AGE_GROUPS.items():
+                age_group = (age >= min_age) & (age < max_age)
+                if np.any(age_group):
+                    ls_indices = (self.state[uids] == TBS.LATENT_SLOW) & age_group
+                    lf_indices = (self.state[uids] == TBS.LATENT_FAST) & age_group
+                    rate[ls_indices] = [self.get_age_specific_rate('rate_LS_to_presym', age_i) for age_i in age[ls_indices]]
+                    rate[lf_indices] = [self.get_age_specific_rate('rate_LF_to_presym', age_i) for age_i in age[lf_indices]]
             
         # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
@@ -173,16 +166,18 @@ class TB(ss.Infection):
 
     @staticmethod
     def p_presym_to_active(self, sim, uids):
-        """ Calculate the probability of transitioning from presymptomatic to active TB based on age-specific rates"""
+        # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "No all the passed individuals are in the presymptomatic state"
-        age = sim.people.age[uids]  # Get ages of individuals
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
-        rate[self.state[uids] == TBS.ACTIVE_PRESYMP] = self.pars.rate_presym_to_active  
-        
-        if age.min() < 15 and age.min()>0:  # This conditional could also be used to turn off age-specific rates
-            indices = np.where(self.state[uids] == TBS.ACTIVE_PRESYMP)[0]
-            rates = [self.get_age_specific_rate('rate_presym_to_active', age[i]) for i in indices ]
-            rate[:] = rates
+        if self.pars.by_age:                       
+            age = sim.people.age[uids]  # Get ages of individuals
+            for age_group, (min_age, max_age) in self.AGE_GROUPS.items():
+                age_group = (age >= min_age) & (age < max_age)
+                
+                # filter the uids that are in the age group    
+                if np.any(age_group):
+                    indices = (self.state[uids] == TBS.ACTIVE_PRESYMP) & age_group
+                    rate[indices] = [self.get_age_specific_rate('rate_presym_to_active', age_i) for age_i in age[indices]]
             
         prob = 1-np.exp(-rate)
         return prob
@@ -190,17 +185,18 @@ class TB(ss.Infection):
     @staticmethod
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        
-        age = sim.people.age[uids]  # Get ages of individuals
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
-        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Active - on treatment have a different clearance rate
+        if self.pars.by_age:  # If using age-specific rates
+            age = sim.people.age[uids]  # Get ages of individuals
+            for age_group, (min_age, max_age) in self.AGE_GROUPS.items():
+                age_group = (age >= min_age) & (age < max_age)
+                if np.any(age_group):
+                    # Find indices of individuals in specific active TB states who are also under 15
+                    active_indices = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]) & age_group
+                    
+                    # Assign age-specific rates for active TB to clearance for individuals under 15 directly
+                    rate[active_indices] = [self.get_age_specific_rate('rate_active_to_clear', age_i) for age_i in age[active_indices]]
 
-        if age.min() < 15 and age.min()>0:
-            # Active to Clear
-            indices = np.where(np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))[0]
-            rates = [self.get_age_specific_rate('rate_active_to_clear', age[i]) for i in indices ]
-            rate[:] = rates
-                
         # sets the rate for On treatment to Clear
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
         rate *= self.rr_clearance[uids]
@@ -211,26 +207,22 @@ class TB(ss.Infection):
     @staticmethod
     def p_active_to_death(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        age = sim.people.age[uids]  # Get ages of individuals
         rate = np.full(len(uids), fill_value=self.pars.rate_exptb_to_dead)
-        
         rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
-        rate[self.state[uids] == TBS.ACTIVE_EXPTB] = self.pars.rate_exptb_to_dead
         
-        if age.min() < 15 and age.min()>0:  # This conditional could also be used to turn off age-specific rates
+        if self.pars.by_age:    
+            age = sim.people.age[uids]  # Get ages of individuals
+            for age_group, (min_age, max_age) in self.AGE_GROUPS.items():
+                age_group = (age >= min_age) & (age < max_age)
+                if np.any(age_group):
+                    smpos_indices = (self.state[uids] == TBS.ACTIVE_SMPOS) & age_group
+                    smneg_indices = (self.state[uids] == TBS.ACTIVE_SMNEG) & age_group
+                    exptb_indices = (self.state[uids] == TBS.ACTIVE_EXPTB) & age_group
 
-            smpos_indices = np.where(self.state[uids] == TBS.ACTIVE_SMPOS)[0]
-            smpos_rates = [self.get_age_specific_rate('rate_smpos_to_dead', age[i]) for i in smpos_indices ]
-            rate[self.state[uids] == TBS.ACTIVE_SMPOS] = smpos_rates
-            
-            smneg_indices = np.where(self.state[uids] == TBS.ACTIVE_SMNEG)[0]
-            smneg_rates = [self.get_age_specific_rate('rate_smneg_to_dead', age[i]) for i in smneg_indices ]
-            rate[self.state[uids] == TBS.ACTIVE_SMNEG] = smneg_rates
-            
-            exptb_indices = np.where(self.state[uids] == TBS.ACTIVE_EXPTB)[0]
-            exptb_rates = [self.get_age_specific_rate('rate_exptb_to_dead', age[i]) for i in exptb_indices ]
-            rate[self.state[uids] == TBS.ACTIVE_EXPTB] = exptb_rates
+                    rate[smpos_indices] = [self.get_age_specific_rate('rate_smpos_to_dead', age_i) for age_i in age[smpos_indices]]
+                    rate[smneg_indices] = [self.get_age_specific_rate('rate_smneg_to_dead', age_i) for age_i in age[smneg_indices]]
+                    rate[exptb_indices] = [self.get_age_specific_rate('rate_exptb_to_dead', age_i) for age_i in age[exptb_indices]]
 
         rate *= self.rr_death[uids]
 
