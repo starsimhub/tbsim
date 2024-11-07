@@ -105,13 +105,13 @@ class TB(ss.Infection):
             },
             '15, 25': {     # For now, using the same values as for adults but could be different
                 'rate_LS_to_presym': ss.perday(8e-5, parent_unit=unit, parent_dt=dt),
-                    'rate_LF_to_presym': ss.perday(9e-3, parent_unit=unit, parent_dt=dt),
-                    'rate_presym_to_active': ss.perday(10e-2, parent_unit=unit, parent_dt=dt),
-                    'rate_active_to_clear': ss.perday(12.4e-4, parent_unit=unit, parent_dt=dt),
-                    'rate_smpos_to_dead': ss.perday(14.5e-4, parent_unit=unit, parent_dt=dt),
-                    'rate_smneg_to_dead': ss.perday(0.13 * 4.5e-4, parent_unit=unit, parent_dt=dt),
-                    'rate_exptb_to_dead': ss.perday(0.215 * 4.5e-4, parent_unit=unit, parent_dt=dt),
-                    'rate_treatment_to_clear': ss.peryear(12/2, parent_unit=unit, parent_dt=dt)
+                'rate_LF_to_presym': ss.perday(9e-3, parent_unit=unit, parent_dt=dt),
+                'rate_presym_to_active': ss.perday(10e-2, parent_unit=unit, parent_dt=dt),
+                'rate_active_to_clear': ss.perday(12.4e-4, parent_unit=unit, parent_dt=dt),
+                'rate_smpos_to_dead': ss.perday(14.5e-4, parent_unit=unit, parent_dt=dt),
+                'rate_smneg_to_dead': ss.perday(0.13 * 4.5e-4, parent_unit=unit, parent_dt=dt),
+                'rate_exptb_to_dead': ss.perday(0.215 * 4.5e-4, parent_unit=unit, parent_dt=dt),
+                'rate_treatment_to_clear': ss.peryear(12/2, parent_unit=unit, parent_dt=dt)
                 },
             '25, 150': {
                 'rate_LS_to_presym': ss.perday(3e-5, parent_unit=unit, parent_dt=dt),
@@ -137,8 +137,8 @@ class TB(ss.Infection):
             for min_age, max_age in self.AGE_GROUPS:
                 uids_slice = (age_uids >= min_age) & (age_uids < max_age)
                 if np.any(uids_slice):
-                    ls = self.state[ss.uids(uids_slice)] == TBS.LATENT_SLOW
-                    lf = self.state[ss.uids(uids_slice)] == TBS.LATENT_FAST
+                    ls = (self.state[uids] == TBS.LATENT_SLOW) & uids_slice
+                    lf = (self.state[uids] == TBS.LATENT_FAST) & uids_slice
                     if len(rate[ls]) > 0: 
                         rate[ls] = np.full(len(rate[ls]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_LS_to_presym'])
                     if len(rate[lf]) > 0: 
@@ -203,10 +203,18 @@ class TB(ss.Infection):
             for min_age, max_age in self.AGE_GROUPS:
                 uids_slice = (age_uids >= min_age) & (age_uids < max_age)
                 if np.any(uids_slice):
-                    rate[self.state[uids_slice] == TBS.ACTIVE_SMPOS] = np.full(len(rate[uids_slice]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_smpos_to_dead'])
-                    rate[self.state[uids_slice] == TBS.ACTIVE_SMNEG] = np.full(len(rate[uids_slice]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_smneg_to_dead'])
-                    rate[self.state[uids_slice] == TBS.ACTIVE_EXPTB] = np.full(len(rate[uids_slice]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_exptb_to_dead'])
-
+                    
+                    smpos = (self.state[uids] == TBS.ACTIVE_SMPOS) & uids_slice
+                    if len(rate[smpos]) > 0: 
+                        rate[smpos] = np.full(len(rate[smpos]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_smpos_to_dead'])
+                    
+                    smneg = (self.state[uids] == TBS.ACTIVE_SMNEG) & uids_slice
+                    if len(rate[smneg]) > 0: 
+                        rate[smneg] =  np.full(len(rate[smneg]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_smneg_to_dead'])
+                    
+                    exptb = (self.state[uids] == TBS.ACTIVE_EXPTB) & uids_slice
+                    if len(rate[exptb]) > 0: 
+                        rate[exptb] =  np.full(len(rate[exptb]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_exptb_to_dead'])
 
         rate *= self.rr_death[uids]
 
