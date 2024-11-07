@@ -32,7 +32,7 @@ class TB(ss.Infection):
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
-            by_age = False,                      # Whether to use age-specific rates
+            by_age = True,                      # Whether to use age-specific rates
 
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -86,35 +86,34 @@ class TB(ss.Infection):
     
     def init_age_range(self, unit, dt):
         # Age groups (example ranges)
-        self.AGE_GROUPS = {
-            'children': (0, 15),
-            'adolescents': (15, 25),
-            'adults': (25, 200)
-        }
+        self.AGE_GROUPS = [[-1, 15], 
+                           [15, 25], 
+                           [25, 150]]
+
 
         # Age-specific progression rates (example values)
         self.AGE_SPECIFIC_RATES = {
-            'children': {           
-                'rate_LS_to_presym': ss.perday(2.0548e-06, parent_unit=unit, parent_dt=dt), # 0.00075/365 - Progression rate from the latent slow to active TB disease stage in children is 0.00075 per year for both fast and slow progressors​(tb_so1).
-                'rate_LF_to_presym': ss.perday(4.5e-3, parent_unit=unit, parent_dt=dt), # 1.64e-3/365 - Progression rate from the latent fast to active TB disease stage in children is 1.64 per year for both fast and slow progressors​(tb_so1).
-                'rate_presym_to_active': ss.perday(5.48e-3, parent_unit=unit, parent_dt=dt),  # 2/365 - Progression rate from the presymptomatic (early TB) to active TB disease stage in children is 2.0 per year for both fast and slow progressors​(tb_so1).
-                'rate_active_to_clear': ss.perday(2.74e-4, parent_unit=unit, parent_dt=dt),   # 0.1/365 - The rate of clearance of active TB disease in children is 0.1 per year (tb_so1).
-                'rate_smpos_to_dead': ss.perday(6.85e-4, parent_unit=unit, parent_dt=dt),  # 0.25/365 - Smear-Positive TB mortality rate
-                'rate_smneg_to_dead': ss.perday(2.74e-4, parent_unit=unit, parent_dt=dt),  # 0.1/365 - Smear-Negative TB mortality rate
-                'rate_exptb_to_dead': ss.perday(2.74e-4, parent_unit=unit, parent_dt=dt),  # 0.1/365 = Extra-Pulmonary TB mortality rate
-                'rate_treatment_to_clear': ss.peryear(2, parent_unit=unit, parent_dt=dt)   # The removal rate from treatment (representing successful completion of treatment) for TB in both fast progressors (EDF) and slow progressors (EDS)
+            '-1, 15': {           
+                'rate_LS_to_presym': ss.perday(.5, parent_unit=unit, parent_dt=dt), # 0.00075/365 = 2.0548e-06 - Progression rate from the latent slow to active TB disease stage in children is 0.00075 per year for both fast and slow progressors​(tb_so1).
+                'rate_LF_to_presym': ss.perday(.4, parent_unit=unit, parent_dt=dt), # 1.64e-3/365 = 4.5e-3    - Progression rate from the latent fast to active TB disease stage in children is 1.64 per year for both fast and slow progressors​(tb_so1).
+                'rate_presym_to_active': ss.perday(.3, parent_unit=unit, parent_dt=dt),  # 2/365 = 5.48e-3   - Progression rate from the presymptomatic (early TB) to active TB disease stage in children is 2.0 per year for both fast and slow progressors​(tb_so1).
+                'rate_active_to_clear': ss.perday(.4, parent_unit=unit, parent_dt=dt),   # 0.1/365 = 2.74e-4 - The rate of clearance of active TB disease in children is 0.1 per year (tb_so1).
+                'rate_smpos_to_dead': ss.perday(.5, parent_unit=unit, parent_dt=dt),  # 0.25/365 = 6.85e-4   - Smear-Positive TB mortality rate
+                'rate_smneg_to_dead': ss.perday(.2, parent_unit=unit, parent_dt=dt),  # 0.1/365 = 2.74e-4    - Smear-Negative TB mortality rate
+                'rate_exptb_to_dead': ss.perday(.1, parent_unit=unit, parent_dt=dt),  # 0.1/365 = 2.74e-4    - Extra-Pulmonary TB mortality rate
+                'rate_treatment_to_clear': ss.peryear(6, parent_unit=unit, parent_dt=dt)   # 2    - The removal rate from treatment (representing successful completion of treatment) for TB in both fast progressors (EDF) and slow progressors (EDS)
             },
-            'adolescents': {     # For now, using the same values as for adults but could be different
-                'rate_LS_to_presym': ss.perday(3e-5, parent_unit=unit, parent_dt=dt),
-                    'rate_LF_to_presym': ss.perday(6e-3, parent_unit=unit, parent_dt=dt),
-                    'rate_presym_to_active': ss.perday(3e-2, parent_unit=unit, parent_dt=dt),
-                    'rate_active_to_clear': ss.perday(2.4e-4, parent_unit=unit, parent_dt=dt),
-                    'rate_smpos_to_dead': ss.perday(4.5e-4, parent_unit=unit, parent_dt=dt),
-                    'rate_smneg_to_dead': ss.perday(0.3 * 4.5e-4, parent_unit=unit, parent_dt=dt),
-                    'rate_exptb_to_dead': ss.perday(0.15 * 4.5e-4, parent_unit=unit, parent_dt=dt),
+            '15, 25': {     # For now, using the same values as for adults but could be different
+                'rate_LS_to_presym': ss.perday(8e-5, parent_unit=unit, parent_dt=dt),
+                    'rate_LF_to_presym': ss.perday(9e-3, parent_unit=unit, parent_dt=dt),
+                    'rate_presym_to_active': ss.perday(10e-2, parent_unit=unit, parent_dt=dt),
+                    'rate_active_to_clear': ss.perday(12.4e-4, parent_unit=unit, parent_dt=dt),
+                    'rate_smpos_to_dead': ss.perday(14.5e-4, parent_unit=unit, parent_dt=dt),
+                    'rate_smneg_to_dead': ss.perday(0.13 * 4.5e-4, parent_unit=unit, parent_dt=dt),
+                    'rate_exptb_to_dead': ss.perday(0.215 * 4.5e-4, parent_unit=unit, parent_dt=dt),
                     'rate_treatment_to_clear': ss.peryear(12/2, parent_unit=unit, parent_dt=dt)
                 },
-            'adults': {
+            '25, 150': {
                 'rate_LS_to_presym': ss.perday(3e-5, parent_unit=unit, parent_dt=dt),
                 'rate_LF_to_presym': ss.perday(6e-3, parent_unit=unit, parent_dt=dt),
                 'rate_presym_to_active': ss.perday(3e-2, parent_unit=unit, parent_dt=dt),
@@ -125,15 +124,7 @@ class TB(ss.Infection):
                 'rate_treatment_to_clear': ss.peryear(12/2, parent_unit=unit, parent_dt=dt)
             } 
         }
-
-    def get_age_specific_rate(self, rate_type, age):
-        # Determine the age group and retrieve the age-specific rate in one step
-        for group, (min_age, max_age) in TB.AGE_GROUPS.items():
-            if min_age <= age <= max_age:
-                return self.AGE_SPECIFIC_RATES[group].get(rate_type)
-        # Default to 'adults' if age does not fit any group
-        return self.AGE_SPECIFIC_RATES['adults'].get(rate_type)
-    
+   
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
@@ -141,15 +132,17 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         
-        if self.pars.by_age:  # If using age-specific rates
-            age = sim.people.age[uids]       # Get ages of individuals on the simulation for the given UIDs
-            for age_group, (min_age, max_age) in self.AGE_GROUPS.items():
-                age_group = (age >= min_age) & (age < max_age)
-                if np.any(age_group):
-                    ls_indices = (self.state[uids] == TBS.LATENT_SLOW) & age_group
-                    lf_indices = (self.state[uids] == TBS.LATENT_FAST) & age_group
-                    rate[ls_indices] = [self.get_age_specific_rate('rate_LS_to_presym', age_i) for age_i in age[ls_indices]]
-                    rate[lf_indices] = [self.get_age_specific_rate('rate_LF_to_presym', age_i) for age_i in age[lf_indices]]
+        if self.pars.by_age:     
+            age_uids = sim.people.age[uids]  
+            for min_age, max_age in self.AGE_GROUPS:
+                uids_slice = (age_uids >= min_age) & (age_uids < max_age)
+                if np.any(uids_slice):
+                    ls = self.state[ss.uids(uids_slice)] == TBS.LATENT_SLOW
+                    lf = self.state[ss.uids(uids_slice)] == TBS.LATENT_FAST
+                    if len(rate[ls]) > 0: 
+                        rate[ls] = np.full(len(rate[ls]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_LS_to_presym'])
+                    if len(rate[lf]) > 0: 
+                        rate[lf] = np.full(len(rate[lf]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_LF_to_presym'])
             
         # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
@@ -167,20 +160,17 @@ class TB(ss.Infection):
         return prob
 
     @staticmethod
-    def p_presym_to_active(self, sim, uids):
+    def p_presym_to_active(self, sim, uids):    #GOOD ONE!!!
+        import pandas as pd
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "No all the passed individuals are in the presymptomatic state"
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
-        if self.pars.by_age:                       
-            age = sim.people.age[uids]  # Get ages of individuals
-            for age_group, (min_age, max_age) in self.AGE_GROUPS.items():
-                age_group = (age >= min_age) & (age < max_age)
-                
-                # filter the uids that are in the age group    
-                if np.any(age_group):
-                    indices = (self.state[uids] == TBS.ACTIVE_PRESYMP) & age_group
-                    rate[indices] = [self.get_age_specific_rate('rate_presym_to_active', age_i) for age_i in age[indices]]
-            
+        if self.pars.by_age:     
+            age_uids = sim.people.age[uids]  
+            for min_age, max_age in self.AGE_GROUPS:
+                uids_slice = (age_uids >= min_age) & (age_uids < max_age)
+                if np.any(uids_slice):
+                    rate[uids_slice] = np.full(len(rate[uids_slice]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_presym_to_active'])
         prob = 1-np.exp(-rate)
         return prob
 
@@ -188,21 +178,16 @@ class TB(ss.Infection):
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
-        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
-        if self.pars.by_age:  # If using age-specific rates
-            age = sim.people.age[uids]  # Get ages of individuals
-            for age_group, (min_age, max_age) in self.AGE_GROUPS.items():
-                age_group = (age >= min_age) & (age < max_age)
-                if np.any(age_group):
-                    # Find indices of individuals in specific active TB states who are also under 15
-                    active_indices = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]) & age_group
-                    
-                    # Assign age-specific rates for active TB to clearance for individuals under 15 directly
-                    rate[active_indices] = [self.get_age_specific_rate('rate_active_to_clear', age_i) for age_i in age[active_indices]]
-                    # sets the rate for On treatment to Clear
-                    rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
+      
+        if self.pars.by_age:     
+            age_uids = sim.people.age[uids]  
+            for min_age, max_age in self.AGE_GROUPS:
+                uids_slice = (age_uids >= min_age) & (age_uids < max_age)
+                if np.any(uids_slice):
+                    rate[uids_slice] = np.full(len(rate[uids_slice]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_active_to_clear'])                    
         rate *= self.rr_clearance[uids]
 
+        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
         prob = 1-np.exp(-rate)
         return prob
 
@@ -213,18 +198,15 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
         
-        if self.pars.by_age:    
-            age = sim.people.age[uids]  # Get ages of individuals
-            for age_group, (min_age, max_age) in self.AGE_GROUPS.items():
-                age_group = (age >= min_age) & (age < max_age)
-                if np.any(age_group):
-                    smpos_indices = (self.state[uids] == TBS.ACTIVE_SMPOS) & age_group
-                    smneg_indices = (self.state[uids] == TBS.ACTIVE_SMNEG) & age_group
-                    exptb_indices = (self.state[uids] == TBS.ACTIVE_EXPTB) & age_group
+        if self.pars.by_age:     
+            age_uids = sim.people.age[uids]  
+            for min_age, max_age in self.AGE_GROUPS:
+                uids_slice = (age_uids >= min_age) & (age_uids < max_age)
+                if np.any(uids_slice):
+                    rate[self.state[uids_slice] == TBS.ACTIVE_SMPOS] = np.full(len(rate[uids_slice]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_smpos_to_dead'])
+                    rate[self.state[uids_slice] == TBS.ACTIVE_SMNEG] = np.full(len(rate[uids_slice]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_smneg_to_dead'])
+                    rate[self.state[uids_slice] == TBS.ACTIVE_EXPTB] = np.full(len(rate[uids_slice]), fill_value=self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_exptb_to_dead'])
 
-                    rate[smpos_indices] = [self.get_age_specific_rate('rate_smpos_to_dead', age_i) for age_i in age[smpos_indices]]
-                    rate[smneg_indices] = [self.get_age_specific_rate('rate_smneg_to_dead', age_i) for age_i in age[smneg_indices]]
-                    rate[exptb_indices] = [self.get_age_specific_rate('rate_exptb_to_dead', age_i) for age_i in age[exptb_indices]]
 
         rate *= self.rr_death[uids]
 
@@ -265,7 +247,8 @@ class TB(ss.Infection):
     def step(self):
         # Perform TB progression steps
         super().step()
-        if self.pars.by_age and  self.AGE_SPECIFIC_RATES['children']['rate_LS_to_presym'].parent_unit != 'year':
+        if self.pars.by_age and  self.AGE_SPECIFIC_RATES['-1, 15']['rate_LS_to_presym'].parent_unit != 'year':
+            print("Warning: Age-specific rates are ON")
             self.init_age_range(self.unit, self.dt)
         p = self.pars
         ti = self.ti
