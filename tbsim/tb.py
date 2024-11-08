@@ -32,7 +32,7 @@ class TB(ss.Infection):
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
-            by_age = True,                      # Whether to use age-specific rates
+            by_age = False,                      # Whether to use age-specific rates
 
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -80,17 +80,19 @@ class TB(ss.Infection):
         self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
+        
         if self.pars.by_age: self.init_age_range(self.unit, self.dt)
+        
         return
     
     def init_age_range(self, unit, dt):
         # Age groups (example ranges)
-        self.AGE_GROUPS = [[-1, 15], 
+        self.AGE_GROUPS = [[0, 15], 
                            [15, 25], 
                            [25, 150]]
         # Age-specific progression rates (example values)
         self.AGE_SPECIFIC_RATES = {
-            '-1, 15': {           
+            '0, 15': {           
                 'rate_LS_to_presym': ss.perday(2.0548e-06, parent_unit=unit, parent_dt=dt), # 0.00075/365  
                 'rate_LF_to_presym': ss.perday(4.5e-3, parent_unit=unit, parent_dt=dt), # 1.64e-3/365 
                 'rate_presym_to_active': ss.perday(5.48e-3, parent_unit=unit, parent_dt=dt),  # 2/365 
@@ -247,9 +249,10 @@ class TB(ss.Infection):
     def step(self):
         # Perform TB progression steps
         super().step()
-        if self.pars.by_age and  self.AGE_SPECIFIC_RATES['-1, 15']['rate_LS_to_presym'].parent_unit != 'year':
+        if self.pars.by_age and self.AGE_SPECIFIC_RATES[0][0].parent_unit != 'year':
             print("Warning: Age-specific rates are ON")
             self.init_age_range(self.unit, self.dt)
+            
         p = self.pars
         ti = self.ti
 
