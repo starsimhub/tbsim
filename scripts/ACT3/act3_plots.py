@@ -16,7 +16,6 @@ def plot_scenarios(results, path=figs_path):
     # maybe have a different function to process the data? 
     tb_results_agg = (
       results
-        .drop(columns='time')
         .melt(id_vars=['time_year', 'scenario', 'rand_seed'], 
                   value_vars=['on_treatment', 'prevalence', 'active_presymp', 'active_smpos', 'active_exptb'], 
                   var_name='state',

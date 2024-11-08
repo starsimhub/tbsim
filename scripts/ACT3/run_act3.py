@@ -63,7 +63,7 @@ def build_ACF(skey, scen, rand_seed=0):
     sim_pars = dict(
         # default simulation parameters
         unit='day', dt=14,
-        start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'),
+        start=ss.date('2013-01-01'), stop=ss.date('2016-12-31'),
         rand_seed=rand_seed
         )
 
@@ -95,18 +95,13 @@ def run_ACF(skey, scen, rand_seed=0):
     sim.run()
 
     tb_res = pd.DataFrame({
-        'time': sim.results.timevec,
+        'time_year': sim.results.timevec,
         'on_treatment': sim.results.tb.n_on_treatment, 
         'prevalence': sim.results.tb.prevalence,
         'active_presymp': sim.results.tb.n_active_presymp,
         'active_smpos': sim.results.tb.n_active_smpos,
         'active_exptb': sim.results.tb.n_active_exptb,
     })
-
-    # redfine the time in years
-    tb_res = tb_res.assign(
-        time_year = lambda x: x['time'].apply(sc.datetoyear)
-    )
 
     acf_res = pd.DataFrame({
         'time_year': sim.results.activecasefinding.time,
