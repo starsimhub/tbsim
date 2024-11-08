@@ -81,7 +81,7 @@ class TB(ss.Infection):
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
         
-        if self.pars.by_age: self.init_age_range(self.unit, self.dt)
+        if self.pars.by_age: self.init_age_range(self.unit, self.t.dt)
         
         return
     
@@ -251,7 +251,7 @@ class TB(ss.Infection):
         super().step()
         if self.pars.by_age and self.AGE_SPECIFIC_RATES[0][0].parent_unit != 'year':
             print("Warning: Age-specific rates are ON")
-            self.init_age_range(self.unit, self.dt)
+            self.init_age_range(self.unit, self.t.dt)
             
         p = self.pars
         ti = self.ti

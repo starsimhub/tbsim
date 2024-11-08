@@ -46,12 +46,11 @@ class HouseholdNet(ss.Network):
 
     def step(self):
         """ Adds newborns to the trial population, including hhid, arm, and household contacts """
-        super().step()
 
         if not self.pars.add_newborns:
             return
 
-        newborn_uids = ss.uids((self.sim.people.age > 0) & (self.sim.people.age < self.dt))
+        newborn_uids = ss.uids((self.sim.people.age > 0) & (self.sim.people.age < self.t.dt))
         if len(newborn_uids) == 0:
             return
 

@@ -114,7 +114,7 @@ class RATIONSTrial(ss.Intervention):
         '''
         p = np.ones(len(uids))
         tb = sim.diseases['tb']
-        dt = self.dt 
+        dt = self.t.dt 
         frac_pulmonary = 0.65 + 0.25
 
         years = dt
@@ -198,11 +198,11 @@ class RATIONSTrial(ss.Intervention):
         return
 
     def step(self):
-        super().step()
+        # super().step()
 
         tb = self.sim.diseases['tb']
         nut = self.sim.diseases['malnutrition']
-        ti, dt = self.ti, self.dt
+        ti, dt = self.ti, self.t.dt
         
         # INCIDENCE FROM COMMUNITY
         if self.pars.x_community_incidence_rate > 0:
