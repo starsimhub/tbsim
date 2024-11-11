@@ -24,7 +24,7 @@ class TB(ss.Infection):
     """
     AGE_GROUPS = {}
     AGE_SPECIFIC_RATES = {}
-
+    age_bins = []
 
     def __init__(self, pars=None, **kwargs):
         super().__init__()
@@ -84,6 +84,7 @@ class TB(ss.Infection):
         
         if self.pars.by_age: # self.init_age_range(self.unit, self.t.dt)
             self.rba = RatesByAge(self.t.unit, self.t.dt)
+            self.age_bins = self.rba.age_bins()
             self.AGE_SPECIFIC_RATES = self.rba.AGE_SPECIFIC_RATES
         
         return
@@ -96,16 +97,19 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         
         if self.pars.by_age:     
-            age_uids = sim.people.age[uids]  
-            for group in self.AGE_SPECIFIC_RATES.keys():
-                min_age, max_age = map(int, group.split(','))
-                uids_slice = (age_uids >= min_age) & (age_uids < max_age)
+            age_uids = sim.people.age[uids]
+            age_indices = np.digitize(age_uids, self.age_bins) - 1
+            for idx in np.unique(age_indices):
+                group = list(self.AGE_SPECIFIC_RATES.keys())[idx]
+                min_age, max_age = group.split(',')
+                uids_slice = (age_indices == idx)
+                
                 ls = (self.state[uids] == TBS.LATENT_SLOW) & uids_slice
                 lf = (self.state[uids] == TBS.LATENT_FAST) & uids_slice
                 if np.any(ls):
-                    rate[ls] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_LS_to_presym']
+                    rate[ls] = self.AGE_SPECIFIC_RATES[group]['rate_LS_to_presym']
                 if np.any(lf):
-                    rate[lf] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_LF_to_presym']
+                    rate[lf] = self.AGE_SPECIFIC_RATES[group]['rate_LF_to_presym']
             
         # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
@@ -129,12 +133,14 @@ class TB(ss.Infection):
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "No all the passed individuals are in the presymptomatic state"
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
         if self.pars.by_age:     
-            age_uids = sim.people.age[uids]  
-            for group in self.AGE_SPECIFIC_RATES.keys():
+            age_uids = sim.people.age[uids]
+            age_indices = np.digitize(age_uids, self.age_bins) - 1
+            for idx in np.unique(age_indices):
+                group = list(self.AGE_SPECIFIC_RATES.keys())[idx]
                 min_age, max_age = map(int, group.split(','))
-                uids_slice = (age_uids >= min_age) & (age_uids < max_age)
+                uids_slice = (age_indices == idx)
                 if np.any(uids_slice):
-                    rate[uids_slice] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_presym_to_active']
+                    rate[uids_slice] = self.AGE_SPECIFIC_RATES[group]['rate_presym_to_active']
         prob = 1-np.exp(-rate)
         return prob
 
@@ -144,13 +150,15 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
       
         if self.pars.by_age:     
-            age_uids = sim.people.age[uids]  
-            for group in self.AGE_SPECIFIC_RATES.keys():
+            age_uids = sim.people.age[uids]
+            age_indices = np.digitize(age_uids, self.age_bins) - 1
+            for idx in np.unique(age_indices):
+                group = list(self.AGE_SPECIFIC_RATES.keys())[idx]
                 min_age, max_age = map(int, group.split(','))
-                uids_slice = (age_uids >= min_age) & (age_uids < max_age)
+                uids_slice = (age_indices == idx)
                 if np.any(uids_slice):
-                    rate[uids_slice] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_active_to_clear']                  
-        
+                    rate[uids_slice] = self.AGE_SPECIFIC_RATES[group]['rate_active_to_clear']    
+                            
         rate *= self.rr_clearance[uids]
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
         prob = 1-np.exp(-rate)
@@ -164,19 +172,21 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
         
         if self.pars.by_age:     
-            age_uids = sim.people.age[uids]  
-            for group in self.AGE_SPECIFIC_RATES.keys():
+            age_uids = sim.people.age[uids]
+            age_indices = np.digitize(age_uids, self.age_bins) - 1
+            for idx in np.unique(age_indices):
+                group = list(self.AGE_SPECIFIC_RATES.keys())[idx]
                 min_age, max_age = map(int, group.split(','))
-                uids_slice = (age_uids >= min_age) & (age_uids < max_age)
+                uids_slice = (age_indices == idx)
                 smpos = (self.state[uids] == TBS.ACTIVE_SMPOS) & uids_slice
                 smneg = (self.state[uids] == TBS.ACTIVE_SMNEG) & uids_slice
                 exptb = (self.state[uids] == TBS.ACTIVE_EXPTB) & uids_slice
                 if np.any(smpos): 
-                    rate[smpos] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_smpos_to_dead']
+                    rate[smpos] = self.AGE_SPECIFIC_RATES[group]['rate_smpos_to_dead']
                 if np.any(smneg): 
-                    rate[smneg] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_smneg_to_dead']
+                    rate[smneg] = self.AGE_SPECIFIC_RATES[group]['rate_smneg_to_dead']
                 if np.any(exptb):
-                    rate[exptb] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_exptb_to_dead']
+                    rate[exptb] = self.AGE_SPECIFIC_RATES[group]['rate_exptb_to_dead']
 
         rate *= self.rr_death[uids]
 

@@ -1,5 +1,5 @@
 import starsim as ss 
-
+import numpy as np
 class RatesByAge:
     
     
@@ -56,3 +56,8 @@ class RatesByAge:
     
     def get_groups(self):
         return list(self.AGE_SPECIFIC_RATES.keys())
+
+    def age_bins(self):
+        age_bins = np.array([int(min_age) for min_age, _ in (group.split(',') for group in self.AGE_SPECIFIC_RATES.keys())] + [np.inf])
+        return age_bins
+        
