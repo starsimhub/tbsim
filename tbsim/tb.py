@@ -1,6 +1,7 @@
 import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
+from tbsim.parametervalues import RatesByAge
 
 from enum import IntEnum
 
@@ -32,7 +33,7 @@ class TB(ss.Infection):
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
-            by_age = False,                      # Whether to use age-specific rates
+            by_age = True,                      # Whether to use age-specific rates
 
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -81,49 +82,12 @@ class TB(ss.Infection):
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
         
-        if self.pars.by_age: self.init_age_range(self.unit, self.t.dt)
+        if self.pars.by_age: # self.init_age_range(self.unit, self.t.dt)
+            self.rba = RatesByAge(self.t.unit, self.t.dt)
+            self.AGE_SPECIFIC_RATES = self.rba.AGE_SPECIFIC_RATES
         
         return
     
-    def init_age_range(self, unit, dt):
-        # Age groups (example ranges)
-        self.AGE_GROUPS = [[0, 15], 
-                           [15, 25], 
-                           [25, 150]]
-        # Age-specific progression rates (example values)
-        self.AGE_SPECIFIC_RATES = {
-            '0, 15': {           
-                'rate_LS_to_presym': ss.perday(2.0548e-06, parent_unit=unit, parent_dt=dt), # 0.00075/365  
-                'rate_LF_to_presym': ss.perday(4.5e-3, parent_unit=unit, parent_dt=dt), # 1.64e-3/365 
-                'rate_presym_to_active': ss.perday(5.48e-3, parent_unit=unit, parent_dt=dt),  # 2/365 
-                'rate_active_to_clear': ss.perday(2.74e-4, parent_unit=unit, parent_dt=dt),  # 0.1/365 
-                'rate_smpos_to_dead': ss.perday(6.85e-4, parent_unit=unit, parent_dt=dt),  #0.25/365 
-                'rate_smneg_to_dead': ss.perday(2.74e-4, parent_unit=unit, parent_dt=dt),  # 0.1/365 
-                'rate_exptb_to_dead': ss.perday(2.74e-4, parent_unit=unit, parent_dt=dt),  # 0.1/365 
-                'rate_treatment_to_clear': ss.peryear(2, parent_unit=unit, parent_dt=dt)   # 2 per year
-            },
-            '15, 25': {     # For now, using the same values as for adults but could be different
-                'rate_LS_to_presym': ss.perday(3e-5, parent_unit=unit, parent_dt=dt),
-                'rate_LF_to_presym': ss.perday(6e-3, parent_unit=unit, parent_dt=dt),
-                'rate_presym_to_active': ss.perday(3e-2, parent_unit=unit, parent_dt=dt),
-                'rate_active_to_clear': ss.perday(2.4e-4, parent_unit=unit, parent_dt=dt),
-                'rate_smpos_to_dead': ss.perday(4.5e-4, parent_unit=unit, parent_dt=dt),
-                'rate_smneg_to_dead': ss.perday(0.3 * 4.5e-4, parent_unit=unit, parent_dt=dt),
-                'rate_exptb_to_dead': ss.perday(0.15 * 4.5e-4, parent_unit=unit, parent_dt=dt),
-                'rate_treatment_to_clear': ss.peryear(12/2, parent_unit=unit, parent_dt=dt) 
-                },
-            '25, 150': {
-                'rate_LS_to_presym': ss.perday(3e-5, parent_unit=unit, parent_dt=dt),
-                'rate_LF_to_presym': ss.perday(6e-3, parent_unit=unit, parent_dt=dt),
-                'rate_presym_to_active': ss.perday(3e-2, parent_unit=unit, parent_dt=dt),
-                'rate_active_to_clear': ss.perday(2.4e-4, parent_unit=unit, parent_dt=dt),
-                'rate_smpos_to_dead': ss.perday(4.5e-4, parent_unit=unit, parent_dt=dt),
-                'rate_smneg_to_dead': ss.perday(0.3 * 4.5e-4, parent_unit=unit, parent_dt=dt),
-                'rate_exptb_to_dead': ss.perday(0.15 * 4.5e-4, parent_unit=unit, parent_dt=dt),
-                'rate_treatment_to_clear': ss.peryear(12/2, parent_unit=unit, parent_dt=dt)
-            } 
-        }
-   
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
@@ -133,14 +97,15 @@ class TB(ss.Infection):
         
         if self.pars.by_age:     
             age_uids = sim.people.age[uids]  
-            for min_age, max_age in self.AGE_GROUPS:
+            for group in self.AGE_SPECIFIC_RATES.keys():
+                min_age, max_age = map(int, group.split(','))
                 uids_slice = (age_uids >= min_age) & (age_uids < max_age)
                 ls = (self.state[uids] == TBS.LATENT_SLOW) & uids_slice
                 lf = (self.state[uids] == TBS.LATENT_FAST) & uids_slice
                 if np.any(ls):
-                    rate[ls] = self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_LS_to_presym']
+                    rate[ls] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_LS_to_presym']
                 if np.any(lf):
-                    rate[lf] = self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_LF_to_presym']
+                    rate[lf] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_LF_to_presym']
             
         # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
@@ -158,17 +123,18 @@ class TB(ss.Infection):
         return prob
 
     @staticmethod
-    def p_presym_to_active(self, sim, uids):    #GOOD ONE!!!
+    def p_presym_to_active(self, sim, uids):    
         import pandas as pd
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "No all the passed individuals are in the presymptomatic state"
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
         if self.pars.by_age:     
             age_uids = sim.people.age[uids]  
-            for min_age, max_age in self.AGE_GROUPS:
+            for group in self.AGE_SPECIFIC_RATES.keys():
+                min_age, max_age = map(int, group.split(','))
                 uids_slice = (age_uids >= min_age) & (age_uids < max_age)
                 if np.any(uids_slice):
-                    rate[uids_slice] = self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_presym_to_active']
+                    rate[uids_slice] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_presym_to_active']
         prob = 1-np.exp(-rate)
         return prob
 
@@ -179,10 +145,11 @@ class TB(ss.Infection):
       
         if self.pars.by_age:     
             age_uids = sim.people.age[uids]  
-            for min_age, max_age in self.AGE_GROUPS:
+            for group in self.AGE_SPECIFIC_RATES.keys():
+                min_age, max_age = map(int, group.split(','))
                 uids_slice = (age_uids >= min_age) & (age_uids < max_age)
                 if np.any(uids_slice):
-                    rate[uids_slice] = self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_active_to_clear']                  
+                    rate[uids_slice] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_active_to_clear']                  
         
         rate *= self.rr_clearance[uids]
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
@@ -198,17 +165,18 @@ class TB(ss.Infection):
         
         if self.pars.by_age:     
             age_uids = sim.people.age[uids]  
-            for min_age, max_age in self.AGE_GROUPS:
+            for group in self.AGE_SPECIFIC_RATES.keys():
+                min_age, max_age = map(int, group.split(','))
                 uids_slice = (age_uids >= min_age) & (age_uids < max_age)
                 smpos = (self.state[uids] == TBS.ACTIVE_SMPOS) & uids_slice
                 smneg = (self.state[uids] == TBS.ACTIVE_SMNEG) & uids_slice
                 exptb = (self.state[uids] == TBS.ACTIVE_EXPTB) & uids_slice
                 if np.any(smpos): 
-                    rate[smpos] = self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_smpos_to_dead']
+                    rate[smpos] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_smpos_to_dead']
                 if np.any(smneg): 
-                    rate[smneg] = self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_smneg_to_dead']
+                    rate[smneg] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_smneg_to_dead']
                 if np.any(exptb):
-                    rate[exptb] = self.AGE_SPECIFIC_RATES[f'{min_age}, {max_age}']['rate_exptb_to_dead']
+                    rate[exptb] = self.AGE_SPECIFIC_RATES[f'{min_age},{max_age}']['rate_exptb_to_dead']
 
         rate *= self.rr_death[uids]
 
@@ -249,9 +217,11 @@ class TB(ss.Infection):
     def step(self):
         # Perform TB progression steps
         super().step()
-        if self.pars.by_age and self.AGE_SPECIFIC_RATES[0][0].parent_unit != 'year':
-            print("Warning: Age-specific rates are ON")
-            self.init_age_range(self.unit, self.t.dt)
+        # if self.pars.by_age a#nd self.AGE_SPECIFIC_RATES[0][0].parent_unit != 'year':
+        #     print("Warning: Age-specific rates are ON")
+        #     # self.init_age_range(self.unit, self.t.dt)
+        #     self.agebins = AgeBins(self.t.unit, self.t.dt)
+        #     self.AGE_GROUPS, self.AGE_SPECIFIC_RATES = self.agebins.AGE_GROUPS, self.agebins.AGE_SPECIFIC_RATES
             
         p = self.pars
         ti = self.ti
