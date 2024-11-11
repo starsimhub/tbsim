@@ -128,7 +128,6 @@ class TB(ss.Infection):
 
     @staticmethod
     def p_presym_to_active(self, sim, uids):    
-        import pandas as pd
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "No all the passed individuals are in the presymptomatic state"
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
@@ -227,12 +226,6 @@ class TB(ss.Infection):
     def step(self):
         # Perform TB progression steps
         super().step()
-        # if self.pars.by_age a#nd self.AGE_SPECIFIC_RATES[0][0].parent_unit != 'year':
-        #     print("Warning: Age-specific rates are ON")
-        #     # self.init_age_range(self.unit, self.t.dt)
-        #     self.agebins = AgeBins(self.t.unit, self.t.dt)
-        #     self.AGE_GROUPS, self.AGE_SPECIFIC_RATES = self.agebins.AGE_GROUPS, self.agebins.AGE_SPECIFIC_RATES
-            
         p = self.pars
         ti = self.ti
 
