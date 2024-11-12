@@ -96,20 +96,19 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         
-        if self.pars.by_age:     
+        if self.pars.by_age:
             age_uids = sim.people.age[uids]
-            age_indices = np.digitize(age_uids, self.age_bins) - 1
-            for idx in np.unique(age_indices):
-                group = list(self.AGE_SPECIFIC_RATES.keys())[idx]
-                min_age, max_age = group.split(',')
-                uids_slice = (age_indices == idx)
-                
-                ls = (self.state[uids] == TBS.LATENT_SLOW) & uids_slice
-                lf = (self.state[uids] == TBS.LATENT_FAST) & uids_slice
-                if np.any(ls):
-                    rate[ls] = self.AGE_SPECIFIC_RATES[group]['rate_LS_to_presym']
-                if np.any(lf):
-                    rate[lf] = self.AGE_SPECIFIC_RATES[group]['rate_LF_to_presym']
+            age_indices = np.digitize(age_uids, self.rba.age_bins()) - 1
+            unique_indices = np.unique(age_indices)
+            # Set rates by age group and latent type
+            for idx in unique_indices:
+                group_rates = self.rba.get_rates(age_uids[age_indices == idx][0])
+                if group_rates:
+                    ls = (self.state[uids] == TBS.LATENT_SLOW) & (age_indices == idx)
+                    lf = (self.state[uids] == TBS.LATENT_FAST) & (age_indices == idx)
+
+                    if np.any(ls): rate[ls] = group_rates['rate_LS_to_presym']
+                    if np.any(lf): rate[lf] = group_rates['rate_LF_to_presym']
             
         # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
@@ -131,15 +130,17 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "No all the passed individuals are in the presymptomatic state"
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
-        if self.pars.by_age:     
+
+        if self.pars.by_age:
             age_uids = sim.people.age[uids]
-            age_indices = np.digitize(age_uids, self.age_bins) - 1
-            for idx in np.unique(age_indices):
-                group = list(self.AGE_SPECIFIC_RATES.keys())[idx]
-                min_age, max_age = map(int, group.split(','))
-                uids_slice = (age_indices == idx)
-                if np.any(uids_slice):
-                    rate[uids_slice] = self.AGE_SPECIFIC_RATES[group]['rate_presym_to_active']
+            age_indices = np.digitize(age_uids, self.rba.age_bins()) - 1
+            unique_indices = np.unique(age_indices)
+            # Set rates by age group
+            for idx in unique_indices:
+                group_rates = self.rba.get_rates(age_uids[age_indices == idx][0])
+                if group_rates:
+                    rate[age_indices == idx] = group_rates['rate_presym_to_active']
+
         prob = 1-np.exp(-rate)
         return prob
 
@@ -148,15 +149,15 @@ class TB(ss.Infection):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
       
-        if self.pars.by_age:     
+        if self.pars.by_age:
             age_uids = sim.people.age[uids]
-            age_indices = np.digitize(age_uids, self.age_bins) - 1
-            for idx in np.unique(age_indices):
-                group = list(self.AGE_SPECIFIC_RATES.keys())[idx]
-                min_age, max_age = map(int, group.split(','))
-                uids_slice = (age_indices == idx)
-                if np.any(uids_slice):
-                    rate[uids_slice] = self.AGE_SPECIFIC_RATES[group]['rate_active_to_clear']    
+            age_indices = np.digitize(age_uids, self.rba.age_bins()) - 1
+            unique_indices = np.unique(age_indices)
+            # Set rates by age group
+            for idx in unique_indices:
+                group_rates = self.rba.get_rates(age_uids[age_indices == idx][0])
+                if group_rates:
+                    rate[age_indices == idx] = group_rates['rate_active_to_clear']
                             
         rate *= self.rr_clearance[uids]
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
@@ -170,22 +171,22 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
         
-        if self.pars.by_age:     
+        if self.pars.by_age:
             age_uids = sim.people.age[uids]
-            age_indices = np.digitize(age_uids, self.age_bins) - 1
-            for idx in np.unique(age_indices):
-                group = list(self.AGE_SPECIFIC_RATES.keys())[idx]
-                min_age, max_age = map(int, group.split(','))
-                uids_slice = (age_indices == idx)
-                smpos = (self.state[uids] == TBS.ACTIVE_SMPOS) & uids_slice
-                smneg = (self.state[uids] == TBS.ACTIVE_SMNEG) & uids_slice
-                exptb = (self.state[uids] == TBS.ACTIVE_EXPTB) & uids_slice
-                if np.any(smpos): 
-                    rate[smpos] = self.AGE_SPECIFIC_RATES[group]['rate_smpos_to_dead']
-                if np.any(smneg): 
-                    rate[smneg] = self.AGE_SPECIFIC_RATES[group]['rate_smneg_to_dead']
-                if np.any(exptb):
-                    rate[exptb] = self.AGE_SPECIFIC_RATES[group]['rate_exptb_to_dead']
+            age_indices = np.digitize(age_uids, self.rba.age_bins()) - 1
+            unique_indices = np.unique(age_indices)
+
+            # Set rates by age group and state
+            for idx in unique_indices:
+                group_rates = self.rba.get_rates(age_uids[age_indices == idx][0])
+                if group_rates:
+                    smpos = (self.state[uids] == TBS.ACTIVE_SMPOS) & (age_indices == idx)
+                    smneg = (self.state[uids] == TBS.ACTIVE_SMNEG) & (age_indices == idx)
+                    exptb = (self.state[uids] == TBS.ACTIVE_EXPTB) & (age_indices == idx)
+
+                    if np.any(smpos): rate[smpos] = group_rates['rate_smpos_to_dead']
+                    if np.any(smneg): rate[smneg] = group_rates['rate_smneg_to_dead']
+                    if np.any(exptb): rate[exptb] = group_rates['rate_exptb_to_dead']
 
         rate *= self.rr_death[uids]
 
