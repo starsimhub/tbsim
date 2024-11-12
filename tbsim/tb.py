@@ -33,7 +33,7 @@ class TB(ss.Infection):
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
-            by_age = True,                      # Whether to use age-specific rates
+            by_age = False,                      # Whether to use age-specific rates
 
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
