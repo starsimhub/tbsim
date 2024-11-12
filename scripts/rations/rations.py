@@ -198,8 +198,6 @@ class RATIONSTrial(ss.Intervention):
         return
 
     def step(self):
-        # super().step()
-
         tb = self.sim.diseases['tb']
         nut = self.sim.diseases['malnutrition']
         ti, dt = self.ti, self.t.dt
