@@ -22,8 +22,6 @@ class TB(ss.Infection):
     """
     TB model with age-specific progression rates.
     """
-    AGE_GROUPS = {}
-    AGE_SPECIFIC_RATES = {}
     age_bins = []
 
     def __init__(self, pars=None, **kwargs):
@@ -34,6 +32,7 @@ class TB(ss.Infection):
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
             by_age = False,                      # Whether to use age-specific rates
+            by_age_override = None,              # Override default age-specific rates
 
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -85,7 +84,6 @@ class TB(ss.Infection):
         if self.pars.by_age: # self.init_age_range(self.unit, self.t.dt)
             self.rba = RatesByAge(self.t.unit, self.t.dt)
             self.age_bins = self.rba.age_bins()
-            self.AGE_SPECIFIC_RATES = self.rba.AGE_SPECIFIC_RATES
         
         return
     
