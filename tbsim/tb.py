@@ -157,8 +157,8 @@ class TB(ss.Infection):
                 if group_rates:
                     rate[age_indices == idx] = group_rates['rate_active_to_clear']
                             
-        rate *= self.rr_clearance[uids]
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
+        rate *= self.rr_clearance[uids]
         prob = 1-np.exp(-rate)
         return prob
 
