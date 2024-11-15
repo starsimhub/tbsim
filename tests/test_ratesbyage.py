@@ -29,7 +29,7 @@ def test_apply_overrides():
 
 def test_get_groups(rates_by_age):
     groups = rates_by_age.get_groups()
-    assert groups == ['0,15', '15,25', '25,150']
+    assert groups == [(0,15), (15,25), (25,150)]
 
 def test_age_bins(rates_by_age):
     age_bins = rates_by_age.age_bins()
