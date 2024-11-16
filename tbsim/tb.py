@@ -93,24 +93,11 @@ class TB(ss.Infection):
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
-        
-       
         if self.pars.by_age:
-            
-            # TBS.LATENT_SLOW
-            ls_rate_map = self.rba.get_map('rate_LS_to_presym') # Get the rate map for the transition from Latent Slow to Pre-symptomatic
-            ls_age_mask = np.isin(self.state[uids], [TBS.LATENT_SLOW]) # Mask for agents in Latent Slow state
-            ls_age_indices = np.digitize(sim.people.age[uids[ls_age_mask]], self.rba.age_bins()) - 1 # Get the age indices for the agents in Latent Slow state
-            mapped_ls = np.vectorize(ls_rate_map.get, otypes=[float])(ls_age_indices) # Map the rates to the age indices
-            rate[ls_age_mask] = mapped_ls  # Set rate using mask 
-            
-            # TBS.LATENT_FAST
-            lf_rate_map = self.rba.get_map('rate_LF_to_presym')
-            lf_age_mask = np.isin(self.state[uids], [TBS.LATENT_FAST])
-            lf_age_indices = np.digitize(sim.people.age[uids[lf_age_mask]], self.rba.age_bins()) - 1
-            mapped_lf = np.vectorize(lf_rate_map.get, otypes=[float])(lf_age_indices)
-            rate[lf_age_mask] = mapped_lf  # Set rate using mask 
-
+            ls_uids, values = self.age_st_rates(self, sim, uids, 'rate_LS_to_presym', [TBS.LATENT_SLOW])
+            rate[ls_uids] = values  # Set rate using mask
+            lf_uids, values = self.age_st_rates(self, sim, uids, 'rate_LF_to_presym', [TBS.LATENT_FAST])
+            rate[lf_uids] = values  # Set rate using mask
         # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
 
@@ -131,14 +118,9 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "The p_presym_to_active function should only be called for agents in the pre symptomatic state, however some agents were in a different state."
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
-
         if self.pars.by_age:
-            rate_map = self.rba.get_map('rate_presym_to_active')
-            age_mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
-            age_indices = np.digitize(sim.people.age[uids[age_mask]], self.rba.age_bins()) - 1
-            mapped = np.vectorize(rate_map.get, otypes=[float])(age_indices)
-            rate[age_mask] = mapped  # Set rate using mask 
-
+            mask, rates = self.age_st_rates(self, sim, uids, 'rate_presym_to_active', [TBS.ACTIVE_PRESYMP])    
+            rate[mask] = rates  # Set rates
         prob = 1-np.exp(-rate)
         return prob
 
@@ -146,14 +128,9 @@ class TB(ss.Infection):
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
-      
         if self.pars.by_age:
-            rate_map = self.rba.get_map('rate_active_to_clear')
-            age_mask = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
-            age_indices = np.digitize(sim.people.age[uids[age_mask]], self.rba.age_bins()) - 1
-            mapped = np.vectorize(rate_map.get, otypes=[float])(age_indices)
-            rate[age_mask] = mapped  # Set rate using mask 
-            
+            mask, rates = self.age_st_rates(self, sim, uids, 'rate_active_to_clear', [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])    
+            rate[mask] = rates  # Set rates
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
         rate *= self.rr_clearance[uids]
         prob = 1-np.exp(-rate)
@@ -167,32 +144,27 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
         
         if self.pars.by_age:
-            # ACTIVE_SMPOS
-            smpos_rate_map = self.rba.get_map('rate_smpos_to_dead')
-            smpos_age_mask = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS])
-            smpos_age_indices = np.digitize(sim.people.age[uids[smpos_age_mask]], self.rba.age_bins()) - 1
-            mapped_smpos = np.vectorize(smpos_rate_map.get, otypes=[float])(smpos_age_indices)
-            rate[smpos_age_mask] = mapped_smpos  # Set rate using mask
-
-            # ACTIVE_SMNEG
-            smneg_rate_map = self.rba.get_map('rate_smneg_to_dead')
-            smneg_age_mask = np.isin(self.state[uids], [TBS.ACTIVE_SMNEG])
-            smneg_age_indices = np.digitize(sim.people.age[uids[smneg_age_mask]], self.rba.age_bins()) - 1
-            mapped_smneg = np.vectorize(smneg_rate_map.get, otypes=[float])(smneg_age_indices)
-            rate[smneg_age_mask] = mapped_smneg  # Set rate using mask
-
-            # ACTIVE_EXPTB
-            exptb_rate_map = self.rba.get_map('rate_exptb_to_dead')
-            exptb_age_mask = np.isin(self.state[uids], [TBS.ACTIVE_EXPTB])
-            exptb_age_indices = np.digitize(sim.people.age[uids[exptb_age_mask]], self.rba.age_bins()) - 1
-            mapped_exptb = np.vectorize(exptb_rate_map.get, otypes=[float])(exptb_age_indices)
-            rate[exptb_age_mask] = mapped_exptb  # Set rate using mask
-
+            smpos_uids, rates = self.age_st_rates(self, sim, uids, 'rate_smpos_to_dead', [TBS.ACTIVE_SMPOS])    
+            rate[smpos_uids] = rates  # Set rate using mask
+            smneg_uids, rates = self.age_st_rates(self, sim, uids, 'rate_smneg_to_dead', [TBS.ACTIVE_SMNEG])    
+            rate[smneg_uids] = rates  # Set rate using mask
+            exptb_uids, rates = self.age_st_rates(self, sim, uids, 'rate_exptb_to_dead', [TBS.ACTIVE_EXPTB])    
+            rate[exptb_uids] = rates  # Set rate using mask
+            
         rate *= self.rr_death[uids]
-
         prob = 1-np.exp(-rate)
         return prob
-
+    
+    @staticmethod
+    def age_st_rates(self, sim, uids, rate_name, states):
+        # Age Stratified Rates: 
+        # Retrieve age-specific rates and a uids for individuals in specified states based on the given rate name.
+            rate_map = self.rba.get_map(rate_name)
+            mask = np.isin(self.state[uids], [states])
+            age_indices = np.digitize(sim.people.age[uids[mask]], self.rba.age_bins()) - 1
+            rates = np.vectorize(rate_map.get, otypes=[float])(age_indices)
+            return mask, rates
+        
     @property
     def infectious(self):
         """
