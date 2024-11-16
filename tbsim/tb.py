@@ -1,6 +1,7 @@
 import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
+from tbsim.parametervalues import RatesByAge
 
 from enum import IntEnum
 
@@ -18,6 +19,11 @@ class TBS(IntEnum):
 
 
 class TB(ss.Infection):
+    """
+    TB model with age-specific progression rates.
+    """
+    age_bins = []
+
     def __init__(self, pars=None, **kwargs):
         super().__init__()
 
@@ -25,6 +31,8 @@ class TB(ss.Infection):
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
+            by_age = True,                      # Whether to use age-specific rates
+            by_age_override = None,              # Override default age-specific rates
 
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -61,7 +69,6 @@ class TB(ss.Infection):
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
             ss.State('on_treatment', default=False),
-
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
 
@@ -73,16 +80,25 @@ class TB(ss.Infection):
         self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
-
+        
+        if self.pars.by_age: # self.init_age_range(self.unit, self.t.dt)
+            self.rba = RatesByAge(self.t.unit, self.t.dt)
+            self.age_bins = self.rba.age_bins()
+        
         return
-
+    
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
-
         rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
+        if self.pars.by_age:
+            ls_uids, values = self.age_st_rates(self, sim, uids, 'rate_LS_to_presym', [TBS.LATENT_SLOW])
+            rate[ls_uids] = values  # Set rate using mask
+            lf_uids, values = self.age_st_rates(self, sim, uids, 'rate_LF_to_presym', [TBS.LATENT_FAST])
+            rate[lf_uids] = values  # Set rate using mask
+        # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
 
         prob = 1-np.exp(-rate)
@@ -98,10 +114,13 @@ class TB(ss.Infection):
         return prob
 
     @staticmethod
-    def p_presym_to_active(self, sim, uids):
+    def p_presym_to_active(self, sim, uids):    
         # Could be more complex function of time in state, but exponential for now
-        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
+        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "The p_presym_to_active function should only be called for agents in the pre symptomatic state, however some agents were in a different state."
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
+        if self.pars.by_age:
+            mask, rates = self.age_st_rates(self, sim, uids, 'rate_presym_to_active', [TBS.ACTIVE_PRESYMP])    
+            rate[mask] = rates  # Set rates
         prob = 1-np.exp(-rate)
         return prob
 
@@ -109,9 +128,11 @@ class TB(ss.Infection):
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
-        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
+        if self.pars.by_age:
+            mask, rates = self.age_st_rates(self, sim, uids, 'rate_active_to_clear', [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])    
+            rate[mask] = rates  # Set rates
+        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
         rate *= self.rr_clearance[uids]
-
         prob = 1-np.exp(-rate)
         return prob
 
@@ -121,12 +142,29 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_exptb_to_dead)
         rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
-
+        
+        if self.pars.by_age:
+            smpos_uids, rates = self.age_st_rates(self, sim, uids, 'rate_smpos_to_dead', [TBS.ACTIVE_SMPOS])    
+            rate[smpos_uids] = rates  # Set rate using mask
+            smneg_uids, rates = self.age_st_rates(self, sim, uids, 'rate_smneg_to_dead', [TBS.ACTIVE_SMNEG])    
+            rate[smneg_uids] = rates  # Set rate using mask
+            exptb_uids, rates = self.age_st_rates(self, sim, uids, 'rate_exptb_to_dead', [TBS.ACTIVE_EXPTB])    
+            rate[exptb_uids] = rates  # Set rate using mask
+            
         rate *= self.rr_death[uids]
-
         prob = 1-np.exp(-rate)
         return prob
-
+    
+    @staticmethod
+    def age_st_rates(self, sim, uids, rate_name, states):
+        # Age Stratified Rates: 
+        # Retrieve age-specific rates and a uids for individuals in specified states based on the given rate name.
+            rate_map = self.rba.get_map(rate_name)
+            mask = np.isin(self.state[uids], [states])
+            age_indices = np.digitize(sim.people.age[uids[mask]], self.rba.age_bins()) - 1
+            rates = np.vectorize(rate_map.get, otypes=[float])(age_indices)
+            return mask, rates
+        
     @property
     def infectious(self):
         """
@@ -159,7 +197,7 @@ class TB(ss.Infection):
         return
 
     def step(self):
-        # Make all the updates from the SIR model 
+        # Perform TB progression steps
         super().step()
         p = self.pars
         ti = self.ti

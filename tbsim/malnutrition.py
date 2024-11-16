@@ -24,12 +24,12 @@ class Malnutrition(ss.Disease):
     @staticmethod
     def dweight_loc(self, sim, uids):
         mu = np.zeros(len(uids))
-        mu[self.receiving_macro] = 1.0*self.dt # Upwards drift in percentile for those receiving macro supplementation
+        mu[self.receiving_macro] = 1.0*self.t.dt # Upwards drift in percentile for those receiving macro supplementation
         return mu
 
     @staticmethod
     def dweight_scale(self, sim, uids):
-        std = np.full(len(uids), fill_value=0.01*self.dt)
+        std = np.full(len(uids), fill_value=0.01*self.t.dt)
         return std
 
     def weight(self, uids=None):
@@ -143,7 +143,6 @@ class Malnutrition(ss.Disease):
         Initialize results
         """
         super().init_results()
-        npts = self.sim.npts
         self.define_results(
             # ss.Result(self.name, 'prev_macro_standard_or_above', npts, dtype=float),
             # ss.Result(self.name, 'prev_macro_slightly_below', npts, dtype=float),

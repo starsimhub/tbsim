@@ -1,0 +1,84 @@
+import starsim as ss 
+import numpy as np
+
+class RatesByAge:
+    def __init__(self, unit, dt, override=None):
+        self.unit = unit
+        self.dt = dt    
+        
+        # Key tuberculosis natural history parameters.
+        self.AGE_SPECIFIC_RATES = {
+            (0,15): {
+                'rate_LS_to_presym': ss.perday(2.0548e-06, parent_unit=self.unit, parent_dt=self.dt),   # 0.00075/365  
+                'rate_LF_to_presym': ss.perday(4.5e-3, parent_unit=self.unit, parent_dt=self.dt),       # 1.64e-3/365 
+                'rate_presym_to_active': ss.perday(5.48e-3, parent_unit=self.unit, parent_dt=self.dt),  # 2/365 
+                'rate_active_to_clear': ss.perday(2.74e-4, parent_unit=self.unit, parent_dt=self.dt),   # 0.1/365 
+                'rate_smpos_to_dead': ss.perday(6.85e-4, parent_unit=self.unit, parent_dt=self.dt),     # 0.25/365 
+                'rate_smneg_to_dead': ss.perday(2.74e-4, parent_unit=self.unit, parent_dt=self.dt),     # 0.1/365 
+                'rate_exptb_to_dead': ss.perday(2.74e-4, parent_unit=self.unit, parent_dt=self.dt),     # 0.1/365 
+                'rate_treatment_to_clear': ss.peryear(2, parent_unit=self.unit, parent_dt=self.dt)      # 2 per year
+            },
+            (15,25): {     # For now, using the same values as for adults but could be different
+                'rate_LS_to_presym': ss.perday(3e-5, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_LF_to_presym': ss.perday(6e-3, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_presym_to_active': ss.perday(3e-2, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_active_to_clear': ss.perday(2.4e-4, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_smpos_to_dead': ss.perday(4.5e-4, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_smneg_to_dead': ss.perday(0.3 * 4.5e-4, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_exptb_to_dead': ss.perday(0.15 * 4.5e-4, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_treatment_to_clear': ss.peryear(12/2, parent_unit=self.unit, parent_dt=self.dt) 
+                },
+            (25,150): {
+                'rate_LS_to_presym': ss.perday(3e-5, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_LF_to_presym': ss.perday(6e-3, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_presym_to_active': ss.perday(3e-2, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_active_to_clear': ss.perday(2.4e-4, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_smpos_to_dead': ss.perday(4.5e-4, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_smneg_to_dead': ss.perday(0.3 * 4.5e-4, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_exptb_to_dead': ss.perday(0.15 * 4.5e-4, parent_unit=self.unit, parent_dt=self.dt),
+                'rate_treatment_to_clear': ss.peryear(12/2, parent_unit=self.unit, parent_dt=self.dt)
+            } 
+        }
+        # Apply overrides
+        if override is not None:
+            self.apply_overrides(override)
+            
+    def apply_overrides(self, override): # optional method
+        for age_range, rates in override.items():
+            if age_range in self.AGE_SPECIFIC_RATES:
+                # Update only the specific rates provided in the override for each age range
+                self.AGE_SPECIFIC_RATES[age_range].update(rates)
+            else:
+                # Add new age ranges if not in the defaults
+                self.AGE_SPECIFIC_RATES[age_range] = rates
+
+    def get_rates(self, age):
+        for age_range, rates in self.AGE_SPECIFIC_RATES.items():
+            min_age, max_age = age_range
+            if age in range(min_age, max_age):    
+                return rates
+        return None
+
+    def get_rate(self, age, rate):  # optional method
+        rates = self.get_rates(age)
+        if rates is not None:
+            return rates[rate]
+        return None
+
+    
+    def get_groups(self):
+        return list(self.AGE_SPECIFIC_RATES.keys())
+
+    def age_bins(self):
+        # Extract the minimum age from each age range tuple and append np.inf as the upper bound
+        age_bins = np.array([min_age for min_age, _ in self.AGE_SPECIFIC_RATES.keys()] + [np.inf])
+        return age_bins
+    
+    def get_map(self, rate):
+        mapping = {
+           -1: self.AGE_SPECIFIC_RATES[(0, 15)][rate],
+            0: self.AGE_SPECIFIC_RATES[(0, 15)][rate],
+            1: self.AGE_SPECIFIC_RATES[(15, 25)][rate],
+            2: self.AGE_SPECIFIC_RATES[(25, 150)][rate]
+        }
+        return mapping
