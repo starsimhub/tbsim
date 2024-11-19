@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import os
+import matplotlib.pyplot as plt
 
 debug = False
 
@@ -20,7 +21,7 @@ do_save = 0
 n_agents = 2e3
 
 
-#%% a function to load the data for calibration
+# a function to load the data for calibration
 def make_data(file_path = os.path.join('data', 'calib_data', "marks_2019_2022.xlsx"), 
               sheet_name = 'S1', arm=None):
     """
@@ -54,7 +55,7 @@ def make_data(file_path = os.path.join('data', 'calib_data', "marks_2019_2022.xl
     return df
 
 
-#%% a function to build a simulation for calibration
+# a function to build a simulation for calibration
 def make_sim(rand_seed=0):
     """
     Build the simulation object that will simulate the ACT3
@@ -109,7 +110,7 @@ def make_sim(rand_seed=0):
     return sim
 
 
-#%% a function to sue the input calibration parameters to modify the simulation
+# a function to sue the input calibration parameters to modify the simulation
 def build_sim(sim, calib_pars, **kwargs):
     """ Modify the base simulation by applying calib_pars """
 
@@ -140,14 +141,14 @@ def build_sim(sim, calib_pars, **kwargs):
         
     return sim
 
- #%% a fucntion to run the calibration 
+# a fucntion to run the calibration 
 def run_calib(do_plot = False):
     """ Runs the claibration for the ACT3 model """
 
     # defining calibration paramters 
     # Going to start with just 1
     calib_pars = dict(
-        beta = dict( low=0.01, high=0.80, guess=0.05, 
+        beta = dict(low=0.01, high=0.80, guess=0.05, 
                     suggest_type='suggest_float', log=True, path=('diseases', 'tb', 'beta')),
       
     )
@@ -164,7 +165,7 @@ def run_calib(do_plot = False):
         
         real_data = pd.DataFrame({
             'prev': data_input['prev']
-        } index=pd.index([ti for ti in data_input['time']], name ='t')),
+        }, index=pd.index([ti for ti in data_input['time']], name ='t')),
 
        sim_data_fn = lambda sim: pd.DataFrame({
             'prev': sim.results.tb.prevalence,
@@ -188,7 +189,7 @@ def run_calib(do_plot = False):
         
         total_trioals = 1_000,
         n_workers = None,
-        die = True
+        die = True,
         debug = debug
         )
     
@@ -212,8 +213,7 @@ def run_calib(do_plot = False):
 
     return sim, calib    
 
-
-#%% Run as a script
+# Run as a script
 if __name__ == '__main__':
 
     # Useful for generating fake "real_data"
@@ -231,9 +231,9 @@ if __name__ == '__main__':
     T = sc.timer()
     do_plot = True
 
-    sim, calib = test_calibration(do_plot=do_plot)
+    sim, calib = run_calib(do_plot=do_plot)
 
     T.toc()
 
-    import matplotlib.pyplot as plt
+    
     plt.show()
