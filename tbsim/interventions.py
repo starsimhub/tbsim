@@ -80,13 +80,13 @@ class ActiveCaseFinding(ss.Intervention):
     def step(self):
         """ Apply the intervention """
 
-        super().step()
         sim = self.sim
 
         # Determine when the intervention is active and return if nothing to do
         years = np.array(list(self.pars.date_cov.keys()))
+        sim_year = self.t.now('year')
         is_active = (
-            (sim.now_year >= years) & (sim.now_year < years + self.sim.dt_year)
+            (sim_year >= years) & (sim_year < years + self.t.dt_year)
         )
         if not np.any(is_active):
             return
@@ -109,7 +109,7 @@ class ActiveCaseFinding(ss.Intervention):
 
         # Update the results 
         timepoint = np.where(is_active)[0][0]
-        self.results.time[timepoint] = sim.now_year
+        self.results.time[timepoint] = sim_year
         self.results.n_elig[timepoint] = np.sum(elig)
         self.results.n_found[timepoint] = len(found_uids)
         self.results.n_treated[timepoint] = len(treated_uids)

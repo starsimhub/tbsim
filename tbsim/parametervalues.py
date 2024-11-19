@@ -55,7 +55,7 @@ class RatesByAge:
     def get_rates(self, age):
         for age_range, rates in self.AGE_SPECIFIC_RATES.items():
             min_age, max_age = age_range
-            if age in range(min_age, max_age):    
+            if age in range(min_age, max_age):
                 return rates
         return None
 

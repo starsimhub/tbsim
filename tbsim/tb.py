@@ -32,7 +32,7 @@ class TB(ss.Infection):
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
             by_age = True,                      # Whether to use age-specific rates
-            by_age_override = None,              # Override default age-specific rates
+            by_age_override = None,             # Override default age-specific rates
 
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -80,13 +80,13 @@ class TB(ss.Infection):
         self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
-        
+
         if self.pars.by_age: # self.init_age_range(self.unit, self.t.dt)
             self.rba = RatesByAge(self.t.unit, self.t.dt)
             self.age_bins = self.rba.age_bins()
-        
+
         return
-    
+
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
@@ -159,12 +159,12 @@ class TB(ss.Infection):
     def age_st_rates(self, sim, uids, rate_name, states):
         # Age Stratified Rates: 
         # Retrieve age-specific rates and a uids for individuals in specified states based on the given rate name.
-            rate_map = self.rba.get_map(rate_name)
-            mask = np.isin(self.state[uids], [states])
-            age_indices = np.digitize(sim.people.age[uids[mask]], self.rba.age_bins()) - 1
-            rates = np.vectorize(rate_map.get, otypes=[float])(age_indices)
-            return mask, rates
-        
+        rate_map = self.rba.get_map(rate_name)
+        mask = np.isin(self.state[uids], [states])
+        age_indices = np.digitize(sim.people.age[uids[mask]], self.rba.age_bins()) - 1
+        rates = np.vectorize(rate_map.get, otypes=[float])(age_indices)
+        return mask, rates
+
     @property
     def infectious(self):
         """
