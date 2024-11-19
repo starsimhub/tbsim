@@ -34,15 +34,6 @@ class TB(ss.Infection):
             by_age = True,                      # Whether to use age-specific rates
             by_age_override = None,             # Override default age-specific rates
 
-            rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
-            rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
-            rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
-            rate_active_to_clear    = ss.perday(2.4e-4),               # Active infection to natural clearance (per day)
-            rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
-            rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
-            rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = ss.peryear(12/2),                # 2 months
-
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
             # Relative transmissibility of each state
@@ -71,7 +62,6 @@ class TB(ss.Infection):
             ss.State('on_treatment', default=False),
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
-
             ss.FloatArr('reltrans_het', default=1.0),           # Individual-level heterogeneity on infectiousness, acts in addition to stage-based rates
         )
 
@@ -81,9 +71,8 @@ class TB(ss.Infection):
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
 
-        if self.pars.by_age: # self.init_age_range(self.unit, self.t.dt)
-            self.rba = RatesByAge(self.t.unit, self.t.dt)
-            self.age_bins = self.rba.age_bins()
+        self.rba = RatesByAge(self.t.unit, self.t.dt)
+        self.age_bins = self.rba.age_bins()
 
         return
 
@@ -91,12 +80,14 @@ class TB(ss.Infection):
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
-        rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
-        rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
+        rate = np.zeros(len(uids))
+        rate[self.state[uids] == TBS.LATENT_SLOW] = self.rba.get_rate(0, 'rate_LS_to_presym')
+        rate[self.state[uids] == TBS.LATENT_FAST] = self.rba.get_rate(0, 'rate_LF_to_presym')
+        
         if self.pars.by_age:
-            ls_uids, values = self.age_st_rates(self, sim, uids, 'rate_LS_to_presym', [TBS.LATENT_SLOW])
+            ls_uids, values = self.age_st_rates(self,  uids, 'rate_LS_to_presym', [TBS.LATENT_SLOW])
             rate[ls_uids] = values  # Set rate using mask
-            lf_uids, values = self.age_st_rates(self, sim, uids, 'rate_LF_to_presym', [TBS.LATENT_FAST])
+            lf_uids, values = self.age_st_rates(self,  uids, 'rate_LF_to_presym', [TBS.LATENT_FAST])
             rate[lf_uids] = values  # Set rate using mask
         # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
@@ -109,17 +100,22 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.zeros(len(uids))
-        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
+        rate[self.on_treatment[uids]] =self.rba.get_rate(0, 'rate_treatment_to_clear') # Default rate
+        
+        if self.pars.by_age:
+            mask, rates = self.age_st_rates(self,  uids, 'rate_treatment_to_clear', [TBS.ACTIVE_PRESYMP])    
+            rate[mask] = rates  # Set rates        
+        
         prob = 1-np.exp(-rate)
         return prob
 
     @staticmethod
-    def p_presym_to_active(self, sim, uids):    
+    def p_presym_to_active(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "The p_presym_to_active function should only be called for agents in the pre symptomatic state, however some agents were in a different state."
-        rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
+        rate = np.full(len(uids), fill_value=self.rba.get_rate(0, 'rate_presym_to_active'))
         if self.pars.by_age:
-            mask, rates = self.age_st_rates(self, sim, uids, 'rate_presym_to_active', [TBS.ACTIVE_PRESYMP])    
+            mask, rates = self.age_st_rates(self,  uids, 'rate_presym_to_active', [TBS.ACTIVE_PRESYMP])    
             rate[mask] = rates  # Set rates
         prob = 1-np.exp(-rate)
         return prob
@@ -127,11 +123,14 @@ class TB(ss.Infection):
     @staticmethod
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
+        rate = np.full(len(uids), fill_value=self.rba.get_rate(0, 'rate_active_to_clear'))
+        rate[self.on_treatment[uids]] = self.rba.get_rate(0, 'rate_treatment_to_clear')  # Do we use the default rate?
+        
         if self.pars.by_age:
-            mask, rates = self.age_st_rates(self, sim, uids, 'rate_active_to_clear', [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])    
+            mask, rates = self.age_st_rates(self,  uids, 'rate_active_to_clear', [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])    
             rate[mask] = rates  # Set rates
-        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
+            ot_mask, ot_rates = self.age_st_rates(self,  self.on_treatment[uids], 'rate_treatment_to_clear', [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])    
+            rate[ot_mask] = ot_rates  # Set rate using mask
         rate *= self.rr_clearance[uids]
         prob = 1-np.exp(-rate)
         return prob
@@ -139,29 +138,30 @@ class TB(ss.Infection):
     @staticmethod
     def p_active_to_death(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        rate = np.full(len(uids), fill_value=self.pars.rate_exptb_to_dead)
-        rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead
-        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
+        rate = np.zeros(len(uids))
+        rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.rba.get_rate(0, 'rate_smpos_to_dead')
+        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.rba.get_rate(0, 'rate_smneg_to_dead')
+        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.rba.get_rate(0, 'rate_exptb_to_dead')
         
         if self.pars.by_age:
-            smpos_uids, rates = self.age_st_rates(self, sim, uids, 'rate_smpos_to_dead', [TBS.ACTIVE_SMPOS])    
-            rate[smpos_uids] = rates  # Set rate using mask
-            smneg_uids, rates = self.age_st_rates(self, sim, uids, 'rate_smneg_to_dead', [TBS.ACTIVE_SMNEG])    
-            rate[smneg_uids] = rates  # Set rate using mask
-            exptb_uids, rates = self.age_st_rates(self, sim, uids, 'rate_exptb_to_dead', [TBS.ACTIVE_EXPTB])    
-            rate[exptb_uids] = rates  # Set rate using mask
+            smpos_uids, rates = self.age_st_rates(self, uids, 'rate_smpos_to_dead', [TBS.ACTIVE_SMPOS])    
+            rate[smpos_uids] = rates
+            smneg_uids, rates = self.age_st_rates(self, uids, 'rate_smneg_to_dead', [TBS.ACTIVE_SMNEG])    
+            rate[smneg_uids] = rates
+            exptb_uids, rates = self.age_st_rates(self, uids, 'rate_exptb_to_dead', [TBS.ACTIVE_EXPTB])    
+            rate[exptb_uids] = rates
             
         rate *= self.rr_death[uids]
         prob = 1-np.exp(-rate)
         return prob
     
     @staticmethod
-    def age_st_rates(self, sim, uids, rate_name, states):
+    def age_st_rates(self, uids, rate_name, states):
         # Age Stratified Rates: 
         # Retrieve age-specific rates and a uids for individuals in specified states based on the given rate name.
         rate_map = self.rba.get_map(rate_name)
         mask = np.isin(self.state[uids], [states])
-        age_indices = np.digitize(sim.people.age[uids[mask]], self.rba.age_bins()) - 1
+        age_indices = np.digitize(self.sim.people.age[uids[mask]], self.rba.age_bins()) - 1
         rates = np.vectorize(rate_map.get, otypes=[float])(age_indices)
         return mask, rates
 

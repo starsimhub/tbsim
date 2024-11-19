@@ -8,6 +8,16 @@ class RatesByAge:
         
         # Key tuberculosis natural history parameters.
         self.AGE_SPECIFIC_RATES = {
+            (0, None): {  # Default values for all ages
+                'rate_LS_to_presym': ss.perday(3e-5, parent_unit=self.unit, parent_dt=self.dt),  # Latent Slow to Active Pre-Symptomatic (per day)
+                'rate_LF_to_presym': ss.perday(6e-3, parent_unit=self.unit, parent_dt=self.dt),  # Latent Fast to Active Pre-Symptomatic (per day)
+                'rate_presym_to_active': ss.perday(3e-2, parent_unit=self.unit, parent_dt=self.dt),  # Pre-symptomatic to symptomatic (per day)
+                'rate_active_to_clear': ss.perday(2.4e-4, parent_unit=self.unit, parent_dt=self.dt),  # Active infection to natural clearance (per day)
+                'rate_exptb_to_dead': ss.perday(0.15 * 4.5e-4, parent_unit=self.unit, parent_dt=self.dt),  # Extra-Pulmonary TB to Dead (per day)
+                'rate_smpos_to_dead': ss.perday(4.5e-4, parent_unit=self.unit, parent_dt=self.dt),  # Smear Positive Pulmonary TB to Dead (per day)
+                'rate_smneg_to_dead': ss.perday(0.3 * 4.5e-4, parent_unit=self.unit, parent_dt=self.dt),  # Smear Negative Pulmonary TB to Dead (per day)
+                'rate_treatment_to_clear': ss.peryear(12/2, parent_unit=self.unit, parent_dt=self.dt)  # Treatment to natural clearance (per year)
+            },
             (0,15): {
                 'rate_LS_to_presym': ss.perday(2.0548e-06, parent_unit=self.unit, parent_dt=self.dt),   # 0.00075/365  
                 'rate_LF_to_presym': ss.perday(4.5e-3, parent_unit=self.unit, parent_dt=self.dt),       # 1.64e-3/365 
@@ -55,14 +65,21 @@ class RatesByAge:
     def get_rates(self, age):
         for age_range, rates in self.AGE_SPECIFIC_RATES.items():
             min_age, max_age = age_range
-            if age in range(min_age, max_age):
+            if max_age is None:  # Handle "all ages" bin
+                max_age = float('inf')
+            if min_age <= age < max_age:
                 return rates
         return None
 
-    def get_rate(self, age, rate):  # optional method
+    def get_rate(self, age, rate):  
+        # Attempt to get rates for the specific age bin
         rates = self.get_rates(age)
-        if rates is not None:
+        if rates is not None and rate in rates:
             return rates[rate]
+        
+        # Fallback to the "all ages" bin
+        if (0, None) in self.AGE_SPECIFIC_RATES and rate in self.AGE_SPECIFIC_RATES[(0, None)]:
+            return self.AGE_SPECIFIC_RATES[(0, None)][rate]
         return None
 
     
