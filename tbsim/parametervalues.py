@@ -74,14 +74,14 @@ class RatesByAge:
         age_bins = np.array([min_age for min_age, _ in self.AGE_SPECIFIC_RATES.keys()] + [np.inf])
         return age_bins
     
-def get_map(self, rate):
-    # Dynamically create the mapping based on the defined age groups
-    mapping = {}
-    for idx, age_range in enumerate(self.AGE_SPECIFIC_RATES.keys()):
-        if rate in self.AGE_SPECIFIC_RATES[age_range]:
-            mapping[idx] = self.AGE_SPECIFIC_RATES[age_range][rate]
-        else:
-            raise KeyError(f"Rate '{rate}' not found for age range {age_range}")
-    # Optionally handle default or special cases, like -1
-    mapping[-1] = mapping.get(0, None)
-    return mapping
+    def get_map(self, rate):
+        # Dynamically create the mapping based on the defined age groups
+        mapping = {}
+        for idx, age_range in enumerate(self.AGE_SPECIFIC_RATES.keys()):
+            if rate in self.AGE_SPECIFIC_RATES[age_range]:
+                mapping[idx] = self.AGE_SPECIFIC_RATES[age_range][rate]
+            else:
+                raise KeyError(f"Rate '{rate}' not found for age range {age_range}")
+        # Optionally handle default or special cases, like -1
+        mapping[-1] = mapping.get(0, None)
+        return mapping
