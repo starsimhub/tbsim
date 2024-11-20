@@ -43,9 +43,6 @@ def build_RATIONS(skey, scen, rand_seed=0):
     tb_pars = dict(
         beta = ss.beta(0.045),
         init_prev = 0, # Infections seeded by Rations class
-        rate_LS_to_presym = ss.perday(3e-5),
-        rate_LF_to_presym = ss.perday(6e-3),
-        
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
         rel_trans_smneg     = 0.3,

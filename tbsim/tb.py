@@ -73,7 +73,7 @@ class TB(ss.Infection):
 
         self.rba = RatesByAge(self.t.unit, self.t.dt)
         self.age_bins = self.rba.age_bins()
-
+        # Question: Do we want to have (for any reason) the rates exposed as parameters
         return
 
     @staticmethod
@@ -124,16 +124,20 @@ class TB(ss.Infection):
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         rate = np.full(len(uids), fill_value=self.rba.get_rate(0, 'rate_active_to_clear'))
-        rate[self.on_treatment[uids]] = self.rba.get_rate(0, 'rate_treatment_to_clear')  # Do we use the default rate?
-        
+        rate[self.on_treatment[uids]] = self.rba.get_rate(0, 'rate_treatment_to_clear')     # Default values
+      
         if self.pars.by_age:
             mask, rates = self.age_st_rates(self,  uids, 'rate_active_to_clear', [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])    
             rate[mask] = rates  # Set rates
-            ot_mask, ot_rates = self.age_st_rates(self,  self.on_treatment[uids], 'rate_treatment_to_clear', [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])    
-            rate[ot_mask] = ot_rates  # Set rate using mask
+            
+            on_treatment_uids = ss.uids(self.on_treatment[uids])
+            mask, rates = self.age_st_rates(self,  on_treatment_uids, 'rate_treatment_to_clear', [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])    
+            rate[mask] = rates  # Set rates
+                                        
         rate *= self.rr_clearance[uids]
         prob = 1-np.exp(-rate)
         return prob
+
 
     @staticmethod
     def p_active_to_death(self, sim, uids):
