@@ -54,8 +54,7 @@ jobs:
       - name: Run Tests
         working-directory: ./tests
         run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml
-        continue-on-error: true # Continue to next steps even if tests fail
-
+      
       - name: Upload test results as artifact
         uses: actions/upload-artifact@v4
         if: always() # Ensure this step runs whether tests pass or fail
