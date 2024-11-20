@@ -2,19 +2,19 @@ name: Run tests
 on:
   pull_request:
     branches:
-      - main
+      - '**'
     types:
       - opened
       - synchronize # Triggers on any update to the pull request, like adding commits
 
   push:
     branches:
-      - main # This ensures the workflow runs whenever code is pushed to the main branch
+      - '**'
     paths:
       - 'tbsim/**'
-      - '.github/workflows/**'
       - 'scripts/**'
       - 'tests/**'
+      - '.github/workflows/**'
 
 concurrency:
   group: ${{ github.ref }}-tests
