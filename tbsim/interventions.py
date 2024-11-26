@@ -34,6 +34,7 @@ class ActiveCaseFinding(ss.Intervention):
                 sc.date('2014-06-01'): 0.6,
                 sc.date('2015-06-01'): 0.7,
                 sc.date('2016-06-01'): 0.64,
+                sc.date('2017-06-01'): 0.64, # setting this to the same as 2016 for now
             },
 
             age_min = 15,

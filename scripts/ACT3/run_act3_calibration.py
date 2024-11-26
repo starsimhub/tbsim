@@ -1,8 +1,7 @@
 """
 Using the calibration uplift propsed by Dan Klien.
-NOTE: Until the PR is merged will need to use the claib_uplift branch of starsim.
+NOTE: Until the PR is merged will need to use the claib-continued branch of starsim.
 """
-
 
 #%% Import the required packages and set some calibration defaults 
 import starsim as ss
@@ -10,6 +9,8 @@ import tbsim as mtb
 import numpy as np
 import pandas as pd
 import sciris as sc
+import scipy.stats as sps
+import seaborn as sns
 import os
 import matplotlib.pyplot as plt
 
@@ -18,12 +19,13 @@ debug = False
 # is subject to change later 
 do_plot = 1
 do_save = 0
-n_agents = 2e3
+n_agents = 1e3
 
-
-# a function to load the data for calibration
-def make_data(file_path = os.path.join('data', 'calib_data', "marks_2019_2022.xlsx"), 
-              sheet_name = 'S1', arm=None):
+#%% a function to load the data for calibration
+def make_data(file_path = os.path.join('scripts', 'ACT3', 
+                                       'data', 'calib_data', 
+                                       "marks_2019_2022.xlsx"), 
+              sheet_name = 'S1'):
     """
     Load and process the data for calibration
     """
@@ -31,38 +33,36 @@ def make_data(file_path = os.path.join('data', 'calib_data', "marks_2019_2022.xl
     # load the data 
     prev_data = pd.read_excel(file_path, sheet_name=sheet_name)
     
-    # select the relevant arm 
-    if arm is not None:
-        prev_data = prev_data.loc[prev_data['Arm'] == arm]
-    
     # process the data to extract the relevant columns 
     df = (
     prev_data \
     .loc[prev_data['Group'] == 'Xpert MTB positive and Mtb culture positive'] \
     .drop(columns=['Group']) \
-    .iloc[:, [0, 1, 3]]
+    .iloc[:, [0, 1, 2, 3]]
     )
-    # rename columns for clarity
-    df.columns = ['time', 'arm', 'prev']
     
-    # year of the trial 
-    df['time'] = np.array([sc.date('2014-12-31'), 
-                           sc.date('2015-12-31'), 
-                           sc.date('2016-12-31'),
-                           sc.date('2017-12-31')
+    # rename columns for clarity
+    df.columns = ['time', 'arm', 'n_elig', 'n_found']
+    
+    # TODO: year of the trial -- need a better way to assign these values 
+    df['time'] = np.array([sc.date('2014-06-01'), 
+                           sc.date('2015-06-01'), 
+                           sc.date('2016-06-01'),
+                           sc.date('2017-06-01'),
+                           sc.date('2017-06-01')
                            ])
 
     return df
 
 
-# a function to build a simulation for calibration
-def make_sim(rand_seed=0):
+#%% a function to build a simulation for calibration
+def make_sim():
     """
     Build the simulation object that will simulate the ACT3
     """
 
     # random seed is used when deciding the initial n_agents, so set here
-    np.random.seed(rand_seed)
+    np.random.seed()
 
     # Retrieve intervention, TB, and simulation-related parameters from scen and skey
     # for TB
@@ -97,51 +97,159 @@ def make_sim(rand_seed=0):
     sim_pars = dict(
         # default simulation parameters
         unit='day', dt=14,
-        start=ss.date('2003-01-01'), stop=ss.date('2017-12-31'),
-        rand_seed=rand_seed
+        start=ss.date('2010-01-01'), stop=ss.date('2018-12-31')
         )
 
     # build the sim object 
     sim = ss.Sim(
         people=pop, networks=nets, diseases=tb, demographics=demog, interventions=intv,
-        pars=sim_pars
+        pars=sim_pars, verbose = 0
     )
 
     return sim
 
 
-# a function to sue the input calibration parameters to modify the simulation
+#%% a function to sue the input calibration parameters to modify the simulation
 def build_sim(sim, calib_pars, **kwargs):
     """ Modify the base simulation by applying calib_pars """
 
+    reps = kwargs.get('n_clusters', 1)
+    
     # extract the relevant parameters from the simulation object
     # only modifying diesease, intervention and network parameters
     nets_par = sim.pars.networks
     tb_par = sim.pars.diseases
 
-    for key, value in calib_pars.items():
+    if calib_pars is not None:
+        for key, value in calib_pars.items():
         
-        v = value
-        
-        if key == 'rand_seed':
-            sim.pars.rand_seed = v
-            continue
-        
-        # TODO: 
-        # This needs to like a look-up table rather than the if-else block
-        # Maybe some way of specifying the address
-        if key == 'beta':
-            tb_par.beta = ss.beta(v)
-        elif key == 'init_prev':
-            tb_par.init_prev = ss.bernoulli(v)
-        elif key == 'n_contacts':
-            nets_par.n_contacts = ss.poisson(v)
-        else:
-            raise NotImplementedError(f'Parameter {key} not recognized')
-        
-    return sim
+            v = value
+            
+            if key == 'rand_seed':
+                sim.pars.rand_seed = v
+                continue
+            
+            # TODO: 
+            # This needs to like a look-up table rather than the if-else block
+            # Maybe some way of specifying the address(?)
+            if key == 'beta':
+                tb_par.beta = ss.beta(v)
+            elif key == 'init_prev':
+                tb_par.init_prev = ss.bernoulli(v)
+            elif key == 'n_contacts':
+                nets_par.n_contacts = ss.poisson(v)
+            else:
+                raise NotImplementedError(f'Parameter {key} not recognized')
+    
+    # twice the number of reps are needed sinces there are two arms 
+    total_reps = reps*2    
+    
+    # constrcut the multi-sim object
+    ms = ss.MultiSim(
+        sim, 
+        iterpars=dict(rand_seed=np.random.randint(0, 1e6, total_reps)), 
+        initialize=True, debug = True, parallel=False
+        ) 
 
-# a fucntion to run the calibration 
+    # change the labels to the individual simulations, 
+    # and set the control simulation tretaement probability to 0
+    for i, sim in enumerate(ms.sims):
+        if i >= total_reps//2:
+            sim.label = 'Intervention'
+        else:
+            sim.label = 'Control'
+            sim.pars.interventions.p_treat = ss.bernoulli(p=0.0)
+        
+    return  ms  
+
+#%% objective function to calculate the likelihood of the model|data 
+# make sim_data 
+def make_sim_data(multi_sim, obs_data):
+    """
+    Make the simulation data from the calibration
+    """
+    sim_data = []
+    for i, s in enumerate(multi_sim.sims):
+        if s.label == 'Intervention':
+            sim_df = pd.DataFrame({
+                'replicate': [i] * 4,
+                'time': obs_data['time'],
+                'n_elig': s.results.activecasefinding['n_elig'][:4],
+                'n_found': s.results.activecasefinding['n_found'][:4]
+            })
+            sim_data.append(sim_df)
+    
+    return pd.concat(sim_data)
+
+# extract beta-binomial density
+def neg_beta_binom_density(row):
+    # expected values
+    x_e = row['n_found']
+    n_e = row['n_elig']
+    # observed values
+    x_o = row['n_found_obs']
+    n_o = row['n_elig_obs']
+
+    return -sps.betabinom.logpmf(k=x_o, n=n_o, a=x_e+1, b=n_e-x_e+1)
+
+# objective function
+def objective_fn(sim, **kwargs):
+    """
+    Objective function to calculate the likelihood of the model given the data.
+    This funtion expects the following inputs:
+        1. the simulation object runs 
+        2. the data to compare the simulation to - provided as **kwargs
+    """
+
+    data = kwargs.get('data', None)
+    method = kwargs.get('method', None)
+    
+    # prepare the data for comparison
+    data_intv = data \
+        .loc[data['arm'] == 'Intervention'] \
+        .drop(columns=['arm']) 
+    data_intv.columns = ['time', 'n_elig_obs', 'n_found_obs']
+    
+    # prepare the simulation for comparison
+    sim_data = make_sim_data(sim, data_intv)
+
+    # calculate the likelihood of the model given the data
+    merged = pd.merge(data_intv, sim_data, on=['time'], how='inner')  
+    merged['nloglik'] = merged.apply(neg_beta_binom_density, axis=1)
+    merged = merged[['replicate', 'nloglik']].groupby('replicate').sum()
+    
+    return merged['nloglik'].mean()
+
+
+def plot_compare_fit(calib, **kwargs):
+    """Makes comparison plots of the calibration sims to the data"""
+    obs_data = kwargs.get('obs_data')
+
+    intv_data = obs_data[obs_data['arm'] == 'Intervention'].drop(columns=['arm'])
+    intv_data.columns = ['time', 'n_elig', 'n_found']
+
+    sim_output_before = make_sim_data(calib.before_msim, intv_data)
+    sim_output_before_summary = sim_output_before.groupby('time').agg({'n_elig': 'sum', 'n_found': 'sum'}).reset_index()
+    sim_output_before_summary['state'] = 'before'
+    
+    sim_output_after = make_sim_data(calib.after_msim, intv_data)
+    sim_output_after_summary = sim_output_after.groupby('time').agg({'n_elig': 'sum', 'n_found': 'sum'}).reset_index()
+    sim_output_after_summary['state'] = 'after'
+
+    sim_output_summary = pd.concat([sim_output_before_summary, sim_output_after_summary])
+    sim_output_summary['prevalence'] = sim_output_summary['n_found']/sim_output_summary['n_elig']*100_000
+
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    ax.plot(intv_data['time'], sim_output_summary[sim_output_summary['state'] == 'before']['prevalence'], label='Simulated Before Calibration')
+    ax.plot(intv_data['time'], sim_output_summary[sim_output_summary['state'] == 'after']['prevalence'], label='Simulated After Calibration')
+    ax.plot(intv_data['time'], intv_data['n_found']/intv_data['n_elig']*100_000, 'o', label='Observed')
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Prevalence per 100,000')
+    ax.legend()
+
+    return fig
+
+#%%a function to run the calibration 
 def run_calib(do_plot = False):
     """ Runs the claibration for the ACT3 model """
 
@@ -154,28 +262,12 @@ def run_calib(do_plot = False):
     )
 
     # generate the data for calibration
-    data_input = make_data(arm='Intervention').drop(columns='arm')
+    data = make_data().reset_index(drop=True)
 
     # define a simulation object
     sim = make_sim()
 
-    # define a component
-    prevalence_comp = ss.CalibComponent(
-        name = 'prevalence',
-        
-        real_data = pd.DataFrame({
-            'prev': data_input['prev']
-        }, index=pd.index([ti for ti in data_input['time']], name ='t')),
-
-       sim_data_fn = lambda sim: pd.DataFrame({
-            'prev': sim.results.tb.prevalence,
-        }, index=pd.Index(sim.results.timevec, name='t')),
-
-        conform = ss.eConform.PREVALENT,
-        likelihood = ss.eLikelihood.POISSON,
-
-        weight = 1
-        )
+    #test = objective_fn(msim, **kwargs)
     
     # make calibration
     calib = ss.Calibration(
@@ -183,32 +275,28 @@ def run_calib(do_plot = False):
         sim = sim,
 
         build_fn = build_sim,
-        build_kwargs = None,
+        build_kw = dict(n_clusters=60),
         
-        components = [prevalence_comp],
+        eval_fn = objective_fn,
+        eval_kw = dict(data=data, method='mcmc'),
         
-        total_trioals = 1_000,
-        n_workers = None,
+        total_trials = 100,
+        n_workers = 10,
         die = True,
-        debug = debug
+        debug = debug,
         )
     
     # Perform the calibration
     sc.printcyan('\nPeforming calibration...')
-    calib.calibrate(confirm_fit=False)
+    calib.calibrate()
 
     # Confirm
     sc.printcyan('\nConfirming fit...')
-    calib.confirm_fit()
-    print(f'Fit with original pars: {calib.before_fits}')
-    print(f'Fit with best-fit pars: {calib.after_fits}')
-    if calib.after_fits.mean() <= calib.before_fits.mean():
-        print('✓ Calibration improved fit')
-    else:
-        print('✗ Calibration did not improve fit, but this sometimes happens stochastically and is not necessarily an error')
-
+    calib.check_fit()
+    
     if do_plot:
-        calib.plot_sims()
+        # plot_facet(calib, obs_data=data)
+        plot_compare_fit(calib, obs_data=data)
         calib.plot_trend()
 
     return sim, calib    
