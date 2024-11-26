@@ -51,7 +51,7 @@ class RatesByAge:
             } 
         }
         
-        self.RATES_DICT_RESOLVED = {
+        self.RATES_DICT = {
             'rate_LS_to_presym': {
                 0: ss.perday(0, unit, dt),
                 1: ss.perday(3e-5, unit, dt),
@@ -123,13 +123,14 @@ class RatesByAge:
             'rate_smneg_to_dead': self.arr('rate_smneg_to_dead'),
             'rate_treatment_to_clear': self.arr('rate_treatment_to_clear')
         }
-        self.RESOLVED = data
+        self.RATES = data
+
         # Apply overrides
         if override is not None:
             self.apply_overrides(override)
             
     def arr(self, name):
-        result = np.array(list(self.RATES_DICT_RESOLVED[name].values()))
+        result = np.array(list(self.RATES_DICT[name].values()))
         return result
     
     def apply_overrides(self, override): # optional method

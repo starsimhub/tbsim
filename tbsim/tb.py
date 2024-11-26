@@ -71,10 +71,9 @@ class TB(ss.Infection):
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
         
         self.rba = RatesByAge(self.t.unit, self.t.dt)
-        self.age_bins = self.rba.age_bins()
-        self.pars['rates_byage'] = self.rba.RESOLVED
+        self.pars['rates_byage'] = self.rba.RATES
         self.age_cutoffs = self.pars['rates_byage']['age_cutoffs']
-        # Question: Do we want to have (for any reason) the rates exposed as parameters
+
         return
 
     @staticmethod
@@ -86,16 +85,19 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.LATENT_FAST] = self.rba.get_rate(0, 'rate_LF_to_presym')
         
         if self.pars.by_age:
-            ls_uids, values = self.age_st_rates(self,  uids, 'rate_LS_to_presym', [TBS.LATENT_SLOW])
-            rate[ls_uids] = values  # Set rate using mask
-            lf_uids, values = self.age_st_rates(self,  uids, 'rate_LF_to_presym', [TBS.LATENT_FAST])
-            rate[lf_uids] = values  # Set rate using mask
+            ls_uids = np.isin(self.state[uids], [TBS.LATENT_SLOW])
+            age_indexes = np.digitize(self.sim.people.age[uids[ls_uids]], bins=self.age_cutoffs) - 1
+            rate[ls_uids] = self.pars['rates_byage']['rate_LS_to_presym'][age_indexes]
+            
+            lf_uids = np.isin(self.state[uids], [TBS.LATENT_FAST] )
+            age_indexes = np.digitize(self.sim.people.age[uids[lf_uids]], bins=self.age_cutoffs) - 1
+            rate[lf_uids] = self.pars['rates_byage']['rate_LF_to_presym'][age_indexes]
+            
         # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
 
         prob = 1-np.exp(-rate)
         return prob
-
     @staticmethod
     def p_presym_to_clear(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
@@ -121,7 +123,6 @@ class TB(ss.Infection):
             age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs) - 1
             rate[mask] = self.pars['rates_byage']['rate_presym_to_active'][age_indexes]
             
-            
         prob = 1-np.exp(-rate)
         return prob
 
@@ -137,8 +138,9 @@ class TB(ss.Infection):
             rate[mask] = self.pars['rates_byage']['rate_active_to_clear'][age_indexes]
             
             on_treatment_uids = ss.uids(self.on_treatment[uids])
-            mask, rates = self.age_st_rates(self,  on_treatment_uids, 'rate_treatment_to_clear', [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])    
-            rate[mask] = rates  # Set rates
+            mask = np.isin(on_treatment_uids, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+            age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs) - 1
+            rate[mask] = self.pars['rates_byage']['rate_treatment_to_clear'][age_indexes]
             
         rate *= self.rr_clearance[uids]
         prob = 1-np.exp(-rate)
@@ -154,30 +156,22 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.rba.get_rate(0, 'rate_exptb_to_dead')
         
         if self.pars.by_age:
-            smpos_uids, rates = self.age_st_rates(self, uids, 'rate_smpos_to_dead', [TBS.ACTIVE_SMPOS])    
-            rate[smpos_uids] = rates
-            smneg_uids, rates = self.age_st_rates(self, uids, 'rate_smneg_to_dead', [TBS.ACTIVE_SMNEG])    
-            rate[smneg_uids] = rates
-            exptb_uids, rates = self.age_st_rates(self, uids, 'rate_exptb_to_dead', [TBS.ACTIVE_EXPTB])    
-            rate[exptb_uids] = rates
+            smpos_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS])
+            age_indexes = np.digitize(self.sim.people.age[uids[smpos_uids]], bins=self.age_cutoffs) - 1
+            rate[smpos_uids] = self.pars['rates_byage']['rate_smpos_to_dead'][age_indexes]
+            
+            smneg_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMNEG])
+            age_indexes = np.digitize(self.sim.people.age[uids[smneg_uids]], bins=self.age_cutoffs) - 1
+            rate[smneg_uids] = self.pars['rates_byage']['rate_smneg_to_dead'][age_indexes]
+            
+            exptb_uids = np.isin(self.state[uids], [TBS.ACTIVE_EXPTB])
+            age_indexes = np.digitize(self.sim.people.age[uids[exptb_uids]], bins=self.age_cutoffs) - 1
+            rate[exptb_uids] = self.pars['rates_byage']['rate_exptb_to_dead'][age_indexes]
             
         rate *= self.rr_death[uids]
         prob = 1-np.exp(-rate)
         return prob
     
-    @staticmethod
-    def age_st_rates(self, uids, rate_name, states):
-        # Age Stratified Rates: 
-        # Retrieve age-specific rates and a uids for individuals in specified states based on the given rate name.
-        rate_map = self.rba.get_map(rate_name)
-        
-        mask = np.isin(self.state[uids], [states])
-        
-        age_indices = np.digitize(self.sim.people.age[uids[mask]], self.rba.age_bins()) - 1
-        
-        rates = np.vectorize(rate_map.get, otypes=[float])(age_indices)
-        return mask, rates
-
     @property
     def infectious(self):
         """
