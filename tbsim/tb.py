@@ -1,7 +1,7 @@
 import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
-from tbsim.parametervalues import get_rates, RatesByAge
+from tbsim.parametervalues import RatesByAge
 
 from enum import IntEnum
 
@@ -23,6 +23,7 @@ class TB(ss.Infection):
     TB model with age-specific progression rates.
     """
     age_cutoffs = []
+    RATES_TB_INTERNAL={}
     def __init__(self, pars=None, **kwargs):
         super().__init__()
 
@@ -31,7 +32,7 @@ class TB(ss.Infection):
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
             by_age = True,                      # Whether to use age-specific rates
-            rates_byage = get_rates(self.t.unit, self.t.dt),
+            rates_byage = None,
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
             # Relative transmissibility of each state
@@ -71,7 +72,7 @@ class TB(ss.Infection):
         
         self.rba = RatesByAge(self.t.unit, self.t.dt)
         self.age_bins = self.rba.age_bins()
-        
+        self.pars['rates_byage'] = self.rba.RESOLVED
         self.age_cutoffs = self.pars['rates_byage']['age_cutoffs']
         # Question: Do we want to have (for any reason) the rates exposed as parameters
         return
@@ -213,6 +214,7 @@ class TB(ss.Infection):
         super().step()
         p = self.pars
         ti = self.ti
+
 
         # Latent --> active pre-symptomatic
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
