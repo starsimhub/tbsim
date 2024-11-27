@@ -81,8 +81,8 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
         rate = np.zeros(len(uids))
-        rate[self.state[uids] == TBS.LATENT_SLOW] = self.rba.get_rate(0, 'rate_LS_to_presym')
-        rate[self.state[uids] == TBS.LATENT_FAST] = self.rba.get_rate(0, 'rate_LF_to_presym')
+        rate[self.state[uids] == TBS.LATENT_SLOW] = self.pars['rates_byage']['rate_LS_to_presym'][1]
+        rate[self.state[uids] == TBS.LATENT_FAST] = self.pars['rates_byage']['rate_LF_to_presym'][1]
         
         if self.pars.by_age:
             ls_uids = np.isin(self.state[uids], [TBS.LATENT_SLOW])
@@ -103,7 +103,7 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.zeros(len(uids))
-        rate[self.on_treatment[uids]] =self.rba.get_rate(0, 'rate_treatment_to_clear') # Default rate
+        rate[self.on_treatment[uids]] =self.pars['rates_byage']['rate_treatment_to_clear'][1] # Default rate
         
         if self.pars.by_age:
             mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
@@ -116,7 +116,7 @@ class TB(ss.Infection):
     def p_presym_to_active(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "The p_presym_to_active function should only be called for agents in the pre symptomatic state, however some agents were in a different state."
-        rate = np.full(len(uids), fill_value=self.rba.get_rate(0, 'rate_presym_to_active'))
+        rate = np.full(len(uids), fill_value=self.pars['rates_byage']['rate_presym_to_active'][1])
  
         if self.pars.by_age:
             mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
@@ -129,8 +129,8 @@ class TB(ss.Infection):
     @staticmethod
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        rate = np.full(len(uids), fill_value=self.rba.get_rate(0, 'rate_active_to_clear'))
-        rate[self.on_treatment[uids]] = self.rba.get_rate(0, 'rate_treatment_to_clear')     # Default values
+        rate = np.full(len(uids), fill_value=self.pars['rates_byage']['rate_active_to_clear'][1])
+        rate[self.on_treatment[uids]] = self.pars['rates_byage']['rate_treatment_to_clear'][1]     # Default values
       
         if self.pars.by_age:
             mask = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
@@ -151,9 +151,9 @@ class TB(ss.Infection):
     def p_active_to_death(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         rate = np.zeros(len(uids))
-        rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.rba.get_rate(0, 'rate_smpos_to_dead')
-        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.rba.get_rate(0, 'rate_smneg_to_dead')
-        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.rba.get_rate(0, 'rate_exptb_to_dead')
+        rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars['rates_byage']['rate_smpos_to_dead'][1] 
+        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars['rates_byage']['rate_smneg_to_dead'][1] 
+        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars['rates_byage']['rate_exptb_to_dead'][1] 
         
         if self.pars.by_age:
             smpos_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS])
