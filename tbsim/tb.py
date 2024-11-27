@@ -8,11 +8,8 @@ __all__ = ['TB', 'TBS']
 
 class TBS(IntEnum):
     NONE            = -1    # No TB
-    #ACUTE_TRANS     = 0     # Acute TB, transmission # may not matter for ACT3 ??
     LATENT_SLOW     = 0     # Latent TB, slow progression
     LATENT_FAST     = 1     # Latent TB, fast progression
-    #ACTIVE_PRESYMP_FAST  = 2     # Active TB, pre-symptomatic
-    #ACTIVE_PRESYMP_SLOW  = 2     # Active TB, pre-symptomatic
     ACTIVE_PRESYMP  = 2     # Active TB, pre-symptomatic
     ACTIVE_SMPOS    = 3     # Active TB, smear positive
     ACTIVE_SMNEG    = 4     # Active TB, smear negative
@@ -28,9 +25,6 @@ class TB(ss.Infection):
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
-            # rate_acute_LS
-            # rate_acute_LF
-            #rate_LS_to_presym       = ss.perday(np.random.weibull(3e-5)))
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)            
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
             rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
@@ -41,8 +35,6 @@ class TB(ss.Infection):
             rate_treatment_to_clear = ss.peryear(12/2),                # 2 months
 
             
-            # LF or slow need to intro choice here
-            # pre_symp_active_state = ss.choice(a=[TBS.PRESYM_SLOW, TBS.PRESYM_FAST], p=[0.65, 0.25]),
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
             # Relative transmissibility of each state

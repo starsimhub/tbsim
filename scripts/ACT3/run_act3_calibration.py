@@ -16,6 +16,9 @@ import matplotlib.pyplot as plt
 
 debug = False
 
+n_clusters = [20, 10][debug]  # this
+n_trials = [500, 2][debug]
+
 # is subject to change later 
 do_plot = 1
 do_save = 0
@@ -72,7 +75,7 @@ def make_sim():
         ss.Deaths(pars=dict(death_rate=10)),
         ss.Pregnancy(pars=dict(fertility_rate=45))
     ]
-    nets = ss.RandomNet(n_contacts = ss.poisson(lam=5), dur = 0)
+    nets = ss.RandomNet(n_contacts = ss.poisson(lam=1), dur = 0)
 
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
@@ -97,7 +100,7 @@ def make_sim():
     sim_pars = dict(
         # default simulation parameters
         unit='day', dt=14,
-        start=ss.date('2010-01-01'), stop=ss.date('2018-12-31')
+        start=ss.date('2000-01-01'), stop=ss.date('2018-12-31')
         )
 
     # build the sim object 
@@ -117,18 +120,18 @@ def build_sim(sim, calib_pars, **kwargs):
     
     # extract the relevant parameters from the simulation object
     # only modifying diesease, intervention and network parameters
-    nets_par = sim.pars.networks
-    tb_par = sim.pars.diseases
+    nets_par = sim.pars.networks.pars
+    tb_par = sim.pars.diseases.pars
 
     if calib_pars is not None:
-        for key, value in calib_pars.items():
-        
-            v = value
+        for key, config in calib_pars.items():
             
             if key == 'rand_seed':
-                sim.pars.rand_seed = v
+                sim.pars.rand_seed = config
                 continue
             
+            v = config['value']  
+
             # TODO: 
             # This needs to like a look-up table rather than the if-else block
             # Maybe some way of specifying the address(?)
@@ -159,7 +162,7 @@ def build_sim(sim, calib_pars, **kwargs):
         else:
             sim.label = 'Control'
             sim.pars.interventions.p_treat = ss.bernoulli(p=0.0)
-        
+    
     return  ms  
 
 #%% objective function to calculate the likelihood of the model|data 
@@ -178,6 +181,8 @@ def make_sim_data(multi_sim, obs_data):
                 'n_found': s.results.activecasefinding['n_found'][:4]
             })
             sim_data.append(sim_df)
+
+    # print(sim_data[0]['beta'])
     
     return pd.concat(sim_data)
 
@@ -216,38 +221,66 @@ def objective_fn(sim, **kwargs):
     # calculate the likelihood of the model given the data
     merged = pd.merge(data_intv, sim_data, on=['time'], how='inner')  
     merged['nloglik'] = merged.apply(neg_beta_binom_density, axis=1)
+    # sum over the time points within each replicate
     merged = merged[['replicate', 'nloglik']].groupby('replicate').sum()
     
-    return merged['nloglik'].mean()
+    return merged['nloglik'].mean() # mean over the replicates
 
 
 def plot_compare_fit(calib, **kwargs):
     """Makes comparison plots of the calibration sims to the data"""
     obs_data = kwargs.get('obs_data')
-
+    # only extract the intervention data
     intv_data = obs_data[obs_data['arm'] == 'Intervention'].drop(columns=['arm'])
     intv_data.columns = ['time', 'n_elig', 'n_found']
 
+    # pick simulations for comparisons 
     sim_output_before = make_sim_data(calib.before_msim, intv_data)
-    sim_output_before_summary = sim_output_before.groupby('time').agg({'n_elig': 'sum', 'n_found': 'sum'}).reset_index()
-    sim_output_before_summary['state'] = 'before'
-    
+    sim_output_before['state'] = 'Before'
     sim_output_after = make_sim_data(calib.after_msim, intv_data)
-    sim_output_after_summary = sim_output_after.groupby('time').agg({'n_elig': 'sum', 'n_found': 'sum'}).reset_index()
-    sim_output_after_summary['state'] = 'after'
+    sim_output_after['state'] = 'After'
+    
+    # make one data 
+    sim_output = pd.concat([sim_output_before, sim_output_after])
 
-    sim_output_summary = pd.concat([sim_output_before_summary, sim_output_after_summary])
-    sim_output_summary['prevalence'] = sim_output_summary['n_found']/sim_output_summary['n_elig']*100_000
+    # make a facte plots of binomial 
+    g = sns.FacetGrid(data=sim_output, col='time', row = 'state', sharex=False)
+    g.map_dataframe(plot_facet, obs_data=intv_data)
 
+    sim_output['prevalence'] = sim_output['n_found']/sim_output['n_elig']*100_000
+    sim_output_summary = sim_output.groupby(['time', 'state']).mean().reset_index()
+
+    # compare the prevalence
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-    ax.plot(intv_data['time'], sim_output_summary[sim_output_summary['state'] == 'before']['prevalence'], label='Simulated Before Calibration')
-    ax.plot(intv_data['time'], sim_output_summary[sim_output_summary['state'] == 'after']['prevalence'], label='Simulated After Calibration')
+    ax.plot(intv_data['time'], sim_output_summary[sim_output_summary['state'] == 'Before']['prevalence'], label='Before calibration')
+    ax.plot(intv_data['time'], sim_output_summary[sim_output_summary['state'] == 'After']['prevalence'], label='After calibration')
     ax.plot(intv_data['time'], intv_data['n_found']/intv_data['n_elig']*100_000, 'o', label='Observed')
     ax.set_xlabel('Time')
     ax.set_ylabel('Prevalence per 100,000')
     ax.legend()
 
+    # just trajectories
+    calib.after_msim.plot('tb')
+
     return fig
+
+def plot_facet(data, obs_data, color, **kwargs):
+    t = data.iloc[0]['time']
+    expected = obs_data.set_index('time').loc[t]
+    e_n, e_x = expected['n_elig'], expected['n_found']
+    kk = np.arange(int(e_x/2), int(2*e_x))
+    for idx, row in data.iterrows():
+        alpha = row['n_found'] + 1
+        beta = row['n_elig'] - row['n_found'] + 1
+        q = sps.betabinom(n=e_n, a=alpha, b=beta)
+        yy = q.pmf(kk)
+        plt.step(kk, yy, label=f"{row['replicate']}")
+        yy = q.pmf(e_x)
+        plt.plot(e_x, yy, 'x', ms=10, color='k')
+    plt.axvline(e_x, color='k', linestyle='--')
+
+    return plt
+
 
 #%%a function to run the calibration 
 def run_calib(do_plot = False):
@@ -256,9 +289,12 @@ def run_calib(do_plot = False):
     # defining calibration paramters 
     # Going to start with just 1
     calib_pars = dict(
-        beta = dict(low=0.01, high=0.80, guess=0.05, 
-                    suggest_type='suggest_float', log=True, path=('diseases', 'tb', 'beta')),
-      
+        beta = dict(low=0.01, high=0.3, guess=0.01, 
+                    suggest_type='suggest_float', log=True), 
+        init_prev = dict(low=0.01, high=0.3, guess=0.05, 
+                         suggest_type='suggest_float', log=True), 
+        n_contacts = dict(low=1, high=10, guess=4, 
+                          suggest_type='suggest_int', log=False)                             
     )
 
     # generate the data for calibration
@@ -275,12 +311,12 @@ def run_calib(do_plot = False):
         sim = sim,
 
         build_fn = build_sim,
-        build_kw = dict(n_clusters=60),
+        build_kw = dict(n_clusters=n_clusters),
         
         eval_fn = objective_fn,
         eval_kw = dict(data=data, method='mcmc'),
         
-        total_trials = 100,
+        total_trials = n_trials,
         n_workers = 10,
         die = True,
         debug = debug,
@@ -295,7 +331,7 @@ def run_calib(do_plot = False):
     calib.check_fit()
     
     if do_plot:
-        # plot_facet(calib, obs_data=data)
+        #plot_facet(calib, obs_data=data)
         plot_compare_fit(calib, obs_data=data)
         calib.plot_trend()
 
@@ -308,13 +344,13 @@ if __name__ == '__main__':
     if False:
         sim = make_sim()
         pars = {
-            'beta'      : dict(value=0.075),
-            'init_prev' : dict(value=0.02),
-            'n_contacts': dict(value=4),
+            'beta'      : dict(value=1)#,
+            #'init_prev' : dict(value=0.02),
+            #'n_contacts': dict(value=4),
         }
-        sim = build_sim(sim, pars)
-        ms = ss.MultiSim(sim, n_runs=25)
-        ms.run().plot()
+        ms = build_sim(sim, pars)
+        ms.run().plot('tb')
+        plt.show()
 
     T = sc.timer()
     do_plot = True
