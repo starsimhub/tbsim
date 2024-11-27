@@ -197,7 +197,7 @@ class TB(ss.Infection):
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
         # Update result count of new infections 
-        self.results['new_infections'][self.ti] += len(uids)
+        self.ti_infected[uids] = self.ti
         return
 
     def step(self):
