@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 debug = False
 
 n_clusters = [20, 10][debug]  # this
-n_trials = [500, 2][debug]
+n_trials = [100, 2][debug]
 
 # is subject to change later 
 do_plot = 1
@@ -100,7 +100,7 @@ def make_sim():
     sim_pars = dict(
         # default simulation parameters
         unit='day', dt=14,
-        start=ss.date('2000-01-01'), stop=ss.date('2018-12-31')
+        start=ss.date('1970-01-01'), stop=ss.date('2018-12-31')
         )
 
     # build the sim object 
@@ -167,18 +167,33 @@ def build_sim(sim, calib_pars, **kwargs):
 
 #%% objective function to calculate the likelihood of the model|data 
 # make sim_data 
-def make_sim_data(multi_sim, obs_data):
+def make_sim_data(multi_sim, obs_data, **kwargs):
     """
     Make the simulation data from the calibration
     """
+    sim = kwargs.get('sim', None)
+    
     sim_data = []
+    
+    if(sim == 'all'):
+        for i, s in enumerate(multi_sim.sims):
+            sim_df = pd.DataFrame({
+                'replicate': [i] * 4,
+                'time': obs_data['time'][:4],
+                'n_elig': s.results.activecasefinding['n_elig'][:4],
+                'n_found': s.results.activecasefinding['n_found'][:4], 
+                'arm': [s.label] * 4 
+            })
+            sim_data.append(sim_df)
+
     for i, s in enumerate(multi_sim.sims):
         if s.label == 'Intervention':
             sim_df = pd.DataFrame({
                 'replicate': [i] * 4,
-                'time': obs_data['time'],
+                'time': obs_data['time'][:4],
                 'n_elig': s.results.activecasefinding['n_elig'][:4],
-                'n_found': s.results.activecasefinding['n_found'][:4]
+                'n_found': s.results.activecasefinding['n_found'][:4],
+                'arm': [s.label] * 4
             })
             sim_data.append(sim_df)
 
@@ -230,39 +245,47 @@ def objective_fn(sim, **kwargs):
 def plot_compare_fit(calib, **kwargs):
     """Makes comparison plots of the calibration sims to the data"""
     obs_data = kwargs.get('obs_data')
-    # only extract the intervention data
-    intv_data = obs_data[obs_data['arm'] == 'Intervention'].drop(columns=['arm'])
-    intv_data.columns = ['time', 'n_elig', 'n_found']
+    
+    
+    # extract the data 
+    intv_data = obs_data
+    intv_data.columns = ['time', 'arm', 'n_elig', 'n_found']
 
     # pick simulations for comparisons 
-    sim_output_before = make_sim_data(calib.before_msim, intv_data)
+    sim_output_before = make_sim_data(calib.before_msim, intv_data, sim='all').reset_index(drop=True)
     sim_output_before['state'] = 'Before'
-    sim_output_after = make_sim_data(calib.after_msim, intv_data)
+    sim_output_after = make_sim_data(calib.after_msim, intv_data, sim='all').reset_index(drop=True)
     sim_output_after['state'] = 'After'
     
     # make one data 
-    sim_output = pd.concat([sim_output_before, sim_output_after])
+    sim_output = pd.concat([sim_output_before, sim_output_after]).reset_index(drop=True)
+
 
     # make a facte plots of binomial 
-    g = sns.FacetGrid(data=sim_output, col='time', row = 'state', sharex=False)
-    g.map_dataframe(plot_facet, obs_data=intv_data)
+    #g = sns.FacetGrid(data=sim_output[sim_output['arm'=="Intervention"]], col='time', row = 'state', sharex=False)
+    #g.map_dataframe(plot_facet, obs_data=intv_data['arm'=="Intervention"])
 
     sim_output['prevalence'] = sim_output['n_found']/sim_output['n_elig']*100_000
-    sim_output_summary = sim_output.groupby(['time', 'state']).mean().reset_index()
+    sim_output_summary = sim_output.groupby(['time', 'arm', 'state']).mean().reset_index()
 
     # compare the prevalence
-    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-    ax.plot(intv_data['time'], sim_output_summary[sim_output_summary['state'] == 'Before']['prevalence'], label='Before calibration')
-    ax.plot(intv_data['time'], sim_output_summary[sim_output_summary['state'] == 'After']['prevalence'], label='After calibration')
-    ax.plot(intv_data['time'], intv_data['n_found']/intv_data['n_elig']*100_000, 'o', label='Observed')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Prevalence per 100,000')
-    ax.legend()
+    # Facet plot of prevalence over time
+    intv_data['prevalence'] = intv_data['n_found']/intv_data['n_elig']*100_000
+    
+    intv_plt_data = pd.concat([intv_data, intv_data])
+    intv_plt_data['state'] = ['Before']*5 + ['After']*5
+    
+    h = sns.FacetGrid(sim_output_summary, col='arm', row='state', margin_titles=True)
+    h.map_dataframe(sns.lineplot, x='time', y='prevalence')
+    #h.map_dataframe(sns.scatterplot, x='time', y=intv_data['prevalence'], color='red', marker='o', label='Observed')
+    # change the orientation of the x-axis labels
+    h.set_xticklabels(rotation=45)
+    h.add_legend()
 
     # just trajectories
     calib.after_msim.plot('tb')
 
-    return fig
+    return h
 
 def plot_facet(data, obs_data, color, **kwargs):
     t = data.iloc[0]['time']

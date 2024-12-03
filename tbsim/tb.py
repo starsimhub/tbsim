@@ -1,6 +1,7 @@
 import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from enum import IntEnum
 
@@ -22,9 +23,9 @@ class TB(ss.Infection):
         super().__init__()
 
         self.define_pars(
-            init_prev = ss.bernoulli(0.01),     # Initial seed infections
-            beta = 0.25,                        # Transmission rate
-            p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
+            init_prev = ss.bernoulli(0.01),                            # Initial seed infections
+            beta = ss.beta(0.25),                                      # Infection probability
+            p_latent_fast = ss.bernoulli(0.1),                         # Probability of latent fast as opposed to latent slow
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)            
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
             rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
@@ -32,7 +33,7 @@ class TB(ss.Infection):
             rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
             rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
             rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = ss.peryear(12/2),                # 2 months
+            rate_treatment_to_clear = ss.peryear(12/2),                # 2 months is the duartion treatment implies 6 per year
 
             
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
@@ -155,7 +156,7 @@ class TB(ss.Infection):
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
         # Update result count of new infections 
-        self.results['new_infections'][self.ti] += len(uids)
+        self.ti_infected[uids] = self.ti
         return
 
     def step(self):
@@ -287,6 +288,8 @@ class TB(ss.Infection):
             ss.Result('n_active_smpos',   dtype=int, label='Active Smear Positive'),
             ss.Result('n_active_smneg',   dtype=int, label='Active Smear Negative'),
             ss.Result('n_active_exptb',   dtype=int, label='Active Extra-Pulmonary'),
+            ss.Result('new_cases',        dtype=int, label='New Cases'),
+            ss.Result('cum_cases',        dtype=int, label='Cumulative Cases'),
             ss.Result('new_deaths',       dtype=int, label='New Deaths'),
             ss.Result('cum_deaths',       dtype=int, label='Cumulative Deaths'),
         )
@@ -303,16 +306,20 @@ class TB(ss.Infection):
         res.n_active_smpos[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
         res.n_active_smneg[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
         res.n_active_exptb[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
+        res.new_cases[ti]        = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
         return
 
     def finalize_results(self):
         super().finalize_results()
-        self.results['cum_deaths'] = np.cumsum(self.results['new_deaths'])
+        res = self.results
+        res['cum_deaths'] = np.cumsum(res['new_deaths'])
+        res['cum_cases'] = np.cumsum(res['new_cases'])
+        
         return
 
     def plot(self):
         fig = plt.figure()
-        for rkey in ['latent_slow', 'latent_fast', 'active_presymp', 'active_smpos', 'active_smneg', 'active_exptb']:
+        for rkey in ['latent_slow', 'latent_fast', 'active_presymp', 'active_smpos', 'active_smneg', 'active_exptb', 'new_cases', 'cum_cases']:
             plt.plot(self.results['n_'+rkey], label=rkey.title())
         plt.legend()
         return fig
