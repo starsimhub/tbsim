@@ -130,7 +130,7 @@ class TB(ss.Infection):
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         rate = np.full(len(uids), fill_value=self.pars['rates_byage']['rate_active_to_clear'][0])
-        rate[self.on_treatment[uids]] = self.pars['rates_byage']['rate_treatment_to_clear'][1]     # Default values
+        rate[self.on_treatment[uids]] = self.pars['rates_byage']['rate_treatment_to_clear'][0]     # Default values
       
         if self.pars.by_age:
             mask = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
