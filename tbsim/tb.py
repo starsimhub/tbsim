@@ -31,7 +31,8 @@ class TB(ss.Infection):
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
             by_age = True,                      # Whether to use age-specific rates
-            rates_byage = None,
+            rates_byage = None,                 # To host the Age-specific rates and make them available to the model
+            rate_overrides = None,                       # User provided rates
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
             # Relative transmissibility of each state
@@ -71,7 +72,12 @@ class TB(ss.Infection):
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
         
-        self.rba = RatesByAge(self.t.unit, self.t.dt)
+        # Extract user-defined rate overrides
+        new_values = None
+        if self.pars['rate_overrides']:
+            new_values = {key: value for key, value in pars['rate_overrides'].items() if key.startswith('rate_')}
+        
+        self.rba = RatesByAge(self.t.unit, self.t.dt, override=new_values)
         self.pars['rates_byage'] = self.rba.RATES
         self.age_cutoffs = self.rba.AGE_CUTOFFS
 
@@ -200,7 +206,7 @@ class TB(ss.Infection):
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
         # Update result count of new infections 
-        self.results['new_infections'][self.ti] += len(uids)
+        self.ti_infected[uids] = self.ti
         return
 
     def step(self):

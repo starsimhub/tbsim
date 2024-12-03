@@ -4,7 +4,8 @@ import numpy as np
 class RatesByAge:
 
     def __init__(self, unit, dt, override=None):
-
+        self.unit = unit
+        self.dt = dt
         self.RATES_DICT = {
             'rate_LS_to_presym': {
                 0: ss.perday(3e-5, unit, dt),   
@@ -55,20 +56,40 @@ class RatesByAge:
                 np.inf: ss.perday(12/2, unit, dt),
             },
         }
+        
+        self.override_rates(override)
 
-        self.RATES  = {
-            'rate_LS_to_presym': self.arr('rate_LS_to_presym'),
-            'rate_LF_to_presym': self.arr('rate_LF_to_presym'),
-            'rate_presym_to_active': self.arr('rate_presym_to_active'),
-            'rate_active_to_clear': self.arr('rate_active_to_clear'),
-            'rate_exptb_to_dead': self.arr('rate_exptb_to_dead'),
-            'rate_smpos_to_dead': self.arr('rate_smpos_to_dead'),
-            'rate_smneg_to_dead': self.arr('rate_smneg_to_dead'),
-            'rate_treatment_to_clear': self.arr('rate_treatment_to_clear')
-        }
+        self.RATES  = self.RATES = {key: self.arr(key) for key in self.RATES_DICT}
         self.AGE_CUTOFFS = np.array([ 0, 15, 25, np.inf])
             
     def arr(self, name):
         arr = np.array(list(self.RATES_DICT[name].values()))
         return arr
     
+    def override_rates(self, override):
+        if override:
+            for rate_name, value in override.items():
+                if rate_name not in self.RATES_DICT:
+                    raise ValueError(f"Rate '{rate_name}' is not recognized.")
+
+                if isinstance(value, dict):
+                    # Validate and update age-specific rates
+                    if set(value.keys()) != set(self.RATES_DICT[rate_name].keys()):
+                        raise ValueError(f"Age values for '{rate_name}' must match {list(self.RATES_DICT[rate_name].keys())}.")
+                    
+                    for age, rate in value.items():
+                        if isinstance(rate, (int, float)):
+                            rate = ss.perday(rate, self.unit, self.dt)  # Convert numeric to ss.perday
+                        elif not isinstance(rate, ss.rate):
+                            raise ValueError(f"Rate for age {age} in '{rate_name}' must be a numeric value or ss.rate.")
+                        self.RATES_DICT[rate_name][age] = rate
+                else:
+                    # Validate and update global rate
+                    if isinstance(value, (int, float)):
+                        value = ss.perday(value, self.unit, self.dt)  # Convert numeric to ss.perday
+                    elif not isinstance(value, ss.rate):
+                        raise ValueError(f"Global value for '{rate_name}' must be a numeric value or ss.rate.")
+                    
+                    # Apply the same global rate to all age groups
+                    for age in self.RATES_DICT[rate_name]:
+                        self.RATES_DICT[rate_name][age] = value
