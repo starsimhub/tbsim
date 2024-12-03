@@ -153,7 +153,7 @@ class TB(ss.Infection):
         rate = np.zeros(len(uids))
         rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars['rates_byage']['rate_smpos_to_dead'][0] 
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars['rates_byage']['rate_smneg_to_dead'][0] 
-        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars['rates_byage']['rate_exptb_to_dead'][0] 
+        rate[self.state[uids] == TBS.ACTIVE_EXPTB] = self.pars['rates_byage']['rate_exptb_to_dead'][0] 
         
         if self.pars.by_age:
             smpos_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS])
