@@ -3,9 +3,12 @@ import numpy as np
 
 class RatesByAge:
 
-    def __init__(self, unit, dt, override=None):
+    def __init__(self, unit, dt, override=None, use_globals=False):
         self.unit = unit
         self.dt = dt
+        self.override = override
+        self.use_globals = use_globals
+        
         self.RATES_DICT = {
             'rate_LS_to_presym': {
                 0: ss.perday(3e-5, unit, dt),   
@@ -57,7 +60,7 @@ class RatesByAge:
             },
         }
         
-        self.override_rates(override)
+        self.override_rates()
 
         self.RATES  = self.RATES = {key: self.arr(key) for key in self.RATES_DICT}
         self.AGE_CUTOFFS = self.generate_age_cutoffs()
@@ -67,7 +70,14 @@ class RatesByAge:
         arr = np.array(list(self.RATES_DICT[name].values()))
         return arr
 
-    def override_rates(self, override):
+    def override_rates(self):
+        override = self.override
+        
+        if self.use_globals:
+            for rate_name in self.RATES_DICT:
+                self.RATES_DICT[rate_name] = {np.inf : self.RATES_DICT[rate_name][np.inf]} # Override all rates with the global value
+            return   # Makes sure only default rates are used
+            
         if override:
             for rate_name, value in override.items():
                 if rate_name not in self.RATES_DICT:
@@ -104,4 +114,17 @@ class RatesByAge:
                         
     def generate_age_cutoffs(self):
             return {rate_name: np.array(sorted(rates.keys())) for rate_name, rates in self.RATES_DICT.items()}
+        
+    def print_all(self):
+        import pprint
+        pprint.pprint(self.RATES_DICT)
+        pprint.pprint(self.RATES)
+        return
+    
+    def save(self, filename):
+        import json
+        with open(filename, 'w') as f:
+            json.dump(self.RATES_DICT, f)
+            json.dump(self.AGE_CUTOFFS, f)
+        return
     
