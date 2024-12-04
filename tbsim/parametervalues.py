@@ -60,36 +60,48 @@ class RatesByAge:
         self.override_rates(override)
 
         self.RATES  = self.RATES = {key: self.arr(key) for key in self.RATES_DICT}
-        self.AGE_CUTOFFS = np.array([ 0, 15, 25, np.inf])
-            
+        self.AGE_CUTOFFS = self.generate_age_cutoffs()
+        return
+    
     def arr(self, name):
         arr = np.array(list(self.RATES_DICT[name].values()))
         return arr
-    
+
     def override_rates(self, override):
         if override:
             for rate_name, value in override.items():
                 if rate_name not in self.RATES_DICT:
                     raise ValueError(f"Rate '{rate_name}' is not recognized.")
-
+                
+                # If the value is a dictionary, validate, sort, and merge it with the existing rates
                 if isinstance(value, dict):
-                    # Validate and update age-specific rates
-                    if set(value.keys()) != set(self.RATES_DICT[rate_name].keys()):
-                        raise ValueError(f"Age values for '{rate_name}' must match {list(self.RATES_DICT[rate_name].keys())}.")
+                    # Sort the dictionary by age keys
+                    sorted_value = {k: v for k, v in sorted(value.items())}
                     
-                    for age, rate in value.items():
+                    for age, rate in sorted_value.items():
                         if isinstance(rate, (int, float)):
-                            rate = ss.perday(rate, self.unit, self.dt)  # Convert numeric to ss.perday
+                            rate = ss.perday(rate, self.unit, self.dt)  # Convert to ss.perday
                         elif not isinstance(rate, ss.rate):
-                            raise ValueError(f"Rate for age {age} in '{rate_name}' must be a numeric value or ss.rate.")
+                            raise ValueError(f"Rate for age {age} in '{rate_name}' must be numeric or ss.rate.")
+                        
+                        # Update or add the new rate for the specified age
                         self.RATES_DICT[rate_name][age] = rate
+                
+                # If the value is a scalar and a key of np.inf is passed, replace the entire rate dictionary
+                elif isinstance(value, (int, float)):
+                    self.RATES_DICT[rate_name] = {np.inf: ss.perday(value, self.unit, self.dt)}
+                
+                # If the value is a scalar without np.inf key, override all rates for this rate name
+                elif isinstance(value, ss.rate):
+                    self.RATES_DICT[rate_name] = {np.inf: value}
+                
                 else:
-                    # Validate and update global rate
-                    if isinstance(value, (int, float)):
-                        value = ss.perday(value, self.unit, self.dt)  # Convert numeric to ss.perday
-                    elif not isinstance(value, ss.rate):
-                        raise ValueError(f"Global value for '{rate_name}' must be a numeric value or ss.rate.")
-                    
-                    # Apply the same global rate to all age groups
-                    for age in self.RATES_DICT[rate_name]:
-                        self.RATES_DICT[rate_name][age] = value
+                    raise ValueError(f"Value for '{rate_name}' must be a dictionary, scalar, or ss.rate.")
+            
+            # Ensure keys are sorted for consistency
+            for rate_name in self.RATES_DICT:
+                self.RATES_DICT[rate_name] = dict(sorted(self.RATES_DICT[rate_name].items()))
+                        
+    def generate_age_cutoffs(self):
+            return {rate_name: np.array(sorted(rates.keys())) for rate_name, rates in self.RATES_DICT.items()}
+    
