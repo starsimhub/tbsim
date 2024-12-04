@@ -186,7 +186,7 @@ class TB(ss.Infection):
                 self.ti_active[new_active_uids] = ti
 
         # Active --> Susceptible via natural recovery or as accelerated by treatment (clear)
-        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids
+        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids
         new_clear_active_uids = self.p_active_to_clear.filter(active_uids)
         new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
@@ -200,7 +200,7 @@ class TB(ss.Infection):
             self.on_treatment[new_clear_uids] = False
 
         # Active --> Death
-        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
+        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
         new_death_uids = self.p_active_to_death.filter(active_uids)
         if len(new_death_uids):
             self.sim.people.request_death(new_death_uids)
