@@ -33,31 +33,19 @@ def test_initial_states():
 def test_tb_initialization():
     tb = mtb.TB()
     assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_presym_to_active'], ss.rate)
-    assert isinstance(tb.pars['rate_active_to_clear'], ss.rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_LS_to_presym'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_LF_to_presym'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_presym_to_active'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_active_to_clear'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_exptb_to_dead'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_smpos_to_dead'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_smneg_to_dead'][0], ss.rate)
     assert isinstance(tb.pars['rel_trans_presymp'], float)
     assert isinstance(tb.pars['rel_trans_smpos'], float)
     assert isinstance(tb.pars['rel_trans_smneg'], float)
     assert isinstance(tb.pars['rel_trans_exptb'], float)
     assert isinstance(tb.pars['rel_trans_treatment'], float)
     
-def test_default_parameters():
-    tb = mtb.TB()
-    print(tb)
-    assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.rate)
-    # assert isinstance(tb.pars['rate_active_to_cure'], ss.rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rel_trans_smpos'], float)
-
 def test_tb_infectious():
     tb = mtb.TB()
     tb.state[:] = mtb.TBS.ACTIVE_PRESYMP
