@@ -35,7 +35,6 @@ class TB(ss.Infection):
             rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
             rate_treatment_to_clear = ss.peryear(12/2),                # 2 months is the duartion treatment implies 6 per year
 
-            
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
             # Relative transmissibility of each state
@@ -282,16 +281,17 @@ class TB(ss.Infection):
         super().init_results()
         
         self.define_results(
-            ss.Result('n_latent_slow',    dtype=int, label='Latent Slow'),
-            ss.Result('n_latent_fast',    dtype=int, label='Latent Fast'),
-            ss.Result('n_active_presymp', dtype=int, label='Active Pre-Symptomatic'), 
-            ss.Result('n_active_smpos',   dtype=int, label='Active Smear Positive'),
-            ss.Result('n_active_smneg',   dtype=int, label='Active Smear Negative'),
-            ss.Result('n_active_exptb',   dtype=int, label='Active Extra-Pulmonary'),
-            ss.Result('new_cases',        dtype=int, label='New Cases'),
-            ss.Result('cum_cases',        dtype=int, label='Cumulative Cases'),
-            ss.Result('new_deaths',       dtype=int, label='New Deaths'),
-            ss.Result('cum_deaths',       dtype=int, label='Cumulative Deaths'),
+            ss.Result('n_latent_slow',     dtype=int, label='Latent Slow'),
+            ss.Result('n_latent_fast',     dtype=int, label='Latent Fast'),
+            ss.Result('n_active_presymp',  dtype=int, label='Active Pre-Symptomatic'), 
+            ss.Result('n_active_smpos',    dtype=int, label='Active Smear Positive'),
+            ss.Result('n_active_smneg',    dtype=int, label='Active Smear Negative'),
+            ss.Result('n_active_exptb',    dtype=int, label='Active Extra-Pulmonary'),
+            ss.Result('new_cases',         dtype=int, label='New Cases'),
+            ss.Result('prevalence_active', dtype=int, label='Prevalence (Active)'),
+            ss.Result('cum_cases',         dtype=int, label='Cumulative Cases'),
+            ss.Result('new_deaths',        dtype=int, label='New Deaths'),
+            ss.Result('cum_deaths',        dtype=int, label='Cumulative Deaths'),
         )
         return
 
@@ -300,13 +300,15 @@ class TB(ss.Infection):
         res = self.results
         ti = self.ti
 
-        res.n_latent_slow[ti]    = np.count_nonzero(self.state == TBS.LATENT_SLOW)
-        res.n_latent_fast[ti]    = np.count_nonzero(self.state == TBS.LATENT_FAST)
-        res.n_active_presymp[ti] = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
-        res.n_active_smpos[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
-        res.n_active_smneg[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
-        res.n_active_exptb[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
-        res.new_cases[ti]        = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
+        res.n_latent_slow[ti]     = np.count_nonzero(self.state == TBS.LATENT_SLOW)
+        res.n_latent_fast[ti]     = np.count_nonzero(self.state == TBS.LATENT_FAST)
+        res.n_active_presymp[ti]  = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
+        res.n_active_smpos[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
+        res.n_active_smneg[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
+        res.n_active_exptb[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
+        res.new_cases[ti]         = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
+        res.prevalence_active[ti] = res.new_cases[ti] / np.count_nonzero(self.sim.people.alive) 
+
         return
 
     def finalize_results(self):
