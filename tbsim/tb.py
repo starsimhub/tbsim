@@ -30,7 +30,6 @@ class TB(ss.Infection):
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
             beta = 0.25,                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
-            use_globals = False,                      # Whether to use age-specific rates
             rate_overrides = None,                       # User provided rates
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
             # Relative transmissibility of each state
@@ -39,17 +38,17 @@ class TB(ss.Infection):
             rel_trans_smneg     = 0.3,
             rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
+            rate_LS_to_presym = RateVec(cutoffs=[0, 15, 25], values=[3e-5, 2.0548e-6, 3e-5, 3e-5]),
+            rate_LF_to_presym = RateVec(cutoffs=[0, 15, 25], values=[6e-3, 4.5e-3, 6e-3, 6e-3]),
+            rate_presym_to_active = RateVec(cutoffs=[0, 15, 25], values=[3e-2, 5.48e-3, 3e-2, 6e-3]),
+            rate_active_to_clear = RateVec(cutoffs=[0, 15, 25], values=[2.4e-4, 2.74e-4, 2.4e-4, 2.4e-4]),
+            rate_smpos_to_dead = RateVec(cutoffs=[0, 15, 25], values=[4.5e-4, 6.85e-4, 4.5e-4, 4.5e-4]),
+            rate_smneg_to_dead = RateVec(cutoffs=[0, 15, 25], values=[1.35e-4, 2.74e-4, 1.35e-4, 1.35e-4]),
+            rate_exptb_to_dead = RateVec(cutoffs=[0, 15, 25], values=[6.75e-5, 2.74e-4, 6.75e-5, 6.75e-5]),
+            rate_treatment_to_clear = RateVec(cutoffs=[0, 15, 25], values=[6, 2, 6, 6]),
 
             reltrans_het = ss.constant(v=1.0),
         )
-        rate_LS_to_presym = RateVec(cutoffs=[0, 15, 25], values=[3e-5, 2.0548e-6, 3e-5, 3e-5])
-        rate_LF_to_presym = RateVec(cutoffs=[0, 15, 25], values=[6e-3, 4.5e-3, 6e-3, 6e-3])
-        rate_presym_to_active = RateVec(cutoffs=[0, 15, 25], values=[3e-2, 5.48e-3, 3e-2, 6e-3])
-        rate_active_to_clear = RateVec(cutoffs=[0, 15, 25], values=[2.4e-4, 2.74e-4, 2.4e-4, 2.4e-4])
-        rate_smpos_to_dead = RateVec(cutoffs=[0, 15, 25], values=[4.5e-4, 6.85e-4, 4.5e-4, 4.5e-4])
-        rate_smneg_to_dead = RateVec(cutoffs=[0, 15, 25], values=[1.35e-4, 2.74e-4, 1.35e-4, 1.35e-4])
-        rate_exptb_to_dead = RateVec(cutoffs=[0, 15, 25], values=[6.75e-5, 2.74e-4, 6.75e-5, 6.75e-5])
-        rate_treatment_to_clear = RateVec(cutoffs=[0, 15, 25], values=[6, 2, 6, 6]),
         self.update_pars(pars, **kwargs) 
 
         self.define_states(
@@ -71,17 +70,6 @@ class TB(ss.Infection):
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
         
-        # Extract user-defined rate overrides
-        new_values = None
-        if self.pars['rate_overrides'] and not self.pars['use_globals']:
-            new_values = {key: value for key, value in pars['rate_overrides'].items() if key.startswith('rate_')}
-        
-        # User can control if the rates used are global or age-specific, default is age-specific
-        # If global rates are used, all age-specific rates are set to the global value (global takes precedence)
-        self.rba = RatesByAge(self.t.unit, self.t.dt, new_values, self.pars['use_globals'])
-        self.rates_byage = self.rba.rates
-        self.age_cutoffs = self.rba.age_cutoffs
-        
         return
 
     @staticmethod
@@ -90,14 +78,10 @@ class TB(ss.Infection):
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
         rate = np.zeros(len(uids))
         ls_uids = np.isin(self.state[uids], [TBS.LATENT_SLOW])
-        age_indexes = np.digitize(self.sim.people.age[uids[ls_uids]], bins=self.age_cutoffs['rate_LS_to_presym']) - 1
-        rate[ls_uids] = self.rates_byage['rate_LS_to_presym'][age_indexes]
-        
+        rate[ls_uids] = self.pars['rate_LS_to_presym'](uids[ls_uids]) 
         lf_uids = np.isin(self.state[uids], [TBS.LATENT_FAST] )
-        age_indexes = np.digitize(self.sim.people.age[uids[lf_uids]], bins=self.age_cutoffs['rate_LF_to_presym']) - 1
-        rate[lf_uids] = self.rates_byage['rate_LF_to_presym'][age_indexes]
+        rate[lf_uids] = self.pars['rate_LF_to_presym'](uids[lf_uids]) 
 
-            
         # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
         prob = 1-np.exp(-rate)
@@ -109,8 +93,7 @@ class TB(ss.Infection):
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.zeros(len(uids))
         mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
-        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_treatment_to_clear']) - 1
-        rate[mask] = self.rates_byage['rate_treatment_to_clear'][age_indexes]
+        rate[mask] = self.pars['rate_treatment_to_clear'](self.sim.people.age[uids[mask]])
         prob = 1-np.exp(-rate)
         return prob
 
@@ -120,8 +103,7 @@ class TB(ss.Infection):
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "The p_presym_to_active function should only be called for agents in the pre symptomatic state, however some agents were in a different state."
         rate = np.zeros(len(uids))
         mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
-        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_presym_to_active']) - 1
-        rate[mask] = self.rates_byage['rate_presym_to_active'][age_indexes]
+        rate[mask] = self.pars['rate_presym_to_active'](self.sim.people.age[uids[mask]])
         prob = 1-np.exp(-rate)
         return prob
 
@@ -131,35 +113,26 @@ class TB(ss.Infection):
         rate = np.zeros(len(uids))
 
         mask = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
-        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_active_to_clear']) - 1
-        rate[mask] = self.rates_byage['rate_active_to_clear'][age_indexes]
-        
+        rate[mask] = self.pars['rate_active_to_clear'](self.sim.people.age[uids[mask]])
+
         on_treatment_uids = ss.uids(self.on_treatment[uids])
         mask = np.isin(on_treatment_uids, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
-        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_treatment_to_clear']) - 1
-        rate[mask] = self.rates_byage['rate_treatment_to_clear'][age_indexes]
-            
+        rate[mask] = self.pars['rate_treatment_to_clear'](self.sim.people.age[uids[mask]])
+
         rate *= self.rr_clearance[uids]
         prob = 1-np.exp(-rate)
         return prob
-
 
     @staticmethod
     def p_active_to_death(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         rate = np.zeros(len(uids))
-        
         smpos_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS])
-        age_indexes = np.digitize(self.sim.people.age[uids[smpos_uids]], bins=self.age_cutoffs['rate_smpos_to_dead']) - 1
-        rate[smpos_uids] = self.rates_byage['rate_smpos_to_dead'][age_indexes]
-        
+        rate[smpos_uids] = self.pars['rate_smpos_to_dead'](self.sim.people.age[uids[smpos_uids]])
         smneg_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMNEG])
-        age_indexes = np.digitize(self.sim.people.age[uids[smneg_uids]], bins=self.age_cutoffs['rate_smneg_to_dead']) - 1
-        rate[smneg_uids] = self.rates_byage['rate_smneg_to_dead'][age_indexes]
-        
+        rate[smneg_uids] = self.pars['rate_smneg_to_dead'](self.sim.people.age[uids[smneg_uids]])
         exptb_uids = np.isin(self.state[uids], [TBS.ACTIVE_EXPTB])
-        age_indexes = np.digitize(self.sim.people.age[uids[exptb_uids]], bins=self.age_cutoffs['rate_exptb_to_dead']) - 1
-        rate[exptb_uids] = self.rates_byage['rate_exptb_to_dead'][age_indexes]
+        rate[exptb_uids] = self.pars['rate_exptb_to_dead'](self.sim.people.age[uids[exptb_uids]])
             
         rate *= self.rr_death[uids]
         prob = 1-np.exp(-rate)
