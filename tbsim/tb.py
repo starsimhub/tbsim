@@ -45,13 +45,6 @@ class TB(ss.Infection):
         )
         self.update_pars(pars, **kwargs) 
 
-
-
-        # # Validate rates
-        # for k, v in self.pars.items():
-        #     if k[:5] == 'rate_':
-        #         assert isinstance(v, ss.rate), 'Rate parameters for TB must be TimePars, e.g. ss.perday(x)'
-
         self.define_states(
             # Initialize states specific to TB:
             ss.FloatArr('state', default=TBS.NONE),             # One state to rule them all?
@@ -79,19 +72,10 @@ class TB(ss.Infection):
         # User can control if the rates used are global or age-specific, default is age-specific
         # If global rates are used, all age-specific rates are set to the global value (global takes precedence)
         self.rba = RatesByAge(self.t.unit, self.t.dt, new_values, self.pars['use_globals'])
-        self.rates_byage = self.rba.RATES
-        self.age_cutoffs = self.rba.AGE_CUTOFFS
+        self.rates_byage = self.rba.rates
+        self.age_cutoffs = self.rba.age_cutoffs
         
         return
-
-    def pprint(self):
-        import pprint
-        # Create a custom pprint format
-        pprint.PrettyPrinter(width=200).pprint({
-            "rates_byage": {key: value.tolist() for key, value in self.rates_byage.items()},
-            "age_cutoffs": self.age_cutoffs,
-        })
-
 
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
