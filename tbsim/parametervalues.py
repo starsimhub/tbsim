@@ -114,3 +114,55 @@ class RatesByAge:
     def generate_age_cutoffs(self):
             return {rate_name: np.array(sorted(rates.keys())) for rate_name, rates in self.rates_dict.items()}
 
+
+class RateVec:
+    def __init__(self, cutoffs, values, interpolation="stair"):
+        """
+        Initialize a RateVec instance.
+        Args:
+            cutoffs (list): List of determinant cutoffs (e.g., ages).
+            values (list): Corresponding rates for each range.
+            interpolation (str): Method of interpolation ('stair' or 'linear').
+        """
+        self.cutoffs = np.array(cutoffs)
+        self.values = np.array(values)
+        self.interpolation = interpolation
+
+        if len(self.cutoffs) + 1 != len(self.values):
+            raise ValueError("Number of values must be one more than the number of cutoffs.")
+
+    def digitize(self, inputs):
+        """
+        Assign rates based on cutoffs using the selected interpolation method.
+        """
+        indices = np.digitize(inputs, self.cutoffs, right=True)
+        if self.interpolation == "stair":
+            return self.values[indices]
+        elif self.interpolation == "linear":
+            return self.linear_interpolate(inputs)
+        else:
+            raise ValueError(f"Unknown interpolation method: {self.interpolation}")
+
+    def linear_interpolate(self, inputs):
+        """
+        Linearly interpolate rates based on inputs.
+        """
+        rates = np.zeros_like(inputs, dtype=float)
+        for i, input_val in enumerate(inputs):
+            if input_val < self.cutoffs[0]:
+                rates[i] = self.values[0]
+            elif input_val > self.cutoffs[-1]:
+                rates[i] = self.values[-1]
+            else:
+                idx = np.searchsorted(self.cutoffs, input_val) - 1
+                x0, x1 = self.cutoffs[idx], self.cutoffs[idx + 1]
+                y0, y1 = self.values[idx], self.values[idx + 1]
+                rates[i] = y0 + (y1 - y0) * (input_val - x0) / (x1 - x0)
+        return rates
+
+    def __call__(self, inputs):
+        return self.digitize(inputs)
+
+    def __repr__(self):
+        return f"RateVec(name={self.name}, cutoffs={self.cutoffs}, values={self.values}, interpolation={self.interpolation})"
+

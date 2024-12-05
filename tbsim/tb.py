@@ -1,7 +1,7 @@
 import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
-from tbsim.parametervalues import RatesByAge
+from tbsim.parametervalues import RatesByAge, RateVec
 
 from enum import IntEnum
 
@@ -33,7 +33,6 @@ class TB(ss.Infection):
             use_globals = False,                      # Whether to use age-specific rates
             rate_overrides = None,                       # User provided rates
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
-
             # Relative transmissibility of each state
             rel_trans_presymp   = 0.1,
             rel_trans_smpos     = 1.0,
@@ -43,6 +42,14 @@ class TB(ss.Infection):
 
             reltrans_het = ss.constant(v=1.0),
         )
+        rate_LS_to_presym = RateVec(cutoffs=[0, 15, 25], values=[3e-5, 2.0548e-6, 3e-5, 3e-5])
+        rate_LF_to_presym = RateVec(cutoffs=[0, 15, 25], values=[6e-3, 4.5e-3, 6e-3, 6e-3])
+        rate_presym_to_active = RateVec(cutoffs=[0, 15, 25], values=[3e-2, 5.48e-3, 3e-2, 6e-3])
+        rate_active_to_clear = RateVec(cutoffs=[0, 15, 25], values=[2.4e-4, 2.74e-4, 2.4e-4, 2.4e-4])
+        rate_smpos_to_dead = RateVec(cutoffs=[0, 15, 25], values=[4.5e-4, 6.85e-4, 4.5e-4, 4.5e-4])
+        rate_smneg_to_dead = RateVec(cutoffs=[0, 15, 25], values=[1.35e-4, 2.74e-4, 1.35e-4, 1.35e-4])
+        rate_exptb_to_dead = RateVec(cutoffs=[0, 15, 25], values=[6.75e-5, 2.74e-4, 6.75e-5, 6.75e-5])
+        rate_treatment_to_clear = RateVec(cutoffs=[0, 15, 25], values=[6, 2, 6, 6]),
         self.update_pars(pars, **kwargs) 
 
         self.define_states(
