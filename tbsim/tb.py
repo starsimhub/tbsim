@@ -292,7 +292,8 @@ class TB(ss.Infection):
             ss.Result('new_deaths',        dtype=int, label='New Deaths'),
             ss.Result('cum_deaths',        dtype=int, label='Cumulative Deaths'),
             ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
-            ss.Result('incdence',          dtype=float, scale=False, label='Incidence per person-year')
+            ss.Result('incidence',          dtype=float, scale=False, label='Incidence per person-year'),
+            ss.Result('new_deaths_n',        dtype=float, label='Death per person-year'), 
         )
         return
 
@@ -301,7 +302,7 @@ class TB(ss.Infection):
         res = self.results
         ti = self.ti
         ti_infctd = self.sim.diseases.tb.ti_infected
-        per_year_fctr = 365.25/self.sim.pars.dt
+        per_year_fctr = 365.25/self.sim.pars.dt   
          
         res.n_latent_slow[ti]     = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti]     = np.count_nonzero(self.state == TBS.LATENT_FAST)
@@ -311,7 +312,8 @@ class TB(ss.Infection):
         res.n_active_exptb[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
         res.new_cases[ti]         = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
         res.prevalence_active[ti] = res.new_cases[ti] / np.count_nonzero(self.sim.people.alive) 
-        res.incdence[ti]          = (np.count_nonzero(ti_infctd == ti) / np.count_nonzero(self.sim.people.alive)) * per_year_fctr
+        res.incidence[ti]          = (np.count_nonzero(ti_infctd == ti) / np.count_nonzero(self.sim.people.alive)) * per_year_fctr
+        res.new_deaths_n[ti]       = res.new_deaths[ti] / np.count_nonzero(self.sim.people.alive) * per_year_fctr
 
         return
 
