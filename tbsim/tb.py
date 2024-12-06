@@ -1,7 +1,8 @@
 import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
-from tbsim.parametervalues import RatesByAge, RateVec
+import sciris as sc
+from tbsim.parametervalues import RateVec
 
 from enum import IntEnum
 
@@ -28,7 +29,7 @@ class TB(ss.Infection):
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),     # Initial seed infections
-            beta = 0.25,                        # Transmission rate
+            beta = ss.beta(0.25),                        # Transmission rate
             p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
             rate_overrides = None,                       # User provided rates
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
@@ -38,14 +39,14 @@ class TB(ss.Infection):
             rel_trans_smneg     = 0.3,
             rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
-            rate_LS_to_presym =       RateVec(cutoffs=[0, 15, 25],    values=[3e-5, 2.0548e-6, 3e-5, 3e-5]),
-            rate_LF_to_presym =       RateVec(cutoffs=[0, 15, 25],    values=[6e-3, 4.5e-3, 6e-3, 6e-3]),
-            rate_presym_to_active =   RateVec(cutoffs=[0, 15, 25],    values=[3e-2, 5.48e-3, 3e-2, 6e-3]),
-            rate_active_to_clear =    RateVec(cutoffs=[0, 15, 25],    values=[2.4e-4, 2.74e-4, 2.4e-4, 2.4e-4]),
-            rate_smpos_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[4.5e-4, 6.85e-4, 4.5e-4, 4.5e-4]),
-            rate_smneg_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[1.35e-4, 2.74e-4, 1.35e-4, 1.35e-4]),
-            rate_exptb_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[6.75e-5, 2.74e-4, 6.75e-5, 6.75e-5]),
-            rate_treatment_to_clear = RateVec(cutoffs=[0, 15, 25],    values=[6, 2, 6, 6]),
+            rate_LS_to_presym =       RateVec(cutoffs=[0, 15, 25],    values=[3e-5, 3e-5, 3e-5, 3e-5]), # 2.0548e-6
+            rate_LF_to_presym =       RateVec(cutoffs=[0, 15, 25],    values=[6e-3, 6e-3, 6e-3, 6e-3]), # 4.5e-3
+            rate_presym_to_active =   RateVec(cutoffs=[0, 15, 25],    values=[3e-2, 3e-2, 3e-2, 3e-3]), # 5.48e-3
+            rate_active_to_clear =    RateVec(cutoffs=[0, 15, 25],    values=[2.4e-4, 2.4e-4, 2.4e-4, 2.4e-4]), # 2.74e-4
+            rate_smpos_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[4.5e-4, 4.5e-4, 4.5e-4, 4.5e-4]), # 6.85e-4
+            rate_smneg_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[1.35e-4, 1.35e-4, 1.35e-4, 1.35e-4]), # 2.74e-4
+            rate_exptb_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[6.75e-5, 6.75e-5, 6.75e-5, 6.75e-5]), # 2.74e-4
+            rate_treatment_to_clear = RateVec(cutoffs=[0, 15, 25],    values=[1/60, 1/60, 1/60, 1/60]), # 1/180
 
             reltrans_het = ss.constant(v=1.0),
         )
@@ -69,7 +70,15 @@ class TB(ss.Infection):
         self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
-        
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+
+        # Initialize RateVec TimePars
+        ratepars = sc.search(self.pars, type=RateVec, skip=dict(keys='sim')) # Should it be self or self.pars?
+        for rp in ratepars.values():
+            rp.init(self.t)
+
         return
 
     @staticmethod
@@ -94,6 +103,8 @@ class TB(ss.Infection):
         rate = np.zeros(len(uids))
         mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
         rate[mask] = self.pars.rate_treatment_to_clear(self.sim.people.age[uids[mask]])
+        
+        rate *= self.rr_clearance[uids]
         prob = 1-np.exp(-rate)
         return prob
 
@@ -174,7 +185,6 @@ class TB(ss.Infection):
         super().step()
         p = self.pars
         ti = self.ti
-
 
         # Latent --> active pre-symptomatic
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
@@ -267,11 +277,15 @@ class TB(ss.Infection):
         # Mark the individuals as being on treatment
         self.on_treatment[tx_uids] = True
 
+        ############################################################
+        # TODO: rr_death and rel_trans will be reset to 1.0 on step()
+
         # Adjust death and clearance rates for those starting treatment
         self.rr_death[tx_uids] = 0  # People on treatment have zero death rate
 
         # Reduce transmission rates for people on treatment
         self.rel_trans[tx_uids] *= self.pars.rel_trans_treatment
+        ############################################################
 
         # Return the number of individuals who started treatment
         return len(tx_uids)

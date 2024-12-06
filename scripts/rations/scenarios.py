@@ -49,7 +49,7 @@ scens = {
         'TB': None,
         'Malnutrition': None,
         'Connector': None,
-        'RATIONS': dict(dur_active_to_dx = ss.weibull(c=2, scale=6/12)),
+        'RATIONS': dict(dur_active_to_dx = ss.years(ss.weibull(c=2, scale=6/12))),
         'Simulation': None,
     },
 }

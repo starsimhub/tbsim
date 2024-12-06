@@ -11,9 +11,13 @@ import matplotlib.dates as mdates
 import matplotlib.ticker as mtick
 
 def plot_rations(resdir, df):
-    first_year = int(df['Year'].iloc[0])
-    assert df['Year'].iloc[0] == first_year
-    df['date'] = pd.to_datetime(365 * (df['Year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
+    if isinstance(df['Year'].iat[0], dt.datetime):
+        df['date'] = df['Year']
+    else:
+        # Convert floating point years to datetime
+        first_year = int(df['Year'].iloc[0])
+        assert df['Year'].iloc[0] == first_year
+        df['date'] = pd.to_datetime(365 * (df['Year']-first_year), unit='D', origin=dt.datetime(year=first_year, month=1, day=1))
 
     #months = sc.date(['2019-08-31', '2019-09-30', '2019-10-31', '2019-11-30', '2019-12-31', '2020-01-31', '2020-02-29', '2020-03-31', '2020-04-30', '2020-05-31', '2020-06-30', '2020-07-31', '2020-08-31', '2020-09-30', '2020-10-31', '2020-11-30', '2020-12-31', '2021-01-31'])
     #enrolled = np.array([105, 215, 244, 284, 248, 263, 265, 184, 63, 69, 122, 104, 54, 107, 112, 115, 186, 60]).cumsum()

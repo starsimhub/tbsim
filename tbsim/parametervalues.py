@@ -12,11 +12,18 @@ class RateVec:
             interpolation (str): Method of interpolation ('stair' or 'linear').
         """
         self.cutoffs = np.array(cutoffs)
-        self.values = np.array(values)
+        # Assume units of day for all rates
+        rates = [ss.perday(v) for v in values if not isinstance(v, ss.TimePar)]
+        self.values = np.array(rates)
         self.interpolation = interpolation
 
         if len(self.cutoffs) + 1 != len(self.values):
             raise ValueError("Number of values must be one more than the number of cutoffs.")
+
+    def init(self, parent):
+        """ Initialize the rate vector """
+        for v in self.values:
+            v.init(parent)
 
     def digitize(self, inputs):
         """
