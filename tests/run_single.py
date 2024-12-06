@@ -71,5 +71,6 @@ if __name__ == '__main__':
     sim_tbn = make_tb_nut()
     sim_tbn.run()
     sim_tbn.diseases['tb'].plot()
+    sim_tbn.plot('tb')
     plt.show()
     plt.close()

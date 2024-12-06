@@ -1,6 +1,9 @@
 import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
+from tbsim.parametervalues import RatesByAge
+import pandas as pd
+
 
 from enum import IntEnum
 
@@ -18,23 +21,27 @@ class TBS(IntEnum):
 
 
 class TB(ss.Infection):
+    """
+    TB model with age-specific progression rates.
+    """
+
     def __init__(self, pars=None, **kwargs):
         super().__init__()
 
         self.define_pars(
-            init_prev = ss.bernoulli(0.01),     # Initial seed infections
-            beta = 0.25,                        # Transmission rate
-            p_latent_fast = ss.bernoulli(0.1),  # Probability of latent fast as opposed to latent slow
-
-            rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)
-            rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
-            rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
-            rate_active_to_clear    = ss.perday(2.4e-4),               # Active infection to natural clearance (per day)
-            rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
-            rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
-            rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = ss.peryear(12/2),                # 2 months
-
+            use_globals = False,                        # 50 - Whether to use age-specific rates
+            rate_overrides = None,                      # 50 - User provided rates
+            init_prev = ss.bernoulli(0.01),                            # Initial seed infections
+            beta = ss.beta(0.25),                                      # Infection probability
+            p_latent_fast = ss.bernoulli(0.1),                         # Probability of latent fast as opposed to latent slow
+#             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)            
+#             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
+#             rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
+#             rate_active_to_clear    = ss.perday(2.4e-4),               # Active infection to natural clearance (per day)
+#             rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
+#             rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
+#             rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
+#             rate_treatment_to_clear = ss.peryear(12/2),                # 2 months is the duartion treatment implies 6 per year
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
             # Relative transmissibility of each state
@@ -48,11 +55,6 @@ class TB(ss.Infection):
         )
         self.update_pars(pars, **kwargs) 
 
-        # Validate rates
-        for k, v in self.pars.items():
-            if k[:5] == 'rate_':
-                assert isinstance(v, ss.rate), 'Rate parameters for TB must be TimePars, e.g. ss.perday(x)'
-
         self.define_states(
             # Initialize states specific to TB:
             ss.FloatArr('state', default=TBS.NONE),             # One state to rule them all?
@@ -61,10 +63,8 @@ class TB(ss.Infection):
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
             ss.State('on_treatment', default=False),
-
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
-
             ss.FloatArr('reltrans_het', default=1.0),           # Individual-level heterogeneity on infectiousness, acts in addition to stage-based rates
         )
 
@@ -73,60 +73,101 @@ class TB(ss.Infection):
         self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
         self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
-
+        
+        # Extract user-defined rate overrides
+        new_values = None
+        if self.pars['rate_overrides'] and not self.pars['use_globals']:
+            new_values = {key: value for key, value in pars['rate_overrides'].items() if key.startswith('rate_')}
+        
+        # User can control if the rates used are global or age-specific, default is age-specific
+        # If global rates are used, all age-specific rates are set to the global value (global takes precedence)
+        self.rba = RatesByAge(self.t.unit, self.t.dt, new_values, self.pars['use_globals'])
+        self.rates_byage = self.rba.rates
+        self.age_cutoffs = self.rba.age_cutoffs
+        
         return
 
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
+        rate = np.zeros(len(uids))
+        ls_uids = np.isin(self.state[uids], [TBS.LATENT_SLOW])
+        age_indexes = np.digitize(self.sim.people.age[uids[ls_uids]], bins=self.age_cutoffs['rate_LS_to_presym']) - 1
+        rate[ls_uids] = self.rates_byage['rate_LS_to_presym'][age_indexes]
+        
+        lf_uids = np.isin(self.state[uids], [TBS.LATENT_FAST] )
+        age_indexes = np.digitize(self.sim.people.age[uids[lf_uids]], bins=self.age_cutoffs['rate_LF_to_presym']) - 1
+        rate[lf_uids] = self.rates_byage['rate_LF_to_presym'][age_indexes]
 
-        rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
-        rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
+            
+        # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
-
         prob = 1-np.exp(-rate)
         return prob
-
+    
     @staticmethod
     def p_presym_to_clear(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.zeros(len(uids))
-        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
+        mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
+        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_treatment_to_clear']) - 1
+        rate[mask] = self.rates_byage['rate_treatment_to_clear'][age_indexes]
         prob = 1-np.exp(-rate)
         return prob
 
     @staticmethod
     def p_presym_to_active(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
-        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
-        rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
+        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "The p_presym_to_active function should only be called for agents in the pre symptomatic state, however some agents were in a different state."
+        rate = np.zeros(len(uids))
+        mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
+        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_presym_to_active']) - 1
+        rate[mask] = self.rates_byage['rate_presym_to_active'][age_indexes]
         prob = 1-np.exp(-rate)
         return prob
 
     @staticmethod
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
-        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
-        rate *= self.rr_clearance[uids]
+        rate = np.zeros(len(uids))
 
+        mask = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_active_to_clear']) - 1
+        rate[mask] = self.rates_byage['rate_active_to_clear'][age_indexes]
+        
+        on_treatment_uids = ss.uids(self.on_treatment[uids])
+        mask = np.isin(on_treatment_uids, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_treatment_to_clear']) - 1
+        rate[mask] = self.rates_byage['rate_treatment_to_clear'][age_indexes]
+            
+        rate *= self.rr_clearance[uids]
         prob = 1-np.exp(-rate)
         return prob
+
 
     @staticmethod
     def p_active_to_death(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        rate = np.full(len(uids), fill_value=self.pars.rate_exptb_to_dead)
-        rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead
-        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
-
+        rate = np.zeros(len(uids))
+        
+        smpos_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS])
+        age_indexes = np.digitize(self.sim.people.age[uids[smpos_uids]], bins=self.age_cutoffs['rate_smpos_to_dead']) - 1
+        rate[smpos_uids] = self.rates_byage['rate_smpos_to_dead'][age_indexes]
+        
+        smneg_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMNEG])
+        age_indexes = np.digitize(self.sim.people.age[uids[smneg_uids]], bins=self.age_cutoffs['rate_smneg_to_dead']) - 1
+        rate[smneg_uids] = self.rates_byage['rate_smneg_to_dead'][age_indexes]
+        
+        exptb_uids = np.isin(self.state[uids], [TBS.ACTIVE_EXPTB])
+        age_indexes = np.digitize(self.sim.people.age[uids[exptb_uids]], bins=self.age_cutoffs['rate_exptb_to_dead']) - 1
+        rate[exptb_uids] = self.rates_byage['rate_exptb_to_dead'][age_indexes]
+            
         rate *= self.rr_death[uids]
-
         prob = 1-np.exp(-rate)
         return prob
-
+    
     @property
     def infectious(self):
         """
@@ -155,14 +196,15 @@ class TB(ss.Infection):
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
         # Update result count of new infections 
-        self.results['new_infections'][self.ti] += len(uids)
+        self.ti_infected[uids] = self.ti
         return
 
     def step(self):
-        # Make all the updates from the SIR model 
+        # Perform TB progression steps
         super().step()
         p = self.pars
         ti = self.ti
+
 
         # Latent --> active pre-symptomatic
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
@@ -185,7 +227,7 @@ class TB(ss.Infection):
                 self.ti_active[new_active_uids] = ti
 
         # Active --> Susceptible via natural recovery or as accelerated by treatment (clear)
-        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids
+        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids
         new_clear_active_uids = self.p_active_to_clear.filter(active_uids)
         new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
@@ -199,7 +241,7 @@ class TB(ss.Infection):
             self.on_treatment[new_clear_uids] = False
 
         # Active --> Death
-        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
+        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
         new_death_uids = self.p_active_to_death.filter(active_uids)
         if len(new_death_uids):
             self.sim.people.request_death(new_death_uids)
@@ -281,14 +323,19 @@ class TB(ss.Infection):
         super().init_results()
         
         self.define_results(
-            ss.Result('n_latent_slow',    dtype=int, label='Latent Slow'),
-            ss.Result('n_latent_fast',    dtype=int, label='Latent Fast'),
-            ss.Result('n_active_presymp', dtype=int, label='Active Pre-Symptomatic'), 
-            ss.Result('n_active_smpos',   dtype=int, label='Active Smear Positive'),
-            ss.Result('n_active_smneg',   dtype=int, label='Active Smear Negative'),
-            ss.Result('n_active_exptb',   dtype=int, label='Active Extra-Pulmonary'),
-            ss.Result('new_deaths',       dtype=int, label='New Deaths'),
-            ss.Result('cum_deaths',       dtype=int, label='Cumulative Deaths'),
+            ss.Result('n_latent_slow',     dtype=int, label='Latent Slow'),
+            ss.Result('n_latent_fast',     dtype=int, label='Latent Fast'),
+            ss.Result('n_active_presymp',  dtype=int, label='Active Pre-Symptomatic'), 
+            ss.Result('n_active_smpos',    dtype=int, label='Active Smear Positive'),
+            ss.Result('n_active_smneg',    dtype=int, label='Active Smear Negative'),
+            ss.Result('n_active_exptb',    dtype=int, label='Active Extra-Pulmonary'),
+            ss.Result('new_cases',         dtype=int, label='New Cases'),
+            ss.Result('cum_cases',         dtype=int, label='Cumulative Cases'),
+            ss.Result('new_deaths',        dtype=int, label='New Deaths'),
+            ss.Result('cum_deaths',        dtype=int, label='Cumulative Deaths'),
+            ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
+            ss.Result('incidence',          dtype=float, scale=False, label='Incidence per person-year'),
+            ss.Result('new_deaths_n',        dtype=float, label='Death per person-year'), 
         )
         return
 
@@ -296,23 +343,33 @@ class TB(ss.Infection):
         super().update_results()
         res = self.results
         ti = self.ti
+        ti_infctd = self.sim.diseases.tb.ti_infected
+        per_year_fctr = 365.25/self.sim.pars.dt   
+         
+        res.n_latent_slow[ti]     = np.count_nonzero(self.state == TBS.LATENT_SLOW)
+        res.n_latent_fast[ti]     = np.count_nonzero(self.state == TBS.LATENT_FAST)
+        res.n_active_presymp[ti]  = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
+        res.n_active_smpos[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
+        res.n_active_smneg[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
+        res.n_active_exptb[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
+        res.new_cases[ti]         = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
+        res.prevalence_active[ti] = res.new_cases[ti] / np.count_nonzero(self.sim.people.alive) 
+        res.incidence[ti]          = (np.count_nonzero(ti_infctd == ti) / np.count_nonzero(self.sim.people.alive)) * per_year_fctr
+        res.new_deaths_n[ti]       = res.new_deaths[ti] / np.count_nonzero(self.sim.people.alive) * per_year_fctr
 
-        res.n_latent_slow[ti]    = np.count_nonzero(self.state == TBS.LATENT_SLOW)
-        res.n_latent_fast[ti]    = np.count_nonzero(self.state == TBS.LATENT_FAST)
-        res.n_active_presymp[ti] = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
-        res.n_active_smpos[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
-        res.n_active_smneg[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
-        res.n_active_exptb[ti]   = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
         return
 
     def finalize_results(self):
         super().finalize_results()
-        self.results['cum_deaths'] = np.cumsum(self.results['new_deaths'])
+        res = self.results
+        res['cum_deaths'] = np.cumsum(res['new_deaths'])
+        res['cum_cases'] = np.cumsum(res['new_cases'])
+        
         return
 
     def plot(self):
         fig = plt.figure()
-        for rkey in ['latent_slow', 'latent_fast', 'active_presymp', 'active_smpos', 'active_smneg', 'active_exptb']:
+        for rkey in ['latent_slow', 'latent_fast', 'active_presymp', 'active_smpos', 'active_smneg', 'active_exptb', 'new_cases', 'cum_cases']:
             plt.plot(self.results['n_'+rkey], label=rkey.title())
         plt.legend()
         return fig

@@ -3,9 +3,9 @@ import numpy as np
 import starsim as ss
 import tbsim as mtb
 
-def make_tb_simplified(agents=20, start=2000, stop=2020, dt=7/365):
+def make_tb_simplified(agents=20, start=2000, stop=2020, dt=7/365, by_age=False):
     pop = ss.People(n_agents=agents)
-    tb = mtb.TB(pars={'beta': ss.beta(0.01), 'init_prev': 0.25})
+    tb = mtb.TB(pars={'beta': ss.beta(0.01), 'init_prev': 0.25, 'by_age': by_age})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))]
     sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start, stop=stop), demographics=dems)
@@ -33,31 +33,19 @@ def test_initial_states():
 def test_tb_initialization():
     tb = mtb.TB()
     assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_presym_to_active'], ss.rate)
-    assert isinstance(tb.pars['rate_active_to_clear'], ss.rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_LS_to_presym'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_LF_to_presym'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_presym_to_active'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_active_to_clear'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_exptb_to_dead'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_smpos_to_dead'][0], ss.rate)
+    assert isinstance(tb.pars['rates_byage']['rates_byage']['rate_smneg_to_dead'][0], ss.rate)
     assert isinstance(tb.pars['rel_trans_presymp'], float)
     assert isinstance(tb.pars['rel_trans_smpos'], float)
     assert isinstance(tb.pars['rel_trans_smneg'], float)
     assert isinstance(tb.pars['rel_trans_exptb'], float)
     assert isinstance(tb.pars['rel_trans_treatment'], float)
     
-def test_default_parameters():
-    tb = mtb.TB()
-    print(tb)
-    assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.rate)
-    # assert isinstance(tb.pars['rate_active_to_cure'], ss.rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rel_trans_smpos'], float)
-
 def test_tb_infectious():
     tb = mtb.TB()
     tb.state[:] = mtb.TBS.ACTIVE_PRESYMP
@@ -389,6 +377,45 @@ def test_active_to_cleared_transition():
 def test_active_to_death_transition():
     # Setup individuals in active TB states
     sim = make_tb_simplified(agents=5000)
+    sim.init()
+    tb = sim.diseases['tb']
+    active_uids = ss.uids(np.arange(4000))  # Also test with a large number of agents
+    tb.state[active_uids] = np.random.choice(
+        [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB],
+        size=len(active_uids),
+    )
+
+    # Manually execute the transition step
+    tb.step()
+
+    # Check if any active TB patients have died
+    died = tb.state[active_uids] == mtb.TBS.DEAD
+    # total = len(died[died])
+    assert died.any(), "At least one active TB patient should have transitioned to death."
+
+def test_active_to_cleared_transition_byage():
+    # Increasing number of agents even higher as the clearance rate is very low
+    sim = make_tb_simplified(agents=5000, by_age=True)
+    sim.init()
+    tb = sim.diseases['tb']
+    # Setup individuals in active TB states
+    active_uids = ss.uids(np.arange(4000))  # Also test with a large number of agents
+    
+    tb.state[active_uids] = np.random.choice(
+        [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB],
+        size=len(active_uids),
+    )
+
+    # Manually execute the transition step
+    tb.step()
+
+    # Check if any active TB patients have cleared the infection
+    cleared = tb.state[active_uids] == mtb.TBS.NONE
+    assert cleared.any(), "At least one active TB patient should have cleared the infection."
+    
+def test_active_to_death_transition_byage():
+    # Setup individuals in active TB states
+    sim = make_tb_simplified(agents=5000, by_age=True)
     sim.init()
     tb = sim.diseases['tb']
     active_uids = ss.uids(np.arange(4000))  # Also test with a large number of agents

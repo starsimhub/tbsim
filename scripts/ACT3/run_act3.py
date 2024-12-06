@@ -7,7 +7,7 @@ import act3_plots as aplt
 import os
 
 
-debug = False #NOTE: Debug runs in serial
+debug = True #NOTE: Debug runs in serial
 default_n_rand_seeds = [60, 1][debug]
 
 
@@ -94,6 +94,9 @@ def run_ACF(skey, scen, rand_seed=0):
     sim = build_ACF(skey, scen, rand_seed)
     sim.run()
 
+    sim.plot('tb')
+    plt.show()
+
     tb_res = pd.DataFrame({
         'time_year': sim.results.timevec,
         'on_treatment': sim.results.tb.n_on_treatment, 
@@ -169,4 +172,7 @@ if __name__ == '__main__':
     df_result = run_scenarios(scens)
 
     # plot the results
+    df_result.get('ACT3')
+
+
     aplt.plot_scenarios(results=df_result.get('TB'))
