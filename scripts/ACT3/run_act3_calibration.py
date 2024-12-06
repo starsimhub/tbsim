@@ -28,7 +28,7 @@ n_agents = 1e3
 def make_data(file_path = os.path.join('scripts', 'ACT3', 
                                        'data', 'calib_data', 
                                        "marks_2019_2022.xlsx"), 
-              sheet_name = 'S1'):
+              sheet_name = '19S1'):
     """
     Load and process the data for calibration
     """
@@ -70,7 +70,7 @@ def make_sim():
     # Retrieve intervention, TB, and simulation-related parameters from scen and skey
     # for TB
     # Create the people, networks, and demographics
-    pop = ss.People(n_agents=np.round(np.random.normal(loc=1000, scale=50)))
+    pop = ss.People(n_agents=np.round(np.random.normal(loc=60_000, scale=50)))
     demog = [
         ss.Deaths(pars=dict(death_rate=10)),
         ss.Pregnancy(pars=dict(fertility_rate=45))
