@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import tbsim.config as cfg
-from scripts.rations.rations import RATIONSTrial
-from scripts.rations.plots import plot_rations, plot_epi, plot_hh, plot_nut, plot_active_infections
+from rations import RATIONSTrial
+from plots import plot_rations, plot_epi, plot_hh, plot_nut, plot_active_infections
 import warnings
 import os 
 
@@ -41,7 +41,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
 
     # Create the instance of TB disease
     tb_pars = dict(
-        beta = ss.beta(0.045),
+        beta = ss.beta(0.00035), # 0.045
         init_prev = 0, # Infections seeded by Rations class
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
@@ -61,8 +61,8 @@ def build_RATIONS(skey, scen, rand_seed=0):
 
     # Create demographics
     dems = [
-        ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people (background deaths, excluding TB-cause)
-        ss.Pregnancy(pars=dict(fertility_rate=45)), # Per 1,000 women
+        ss.Deaths(death_rate=10), # Per 1,000 people (background deaths, excluding TB-cause)
+        ss.Pregnancy(fertility_rate=45), # Per 1,000 women
     ]
 
     # Create the connector between TB and malnutrition
@@ -87,9 +87,10 @@ def build_RATIONS(skey, scen, rand_seed=0):
 
     # Create the simulation parameters and simulation
     sim_pars = dict(
-        dt = 7/365,
-        start = 2019, # Dates don't matter
-        stop = 2030, # Long enough that all pre-symptomatic period end + 2y
+        dt = 7,
+        unit = 'day',
+        start = '2019-01-01', # Dates don't matter
+        stop = '2030-01-01', # Long enough that all pre-symptomatic period end + 2y
         rand_seed = rand_seed,
     )
     if scen is not None and 'Simulation' in scen.keys() and scen['Simulation'] is not None:
@@ -104,7 +105,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
         interventions=intvs,
         analyzers=azs,
     )
-    sim.pars.verbose = [0, sim.pars.dt / 5][debug] # Print status every 5 years instead of every 10 steps
+    sim.pars.verbose = [0, sim.pars.dt / 52][debug] # Print status every 52 steps
 
     return sim
 
@@ -172,7 +173,7 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
 
 if __name__ == '__main__':
     # Define the scenarios
-    from scripts.rations.scenarios import scens
+    from scenarios import scens
    
     scens = {skey:scen for skey, scen in scens.items() if scen is None or 'Skip' not in scen or not scen['Skip']}
     ret = run_scenarios(scens)

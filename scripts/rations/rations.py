@@ -80,12 +80,12 @@ class RATIONSTrial(ss.Intervention):
 
             p_sm_pos = ss.bernoulli(0.72), # SmPos vs SmNeg for active pulmonary TB of index patients
 
-            dur_active_to_dx = ss.weibull(c=2, scale=3/12), # Sensitive parameter - determines how much HH transmission BEFORE the trial
+            dur_active_to_dx = ss.years(ss.weibull(c=2, scale=3/12)), # Sensitive parameter - determines how much HH transmission BEFORE the trial
             #dur_active_to_dx = ss.constant(v=0.01),
 
-            dur_dx_to_first_visit = ss.uniform(low=0, high=1/12),
+            dur_dx_to_first_visit = ss.years(ss.uniform(low=0, high=1/12)),
 
-            dur_visit_to_tx = ss.weibull(c=2, scale=3 * 7/365), # for secondary cases, same as "dur_active_to_dx"?
+            dur_visit_to_tx = ss.years(ss.weibull(c=2, scale=3 * 7/365)), # for secondary cases, same as "dur_active_to_dx"?
             
             #hhsize = ss.histogram(
             #    values=[186832, 489076, 701325, 1145585, 1221054, 951857, 1_334_629, 160_132, 46657][1:],
@@ -114,10 +114,9 @@ class RATIONSTrial(ss.Intervention):
         '''
         p = np.ones(len(uids))
         tb = sim.diseases['tb']
-        dt = self.t.dt 
+        years = sim.t.dt_year
         frac_pulmonary = 0.65 + 0.25
 
-        years = dt
         for cid, cdata in cdf.iterrows():
             cids = self.cid[uids] == cid
             person = np.count_nonzero(cids)
@@ -200,7 +199,7 @@ class RATIONSTrial(ss.Intervention):
     def step(self):
         tb = self.sim.diseases['tb']
         nut = self.sim.diseases['malnutrition']
-        ti, dt = self.ti, self.t.dt
+        ti, dt_year = self.ti, self.t.dt_year
         
         # INCIDENCE FROM COMMUNITY
         if self.pars.x_community_incidence_rate > 0:
@@ -222,7 +221,7 @@ class RATIONSTrial(ss.Intervention):
         if len(new_active_uids):
             # Newly active, figure out time to care seeking
             dur_untreated = self.pars.dur_active_to_dx(new_active_uids)
-            self.ti_dx[new_active_uids] = np.ceil(ti + dur_untreated / dt)
+            self.ti_dx[new_active_uids] = np.ceil(ti + dur_untreated)
 
         # INDEX CASES: Active --> Diagnosed and beginning immediate treatment
         dx_uids = self.index_uids[self.ti_dx[self.index_uids] == ti]
@@ -240,7 +239,7 @@ class RATIONSTrial(ss.Intervention):
             tb.start_treatment(dx_uids)
 
             dur_dx_to_first_visit = self.pars.dur_dx_to_first_visit(dx_uids)
-            self.ti_first_visit[hhids] = np.ceil(ti + dur_dx_to_first_visit / dt)
+            self.ti_first_visit[hhids] = np.ceil(ti + dur_dx_to_first_visit)
             self.ti_visit[hhids] = self.ti_first_visit[hhids]
 
         # Remember when the first visit occurs
@@ -262,7 +261,7 @@ class RATIONSTrial(ss.Intervention):
 
             # Have visited previously?
             have_visited_uids = visit_uids[~np.isnan(self.ti_prev_visit[visit_uids])]
-            new_py = dt * (ti - self.ti_prev_visit[have_visited_uids])
+            new_py = dt_year * (ti - self.ti_prev_visit[have_visited_uids])
             self.results['person_years_ctrl'][ti] = np.sum(new_py[self.arm[have_visited_uids] == Arm.CONTROL])
             self.results['person_years_intv'][ti] = np.sum(new_py[self.arm[have_visited_uids] == Arm.INTERVENTION])
             self.ti_prev_visit[visit_uids] = ti
@@ -274,7 +273,7 @@ class RATIONSTrial(ss.Intervention):
 
             if len(new_active_uids):
                 # Record cases
-                within_2m = (ti - self.ti_enrolled[new_active_uids]) * dt < 2/12 # within first 2 months
+                within_2m = (ti - self.ti_enrolled[new_active_uids]) * dt_year < 2/12 # within first 2 months
                 self.results['coprevalent_cases_ctrl'][ti] = np.count_nonzero(self.arm[new_active_uids[within_2m]] == Arm.CONTROL )
                 self.results['coprevalent_cases_intv'][ti] = np.count_nonzero(self.arm[new_active_uids[within_2m]] == Arm.INTERVENTION)
                 self.results['incident_cases_ctrl'][ti] = np.count_nonzero(self.arm[new_active_uids[~within_2m]] == Arm.CONTROL)
@@ -283,7 +282,7 @@ class RATIONSTrial(ss.Intervention):
                 # SET TIME TO TREATMENT
                 dur_visit_to_tx = self.pars.dur_visit_to_tx(new_active_uids)
                 # Maybe could get treatment independently, outside the trial
-                self.ti_treatment[new_active_uids] = np.ceil(ti + dur_visit_to_tx / dt)
+                self.ti_treatment[new_active_uids] = np.ceil(ti + dur_visit_to_tx)
 
             # PLAN NEXT VISIT
             # The basket was provided to the participants for the duration of
@@ -302,16 +301,16 @@ class RATIONSTrial(ss.Intervention):
 
             # Set timer to next visit, end visits at 6, 12, OR 6-12mo
             # "monthly for the first year and every 3 months thereafter"
-            within_1y = (ti - self.ti_first_visit[visit_hhids]) * dt < 1 # year
-            self.ti_visit[visit_hhids[within_1y]] = np.ceil(ti + 1/12 / dt)
-            self.ti_visit[visit_hhids[~within_1y]] = np.ceil(ti + 3/12 / dt)
+            within_1y = (ti - self.ti_first_visit[visit_hhids]) * dt_year < 1 # year
+            self.ti_visit[visit_hhids[within_1y]] = np.ceil(ti + 1/12 / dt_year)
+            self.ti_visit[visit_hhids[~within_1y]] = np.ceil(ti + 3/12 / dt_year)
 
-            over_2y = (ti - self.ti_first_visit[visit_hhids]) * dt >= 2 # years
+            over_2y = (ti - self.ti_first_visit[visit_hhids]) * dt_year >= 2 # years
             self.ti_visit[visit_hhids[over_2y]] = np.nan # Do not visit again
 
             # 6mo intervention for starters
             # TODO: Extend some households up to 12 months based on conditions noted above
-            over_6m = (ti - self.ti_first_visit[visit_hhids]) * dt >= 6/12 # 6 months
+            over_6m = (ti - self.ti_first_visit[visit_hhids]) * dt_year >= 6/12 # 6 months
             over6m_uids_byhh = [self.uids_by_hhid[h] for h in visit_hhids[over_6m]]
             if len(over6m_uids_byhh) > 0:
                 uids = ss.uids.cat(over6m_uids_byhh)
