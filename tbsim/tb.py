@@ -38,14 +38,14 @@ class TB(ss.Infection):
             rel_trans_smneg     = 0.3,
             rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
-            rate_LS_to_presym = RateVec(cutoffs=[0, 15, 25], values=[3e-5, 2.0548e-6, 3e-5, 3e-5]),
-            rate_LF_to_presym = RateVec(cutoffs=[0, 15, 25], values=[6e-3, 4.5e-3, 6e-3, 6e-3]),
-            rate_presym_to_active = RateVec(cutoffs=[0, 15, 25], values=[3e-2, 5.48e-3, 3e-2, 6e-3]),
-            rate_active_to_clear = RateVec(cutoffs=[0, 15, 25], values=[2.4e-4, 2.74e-4, 2.4e-4, 2.4e-4]),
-            rate_smpos_to_dead = RateVec(cutoffs=[0, 15, 25], values=[4.5e-4, 6.85e-4, 4.5e-4, 4.5e-4]),
-            rate_smneg_to_dead = RateVec(cutoffs=[0, 15, 25], values=[1.35e-4, 2.74e-4, 1.35e-4, 1.35e-4]),
-            rate_exptb_to_dead = RateVec(cutoffs=[0, 15, 25], values=[6.75e-5, 2.74e-4, 6.75e-5, 6.75e-5]),
-            rate_treatment_to_clear = RateVec(cutoffs=[0, 15, 25], values=[6, 2, 6, 6]),
+            rate_LS_to_presym =       RateVec(cutoffs=[0, 15, 25],    values=[3e-5, 2.0548e-6, 3e-5, 3e-5]),
+            rate_LF_to_presym =       RateVec(cutoffs=[0, 15, 25],    values=[6e-3, 4.5e-3, 6e-3, 6e-3]),
+            rate_presym_to_active =   RateVec(cutoffs=[0, 15, 25],    values=[3e-2, 5.48e-3, 3e-2, 6e-3]),
+            rate_active_to_clear =    RateVec(cutoffs=[0, 15, 25],    values=[2.4e-4, 2.74e-4, 2.4e-4, 2.4e-4]),
+            rate_smpos_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[4.5e-4, 6.85e-4, 4.5e-4, 4.5e-4]),
+            rate_smneg_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[1.35e-4, 2.74e-4, 1.35e-4, 1.35e-4]),
+            rate_exptb_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[6.75e-5, 2.74e-4, 6.75e-5, 6.75e-5]),
+            rate_treatment_to_clear = RateVec(cutoffs=[0, 15, 25],    values=[6, 2, 6, 6]),
 
             reltrans_het = ss.constant(v=1.0),
         )
@@ -78,9 +78,9 @@ class TB(ss.Infection):
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
         rate = np.zeros(len(uids))
         ls_uids = np.isin(self.state[uids], [TBS.LATENT_SLOW])
-        rate[ls_uids] = self.pars['rate_LS_to_presym'](uids[ls_uids]) 
+        rate[ls_uids] = self.pars.rate_LS_to_presym(self.sim.people.age[uids[ls_uids]]) 
         lf_uids = np.isin(self.state[uids], [TBS.LATENT_FAST] )
-        rate[lf_uids] = self.pars['rate_LF_to_presym'](uids[lf_uids]) 
+        rate[lf_uids] = self.pars.rate_LF_to_presym(self.sim.people.age[uids[lf_uids]]) 
 
         # Apply individual activation multipliers
         rate *= self.rr_activation[uids]
@@ -93,7 +93,7 @@ class TB(ss.Infection):
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.zeros(len(uids))
         mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
-        rate[mask] = self.pars['rate_treatment_to_clear'](self.sim.people.age[uids[mask]])
+        rate[mask] = self.pars.rate_treatment_to_clear(self.sim.people.age[uids[mask]])
         prob = 1-np.exp(-rate)
         return prob
 
@@ -103,7 +103,7 @@ class TB(ss.Infection):
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "The p_presym_to_active function should only be called for agents in the pre symptomatic state, however some agents were in a different state."
         rate = np.zeros(len(uids))
         mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
-        rate[mask] = self.pars['rate_presym_to_active'](self.sim.people.age[uids[mask]])
+        rate[mask] = self.pars.rate_presym_to_active(self.sim.people.age[uids[mask]])
         prob = 1-np.exp(-rate)
         return prob
 
@@ -113,11 +113,11 @@ class TB(ss.Infection):
         rate = np.zeros(len(uids))
 
         mask = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
-        rate[mask] = self.pars['rate_active_to_clear'](self.sim.people.age[uids[mask]])
+        rate[mask] = self.pars.rate_active_to_clear(self.sim.people.age[uids[mask]])
 
         on_treatment_uids = ss.uids(self.on_treatment[uids])
         mask = np.isin(on_treatment_uids, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
-        rate[mask] = self.pars['rate_treatment_to_clear'](self.sim.people.age[uids[mask]])
+        rate[mask] = self.pars.rate_treatment_to_clear(self.sim.people.age[uids[mask]])
 
         rate *= self.rr_clearance[uids]
         prob = 1-np.exp(-rate)
@@ -128,11 +128,11 @@ class TB(ss.Infection):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         rate = np.zeros(len(uids))
         smpos_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS])
-        rate[smpos_uids] = self.pars['rate_smpos_to_dead'](self.sim.people.age[uids[smpos_uids]])
+        rate[smpos_uids] = self.pars.rate_smpos_to_dead(self.sim.people.age[uids[smpos_uids]])
         smneg_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMNEG])
-        rate[smneg_uids] = self.pars['rate_smneg_to_dead'](self.sim.people.age[uids[smneg_uids]])
+        rate[smneg_uids] = self.pars.rate_smneg_to_dead(self.sim.people.age[uids[smneg_uids]])
         exptb_uids = np.isin(self.state[uids], [TBS.ACTIVE_EXPTB])
-        rate[exptb_uids] = self.pars['rate_exptb_to_dead'](self.sim.people.age[uids[exptb_uids]])
+        rate[exptb_uids] = self.pars.rate_exptb_to_dead(self.sim.people.age[uids[exptb_uids]])
             
         rate *= self.rr_death[uids]
         prob = 1-np.exp(-rate)
