@@ -18,6 +18,7 @@ class ActiveCaseFinding(ss.Intervention):
         ACTIVE_EXPTB    (Active TB, extra-pulmonary)
     - Assign test sensitivity to accurately identify as Active Tb
     - With some coverage rate, the intervention identifies the active TB cases and assigns them to treatment.
+    - People who are found under active case finding are treated with a certain probability.
     """
     def __init__(self, pars=None, *args, **kwargs):
         """
@@ -33,6 +34,7 @@ class ActiveCaseFinding(ss.Intervention):
                 sc.date('2014-06-01'): 0.6,
                 sc.date('2015-06-01'): 0.7,
                 sc.date('2016-06-01'): 0.64,
+                sc.date('2017-06-01'): 0.64, # setting this to the same as 2016 for now
             },
 
             age_min = 15,
@@ -86,7 +88,8 @@ class ActiveCaseFinding(ss.Intervention):
         years = np.array(list(self.pars.date_cov.keys()))
         sim_year = self.t.now('year')
         is_active = (
-            (sim_year >= years) & (sim_year < years + self.t.dt_year)
+            #(sim_year >= years) & (sim_year < years + self.t.dt_year)         # 50-age-specific-tb-reviewed
+            (sim.t.now('year') >= years) & (sim.t.now('year') < years + self.sim.t.dt_year)
         )
         if not np.any(is_active):
             return
@@ -109,7 +112,8 @@ class ActiveCaseFinding(ss.Intervention):
 
         # Update the results 
         timepoint = np.where(is_active)[0][0]
-        self.results.time[timepoint] = sim_year
+        # self.results.time[timepoint] = sim_year                              # 50-age-specific-tb-reviewed
+        self.results.time[timepoint] = sim.t.now('year')
         self.results.n_elig[timepoint] = np.sum(elig)
         self.results.n_found[timepoint] = len(found_uids)
         self.results.n_treated[timepoint] = len(treated_uids)
