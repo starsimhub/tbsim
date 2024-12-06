@@ -3,12 +3,9 @@ import numpy as np
 
 class RatesByAge:
 
-    def __init__(self, unit, dt, override=None, use_globals=False):
+    def __init__(self, unit, dt):
         self.unit = unit
         self.dt = dt
-        self.override = override
-        self.use_globals = use_globals
-        
         self.rates_dict = {
             'rate_LS_to_presym': {
                 0: ss.perday(3e-5, unit, dt),   
@@ -111,5 +108,8 @@ class RateVec:
         return self.digitize(inputs)
 
     def __repr__(self):
-        return f"RateVec(name={self.name}, cutoffs={self.cutoffs}, values={self.values}, interpolation={self.interpolation})"
+        return self.__str__()
+    
+    def __summary__(self):
+        return f"RateVec(cutoffs={self.cutoffs}, values={self.values}, interpolation={self.interpolation})"
 
