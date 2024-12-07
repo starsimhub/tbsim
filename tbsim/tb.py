@@ -38,19 +38,25 @@ class TB(ss.Infection):
             rel_trans_smpos     = 1.0,
             rel_trans_smneg     = 0.3,
             rel_trans_exptb     = 0.05,
-            rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
-            rate_LS_to_presym =       RateVec(cutoffs=[0, 15, 25],    values=[3e-5, 3e-5, 3e-5, 3e-5]), # 2.0548e-6
-            rate_LF_to_presym =       RateVec(cutoffs=[0, 15, 25],    values=[6e-3, 6e-3, 6e-3, 6e-3]), # 4.5e-3
-            rate_presym_to_active =   RateVec(cutoffs=[0, 15, 25],    values=[3e-2, 3e-2, 3e-2, 3e-3]), # 5.48e-3
-            rate_active_to_clear =    RateVec(cutoffs=[0, 15, 25],    values=[2.4e-4, 2.4e-4, 2.4e-4, 2.4e-4]), # 2.74e-4
-            rate_smpos_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[4.5e-4, 4.5e-4, 4.5e-4, 4.5e-4]), # 6.85e-4
-            rate_smneg_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[1.35e-4, 1.35e-4, 1.35e-4, 1.35e-4]), # 2.74e-4
-            rate_exptb_to_dead =      RateVec(cutoffs=[0, 15, 25],    values=[6.75e-5, 6.75e-5, 6.75e-5, 6.75e-5]), # 2.74e-4
-            rate_treatment_to_clear = RateVec(cutoffs=[0, 15, 25],    values=[1/60, 1/60, 1/60, 1/60]), # 1/180
-
+            rel_trans_treatment = 0.5,  # Multiplicative on smpos, smneg, or exptb rel_trans
+            age_off = True,             # Whether to turn off Age specific rates (default is False and value is the first one by default)
+            rate_LS_to_presym =       RateVec(cutoffs=[0, 15, 25], values=[3e-5, 2.0548e-6, 3e-5, 3e-5]),  
+            rate_LF_to_presym =       RateVec(cutoffs=[0, 15, 25], values=[6e-3, 4.5e-3, 6e-3, 6e-3]),  
+            rate_presym_to_active =   RateVec(cutoffs=[0, 15, 25], values=[3e-2, 5.48e-3, 3e-2, 3e-3]),  
+            rate_active_to_clear =    RateVec(cutoffs=[0, 15, 25], values=[2.4e-4, 2.74e-4, 2.4e-4, 2.4e-4]),  
+            rate_smpos_to_dead =      RateVec(cutoffs=[0, 15, 25], values=[4.5e-4, 6.85e-4, 4.5e-4, 4.5e-4]),  
+            rate_smneg_to_dead =      RateVec(cutoffs=[0, 15, 25], values=[1.35e-4, 2.74e-4, 1.35e-4, 1.35e-4]),  
+            rate_exptb_to_dead =      RateVec(cutoffs=[0, 15, 25], values=[6.75e-5, 2.74e-4, 6.75e-5, 6.75e-5]),  
+            rate_treatment_to_clear = RateVec(cutoffs=[0, 15, 25], values=[1/60, 1/180, 1/60, 1/60]), 
             reltrans_het = ss.constant(v=1.0),
         )
         self.update_pars(pars, **kwargs) 
+
+        # identify all instances of RateVec and set 'use_global_rate' to the value provided in age_off
+        if self.pars.age_off:
+            vec = sc.search(self.pars, type=RateVec)
+            for i in range(len(vec)):
+                    vec[i].cutoffs = [np.inf]  # set cutoffs to infinity, this will make the rate constant for all ages (first bin)
 
         self.define_states(
             # Initialize states specific to TB:
