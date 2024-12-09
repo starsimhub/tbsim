@@ -8,6 +8,40 @@ import sciris as sc
 n_reps = 4
 debug = False
 #%% Intervention to reduce trendmssion and progression of the TB disease
+class time_varying_parameter(ss.Intervention):
+    def __init__(self, pars=None, *args, **kwargs):
+        super().__init__()
+        self.define_pars(
+            tb_parameter = 'beta',
+            ti = [sc.date('1995-01-01'),sc.date('2014-01-01')],
+            rc = [1, 0.5],
+        )
+        self.update_pars(pars, **kwargs)
+        return
+    
+    def init_pre(self, sim, **kwargs):
+        super().init_pre(sim, **kwargs)
+        self.orignal_beta = sim.diseases.tb.pars['beta']
+        return
+ 
+    def step(self):
+        # make simulation and input time of the same type
+        datetime_timevec =  sc.date(self.t.timevec)
+        input_datetime = self.pars.ti
+
+        # an ugly solution to find the closest time to the input in timevec
+        t_index = []
+        for i,t in enumerate(input_datetime):
+            abs_diff = [abs(t - x) for x in datetime_timevec]
+            min_index = abs_diff.index(min(abs_diff))
+            t_index.append(min_index)
+        
+        # interpolate the values
+        rc = np.interp(self.t.ti, t_index, self.pars.rc)
+        self.sim.diseases.tb.pars[self.pars.tb_parameter] = self.orignal_beta * rc
+        return
+
+#%% Intervention to reduce trendmssion and progression of the TB disease
 class time_varying_beta(ss.Intervention):
     def __init__(self, pars=None, *args, **kwargs):
         super().__init__()
@@ -41,26 +75,33 @@ class time_varying_beta(ss.Intervention):
         self.sim.diseases.tb.pars[self.pars.tb_parameter] = self.orignal_beta * rc
         return
 
-
 #%% Analyser for to pick out infections in children
-class ChildInfections(ss.Analyzer):
+class AgeInfect(ss.Analyzer):
 
     def init_pre(self, sim):
         super().init_pre(sim)
         self.define_results(
-            ss.Result('age_5_6', dtype=int, label='[5,6) y'),
-            ss.Result('age_6_15', dtype=int, label='[6,15) y'),
+            ss.Result('inf_5_6', dtype=int, label='[5,6) y infections'),
+            ss.Result('inf_6_15', dtype=int, label='[6,15) infections'),
+            ss.Result('inf_15', dtype=int, label='>=15 infections'),
+            ss.Result('pop_5_6', dtype=int, label='[5,6) y alive'),
+            ss.Result('pop_6_15', dtype=int, label='[6,15) alive'),
+            ss.Result('pop_15', dtype=int, label='>=15 alive'),
             )
 
     def step(self):
         ti = self.sim.ti
-        res = self.sim.results.childinfections
+        res = self.sim.results.ageinfect
         infected = self.sim.diseases.tb.infected
+        alive = self.sim.people.alive
         age = self.sim.people.age
-        
-        res['age_5_6'][ti] = infected[(age>=5) & (age<6)].sum()
-        res['age_6_15'][ti] = infected[(age>=6) & (age<15)].sum()
-        
+
+        res['inf_5_6'][ti]  = np.count_nonzero(infected[(age>=5) & (age<6)])
+        res['inf_6_15'][ti] = np.count_nonzero(infected[(age>=6) & (age<15)])
+        res['inf_15'][ti]   = np.count_nonzero(infected[(age>=15)])
+        res['pop_5_6'][ti]  = np.count_nonzero(alive[(age>=5) & (age<6)])
+        res['pop_6_15'][ti] = np.count_nonzero(alive[(age>=6) & (age<15)])
+        res['pop_15'][ti]   = np.count_nonzero(alive[(age>=15)])
 
 def make_tb():
     # --------- People ----------
@@ -97,13 +138,15 @@ def make_tb():
     tb = mtb.TB(tb_pars)
 
     # for the intervention -- start by reducing `beta`
-    decrease_beta = time_varying_beta(
-        dict(ti = [sc.date('1995-01-01'),sc.date('2014-01-01')],
-             rc = [1, 0.55]
+    decrease_beta = time_varying_parameter(
+        dict(
+            tb_parameter = 'beta',
+            ti = [sc.date('1995-01-01'),sc.date('2014-01-01')],
+            rc = [1, 0.55]
              ))
         
     # analyzer to collect the infections in children
-    child_infections = ChildInfections()
+    age_infections = AgeInfect()
     
     # for the simulation parameters
     sim_pars = dict(
@@ -115,20 +158,16 @@ def make_tb():
     # build the sim object 
     sim = ss.Sim(
         people=pop, networks=nets, demographics=demog, diseases=tb, 
-        analyzers=child_infections,
+        analyzers=age_infections,
         interventions=[decrease_beta],
         pars=sim_pars, verbose = 0
     )
 
-    # sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 
-
+    # sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every day 
     ms = ss.MultiSim(sim, iterpars=dict(rand_seed=np.random.randint(0, 1e6, n_reps)), 
                      initialize=True, debug = debug, parallel=True)
 
     return ms
-
-
-
 
 if __name__ == '__main__':  
     tic = sc.tic()
@@ -138,4 +177,3 @@ if __name__ == '__main__':
     sim_tb.plot()
     #sim_tb.plot('demographics')
     plt.show()
-
