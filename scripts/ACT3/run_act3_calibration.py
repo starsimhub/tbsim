@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 debug = False # If true, will run in serial
 n_reps = [10, 1][debug] # Per trial
-total_trials = [100, 10][debug]
+total_trials = [250, 10][debug]
 n_agents = 1_000
 do_plot = 1
 
@@ -89,12 +89,12 @@ def make_sim():
     # for TB
     # Create the people, networks, and demographics
     pop = ss.People(n_agents=np.round(np.random.normal(loc=n_agents, scale=50)))
-    demog = [
+    demog = [ # Note: Better to have Deaths before Births
         ss.Births(pars=dict(birth_rate=109)), 
-        ss.Deaths(pars=dict(death_rate=97.88)) 
+        ss.Deaths(pars=dict(death_rate=97.88)),
     ]
 
-    nets = ss.RandomNet(n_contacts = ss.poisson(lam=3), dur = 0)
+    nets = ss.RandomNet(n_contacts=ss.poisson(lam=3), dur=0)
 
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
@@ -108,16 +108,15 @@ def make_sim():
         rel_trans_exptb=0.05,
         rel_trans_presymp=0.10
     )
-
     tb = mtb.TB(tb_pars)
 
     # Analyzer to track age specific infections
     ageinfect = AgeInfect()
 
-    # For ACT3 - intervention 
+    # ACT3 intervention 
     act3 = mtb.ActiveCaseFinding(dict(p_treat = ss.bernoulli(p=1.0)))
 
-    # For time varying parameters
+    # Time varying parameters
     decrease_beta = time_varying_parameter(
         tb_parameter = 'beta', # The parameter of the TB module to change
         rc_endpoint = 0.5,     # Will linearly interpolate from 1 at start to rc_endpoint at stop
@@ -125,14 +124,14 @@ def make_sim():
         stop = sc.date('2014-01-01'),
     )
 
-    # For the simulation parameters
+    # Simulation parameters
     sim_pars = dict(
         # Default simulation parameters
         unit='day', dt=30,
         start=ss.date('1980-01-01'), stop=ss.date('2018-12-31')
-        )
+    )
 
-    # build the sim object 
+    # Build the Sim object 
     sim = ss.Sim(
         people=pop, networks=nets, diseases=tb, demographics=demog, 
         interventions=[decrease_beta, act3], 
@@ -180,7 +179,7 @@ def run_calibration(do_plot=False):
     calib_pars = dict(
         beta = dict(low=0.01, high=0.30, guess=0.15, suggest_type='suggest_float', log=True), # Log scale and no "path", will be handled by build_sim (ablve)
         init_prev = dict(low=0.01, high=0.25, guess=0.15, path=('diseases', 'hiv', 'init_prev')), # Default type is suggest_float, no need to re-specify
-        n_contacts = dict(low=2, high=10, guess=3, suggest_type='suggest_int', path=('networks', 'randomnet', 'n_contacts')), # Suggest int just for demo
+        n_contacts = dict(low=2, high=10, guess=3, suggest_type='suggest_int'), # Suggest int just for demo
     )
 
     # Make the sim and data
@@ -192,7 +191,7 @@ def run_calibration(do_plot=False):
         weight = 1,
         conform = 'prevalent',
 
-        # need to feed in the right data  
+        # Need to feed in the right data  
         expected = pd.DataFrame({
             'x': [240, 169, 136, 78, 53],             # Number of individuals found to be infectious
             'n': [60000, 43425, 44082, 42150, 41680], # Number of individuals sampled
@@ -225,13 +224,13 @@ def run_calibration(do_plot=False):
     )
 
     infected_5_6 = ss.BetaBinomial(
-        name = 'Number Infected',
+        name = 'Number Infected Age 5-6',
         weight = 1,
         conform = 'prevalent',
 
-        # need to feed in the data 
+        # Need to feed in the data 
         expected = pd.DataFrame({
-            'x': 23,     # Number of individuals found to be infectious
+            'x': 23,  # Number of individuals found to be infectious
             'n': 701, # Number of individuals sampled
         }, index=pd.Index([ss.date(d) for d in ['2017-12-31']], name='t')), # On these dates
         
@@ -242,13 +241,13 @@ def run_calibration(do_plot=False):
     )
 
     infected_6_15 = ss.BetaBinomial(
-        name = 'Number Infected',
+        name = 'Number Infected Age 6-15',
         weight = 1,
         conform = 'prevalent',
 
-        # need to feed in the data 
+        # Need to feed in the data 
         expected = pd.DataFrame({
-            'x': 32,     # Number of individuals found to be infectious
+            'x': 32,  # Number of individuals found to be infectious
             'n': 779, # Number of individuals sampled
         }, index=pd.Index([ss.date(d) for d in ['2017-12-31']], name='t')), # On these dates
         
@@ -258,14 +257,14 @@ def run_calibration(do_plot=False):
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    infected_15 = ss.BetaBinomial(
-        name = 'Number Infected',
+    infected_15plus = ss.BetaBinomial(
+        name = 'Number Infected 15+',
         weight = 1,
         conform = 'prevalent',
 
-        # need to feed in the data 
+        # Need to feed in the data 
         expected = pd.DataFrame({
-            'x': 286,     # Number of individuals found to be infectious
+            'x': 286,  # Number of individuals found to be infectious
             'n': 1319, # Number of individuals sampled
         }, index=pd.Index([ss.date(d) for d in ['2007-12-31']], name='t')), # On these dates
         
@@ -282,7 +281,7 @@ def run_calibration(do_plot=False):
         build_fn = build_sim, # Use default builder, Calibration.translate_pars
         reseed = False,
         components = [prevalence, incidence, 
-                      infected_5_6, infected_6_15, infected_15], #infectious, incidence
+                      infected_5_6, infected_6_15, infected_15plus], #infectious, incidence
         total_trials = total_trials,
         n_workers = None, # None indicates to use all available CPUs
         die = True,
