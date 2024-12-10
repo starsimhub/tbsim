@@ -11,45 +11,42 @@ import matplotlib.pyplot as plt
 
 
 debug = False # If true, will run in serial
-n_reps = [10,1][debug] # Per trial
-total_trials = [100,10][debug]
+n_reps = [10, 1][debug] # Per trial
+total_trials = [100, 10][debug]
 n_agents = 1_000
 do_plot = 1
-#%% Intervention to reduce trendmssion and progression of the TB disease
+
+
+#%% Intervention to reduce transmission and progression of the TB disease
 class time_varying_parameter(ss.Intervention):
     def __init__(self, pars=None, *args, **kwargs):
         super().__init__()
         self.define_pars(
-            tb_parameter = 'beta',
-            rc_endpoint = 0.5,
-            ti = [sc.date('1995-01-01'),sc.date('2014-01-01')]
+            tb_parameter = 'beta', # The parameter of the TB module to change
+            rc_endpoint = 0.5,     # Will linearly interpolate from 1 at start to rc_endpoint at stop
+            start = sc.date('1995-01-01'),
+            stop = sc.date('2014-01-01'),
         )
         self.update_pars(pars, **kwargs)
         return
     
     def init_pre(self, sim, **kwargs):
         super().init_pre(sim, **kwargs)
-        self.orignal_beta = sim.diseases.tb.pars['beta']
+
+        # Store the original value
+        self.original_value = sim.diseases.tb.pars[self.pars.tb_parameter]
+
+        # Make simulation and input time of the same type
+        self.input_year = [sc.datetoyear(t) for t in [self.pars.start, self.pars.stop]]
         return
  
     def step(self):
-        # make simulation and input time of the same type
-        datetime_timevec =  sc.date(self.t.timevec)
-        input_datetime = self.pars.ti
-
-        # an ugly solution to find the closest time to the input in timevec
-        t_index = []
-        for i,t in enumerate(input_datetime):
-            abs_diff = [abs(t - x) for x in datetime_timevec]
-            min_index = abs_diff.index(min(abs_diff))
-            t_index.append(min_index)
-        
-        # interpolate the values
-        rc = np.interp(self.t.ti, t_index, [1, self.pars.rc_endpoint])
-        self.sim.diseases.tb.pars[self.pars.tb_parameter] = self.orignal_beta * rc
+        # Interpolate the values and modify the parameter
+        rc = np.interp(self.t.now('year'), self.input_year, [1, self.pars.rc_endpoint])
+        self.sim.diseases.tb.pars[self.pars.tb_parameter] = self.original_value * rc
         return
 
-#%% analyser to track age specific infections 
+#%% Analyzer to track age specific infections 
 class AgeInfect(ss.Analyzer):
 
     def init_pre(self, sim):
@@ -57,10 +54,10 @@ class AgeInfect(ss.Analyzer):
         self.define_results(
             ss.Result('inf_5_6', dtype=int, label='[5,6) y infections'),
             ss.Result('inf_6_15', dtype=int, label='[6,15) infections'),
-            ss.Result('inf_15', dtype=int, label='>=15 infections'),
+            ss.Result('inf_15+', dtype=int, label='>=15 infections'),
             ss.Result('pop_5_6', dtype=int, label='[5,6) y alive'),
             ss.Result('pop_6_15', dtype=int, label='[6,15) alive'),
-            ss.Result('pop_15', dtype=int, label='>=15 alive'),
+            ss.Result('pop_15+', dtype=int, label='>=15 alive'),
             )
 
     def step(self):
@@ -72,10 +69,10 @@ class AgeInfect(ss.Analyzer):
 
         res['inf_5_6'][ti]  = np.count_nonzero(infected[(age>=5) & (age<6)])
         res['inf_6_15'][ti] = np.count_nonzero(infected[(age>=6) & (age<15)])
-        res['inf_15'][ti]   = np.count_nonzero(infected[(age>=15)])
+        res['inf_15+'][ti]   = np.count_nonzero(infected[(age>=15)])
         res['pop_5_6'][ti]  = np.count_nonzero(alive[(age>=5) & (age<6)])
         res['pop_6_15'][ti] = np.count_nonzero(alive[(age>=6) & (age<15)])
-        res['pop_15'][ti]   = np.count_nonzero(alive[(age>=15)])
+        res['pop_15+'][ti]   = np.count_nonzero(alive[(age>=15)])
 
 #%% Helper functions
 def make_sim():
@@ -83,7 +80,7 @@ def make_sim():
     Build the simulation object that will simulate the ACT3
     """
 
-    # random seed is used when deciding the initial n_agents, so set here
+    # Random seed is used when deciding the initial n_agents, so set here
     np.random.seed()
 
     # Retrieve intervention, TB, and simulation-related parameters from scen and skey
@@ -119,7 +116,12 @@ def make_sim():
     act3 = mtb.ActiveCaseFinding(dict(p_treat = ss.bernoulli(p=1.0)))
 
     # for time varing paraemters
-    decrease_beta = time_varying_parameter()
+    decrease_beta = time_varying_parameter(
+        tb_parameter = 'beta', # The parameter of the TB module to change
+        rc_endpoint = 0.5,     # Will linearly interpolate from 1 at start to rc_endpoint at stop
+        start = sc.date('1995-01-01'),
+        stop = sc.date('2014-01-01'),
+    )
 
     # for the simulation parameters
     sim_pars = dict(
@@ -266,8 +268,8 @@ def run_calibration(do_plot=False):
         }, index=pd.Index([ss.date(d) for d in ['2007-12-31']], name='t')), # On these dates
         
         extract_fn = lambda sim: pd.DataFrame({
-            'x': sim.results.ageinfect.inf_15,
-            'n': sim.results.ageinfect.pop_15,
+            'x': sim.results.ageinfect['inf_15+'],
+            'n': sim.results.ageinfect['pop_15+'],
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
@@ -290,7 +292,7 @@ def run_calibration(do_plot=False):
     calib.calibrate()
 
     # Check
-    assert calib.check_fit(do_plot), 'Calibration did not improve the fit'
+    assert calib.check_fit(), 'Calibration did not improve the fit'
 
     return sim, calib
 
@@ -330,7 +332,6 @@ if __name__ == '__main__':
     T.toc()
 
     if do_plot:
-        calib.plot_sims()
-        #calib.plot_trend()
-        calib.plot_all()
+        calib.plot_final()
+        calib.plot_optuna(['plot_param_importances', 'plot_optimization_history'])
     plt.show()
