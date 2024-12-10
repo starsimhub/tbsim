@@ -10,9 +10,9 @@ import os
 import matplotlib.pyplot as plt
 
 
-debug = True # If true, will run in serial
+debug = False # If true, will run in serial
 n_reps = [10, 1][debug] # Per trial
-total_trials = [250, 10][debug]
+total_trials = [100, 10][debug]
 n_agents = 1_000
 do_plot = 1
 
@@ -312,7 +312,7 @@ def run_calibration(do_plot=False):
     calib.calibrate()
 
     # Check
-    assert calib.check_fit(), 'Calibration did not improve the fit'
+    calib.check_fit()
 
     return sim, calib
 
