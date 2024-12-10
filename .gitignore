@@ -1,6 +1,9 @@
 # Results files
 figs/
 
+# Calibration databases
+*.db
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -168,6 +171,4 @@ cython_debug/
 .DS_Store
 
 # data files
-*.csv
 *.png
-*.xlsx

@@ -18,6 +18,7 @@ class ActiveCaseFinding(ss.Intervention):
         ACTIVE_EXPTB    (Active TB, extra-pulmonary)
     - Assign test sensitivity to accurately identify as Active Tb
     - With some coverage rate, the intervention identifies the active TB cases and assigns them to treatment.
+    - People who are found under active case finding are treated with a certain probability.
     """
     def __init__(self, pars=None, *args, **kwargs):
         """
@@ -33,6 +34,7 @@ class ActiveCaseFinding(ss.Intervention):
                 sc.date('2014-06-01'): 0.6,
                 sc.date('2015-06-01'): 0.7,
                 sc.date('2016-06-01'): 0.64,
+                sc.date('2017-06-01'): 0.64, # setting this to the same as 2016 for now
             },
 
             age_min = 15,
@@ -68,12 +70,10 @@ class ActiveCaseFinding(ss.Intervention):
         return p
 
     def init_results(self):
-        npts = len(self.pars.date_cov)
         self.define_results(
-            ss.Result('time', dtype=float, shape=npts, label='Time', scale=True),
-            ss.Result('n_elig', dtype=int, shape=npts, label='Number eligible', scale=True),
-            ss.Result('n_found', dtype=int, shape=npts, label='Number found',scale=True),
-            ss.Result('n_treated', dtype=int, shape=npts, label='Number treated', scale=True),
+            ss.Result('n_elig', dtype=int, label='Number eligible', scale=True),
+            ss.Result('n_found', dtype=int, label='Number found',scale=True),
+            ss.Result('n_treated', dtype=int, label='Number treated', scale=True),
         )
         return
 
@@ -86,7 +86,7 @@ class ActiveCaseFinding(ss.Intervention):
         years = np.array(list(self.pars.date_cov.keys()))
         sim_year = self.t.now('year')
         is_active = (
-            (sim_year >= years) & (sim_year < years + self.t.dt_year)
+            (sim.t.now('year') >= years) & (sim.t.now('year') < years + self.sim.t.dt_year)
         )
         if not np.any(is_active):
             return
@@ -106,13 +106,11 @@ class ActiveCaseFinding(ss.Intervention):
         # Apply treatment to the found cases
         treated_uids = self.pars.p_treat.filter(found_uids)
         tb.start_treatment(treated_uids)
+        ti = self.t.ti
+        self.results.n_elig[ti] = np.sum(elig)
+        self.results.n_found[ti] = len(found_uids)
+        self.results.n_treated[ti] = len(treated_uids)
 
-        # Update the results 
-        timepoint = np.where(is_active)[0][0]
-        self.results.time[timepoint] = sim_year
-        self.results.n_elig[timepoint] = np.sum(elig)
-        self.results.n_found[timepoint] = len(found_uids)
-        self.results.n_treated[timepoint] = len(treated_uids)
 
         return
 

@@ -1,4 +1,3 @@
-import runpy
 import os
 import seaborn as sns
 import pandas as pd
@@ -6,8 +5,6 @@ import numpy as np
 import sciris as sc
 import matplotlib.pyplot as plt
 
-# source the script to run scenarios 
-runpy.run_path('scripts/ACT3/run_act3.py')
 
 # if pltdir does not exist, create it
 figs_path = os.path.join('results', 'ACT3', 'figs')
@@ -19,7 +16,6 @@ def plot_scenarios(results, path=figs_path):
     # maybe have a different function to process the data? 
     tb_results_agg = (
       results
-        .drop(columns='time')
         .melt(id_vars=['time_year', 'scenario', 'rand_seed'], 
                   value_vars=['on_treatment', 'prevalence', 'active_presymp', 'active_smpos', 'active_exptb'], 
                   var_name='state',
@@ -52,4 +48,3 @@ def plot_scenarios(results, path=figs_path):
 
     sc.savefig('act3_scene.png', folder=path)
 
-plot_scenarios()

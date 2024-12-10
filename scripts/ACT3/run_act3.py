@@ -3,11 +3,11 @@ import tbsim as mtb
 import numpy as np
 import pandas as pd
 import sciris as sc
-import plots
+import act3_plots as aplt
 import os
 
 
-debug = False #NOTE: Debug runs in serial
+debug = True #NOTE: Debug runs in serial
 default_n_rand_seeds = [60, 1][debug]
 
 
@@ -63,7 +63,7 @@ def build_ACF(skey, scen, rand_seed=0):
     sim_pars = dict(
         # default simulation parameters
         unit='day', dt=14,
-        start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'),
+        start=ss.date('2013-01-01'), stop=ss.date('2016-12-31'),
         rand_seed=rand_seed
         )
 
@@ -94,19 +94,17 @@ def run_ACF(skey, scen, rand_seed=0):
     sim = build_ACF(skey, scen, rand_seed)
     sim.run()
 
+    sim.plot('tb')
+    plt.show()
+
     tb_res = pd.DataFrame({
-        'time': sim.results.timevec,
+        'time_year': sim.results.timevec,
         'on_treatment': sim.results.tb.n_on_treatment, 
         'prevalence': sim.results.tb.prevalence,
         'active_presymp': sim.results.tb.n_active_presymp,
         'active_smpos': sim.results.tb.n_active_smpos,
         'active_exptb': sim.results.tb.n_active_exptb,
     })
-
-    # redfine the time in years
-    tb_res = tb_res.assign(
-        time_year = lambda x: x['time'].apply(sc.datetoyear)
-    )
 
     acf_res = pd.DataFrame({
         'time_year': sim.results.activecasefinding.time,
@@ -174,4 +172,7 @@ if __name__ == '__main__':
     df_result = run_scenarios(scens)
 
     # plot the results
-    plots.plot_scenarios(results=df_result.get('TB'))
+    df_result.get('ACT3')
+
+
+    aplt.plot_scenarios(results=df_result.get('TB'))
