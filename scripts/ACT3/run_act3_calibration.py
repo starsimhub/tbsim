@@ -194,7 +194,7 @@ def run_calibration(do_plot=False):
     # Define the calibration parameters
     calib_pars = dict(
         beta = dict(low=0.01, high=0.30, guess=0.15, suggest_type='suggest_float', log=True), # Log scale and no "path", will be handled by build_sim (ablve)
-        init_prev = dict(low=0.01, high=0.25, guess=0.15, path=('diseases', 'hiv', 'init_prev')), # Default type is suggest_float, no need to re-specify
+        init_prev = dict(low=0.01, high=0.25, guess=0.15), # Default type is suggest_float, no need to re-specify
         #n_contacts = dict(low=2, high=10, guess=3),
         beta_change = dict(low=0.25, high=1, guess=0.5),
     )
