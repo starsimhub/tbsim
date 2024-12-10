@@ -70,12 +70,10 @@ class ActiveCaseFinding(ss.Intervention):
         return p
 
     def init_results(self):
-        npts = len(self.pars.date_cov)
         self.define_results(
-            ss.Result('time', dtype=float, shape=npts, label='Time', scale=True),
-            ss.Result('n_elig', dtype=int, shape=npts, label='Number eligible', scale=True),
-            ss.Result('n_found', dtype=int, shape=npts, label='Number found',scale=True),
-            ss.Result('n_treated', dtype=int, shape=npts, label='Number treated', scale=True),
+            ss.Result('n_elig', dtype=int, label='Number eligible', scale=True),
+            ss.Result('n_found', dtype=int, label='Number found',scale=True),
+            ss.Result('n_treated', dtype=int, label='Number treated', scale=True),
         )
         return
 
@@ -109,11 +107,10 @@ class ActiveCaseFinding(ss.Intervention):
         tb.start_treatment(treated_uids)
 
         # Update the results 
-        timepoint = np.where(is_active)[0][0]
-        self.results.time[timepoint] = sim.t.now('year')
-        self.results.n_elig[timepoint] = np.sum(elig)
-        self.results.n_found[timepoint] = len(found_uids)
-        self.results.n_treated[timepoint] = len(treated_uids)
+        ti = self.t.ti
+        self.results.n_elig[ti] = np.sum(elig)
+        self.results.n_found[ti] = len(found_uids)
+        self.results.n_treated[ti] = len(treated_uids)
 
         return
 
