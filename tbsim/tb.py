@@ -312,7 +312,7 @@ class TB(ss.Infection):
         res.n_active_exptb[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
         res.new_cases[ti]         = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
         res.prevalence_active[ti] = res.new_cases[ti] / np.count_nonzero(self.sim.people.alive) 
-        res.incidence[ti]         = (np.count_nonzero(ti_infctd == ti) / np.count_nonzero(self.sim.people.alive)) * per_year_fctr
+        res.incidence_ppy[ti]     = (np.count_nonzero(ti_infctd == ti) / np.count_nonzero(self.sim.people.alive)) * per_year_fctr
         res.deaths_ppy[ti]        = res.new_deaths[ti] / np.count_nonzero(self.sim.people.alive) * per_year_fctr
 
         return

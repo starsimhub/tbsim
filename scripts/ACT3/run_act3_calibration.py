@@ -10,7 +10,7 @@ import os
 import matplotlib.pyplot as plt
 
 
-debug = False # If true, will run in serial
+debug = True # If true, will run in serial
 n_reps = [10, 1][debug] # Per trial
 total_trials = [250, 10][debug]
 n_agents = 1_000
@@ -139,7 +139,9 @@ def make_sim():
     sim_pars = dict(
         # Default simulation parameters
         unit='day', dt=30,
-        start=ss.date('1980-01-01'), stop=ss.date('2018-12-31')
+        #start=ss.date('1980-01-01'),
+        start=ss.date('1900-01-01'),
+        stop=ss.date('2018-12-31')
     )
 
     # Build the Sim object 
