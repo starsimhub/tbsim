@@ -52,10 +52,10 @@ class AgeInfect(ss.Analyzer):
     def init_pre(self, sim):
         super().init_pre(sim)
         self.define_results(
-            ss.Result('inf_5_6', dtype=int, label='[5,6) y infections'),
+            ss.Result('inf_5_6', dtype=int, label='[5,6) infections'),
             ss.Result('inf_6_15', dtype=int, label='[6,15) infections'),
             ss.Result('inf_15+', dtype=int, label='>=15 infections'),
-            ss.Result('pop_5_6', dtype=int, label='[5,6) y alive'),
+            ss.Result('pop_5_6', dtype=int, label='[5,6) alive'),
             ss.Result('pop_6_15', dtype=int, label='[6,15) alive'),
             ss.Result('pop_15+', dtype=int, label='>=15 alive'),
         )
@@ -87,11 +87,20 @@ def make_sim():
 
     # Retrieve intervention, TB, and simulation-related parameters from scen and skey
     # for TB
+
     # Create the people, networks, and demographics
-    pop = ss.People(n_agents=np.round(np.random.normal(loc=n_agents, scale=50)))
-    demog = [ # Note: Better to have Deaths before Births
-        ss.Births(pars=dict(birth_rate=109)), 
-        ss.Deaths(pars=dict(death_rate=97.88)),
+    age_data = pd.DataFrame({ # Data from WPP, https://population.un.org/wpp/Download/Standard/MostUsed/
+        'age': np.arange(0, 101, 5),
+        #'value': [3407, 2453, 2376, 2520, 2182, 2045, 1777, 1701, 1465, 1421, 1119, 907, 692, 484, 309, 160, 52, 22, 6, 1, 0], # 1950
+        'value': [8004, 7093, 6048, 5769, 5246, 4049, 2799, 2081, 1998, 2063, 1726, 1551, 1261, 1081, 774, 552, 269, 102, 23, 3, 0], #1980
+    })
+    pop = ss.People(
+        n_agents = np.round(np.random.normal(loc=n_agents, scale=50)),
+        age_data = age_data,
+    )
+    demog = [
+        ss.Births(birth_rate=ss.peryear(13), unit='day', dt=30),  # Matching to simulation's unit and dt, hopefully soon not necessary
+        ss.Deaths(death_rate=ss.peryear(6), unit='day', dt=30),
     ]
 
     nets = ss.RandomNet(n_contacts=ss.poisson(lam=3), dur=0)
@@ -99,7 +108,7 @@ def make_sim():
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
     tb_pars = dict(
-        beta=ss.beta(0.045),
+        beta=ss.beta(0.045, unit='year'),
         init_prev=0.1,
         rate_LS_to_presym=ss.perday(3e-5),
         rate_LF_to_presym=ss.perday(6e-3),
@@ -156,7 +165,7 @@ def build_sim(sim, calib_pars, **kwargs):
 
         v = pars['value']
         if k == 'beta':
-            sir.pars.beta = ss.beta(v)
+            sir.pars.beta = ss.beta(v, unit='year')
         elif k == 'init_prev':
             sir.pars.init_prev = ss.bernoulli(v)
         elif k == 'n_contacts':
