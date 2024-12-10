@@ -58,11 +58,12 @@ class AgeInfect(ss.Analyzer):
             ss.Result('pop_5_6', dtype=int, label='[5,6) y alive'),
             ss.Result('pop_6_15', dtype=int, label='[6,15) alive'),
             ss.Result('pop_15+', dtype=int, label='>=15 alive'),
-            )
+        )
+        return
 
     def step(self):
-        ti = self.sim.ti
-        res = self.sim.results.ageinfect
+        ti = self.t.ti
+        res = self.results
         infected = self.sim.diseases.tb.infected
         alive = self.sim.people.alive
         age = self.sim.people.age
@@ -73,6 +74,7 @@ class AgeInfect(ss.Analyzer):
         res['pop_5_6'][ti]  = np.count_nonzero(alive[(age>=5) & (age<6)])
         res['pop_6_15'][ti] = np.count_nonzero(alive[(age>=6) & (age<15)])
         res['pop_15+'][ti]   = np.count_nonzero(alive[(age>=15)])
+        return
 
 #%% Helper functions
 def make_sim():
@@ -91,9 +93,9 @@ def make_sim():
         ss.Births(pars=dict(birth_rate=109)), 
         ss.Deaths(pars=dict(death_rate=97.88)) 
     ]
-    
+
     nets = ss.RandomNet(n_contacts = ss.poisson(lam=3), dur = 0)
-    
+
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
     tb_pars = dict(
@@ -109,13 +111,13 @@ def make_sim():
 
     tb = mtb.TB(tb_pars)
 
-    # analyser to track age specific infections
+    # Analyzer to track age specific infections
     ageinfect = AgeInfect()
 
-    # for ACT3 - intervention 
+    # For ACT3 - intervention 
     act3 = mtb.ActiveCaseFinding(dict(p_treat = ss.bernoulli(p=1.0)))
 
-    # for time varing paraemters
+    # For time varying parameters
     decrease_beta = time_varying_parameter(
         tb_parameter = 'beta', # The parameter of the TB module to change
         rc_endpoint = 0.5,     # Will linearly interpolate from 1 at start to rc_endpoint at stop
@@ -123,9 +125,9 @@ def make_sim():
         stop = sc.date('2014-01-01'),
     )
 
-    # for the simulation parameters
+    # For the simulation parameters
     sim_pars = dict(
-        # default simulation parameters
+        # Default simulation parameters
         unit='day', dt=30,
         start=ss.date('1980-01-01'), stop=ss.date('2018-12-31')
         )
@@ -163,10 +165,10 @@ def build_sim(sim, calib_pars, **kwargs):
         else:
             raise NotImplementedError(f'Parameter {k} not recognized')
 
-    if n_reps == 1:
+    if reps == 1:
         return sim
 
-    ms = ss.MultiSim(sim, iterpars=dict(rand_seed=np.random.randint(0, 1e6, n_reps)), initialize=True, debug=True, parallel=False) # Run in serial
+    ms = ss.MultiSim(sim, iterpars=dict(rand_seed=np.random.randint(0, 1e6, reps)), initialize=True, debug=True, parallel=False) # Run in serial
     return ms
 
 
