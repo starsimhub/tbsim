@@ -92,15 +92,17 @@ def make_sim():
     age_data = pd.DataFrame({ # Data from WPP, https://population.un.org/wpp/Download/Standard/MostUsed/
         'age': np.arange(0, 101, 5),
         #'value': [3407, 2453, 2376, 2520, 2182, 2045, 1777, 1701, 1465, 1421, 1119, 907, 692, 484, 309, 160, 52, 22, 6, 1, 0], # 1950
-        'value': [8004, 7093, 6048, 5769, 5246, 4049, 2799, 2081, 1998, 2063, 1726, 1551, 1261, 1081, 774, 552, 269, 102, 23, 3, 0], #1980
+        #'value': [8004, 7093, 6048, 5769, 5246, 4049, 2799, 2081, 1998, 2063, 1726, 1551, 1261, 1081, 774, 552, 269, 102, 23, 3, 0], #1980
+        'value': [7955, 7388, 6928, 7061, 8657, 8104, 8006, 7005, 6486, 5927, 5495, 4625, 3198, 2090, 1366, 1109, 830, 402, 153, 34, 4], #2015
     })
     pop = ss.People(
         n_agents = np.round(np.random.normal(loc=n_agents, scale=50)),
         age_data = age_data,
     )
     demog = [
-        ss.Births(birth_rate=ss.peryear(13), unit='day', dt=30),  # Matching to simulation's unit and dt, hopefully soon not necessary
-        ss.Deaths(death_rate=ss.peryear(6), unit='day', dt=30),
+        # Crude rates for Vietnam in 2015
+        ss.Births(birth_rate=ss.peryear(18.5), unit='day', dt=30),  # Matching to simulation's unit and dt, hopefully soon not necessary
+        ss.Deaths(death_rate=ss.peryear(6.2), unit='day', dt=30),
     ]
 
     nets = ss.RandomNet(n_contacts=ss.poisson(lam=3), dur=0)
