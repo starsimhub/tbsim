@@ -52,9 +52,9 @@ class AgeInfect(ss.Analyzer):
     def init_pre(self, sim):
         super().init_pre(sim)
         self.define_results(
-            ss.Result('inf_5_6', dtype=int, label='[5,6) infections'),
-            ss.Result('inf_6_15', dtype=int, label='[6,15) infections'),
-            ss.Result('inf_15+', dtype=int, label='>=15 infections'),
+            ss.Result('inf_5_6', dtype=int, label='[5,6) Infected'),
+            ss.Result('inf_6_15', dtype=int, label='[6,15) Infected'),
+            ss.Result('inf_15+', dtype=int, label='>=15 Infected'),
             ss.Result('pop_5_6', dtype=int, label='[5,6) alive'),
             ss.Result('pop_6_15', dtype=int, label='[6,15) alive'),
             ss.Result('pop_15+', dtype=int, label='>=15 alive'),
