@@ -283,7 +283,7 @@ def run_calibration(do_plot=False):
         expected = pd.DataFrame({
             'x': 286,  # Number of individuals found to be infectious
             'n': 1319, # Number of individuals sampled
-        }, index=pd.Index([ss.date(d) for d in ['2007-12-31']], name='t')), # On these dates
+        }, index=pd.Index([ss.date(d) for d in ['2016-01-01']], name='t')), # June 2015 to March 2016.
         
         extract_fn = lambda sim: pd.DataFrame({
             'x': sim.results.ageinfect['inf_15+'],
