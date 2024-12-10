@@ -159,6 +159,7 @@ def build_sim(sim, calib_pars, **kwargs):
 
     sir = sim.pars.diseases # There is only one disease in this simulation and it is a SIR
     net = sim.pars.networks # There is only one network in this simulation and it is a RandomNet
+    intv = sim.pars.interventions # There is only one network in this simulation and it is a RandomNet
 
     for k, pars in calib_pars.items():
         if k == 'rand_seed':
@@ -172,6 +173,10 @@ def build_sim(sim, calib_pars, **kwargs):
             sir.pars.init_prev = ss.bernoulli(v)
         elif k == 'n_contacts':
             net.pars.n_contacts = ss.poisson(v)
+        elif k == 'beta_change':
+            for intv in sim.pars.interventions:
+                if isinstance(intv, time_varying_parameter):
+                    intv.pars.rc_endpoint = v
         else:
             raise NotImplementedError(f'Parameter {k} not recognized')
 
@@ -190,7 +195,8 @@ def run_calibration(do_plot=False):
     calib_pars = dict(
         beta = dict(low=0.01, high=0.30, guess=0.15, suggest_type='suggest_float', log=True), # Log scale and no "path", will be handled by build_sim (ablve)
         init_prev = dict(low=0.01, high=0.25, guess=0.15, path=('diseases', 'hiv', 'init_prev')), # Default type is suggest_float, no need to re-specify
-        n_contacts = dict(low=2, high=10, guess=3, suggest_type='suggest_int'), # Suggest int just for demo
+        #n_contacts = dict(low=2, high=10, guess=3),
+        beta_change = dict(low=0.25, high=1, guess=0.5),
     )
 
     # Make the sim and data
@@ -223,14 +229,14 @@ def run_calibration(do_plot=False):
         # Need to feed in the right data 
         expected = pd.DataFrame({
             'n': [28661, 24705, 28823], 
-            'x': [70, 35, 26],      
+            'x': [70, 35, 26],
             't': [ss.date(d) for d in ['2014-01-01', '2015-01-01', '2016-01-01']], # Between t and t1
             't1': [ss.date(d) for d in ['2014-12-31', '2015-12-31', '2016-12-31']],
         }).set_index(['t', 't1']),
 
         extract_fn = lambda sim: pd.DataFrame({
             'x': sim.results.tb.new_cases, # Events
-            'n': sim.results.n_alive * sim.t.dt, # Person-years at risk
+            'n': sim.results.n_alive * sim.t.dt_year, # Person-years at risk
         }, index=pd.Index(sim.results.timevec, name='t'))
     )
 
