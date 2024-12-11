@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 
 debug = False # If true, will run in serial
-n_reps = [10, 1][debug] # Per trial
-total_trials = [100, 10][debug]
+n_reps = [10, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
+total_trials = [100, 2][debug]
 n_agents = 1_000
 do_plot = 1
 
@@ -139,8 +139,8 @@ def make_sim():
     sim_pars = dict(
         # Default simulation parameters
         unit='day', dt=30,
-        #start=ss.date('1980-01-01'),
-        start=ss.date('1900-01-01'),
+        start=ss.date('1980-01-01'),
+        #start=ss.date('1900-01-01'),
         stop=ss.date('2018-12-31')
     )
 
@@ -182,10 +182,21 @@ def build_sim(sim, calib_pars, **kwargs):
         else:
             raise NotImplementedError(f'Parameter {k} not recognized')
 
-    if reps == 1:
-        return sim
+    sims = []
+    for seed in np.random.randint(0, 1e6, reps):
+        sim_intv = sim.copy()
+        sim_intv.pars.rand_seed = seed
+        sim_intv.label = 'Intervention'
+        sims.append(sim_intv)
 
-    ms = ss.MultiSim(sim, iterpars=dict(rand_seed=np.random.randint(0, 1e6, reps)), initialize=True, debug=True, parallel=False) # Run in serial
+        sim_ctrl = sim_intv.copy()
+        sim_ctrl.label = 'Control'
+        for intv in sim.pars.interventions:
+            if isinstance(intv, mtb.ActiveCaseFinding):
+                intv.pars.p_treat = ss.bernoulli(p=0.0)
+        sims.append(sim_ctrl)
+
+    ms = ss.MultiSim(sims, initialize=True, debug=True, parallel=False)
     return ms
 
 
@@ -205,18 +216,35 @@ def run_calibration(do_plot=False):
     sim = make_sim()
     
     # Define the components - for prevalence
-    prevalence = ss.BetaBinomial(
-        name = 'Number Active',
-        weight = 1,
+    prevalence_intv = ss.BetaBinomial(
+        name = 'Prevalence Active (Intervention)',
+        include_fn = lambda sim: sim.label == 'Intervention',
+        weight = 25,
         conform = 'prevalent',
 
-        # Need to feed in the right data  
         expected = pd.DataFrame({
             'x': [360, 169, 136, 78, 53],             # Number of individuals found to be infectious
-            'n': [60000, 43425, 44082, 42150, 41680], # Number of individuals sampled
+            'n': [60000, 43425, 44082, 42150, 42150], # Number of individuals sampled
         }, index=pd.Index([ss.date(d) for d in ['1995-12-31', '2014-12-31', 
                                                 '2015-12-31', '2016-12-31', '2017-12-31']], name='t')), # On these dates
-        
+
+        extract_fn = lambda sim: pd.DataFrame({
+            'x': sim.results.tb.n_active,
+            'n': sim.results.n_alive,
+        }, index=pd.Index(sim.results.timevec, name='t')),
+    )
+
+    prevalence_ctrl = ss.BetaBinomial(
+        name = 'Prevalence Active (Control)',
+        include_fn = lambda sim: sim.label == 'Control',
+        weight = 25,
+        conform = 'prevalent',
+
+        expected = pd.DataFrame({
+            'x': [360, 94],      # Number of individuals found to be infectious
+            'n': [60000, 41680], # Number of individuals sampled
+        }, index=pd.Index([ss.date(d) for d in ['1995-12-31', '2017-12-31']], name='t')), # On these dates
+
         extract_fn = lambda sim: pd.DataFrame({
             'x': sim.results.tb.n_active,
             'n': sim.results.n_alive,
@@ -224,11 +252,11 @@ def run_calibration(do_plot=False):
     )
 
     incidence = ss.GammaPoisson(
-        name = 'Incidence Cases',
+        name = 'Incidence Cases (Intervention)',
+        include_fn = lambda sim: sim.label == 'Intervention',
         weight = 1,
         conform = 'incident',
 
-        # Need to feed in the right data 
         expected = pd.DataFrame({
             'n': [28661, 24705, 28823], 
             'x': [70, 35, 26],
@@ -242,12 +270,12 @@ def run_calibration(do_plot=False):
         }, index=pd.Index(sim.results.timevec, name='t'))
     )
 
-    infected_5_6 = ss.BetaBinomial(
-        name = 'Number Infected Age 5-6',
+    infected_5_6_intv = ss.BetaBinomial(
+        name = 'Prevalence Any Age 5-6 (Intervention)',
+        include_fn = lambda sim: sim.label == 'Intervention',
         weight = 1,
         conform = 'prevalent',
 
-        # Need to feed in the data 
         expected = pd.DataFrame({
             'x': 23,  # Number of individuals found to be infectious
             'n': 701, # Number of individuals sampled
@@ -259,12 +287,29 @@ def run_calibration(do_plot=False):
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    infected_6_15 = ss.BetaBinomial(
-        name = 'Number Infected Age 6-15',
+    infected_5_6_ctrl = ss.BetaBinomial(
+        name = 'Prevalence Any Age 5-6 (Control)',
+        include_fn = lambda sim: sim.label == 'Control',
         weight = 1,
         conform = 'prevalent',
 
-        # Need to feed in the data 
+        expected = pd.DataFrame({
+            'x': 18,  # Number of individuals found to be infectious
+            'n': 705, # Number of individuals sampled
+        }, index=pd.Index([ss.date(d) for d in ['2017-12-31']], name='t')), # On these dates
+        
+        extract_fn = lambda sim: pd.DataFrame({
+            'x': sim.results.ageinfect.inf_5_6,
+            'n': sim.results.ageinfect.pop_5_6
+        }, index=pd.Index(sim.results.timevec, name='t')),
+    )
+
+    infected_6_15_intv = ss.BetaBinomial(
+        name = 'Prevalence Any Age 6-15 (Intervention)',
+        include_fn = lambda sim: sim.label == 'Intervention',
+        weight = 1,
+        conform = 'prevalent',
+
         expected = pd.DataFrame({
             'x': 32,  # Number of individuals found to be infectious
             'n': 779, # Number of individuals sampled
@@ -276,12 +321,29 @@ def run_calibration(do_plot=False):
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    infected_15plus = ss.BetaBinomial(
-        name = 'Number Infected 15+',
+    infected_6_15_ctrl = ss.BetaBinomial(
+        name = 'Prevalence Any Age 6-15 (Control)',
+        include_fn = lambda sim: sim.label == 'Control',
         weight = 1,
         conform = 'prevalent',
 
-        # Need to feed in the data 
+        expected = pd.DataFrame({
+            'x': 64,  # Number of individuals found to be infectious
+            'n': 769, # Number of individuals sampled
+        }, index=pd.Index([ss.date(d) for d in ['2017-12-31']], name='t')), # On these dates
+        
+        extract_fn = lambda sim: pd.DataFrame({
+            'x': sim.results.ageinfect.inf_6_15,
+            'n': sim.results.ageinfect.pop_6_15,
+        }, index=pd.Index(sim.results.timevec, name='t')),
+    )
+
+    # TODO: Which arm?
+    infected_15plus = ss.BetaBinomial(
+        name = 'Prevalence Any 15+',
+        weight = 1,
+        conform = 'prevalent',
+
         expected = pd.DataFrame({
             'x': 286,  # Number of individuals found to be infectious
             'n': 1319, # Number of individuals sampled
@@ -299,8 +361,10 @@ def run_calibration(do_plot=False):
         sim = sim,
         build_fn = build_sim, # Use default builder, Calibration.translate_pars
         reseed = False,
-        components = [prevalence, incidence, 
-                      infected_5_6, infected_6_15, infected_15plus], #infectious, incidence
+        components = [prevalence_intv, prevalence_ctrl, incidence, 
+                      infected_5_6_intv, infected_5_6_ctrl,
+                      infected_6_15_intv, infected_6_15_ctrl,
+                      infected_15plus ],
         total_trials = total_trials,
         n_workers = None, # None indicates to use all available CPUs
         die = True,
