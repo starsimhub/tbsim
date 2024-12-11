@@ -44,6 +44,8 @@ class TB(ss.Infection):
             rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
 
+            rel_sus_postinfection = 1.0, # Relative susceptibility post-infection
+
             reltrans_het = ss.constant(v=1.0),
         )
         self.update_pars(pars, **kwargs) 
@@ -156,6 +158,8 @@ class TB(ss.Infection):
 
         # Update result count of new infections 
         self.ti_infected[uids] = self.ti
+
+        self.rel_sus[uids] = self.pars.rel_sus_postinfection
         return
 
     def step(self):
