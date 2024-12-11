@@ -212,13 +212,13 @@ def run_calibration(do_plot=False):
 
         # Need to feed in the right data  
         expected = pd.DataFrame({
-            'x': [240, 169, 136, 78, 53],             # Number of individuals found to be infectious
+            'x': [360, 169, 136, 78, 53],             # Number of individuals found to be infectious
             'n': [60000, 43425, 44082, 42150, 41680], # Number of individuals sampled
         }, index=pd.Index([ss.date(d) for d in ['1995-12-31', '2014-12-31', 
                                                 '2015-12-31', '2016-12-31', '2017-12-31']], name='t')), # On these dates
         
         extract_fn = lambda sim: pd.DataFrame({
-            'x': sim.results.tb.new_cases,
+            'x': sim.results.tb.n_active,
             'n': sim.results.n_alive,
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
@@ -232,12 +232,12 @@ def run_calibration(do_plot=False):
         expected = pd.DataFrame({
             'n': [28661, 24705, 28823], 
             'x': [70, 35, 26],
-            't': [ss.date(d) for d in ['2014-01-01', '2015-01-01', '2016-01-01']], # Between t and t1
-            't1': [ss.date(d) for d in ['2014-12-31', '2015-12-31', '2016-12-31']],
+            't': [ss.date(d) for d in ['2015-01-01', '2016-01-01', '2017-01-01']], # Between t and t1
+            't1': [ss.date(d) for d in ['2015-12-31', '2016-12-31', '2017-12-31']],
         }).set_index(['t', 't1']),
 
         extract_fn = lambda sim: pd.DataFrame({
-            'x': sim.results.tb.new_cases, # Events
+            'x': sim.results.tb.new_active, # Events
             'n': sim.results.n_alive * sim.t.dt_year, # Person-years at risk
         }, index=pd.Index(sim.results.timevec, name='t'))
     )
