@@ -245,7 +245,8 @@ def build_sim(sim, calib_pars, **kwargs):
                         intv.pars.date_cov[year] = 0.0 # In control arm, no ACF until 2017
         sims.append(sim_ctrl)
 
-    ms = ss.MultiSim(sims, initialize=True, debug=True, parallel=False)
+    #####ms = ss.MultiSim(sims, initialize=True, debug=True, parallel=False)
+    ms = ss.MultiSim(sims, initialize=True, debug=False, parallel=True)
     return ms
 
 
@@ -418,7 +419,7 @@ def make_calibration():
         total_trials = total_trials,
         db_name = f'{resdir}/calibration.db',
         keep_db = True,
-        n_workers = None, # None indicates to use all available CPUs
+        n_workers = max(1, sc.cpu_count() // (2*n_reps)), ######None, # None indicates to use all available CPUs
         die = True,
         debug = debug,
     )
