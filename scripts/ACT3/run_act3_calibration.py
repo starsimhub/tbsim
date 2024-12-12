@@ -81,17 +81,8 @@ class AgeInfect(ss.Analyzer):
         return
 
 #%% Helper functions
-def make_sim():
-    """
-    Build the simulation object that will simulate the ACT3
-    """
 
-    # Random seed is used when deciding the initial n_agents, so set here
-    #np.random.seed()
-
-    # Retrieve intervention, TB, and simulation-related parameters from scen and skey
-    # for TB
-
+def make_people(n):
     # Create the people, networks, and demographics
     age_data = pd.DataFrame({ # Data from WPP, https://population.un.org/wpp/Download/Standard/MostUsed/
         'age': np.arange(0, 101, 5),
@@ -100,9 +91,21 @@ def make_sim():
         'value': [7955, 7388, 6928, 7061, 8657, 8104, 8006, 7005, 6486, 5927, 5495, 4625, 3198, 2090, 1366, 1109, 830, 402, 153, 34, 4], #2015
     })
     pop = ss.People(
-        n_agents = np.round(np.random.normal(loc=n_agents, scale=50)),
+        n_agents = n,
         age_data = age_data,
     )
+    return pop
+
+def make_sim():
+    """
+    Build the simulation object that will simulate the ACT3
+    """
+
+    # Random seed is used when deciding the initial n_agents, so set here
+    np.random.seed()
+    n = np.round(np.random.normal(loc=n_agents, scale=50))
+    pop = make_people(n)
+
     demog = [
         # Crude rates for Vietnam in 2015
         ss.Births(birth_rate=ss.peryear(18.5), unit='day', dt=30),  # Matching to simulation's unit and dt, hopefully soon not necessary
@@ -151,10 +154,7 @@ def make_sim():
     )
 
     # ACT3 intervention 
-    act3 = mtb.ActiveCaseFinding(
-        name = 'ACT3 Active Case Finding',
-        p_treat = ss.bernoulli(p=1.0),
-    )
+    act3 = mtb.ActiveCaseFinding(name='ACT3 Active Case Finding')
 
     # Time varying parameters
     decrease_beta = time_varying_parameter(
@@ -225,6 +225,12 @@ def build_sim(sim, calib_pars, **kwargs):
     sims = []
     for seed in np.random.randint(0, 1e6, reps):
         sim_intv = sim.copy()
+
+        np.random.seed(seed) # Used for initial pop size
+        n = np.round(np.random.normal(loc=n_agents, scale=50))
+        pop = make_people(n)
+        sim_intv.pars.population = pop
+
         sim_intv.pars.rand_seed = seed
         sim_intv.label = 'Intervention'
         sims.append(sim_intv)
