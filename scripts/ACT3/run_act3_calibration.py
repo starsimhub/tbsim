@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 
 debug = False
-n_reps = [2, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
-total_trials = [50, 2][debug]
+n_reps = [5, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
+total_trials = [50, 10][debug]
 n_agents = 1_000
 
 date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
@@ -114,14 +114,16 @@ def make_sim():
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
     tb_pars = dict(
-        beta              = ss.beta(0.045, unit='year'),
-        init_prev         = ss.bernoulli(0.02),
-        rate_LS_to_presym = ss.perday(3e-5),
-        rate_LF_to_presym = ss.perday(6e-3),
-        rel_trans_smpos   = 1.0,
-        rel_trans_smneg   = 0.3,
-        rel_trans_exptb   = 0.05,
-        rel_trans_presymp = 0.10
+        beta                  = ss.beta(0.045, unit='year'),
+        init_prev             = ss.bernoulli(0.02),
+        p_latent_fast         = ss.bernoulli(0.24),
+        rate_presym_to_active = ss.peryear(1/0.3), # duration of 0.3 years (exponential mean)
+        rate_LS_to_presym     = ss.peryear(3e-6),
+        rate_LF_to_presym     = ss.perday(6e-3),
+        rel_trans_smpos       = 1.0,
+        rel_trans_smneg       = 0.2,
+        rel_trans_exptb       = 0.0,
+        rel_trans_presymp     = 0.3,
     )
     tb = mtb.TB(tb_pars)
 
@@ -129,19 +131,22 @@ def make_sim():
     ageinfect = AgeInfect()
 
     pcf = mtb.ActiveCaseFinding(
-        name = 'Passive Case Finding',
+        name = 'Passive Care Seeking',
         p_treat = ss.bernoulli(p=1.0),
         date_cov = {
-            sc.date('1995-01-01'): 0.0,
-            sc.date('2014-01-01'): ss.peryear(1), # Will be multiplied by a value in calibration
+            sc.date('1994-01-01'): 0.0, # Start of DOTs in Vietnam
+            # Coverage values will be multiplied by xpcf, a calibration parameter
+            sc.date('2000-01-01'): ss.peryear(0.7), # 2000 reflects completion of DOTS scale-up in Vietnam
+            sc.date('2020-01-01'): ss.peryear(1.0), # Coverage continued to scale up through 2020
         },
         interp = True,
 
+        # Sensitivity also reflects care seeking behavior as coverage is agnostic to state
         test_sens = {
             mtb.TBS.ACTIVE_SMPOS: 1,
-            mtb.TBS.ACTIVE_PRESYMP: 0.1,
+            mtb.TBS.ACTIVE_PRESYMP: 0.0,
             mtb.TBS.ACTIVE_SMNEG: 0.8,
-            mtb.TBS.ACTIVE_EXPTB: 0.1,
+            mtb.TBS.ACTIVE_EXPTB: 0.1, # Not feeling well, but not obviously TB
         }
     )
 
@@ -211,7 +216,7 @@ def build_sim(sim, calib_pars, **kwargs):
                     intv.pars.start = sc.date(f'{v}-01-01')
         elif k == 'xpcf':
             for intv in sim.pars.interventions:
-                if intv.name == 'Passive Case Finding':
+                if intv.name == 'Passive Care Seeking':
                     for cov in intv.pars.date_cov.values():
                         cov *= v
         else:
@@ -227,8 +232,11 @@ def build_sim(sim, calib_pars, **kwargs):
         sim_ctrl = sim_intv.copy()
         sim_ctrl.label = 'Control'
         for intv in sim.pars.interventions:
-            if isinstance(intv, mtb.ActiveCaseFinding):
-                intv.pars.p_treat = ss.bernoulli(p=0.0)
+            if intv.name == 'ACT3 Active Case Finding':
+                #intv.pars.p_treat = ss.bernoulli(p=0.0)
+                for year, cov in intv.pars.date_cov.items():
+                    if year < 2017: # Year as float
+                        intv.pars.date_cov[year] = 0.0 # In control arm, no ACF until 2017
         sims.append(sim_ctrl)
 
     ms = ss.MultiSim(sims, initialize=True, debug=True, parallel=False)
@@ -375,7 +383,8 @@ def make_calibration():
 
     # TODO: Which arm?
     infected_15plus = ss.BetaBinomial(
-        name = 'Prev Ever Infected 15+',
+        name = 'Prev Ever Infected 15+ (Intervention)',
+        include_fn = lambda sim: sim.label == 'Intervention',
         weight = 1,
         conform = 'prevalent',
 
@@ -452,8 +461,9 @@ if __name__ == '__main__':
     T.toc()
 
     # Check fit and make plots
-    calib.check_fit()
+    calib.check_fit(do_plot=False)
     figs = calib.plot()
+
     for i, fig in enumerate(figs):
         fig.savefig(os.path.join(resdir, f'Component_{i}.png'), dpi=300)
 
@@ -476,10 +486,33 @@ if __name__ == '__main__':
     dfs = []
     for sim in calib.before_msim.sims + calib.after_msim.sims:
         df = sim.to_df()
+        df['seed'] = sim.pars.rand_seed
         df['arm'] = sim.label
         df['calibrated'] = 'After Calibration' if sim.calibrated else 'Before Calibration'
         dfs.append(df)
 
     df = pd.concat(dfs)
+
+    df.to_csv(os.path.join(resdir, 'results.csv'))
+    ret = df.melt(id_vars=['timevec', 'arm', 'calibrated', 'seed'], value_name='value', var_name='variable')
+
+    g = sns.relplot(data=ret, x='timevec', y='value', hue='arm', col='variable', kind='line', style='calibrated', style_order=['Before Calibration'], col_wrap=6, errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='seed'
+    g.set_titles(col_template="{col_name}")
+    g.fig.tight_layout()
+    f.fig.subplots_adjust(top=0.9)
+    g.fig.suptitle('Before Calibration')
+    g.fig.savefig(os.path.join(resdir, 'sim_before.png'), dpi=600)
+
+    g = sns.relplot(data=ret, x='timevec', y='value', hue='arm', col='variable', kind='line', style='calibrated', style_order=['After Calibration'], col_wrap=6, errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='seed'
+    g.set_titles(col_template="{col_name}")
+    g.fig.tight_layout()
+    f.fig.subplots_adjust(top=0.9)
+    g.fig.suptitle('After Calibration')
+    g.fig.savefig(os.path.join(resdir, 'sim_after.png'), dpi=600)
+
+    g = sns.relplot(data=ret, x='timevec', y='value', hue='arm', col='variable', kind='line', style='calibrated', col_wrap=6, errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='seed'
+    g.set_titles(col_template="{col_name}")
+    g.fig.tight_layout()
+    g.fig.savefig(os.path.join(resdir, 'sim_both.png'), dpi=600)
 
     plt.show()
