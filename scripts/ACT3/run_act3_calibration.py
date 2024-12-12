@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 
 debug = False
-n_reps = [5, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
-total_trials = [50, 10][debug]
+n_reps = [10, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
+total_trials = [250, 2][debug]
 n_agents = 1_000
 
 date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
@@ -168,9 +168,9 @@ def make_sim():
     sim_pars = dict(
         # Default simulation parameters
         unit='day', dt=30,
-        start=ss.date('1800-01-01'),
+        #start=ss.date('1800-01-01'),
         #start=ss.date('1900-01-01'),
-        #start=ss.date('1950-01-01'),
+        start=ss.date('1960-01-01'),
         #start=ss.date('1980-01-01'),
         stop=ss.date('2018-12-31')
     )
@@ -223,13 +223,13 @@ def build_sim(sim, calib_pars, **kwargs):
             raise NotImplementedError(f'Parameter {k} not recognized')
 
     sims = []
-    for seed in np.random.randint(0, 1e6, reps):
+    for seed in np.arange(sim.pars.rand_seed, sim.pars.rand_seed+reps): #np.random.randint(0, 1e6, reps):
         sim_intv = sim.copy()
 
         np.random.seed(seed) # Used for initial pop size
         n = np.round(np.random.normal(loc=n_agents, scale=50))
         pop = make_people(n)
-        sim_intv.pars.population = pop
+        sim_intv.pars.people = pop
 
         sim_intv.pars.rand_seed = seed
         sim_intv.label = 'Intervention'
@@ -237,7 +237,7 @@ def build_sim(sim, calib_pars, **kwargs):
 
         sim_ctrl = sim_intv.copy()
         sim_ctrl.label = 'Control'
-        for intv in sim.pars.interventions:
+        for intv in sim_ctrl.pars.interventions:
             if intv.name == 'ACT3 Active Case Finding':
                 #intv.pars.p_treat = ss.bernoulli(p=0.0)
                 for year, cov in intv.pars.date_cov.items():
@@ -410,7 +410,7 @@ def make_calibration():
         calib_pars = calib_pars,
         sim = sim,
         build_fn = build_sim, # Use default builder, Calibration.translate_pars
-        reseed = False,
+        reseed = True,
         components = [prevalence_intv, prevalence_ctrl, incidence, 
                       infected_5_6_intv, infected_5_6_ctrl,
                       infected_6_15_intv, infected_6_15_ctrl,
@@ -481,6 +481,8 @@ if __name__ == '__main__':
                 fig = fig.flatten()[0].get_figure()
             elif isinstance(fig, plt.Axes): # Single axis
                 fig = fig.get_figure()
+            fig.tight_layout()
+            fig.set_size_inches(8, 8)
             fig.savefig(os.path.join(resdir, f'{lbl}.png'), dpi=300)
         except:
             print(f"Failed to save {lbl}.png")
@@ -494,7 +496,7 @@ if __name__ == '__main__':
         df = sim.to_df()
         df['seed'] = sim.pars.rand_seed
         df['arm'] = sim.label
-        df['calibrated'] = 'After Calibration' if sim.calibrated else 'Before Calibration'
+        df['calibrated'] = 'After Calibration' if sim in calib.after_msim.sims else 'Before Calibration'
         dfs.append(df)
 
     df = pd.concat(dfs)
@@ -505,14 +507,14 @@ if __name__ == '__main__':
     g = sns.relplot(data=ret, x='timevec', y='value', hue='arm', col='variable', kind='line', style='calibrated', style_order=['Before Calibration'], col_wrap=6, errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='seed'
     g.set_titles(col_template="{col_name}")
     g.fig.tight_layout()
-    f.fig.subplots_adjust(top=0.9)
+    g.fig.subplots_adjust(top=0.95)
     g.fig.suptitle('Before Calibration')
     g.fig.savefig(os.path.join(resdir, 'sim_before.png'), dpi=600)
 
     g = sns.relplot(data=ret, x='timevec', y='value', hue='arm', col='variable', kind='line', style='calibrated', style_order=['After Calibration'], col_wrap=6, errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='seed'
     g.set_titles(col_template="{col_name}")
     g.fig.tight_layout()
-    f.fig.subplots_adjust(top=0.9)
+    g.fig.subplots_adjust(top=0.95)
     g.fig.suptitle('After Calibration')
     g.fig.savefig(os.path.join(resdir, 'sim_after.png'), dpi=600)
 

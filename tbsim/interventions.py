@@ -70,7 +70,9 @@ class ActiveCaseFinding(ss.Intervention):
         if self.pars.interp:
             p_visit = np.interp(year, years, list(self.pars.date_cov.values()))
         else:
-            if year in self.pars.date_cov:
+            in_year = (year >= years) & (year < years + self.t.dt_year)
+            if in_year.any():
+                year = years[in_year][0]
                 p_visit = self.pars.date_cov[year]
             else:
                 p_visit = 0
