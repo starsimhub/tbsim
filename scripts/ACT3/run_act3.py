@@ -13,7 +13,6 @@ default_n_rand_seeds = [60, 1][debug]
 
 # Check if the results directory exists, if not, create it
 resdir = os.path.join('results', 'ACT3')
-
 os.makedirs(resdir, exist_ok=True)
 
 def build_ACF(skey, scen, rand_seed=0):

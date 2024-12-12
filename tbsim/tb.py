@@ -38,9 +38,9 @@ class TB(ss.Infection):
             active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
 
             # Relative transmissibility of each state
-            rel_trans_presymp   = 0.1,
+            rel_trans_presymp   = 0.1, # 0.0274
             rel_trans_smpos     = 1.0,
-            rel_trans_smneg     = 0.3,
+            rel_trans_smneg     = 0.3, # 0.25
             rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
 
@@ -63,6 +63,7 @@ class TB(ss.Infection):
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
             ss.State('on_treatment', default=False),
+            ss.State('ever_infected', default=False),           # Flag for ever infected
 
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
@@ -158,6 +159,7 @@ class TB(ss.Infection):
 
         # Update result count of new infections 
         self.ti_infected[uids] = self.ti
+        self.ever_infected[uids] = True
 
         self.rel_sus[uids] = self.pars.rel_sus_postinfection
         return
