@@ -20,6 +20,10 @@ date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
 resdir = os.path.join('results', f'ACT3Calib_{date}')
 os.makedirs(resdir, exist_ok=True)
 
+storage = ["mysql://covasim_user@localhost/covasim_db", None][debug]  # Storage for calibrations
+n_workers = [40, 1][debug]  # How many cores to use
+
+
 
 #%% Intervention to reduce transmission and progression of the TB disease
 class time_varying_parameter(ss.Intervention):
@@ -419,7 +423,8 @@ def make_calibration():
         total_trials = total_trials,
         db_name = f'{resdir}/calibration.db',
         keep_db = True,
-        n_workers = None, # None indicates to use all available CPUs
+        n_workers = n_workers, #None, # None indicates to use all available CPUs
+        storage = storage,
         die = True,
         debug = debug,
     )
