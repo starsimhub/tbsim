@@ -121,7 +121,8 @@ def make_sim():
         init_prev             = ss.bernoulli(0.02),
         p_latent_fast         = ss.bernoulli(0.24),
         rate_presym_to_active = ss.peryear(1/0.3), # duration of 0.3 years (exponential mean)
-        rate_LS_to_presym     = ss.peryear(3e-6),
+        #rate_LS_to_presym     = ss.perday(3e-5), # 3e-5 or 3e-6? per day? per year? Initially was 3e-5 per day...
+        rate_LS_to_presym     = ss.time_prob(0.1, unit='year', self_dt=50), # 3e-5 or 3e-6? per day? per year? Initially was 3e-5 per day... 10% over 50 years???
         rate_LF_to_presym     = ss.perday(6e-3),
         rel_trans_smpos       = 1.0,
         rel_trans_smneg       = 0.2,

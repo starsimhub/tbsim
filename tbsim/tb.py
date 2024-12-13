@@ -53,7 +53,7 @@ class TB(ss.Infection):
         # Validate rates
         for k, v in self.pars.items():
             if k[:5] == 'rate_':
-                assert isinstance(v, ss.rate), 'Rate parameters for TB must be TimePars, e.g. ss.perday(x)'
+                assert isinstance(v, ss.TimePar), 'Rate parameters for TB must be TimePars, e.g. ss.perday(x)'
 
         self.define_states(
             # Initialize states specific to TB:
