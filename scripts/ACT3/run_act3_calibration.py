@@ -421,10 +421,11 @@ def make_calibration():
                       infected_6_15_intv, infected_6_15_ctrl,
                       infected_15plus ],
         total_trials = total_trials,
-        db_name = f'{resdir}/calibration.db',
+        db_name = f'{resdir}/calibration.db', # Only if SQLite is used
         keep_db = True,
         n_workers = n_workers, #None, # None indicates to use all available CPUs
         storage = storage,
+        study_name = f'ACT3Calib_{date}',
         die = True,
         debug = debug,
     )
