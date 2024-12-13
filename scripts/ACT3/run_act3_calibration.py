@@ -9,7 +9,7 @@ import seaborn as sns
 import os
 import matplotlib.pyplot as plt
 
-
+mysql = False
 debug = False
 n_reps = [10, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
 total_trials = [250, 2][debug]
@@ -20,8 +20,8 @@ date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
 resdir = os.path.join('results', f'ACT3Calib_{date}')
 os.makedirs(resdir, exist_ok=True)
 
-storage = ["mysql://covasim_user@localhost/covasim_db", None][debug]  # Storage for calibrations
-n_workers = [40, 1][debug]  # How many cores to use
+storage = 'mysql://covasim_user@localhost/covasim_db' if mysql else None
+n_workers = [min(40, sc.cpu_count()), 1][debug]  # How many cores to use
 
 
 
