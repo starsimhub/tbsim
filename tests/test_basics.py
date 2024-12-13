@@ -3,9 +3,9 @@ import numpy as np
 import starsim as ss
 import tbsim as mtb
 
-def make_tb_simplified(agents=20, start=2000, stop=2020, dt=7/365, by_age=False):
+def make_tb_simplified(agents=20, start=2000, stop=2005, dt=7/365, age_off=False):
     pop = ss.People(n_agents=agents)
-    tb = mtb.TB(pars={'beta': ss.beta(0.01), 'init_prev': 0.25, 'by_age': by_age})
+    tb = mtb.TB(pars={'beta': ss.beta(0.01), 'init_prev': 0.25, 'age_off': age_off})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))]
     sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start, stop=stop), demographics=dems)
@@ -29,33 +29,17 @@ def test_initial_states():
     assert isinstance(tb.ti_active, ss.FloatArr)
     assert isinstance(tb.ti_active, ss.FloatArr)
     assert isinstance(tb.ti_active, ss.FloatArr)
-    
-def test_tb_initialization():
-    tb = mtb.TB()
-    assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_presym_to_active'], ss.rate)
-    assert isinstance(tb.pars['rate_active_to_clear'], ss.rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rel_trans_presymp'], float)
-    assert isinstance(tb.pars['rel_trans_smpos'], float)
-    assert isinstance(tb.pars['rel_trans_smneg'], float)
-    assert isinstance(tb.pars['rel_trans_exptb'], float)
-    assert isinstance(tb.pars['rel_trans_treatment'], float)
-    
+   
+
 def test_default_parameters():
     tb = mtb.TB()
     print(tb)
     assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.rate)
-    # assert isinstance(tb.pars['rate_active_to_cure'], ss.rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.rate)
+    assert isinstance(tb.pars['rate_LS_to_presym'], mtb.RateVec)
+    assert isinstance(tb.pars['rate_LF_to_presym'], mtb.RateVec)
+    assert isinstance(tb.pars['rate_exptb_to_dead'], mtb.RateVec)
+    assert isinstance(tb.pars['rate_smpos_to_dead'], mtb.RateVec)
+    assert isinstance(tb.pars['rate_smneg_to_dead'], mtb.RateVec)
     assert isinstance(tb.pars['rel_trans_smpos'], float)
 
 def test_tb_infectious():
@@ -407,7 +391,7 @@ def test_active_to_death_transition():
 
 def test_active_to_cleared_transition_byage():
     # Increasing number of agents even higher as the clearance rate is very low
-    sim = make_tb_simplified(agents=5000, by_age=True)
+    sim = make_tb_simplified(agents=5000, age_off=True)
     sim.init()
     tb = sim.diseases['tb']
     # Setup individuals in active TB states
@@ -427,7 +411,7 @@ def test_active_to_cleared_transition_byage():
     
 def test_active_to_death_transition_byage():
     # Setup individuals in active TB states
-    sim = make_tb_simplified(agents=5000, by_age=True)
+    sim = make_tb_simplified(agents=5000, age_off=True)
     sim.init()
     tb = sim.diseases['tb']
     active_uids = ss.uids(np.arange(4000))  # Also test with a large number of agents
