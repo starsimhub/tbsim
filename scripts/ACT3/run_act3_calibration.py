@@ -123,10 +123,10 @@ def make_sim():
     tb_pars = dict(
         beta                  = ss.beta(0.045, unit='year'),
         init_prev             = ss.bernoulli(0.02),
-        p_latent_fast         = ss.bernoulli(0.24),
+        p_latent_fast         = ss.bernoulli(0.24), # 11% adult, 5% children?
         rate_presym_to_active = ss.peryear(1/0.3), # duration of 0.3 years (exponential mean)
         #rate_LS_to_presym     = ss.perday(3e-5), # 3e-5 or 3e-6? per day? per year? Initially was 3e-5 per day...
-        rate_LS_to_presym     = ss.time_prob(0.1, unit='year', self_dt=50), # 3e-5 or 3e-6? per day? per year? Initially was 3e-5 per day... 10% over 50 years???
+        rate_LS_to_presym     = ss.time_prob(0.1, unit='year', self_dt=50), # (50y->2.88e-4 per day) 3e-5 or 3e-6? per day? per year? Initially was 3e-5 per day... 10% over 50 years???
         rate_LF_to_presym     = ss.perday(6e-3),
         rel_trans_smpos       = 1.0,
         rel_trans_smneg       = 0.2,
@@ -258,12 +258,13 @@ def build_sim(sim, calib_pars, **kwargs):
 def make_calibration():
     # Define the calibration parameters
     calib_pars = dict(
-        beta = dict(low=0.01, high=0.70, guess=0.15, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
+        # {'beta': 0.4016615352455662, 'beta_change': 0.7075221406739112, 'beta_change_year': 2001, 'xpcf': 0.14812009041601049, 'rand_seed': 172264}. Best is trial 88 with value: 11479.499964475886.
+        beta = dict(low=0.01, high=0.70, guess=0.4016615352455662, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
         #init_prev = dict(low=0.01, high=0.25, guess=0.15), # Default type is suggest_float, no need to re-specify
         #n_contacts = dict(low=2, high=10, guess=3),
-        beta_change = dict(low=0.25, high=1, guess=0.5),
-        beta_change_year = dict(low=1950, high=2014, guess=2000, suggest_type='suggest_int'),
-        xpcf = dict(low=0, high=1.0, guess=0.1),
+        beta_change = dict(low=0.25, high=1, guess=0.7075221406739112),
+        beta_change_year = dict(low=1950, high=2014, guess=2001, suggest_type='suggest_int'),
+        xpcf = dict(low=0, high=1.0, guess=0.14812009041601049),
     )
 
     # Make the sim and data
@@ -278,7 +279,7 @@ def make_calibration():
 
         expected = pd.DataFrame({
             'x': [360, 169, 136, 78, 53],             # Number of individuals found to be infectious
-            'n': [60000, 43425, 44082, 42150, 42150], # Number of individuals sampled
+            'n': [60000, 43425, 44082, 44311, 42150], # Number of individuals sampled
         }, index=pd.Index([ss.date(d) for d in ['1995-12-31', '2014-12-31', 
                                                 '2015-12-31', '2016-12-31', '2017-12-31']], name='t')), # On these dates
 
@@ -392,7 +393,6 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    # TODO: Which arm?
     infected_15plus = ss.BetaBinomial(
         name = 'Prev Ever Infected 15+ (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention',
