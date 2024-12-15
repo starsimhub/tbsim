@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 mysql = False
 debug = False
-n_reps = [10, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
-total_trials = [250, 2][debug]
+n_reps = [30, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
+total_trials = [2500, 2][debug]
 n_agents = 1_000
 
 date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
@@ -21,7 +21,7 @@ resdir = os.path.join('results', f'ACT3Calib_{date}')
 os.makedirs(resdir, exist_ok=True)
 
 storage = 'mysql://covasim_user@localhost/covasim_db' if mysql else None
-n_workers = [min(40, sc.cpu_count()), 1][debug]  # How many cores to use
+n_workers = [min(120, sc.cpu_count()), 1][debug]  # How many cores to use
 
 
 
@@ -274,40 +274,39 @@ def make_calibration():
     prevalence_intv = ss.BetaBinomial(
         name = 'Prevalence Active (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention',
-        weight = 25,
+        weight = 1,
         conform = 'prevalent',
 
         expected = pd.DataFrame({
-            'x': [360, 169, 136, 78, 53],             # Number of individuals found to be infectious
-            'n': [60000, 43425, 44082, 44311, 42150], # Number of individuals sampled
-        }, index=pd.Index([ss.date(d) for d in ['1995-12-31', '2014-12-31', 
-                                                '2015-12-31', '2016-12-31', '2017-12-31']], name='t')), # On these dates
+            'x': [169, 136, 78, 53],             # Number of individuals found to be infectious
+            'n': [43425, 44082, 44311, 42150], # Number of individuals sampled
+        }, index=pd.Index([ss.date(d) for d in ['2014-06-16', '2015-06-11', '2016-06-05', '2017-06-30']], name='t')), # On these dates
 
         extract_fn = lambda sim: pd.DataFrame({
-            'x': sim.results.tb.n_active,
-            'n': sim.results.n_alive,
+            'x': sim.results['ACT3 Active Case Finding'].n_positive, # sim.results.tb.n_active,
+            'n': sim.results['ACT3 Active Case Finding'].n_tested, # sim.results.n_alive,
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
     prevalence_ctrl = ss.BetaBinomial(
         name = 'Prevalence Active (Control)',
         include_fn = lambda sim: sim.label == 'Control',
-        weight = 25,
+        weight = 1,
         conform = 'prevalent',
 
         expected = pd.DataFrame({
-            'x': [360, 94],      # Number of individuals found to be infectious
-            'n': [60000, 41680], # Number of individuals sampled
-        }, index=pd.Index([ss.date(d) for d in ['1995-12-31', '2017-12-31']], name='t')), # On these dates
+            'x': [94],      # Number of individuals found to be infectious
+            'n': [41680], # Number of individuals sampled
+        }, index=pd.Index([ss.date(d) for d in ['2017-06-30']], name='t')), # On these dates
 
         extract_fn = lambda sim: pd.DataFrame({
-            'x': sim.results.tb.n_active,
-            'n': sim.results.n_alive,
+            'x': sim.results['ACT3 Active Case Finding'].n_positive, # sim.results.tb.n_active,
+            'n': sim.results['ACT3 Active Case Finding'].n_tested, # sim.results.n_alive,
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
     incidence = ss.GammaPoisson(
-        name = 'Incidence Cases (Intervention)',
+        name = 'Incident Cases 15+ (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention',
         weight = 1,
         conform = 'incident',
@@ -320,8 +319,26 @@ def make_calibration():
         }).set_index(['t', 't1']),
 
         extract_fn = lambda sim: pd.DataFrame({
-            'x': sim.results.tb.new_active, # Events
-            'n': sim.results.n_alive * sim.t.dt_year, # Person-years at risk
+            'x': sim.results.tb['new_active_15+'], # Events
+            'n': sim.results.ageinfect['pop_15+'] * sim.t.dt_year, # Person-years at risk
+        }, index=pd.Index(sim.results.timevec, name='t'))
+    )
+
+    historical_incidence = ss.GammaPoisson(
+        name = 'Incident Cases 15+ (Historical)',
+        weight = 1,
+        conform = 'incident',
+
+        expected = pd.DataFrame({
+            'n': [1437, 1720, 3400], 
+            'x': [5, 6, 10], #[5.4, 5.8, 9.9], # Must be integer for gamma poisson
+            't': [ss.date(d) for d in  ['2000-01-01', '2005-01-01', '2010-01-01']], # Between t and t1
+            't1': [ss.date(d) for d in ['2000-12-31', '2005-12-31', '2010-12-31']],
+        }).set_index(['t', 't1']),
+
+        extract_fn = lambda sim: pd.DataFrame({
+            'x': sim.results.tb['new_active_15+'], # Events
+            'n': sim.results.ageinfect['pop_15+'] * sim.t.dt_year, # Person-years at risk
         }, index=pd.Index(sim.results.timevec, name='t'))
     )
 
@@ -416,7 +433,8 @@ def make_calibration():
         sim = sim,
         build_fn = build_sim, # Use default builder, Calibration.translate_pars
         reseed = True,
-        components = [prevalence_intv, prevalence_ctrl, incidence, 
+        components = [prevalence_intv, prevalence_ctrl,
+                      incidence, historical_incidence,
                       infected_5_6_intv, infected_5_6_ctrl,
                       infected_6_15_intv, infected_6_15_ctrl,
                       infected_15plus ],
@@ -488,9 +506,9 @@ if __name__ == '__main__':
                 fig = fig.flatten()[0].get_figure()
             elif isinstance(fig, plt.Axes): # Single axis
                 fig = fig.get_figure()
-            fig.tight_layout()
             fig.set_size_inches(8, 8)
-            fig.savefig(os.path.join(resdir, f'{lbl}.png'), dpi=300)
+            fig.tight_layout()
+            fig.savefig(os.path.join(resdir, f'{lbl}.png'), dpi=600)
         except:
             print(f"Failed to save {lbl}.png")
 
