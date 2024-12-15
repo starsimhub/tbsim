@@ -14,6 +14,7 @@ debug = False
 n_reps = [30, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
 total_trials = [120*25, 2][debug]
 n_agents = 1_000
+n_runs_check = [60, 5][debug] # Num final runs for checking fit
 
 date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
 # Check if the results directory exists, if not, create it
@@ -244,10 +245,9 @@ def build_sim(sim, calib_pars, **kwargs):
         sim_ctrl.label = 'Control'
         for intv in sim_ctrl.pars.interventions:
             if intv.name == 'ACT3 Active Case Finding':
-                #intv.pars.p_treat = ss.bernoulli(p=0.0)
-                for year, cov in intv.pars.date_cov.items():
-                    if year < 2017: # Year as float
-                        intv.pars.date_cov[year] = 0.0 # In control arm, no ACF until 2017
+                intv.pars.date_cov = { # Numbers from Table 1, row "Persons who gave oral consent to participate — no. (%)"
+                    sc.datetoyear(sc.date('2017-06-01')): 0.862, # Control arm had 86.2% in 2017
+                }
         sims.append(sim_ctrl)
 
     ms = ss.MultiSim(sims, initialize=True, debug=True, parallel=False)
@@ -275,12 +275,12 @@ def make_calibration():
         name = 'Prevalence Active (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention',
         weight = 1,
-        conform = 'prevalent',
+        conform = 'step_containing',
 
         expected = pd.DataFrame({
             'x': [169, 136, 78, 53],             # Number of individuals found to be infectious
             'n': [43425, 44082, 44311, 42150], # Number of individuals sampled
-        }, index=pd.Index([ss.date(d) for d in ['2014-06-16', '2015-06-11', '2016-06-05', '2017-06-30']], name='t')), # On these dates
+        }, index=pd.Index([ss.date(d) for d in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']], name='t')), # On these dates
 
         extract_fn = lambda sim: pd.DataFrame({
             'x': sim.results['ACT3 Active Case Finding'].n_positive, # sim.results.tb.n_active,
@@ -292,12 +292,12 @@ def make_calibration():
         name = 'Prevalence Active (Control)',
         include_fn = lambda sim: sim.label == 'Control',
         weight = 1,
-        conform = 'prevalent',
+        conform = 'step_containing',
 
         expected = pd.DataFrame({
             'x': [94],      # Number of individuals found to be infectious
             'n': [41680], # Number of individuals sampled
-        }, index=pd.Index([ss.date(d) for d in ['2017-06-30']], name='t')), # On these dates
+        }, index=pd.Index([ss.date(d) for d in ['2017-06-01']], name='t')), # On these dates
 
         extract_fn = lambda sim: pd.DataFrame({
             'x': sim.results['ACT3 Active Case Finding'].n_positive, # sim.results.tb.n_active,
@@ -492,7 +492,7 @@ if __name__ == '__main__':
     T.toc()
 
     # Check fit and make plots
-    calib.check_fit(do_plot=False)
+    calib.check_fit(n_runs=n_runs_check, do_plot=False)
     figs = calib.plot()
 
     for i, fig in enumerate(figs):
