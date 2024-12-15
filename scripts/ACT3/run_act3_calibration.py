@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 mysql = False
 debug = False
 n_reps = [30, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
-total_trials = [2500, 2][debug]
+total_trials = [120*25, 2][debug]
 n_agents = 1_000
 
 date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
@@ -460,7 +460,7 @@ if __name__ == '__main__':
         sim = make_sim()
         pars = {
             'beta'      : dict(value=0.075),
-            'init_prev' : dict(value=0.02),
+            'init_prev' : dict(value=0.10),
             'n_contacts': dict(value=4),
         }
         ms = build_sim(sim, pars, n_reps=25)
