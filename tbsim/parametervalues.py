@@ -3,7 +3,7 @@ import numpy as np
 
 
 class RateVec:
-    def __init__(self, cutoffs, values, interpolation="stair"):
+    def __init__(self, cutoffs, values, interpolation="stair", off_value=None):
         """
         Initialize a RateVec instance.
         Args:
@@ -16,6 +16,7 @@ class RateVec:
         rates = [ss.perday(v) for v in values if not isinstance(v, ss.TimePar)]
         self.values = np.array(rates)
         self.interpolation = interpolation
+        self.off_value=off_value
 
         if len(self.cutoffs) + 1 != len(self.values):
             raise ValueError("Number of values must be one more than the number of cutoffs.")
@@ -36,6 +37,28 @@ class RateVec:
             return self.linear_interpolate(inputs)
         else:
             raise ValueError(f"Unknown interpolation method: {self.interpolation}")
+        
+    def turn_age_off(self, new_off_value=None):
+        """
+        Turn age-specific rate functionality off by setting all values to a single value.
+        Args:
+            new_off_value (float, optional):  The value to set for all rates. 
+                                              If not provided, the default `off_value` will be used.
+        Raises:
+            ValueError: If `new_off_value` is not a valid number and `off_value` is not set.
+        """
+        if new_off_value is not None:
+            if not isinstance(new_off_value, (int, float)):
+                raise ValueError(f"Invalid value for new_off_value: {new_off_value}. Must be a number.")
+            self.values = np.array([new_off_value, new_off_value])
+        elif hasattr(self, 'off_value') and self.off_value is not None:
+            self.values = np.array([self.off_value, self.off_value])
+        else:
+            raise ValueError("No valid value provided for turning age off, and 'off_value' is not set.")
+
+        # Simplify cutoffs to cover all ages
+        self.cutoffs = [0]  # Single cutoff to apply the same value to everyone
+
 
     def linear_interpolate(self, inputs):
         """
@@ -63,60 +86,3 @@ class RateVec:
     def __summary__(self):
         return f"RateVec(cutoffs={self.cutoffs}, values={self.values}, interpolation={self.interpolation})"
 
-
-class RatesByAge:
-    def __init__(self, unit, dt):
-        self.unit = unit
-        self.dt = dt
-        self.rates_dict = {
-            'rate_LS_to_presym': {
-                0: ss.perday(3e-5, unit, dt),   
-                15: ss.perday(2.0548e-6, unit, dt),  
-                25: ss.perday(3e-5, unit, dt),
-                np.inf: ss.perday(3e-5, unit, dt),
-            },
-            'rate_LF_to_presym': {
-                0: ss.perday(6e-3, unit, dt),
-                15: ss.perday(4.5e-3, unit, dt),
-                25: ss.perday(6e-3, unit, dt),
-                np.inf: ss.perday(6e-3, unit, dt),
-            },
-            'rate_presym_to_active': {
-                0: ss.perday(3e-2, unit, dt),
-                15: ss.perday(5.48e-3, unit, dt),
-                25: ss.perday(3e-2, unit, dt),
-                np.inf: ss.perday(6e-3, unit, dt),
-            },
-            'rate_active_to_clear': {
-                0: ss.perday(2.4e-4, unit, dt),
-                15: ss.perday(2.74e-4, unit, dt),
-                25: ss.perday(2.4e-4, unit, dt),
-                np.inf: ss.perday(2.4e-4, unit, dt),
-            },
-            'rate_smpos_to_dead': {
-                0: ss.perday(4.5e-4, unit, dt),
-                15: ss.perday(6.85e-4, unit, dt),
-                25: ss.perday(4.5e-4, unit, dt),
-                np.inf: ss.perday(4.5e-4, unit, dt),
-            },
-            'rate_smneg_to_dead': {
-                0: ss.perday(0.3 * 4.5e-4, unit, dt),
-                15: ss.perday(2.74e-4, unit, dt),
-                25: ss.perday(0.3 * 4.5e-4, unit, dt),
-                np.inf: ss.perday(0.3 * 4.5e-4, unit, dt),
-            },
-            'rate_exptb_to_dead': {
-                0: ss.perday(0.15 * 4.5e-4, unit, dt),
-                15: ss.perday(2.74e-4, unit, dt),
-                25: ss.perday(0.15 * 4.5e-4, unit, dt),
-                np.inf: ss.perday(0.15 * 4.5e-4, unit, dt),
-            },
-            'rate_treatment_to_clear': {
-                0: ss.peryear(12/2, unit, dt),
-                15: ss.peryear(2, unit, dt),
-                25: ss.peryear(12/2, unit, dt),
-                np.inf: ss.perday(12/2, unit, dt),
-            },
-        }
-        return 
- 
