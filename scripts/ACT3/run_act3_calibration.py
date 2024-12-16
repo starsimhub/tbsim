@@ -17,6 +17,9 @@ n_agents = 1_000
 n_runs_check = [60, 5][debug] # Num final runs for checking fit
 
 date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
+
+#date = '2024Dec16-032519'
+
 # Check if the results directory exists, if not, create it
 resdir = os.path.join('results', f'ACT3Calib_{date}')
 os.makedirs(resdir, exist_ok=True)
@@ -258,12 +261,13 @@ def make_calibration():
     # Define the calibration parameters
     calib_pars = dict(
         # {'beta': 0.4016615352455662, 'beta_change': 0.7075221406739112, 'beta_change_year': 2001, 'xpcf': 0.14812009041601049, 'rand_seed': 172264}. Best is trial 88 with value: 11479.499964475886.
-        beta = dict(low=0.01, high=0.70, guess=0.4016615352455662, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
+        #{'beta': 0.445499764760726, 'beta_change': 0.6880249223150746, 'beta_change_year': 1986, 'xpcf': 0.08450198158889916, 'rand_seed': 925220}. Best is trial 1747 with value: 103.93212613894507.
+        beta = dict(low=0.01, high=0.70, guess=0.445499764760726, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
         #init_prev = dict(low=0.01, high=0.25, guess=0.15), # Default type is suggest_float, no need to re-specify
         #n_contacts = dict(low=2, high=10, guess=3),
-        beta_change = dict(low=0.25, high=1, guess=0.7075221406739112),
-        beta_change_year = dict(low=1950, high=2014, guess=2001, suggest_type='suggest_int'),
-        xpcf = dict(low=0, high=1.0, guess=0.14812009041601049),
+        beta_change = dict(low=0.25, high=1, guess=0.6880249223150746),
+        beta_change_year = dict(low=1986, high=2014, guess=2001, suggest_type='suggest_int'),
+        xpcf = dict(low=0, high=1.0, guess=0.08450198158889916),
     )
 
     # Make the sim and data
@@ -496,10 +500,12 @@ if __name__ == '__main__':
 
     # Check fit and make plots
     calib.check_fit(n_runs=n_runs_check, do_plot=False)
-    figs = calib.plot()
 
-    for i, fig in enumerate(figs):
-        fig.savefig(os.path.join(resdir, f'Component_{i}.png'), dpi=300)
+    for bootstrap in [True, False]:
+        lbl = '_bootstrap' if bootstrap else ''
+        figs = calib.plot(bootstrap=bootstrap)
+        for i, fig in enumerate(figs):
+            fig.savefig(os.path.join(resdir, f'Component_{i}{lbl}.png'), dpi=300)
 
     plots = ['param_importances', 'optimization_history', 'parallel_coordinate', 'contour']
     figs = calib.plot_optuna([f'plot_{lbl}' for lbl in plots])
