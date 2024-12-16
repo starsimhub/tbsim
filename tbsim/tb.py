@@ -339,7 +339,8 @@ class TB(ss.Infection):
         res = self.results
         ti = self.ti
         ti_infctd = self.ti_infected
-        per_year_fctr = 365.25/self.t.dt_year
+        # per_year_fctr = 365.25/self.t.dt_year #TODO: Dan, you changed this value, however it will result in zero
+        per_year_fctr = 365.25/self.t.dt
 
         res.n_latent_slow[ti]     = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti]     = np.count_nonzero(self.state == TBS.LATENT_FAST)

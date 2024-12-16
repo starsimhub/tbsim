@@ -41,7 +41,7 @@ def build_RATIONS(skey, scen, rand_seed=0):
 
     # Create the instance of TB disease
     tb_pars = dict(
-        beta = ss.beta(0.00035), # 0.045
+        beta = ss.beta(0.045, unit='year'), # 0.045   
         init_prev = 0, # Infections seeded by Rations class
         # Relative transmissibility by TB state
         rel_trans_smpos     = 1.0,
