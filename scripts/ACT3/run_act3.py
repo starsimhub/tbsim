@@ -38,7 +38,7 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
     acf_res = []
     for s in ms.sims:
         df = pd.DataFrame({
-            'time_year': s.results.timevec,
+            'timevec': s.results.timevec,
             'on_treatment': s.results.tb.n_on_treatment, 
             'prevalence': s.results.tb.prevalence,
             'active_presymp': s.results.tb.n_active_presymp,
@@ -46,21 +46,21 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
             'active_exptb': s.results.tb.n_active_exptb,
         })
         df['scenario'] = skey
-        df['label'] = s.label
-        df['rand_seed'] = s.pars.rand_seed
+        df['arm'] = s.label
+        df['seed'] = s.pars.rand_seed
         tb_res.append(df)
 
         act3_dates = [ss.date(t) for t in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']]
         inds = np.searchsorted(s.results.timevec, act3_dates, side='left')
         df = pd.DataFrame({
-            'date': s.results.timevec[inds],
+            'timevec': s.results.timevec[inds],
             'n_elig': s.results['ACT3 Active Case Finding'].n_elig[inds],
             'n_tested': s.results['ACT3 Active Case Finding'].n_tested[inds],
             'n_positive': s.results['ACT3 Active Case Finding'].n_positive[inds],
         })
         df['scenario'] = skey
-        df['label'] = s.label
-        df['rand_seed'] = s.pars.rand_seed
+        df['arm'] = s.label
+        df['seed'] = s.pars.rand_seed
         acf_res.append(df)
 
     tb_res = pd.concat(tb_res)
@@ -125,5 +125,14 @@ if __name__ == '__main__':
     # plot the results
     df_result.get('ACT3')
 
+
+    # MOVE TO aplt:
+    import seaborn as sns
+    ret = df_result.get('TB').reset_index(drop=True).melt(id_vars=['timevec', 'arm', 'seed'], value_name='value', var_name='variable')
+    g = sns.relplot(data=ret, x='timevec', y='value', hue='arm', col='variable', kind='line', row='scenario', errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='seed'
+    g.set_titles(col_template="{col_name}")
+    g.fig.tight_layout()
+    g.fig.savefig(os.path.join(resdir, 'figs', 'timeseries.png'), dpi=600)
+    ################
 
     aplt.plot_scenarios(results=df_result.get('TB'))
