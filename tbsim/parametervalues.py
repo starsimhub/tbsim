@@ -16,15 +16,18 @@ class RateVec:
         rates = [ss.perday(v) for v in values if not isinstance(v, ss.TimePar)]
         self.values = np.array(rates)
         self.interpolation = interpolation
-        self.off_value=off_value
+        self.off_value=ss.perday(off_value) if off_value is not None else None # Default value for turning age off
 
         if len(self.cutoffs) + 1 != len(self.values):
             raise ValueError("Number of values must be one more than the number of cutoffs.")
 
     def init(self, parent):
-        """ Initialize the rate vector """
+        """ Initialize the rate vector and age stratificaiton off value. """
         for v in self.values:
             v.init(parent)
+        
+        if self.off_value is not None:
+            self.off_value.init(parent)
 
     def digitize(self, inputs):
         """
