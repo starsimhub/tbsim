@@ -6,9 +6,14 @@ import sciris as sc
 import act3_plots as aplt
 import os
 
+from run_act3_calibration import make_sim, build_sim
+
 
 debug = True #NOTE: Debug runs in serial
-default_n_rand_seeds = [60, 1][debug]
+
+# EACH SEED WILL RUN R_REPS SIMULATIONS
+default_n_rand_seeds = [10, 2][debug]
+n_reps = [30, 3][debug]
 
 
 # Check if the results directory exists, if not, create it
@@ -17,10 +22,8 @@ os.makedirs(resdir, exist_ok=True)
 
 def run_ACF(base_sim, skey, scen, rand_seed=0):
     """
-    Run the pick simulation for the ACT3 under a single scenario - pick out the results
+    Run n_reps of control and intervention simulations in a single multisim for seed rand_seed
     """
-
-    from run_act3_calibration import build_sim
 
     sim = base_sim.copy()
     # MODIFY THE SIMULATION OBJECT BASED ON THE SCENARIO HERE
@@ -28,7 +31,7 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
     #########################################################
 
     scen['CalibPars']['rand_seed'] = rand_seed # This is the base seed that build_sim will increment from for n_reps
-    ms = build_sim(sim, calib_pars=scen['CalibPars'], n_reps=2)
+    ms = build_sim(sim, calib_pars=scen['CalibPars'], n_reps=n_reps)
     ms.run()
 
     tb_res = []
@@ -74,12 +77,12 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
     for skey, scen in scens.items():
         for rs in range(n_seeds):
             # Append configuration for parallel execution
-            cfgs.append({'skey': skey, 'scen': scen, 'rand_seed': rs})
+            seed = np.random.randint(0, 1e6) # Use a random seed because the multisim will increment from this and we don't want to reuse
+            cfgs.append({'skey': skey, 'scen': scen, 'rand_seed': seed})
 
     # Run simulations in parallel
     T = sc.tic()
 
-    from run_act3_calibration import make_sim
     sim = make_sim()
     results += sc.parallelize(run_ACF, iterkwargs=cfgs, kwargs=dict(base_sim=sim), die=True, serial=debug)
 
