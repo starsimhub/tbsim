@@ -254,7 +254,6 @@ def build_sim(sim, calib_pars, **kwargs):
     return ms
 
 
-#%% Define the tests
 def make_calibration():
     # Define the calibration parameters
     calib_pars = dict(
@@ -273,12 +272,14 @@ def make_calibration():
     # Define the components - for prevalence
     prevalence_intv = ss.BetaBinomial(
         name = 'Prevalence Active (Intervention)',
-        include_fn = lambda sim: sim.label == 'Intervention',
+        include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'step_containing',
+        n_boot = 1000,
+        boot_size = 60,
 
         expected = pd.DataFrame({
-            'x': [169, 136, 78, 53],             # Number of individuals found to be infectious
+            'x': [169, 136, 78, 53],           # Number of individuals found to be infectious
             'n': [43425, 44082, 44311, 42150], # Number of individuals sampled
         }, index=pd.Index([ss.date(d) for d in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']], name='t')), # On these dates
 
@@ -290,7 +291,7 @@ def make_calibration():
 
     prevalence_ctrl = ss.BetaBinomial(
         name = 'Prevalence Active (Control)',
-        include_fn = lambda sim: sim.label == 'Control',
+        include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'step_containing',
 
@@ -307,7 +308,7 @@ def make_calibration():
 
     incidence = ss.GammaPoisson(
         name = 'Incident Cases 15+ (Intervention)',
-        include_fn = lambda sim: sim.label == 'Intervention',
+        include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'incident',
 
@@ -328,6 +329,7 @@ def make_calibration():
         name = 'Incident Cases 15+ (Historical)',
         weight = 1,
         conform = 'incident',
+        include_fn = lambda sim: np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
 
         expected = pd.DataFrame({
             'n': [1437, 1720, 3400], 
@@ -344,7 +346,7 @@ def make_calibration():
 
     infected_5_6_intv = ss.BetaBinomial(
         name = 'Prev Ever Infected Age 5-6 (Intervention)',
-        include_fn = lambda sim: sim.label == 'Intervention',
+        include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'prevalent',
 
@@ -361,7 +363,7 @@ def make_calibration():
 
     infected_5_6_ctrl = ss.BetaBinomial(
         name = 'Prev Ever Infected Age 5-6 (Control)',
-        include_fn = lambda sim: sim.label == 'Control',
+        include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'prevalent',
 
@@ -378,7 +380,7 @@ def make_calibration():
 
     infected_6_15_intv = ss.BetaBinomial(
         name = 'Prev Ever Infected Age 6-15 (Intervention)',
-        include_fn = lambda sim: sim.label == 'Intervention',
+        include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'prevalent',
 
@@ -395,7 +397,7 @@ def make_calibration():
 
     infected_6_15_ctrl = ss.BetaBinomial(
         name = 'Prev Ever Infected Age 6-15 (Control)',
-        include_fn = lambda sim: sim.label == 'Control',
+        include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'prevalent',
 
@@ -412,7 +414,7 @@ def make_calibration():
 
     infected_15plus = ss.BetaBinomial(
         name = 'Prev Ever Infected 15+ (Intervention)',
-        include_fn = lambda sim: sim.label == 'Intervention',
+        include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'prevalent',
 
@@ -427,17 +429,18 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
+    components = [prevalence_intv, prevalence_ctrl, incidence, historical_incidence, infected_5_6_intv, infected_5_6_ctrl, infected_6_15_intv, infected_6_15_ctrl, infected_15plus]
+    for c in components:
+        c.n_boot = 1000
+        c.boot_size = 60
+
     # Make the calibration
     calib = ss.Calibration(
         calib_pars = calib_pars,
         sim = sim,
         build_fn = build_sim, # Use default builder, Calibration.translate_pars
         reseed = True,
-        components = [prevalence_intv, prevalence_ctrl,
-                      incidence, historical_incidence,
-                      infected_5_6_intv, infected_5_6_ctrl,
-                      infected_6_15_intv, infected_6_15_ctrl,
-                      infected_15plus ],
+        components = components,
         total_trials = total_trials,
         db_name = f'{resdir}/calibration.db', # Only if SQLite is used
         keep_db = True,
