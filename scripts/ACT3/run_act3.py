@@ -124,9 +124,13 @@ if __name__ == '__main__':
     if do_run:
         df_result = run_scenarios(scens)
     else:
-        df_result = {}
-        for k in ['TB', 'ACT3']:
-            df_result[k] = pd.read_csv(os.path.join(resdir, f'{k}.csv'))
+        try:
+            df_result = {}
+            for k in ['TB', 'ACT3']:
+                df_result[k] = pd.read_csv(os.path.join(resdir, f'{k}.csv'))
+        except FileNotFoundError:
+            print('No results found, please set do_run to True')
+            raise
 
     # plot the results
     df_result.get('ACT3')
@@ -143,6 +147,13 @@ if __name__ == '__main__':
     g.fig.savefig(os.path.join(resdir, 'figs', 'timeseries.png'), dpi=600)
 
     # ACT3 time series
+    ret = df_result.get('ACT3').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
+    g = sns.relplot(data=ret, x='time_year', y='value', hue='arm', col='variable', kind='line', row='scenario', errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='rand_seed'
+    g.set_titles(col_template="{col_name}")
+    g.fig.tight_layout()
+    g.fig.savefig(os.path.join(resdir, 'figs', 'act3.png'), dpi=600)
+
+    # ACT3 cases found, scaled to trial
     ret = df_result.get('ACT3').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
     g = sns.relplot(data=ret, x='time_year', y='value', hue='arm', col='variable', kind='line', row='scenario', errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='rand_seed'
     g.set_titles(col_template="{col_name}")
