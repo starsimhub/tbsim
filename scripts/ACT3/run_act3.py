@@ -73,9 +73,11 @@ def run_scenarios(scens, n_seeds=default_n_rand_seeds):
     results = []
     cfgs = []
 
+    seeds = np.random.randint(0, 1e6, n_seeds)
+
     # Iterate over scenarios and random seeds
     for skey, scen in scens.items():
-        for rs in range(n_seeds):
+        for seed in seeds:
             # Append configuration for parallel execution
             seed = np.random.randint(0, 1e6) # Use a random seed because the multisim will increment from this and we don't want to reuse
             cfgs.append({'skey': skey, 'scen': scen, 'rand_seed': seed})
