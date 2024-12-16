@@ -27,10 +27,11 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
 
     sim = base_sim.copy()
     # MODIFY THE SIMULATION OBJECT BASED ON THE SCENARIO HERE
-    # skey, scen, rand_seed
-    #########################################################
+    # skey, scen
 
     scen['CalibPars']['rand_seed'] = rand_seed # This is the base seed that build_sim will increment from for n_reps
+    #########################################################
+
     ms = build_sim(sim, calib_pars=scen['CalibPars'], n_reps=n_reps)
     ms.run()
 
