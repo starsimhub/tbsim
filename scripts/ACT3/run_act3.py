@@ -128,7 +128,7 @@ if __name__ == '__main__':
 
     # MOVE TO aplt:
     import seaborn as sns
-    ret = df_result.get('TB').reset_index(drop=True).melt(id_vars=['timevec', 'arm', 'seed'], value_name='value', var_name='variable')
+    ret = df_result.get('TB').reset_index(drop=True).melt(id_vars=['scenario', 'timevec', 'arm', 'seed'], value_name='value', var_name='variable')
     g = sns.relplot(data=ret, x='timevec', y='value', hue='arm', col='variable', kind='line', row='scenario', errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='seed'
     g.set_titles(col_template="{col_name}")
     g.fig.tight_layout()
