@@ -24,12 +24,14 @@ def make_tb():
     tb_pars = dict(
         beta=ss.beta(0.02),
         init_prev=0.25,
-        rate_LS_to_presym=ss.perday(3e-5),
-        rate_LF_to_presym=ss.perday(6e-3),
-        rate_active_to_clear=ss.perday(2.4e-4),
-        rate_exptb_to_dead=ss.perday(0.15 * 4.5e-4),      
-        rate_smpos_to_dead=ss.perday(4.5e-4),             
-        rate_smneg_to_dead=ss.perday(0.3 * 4.5e-4), 
+        rate_LS_to_presym =       mtb.RateVec(cutoffs=[0, 15, 25], values=[3e-5, 2.0548e-6, 3e-5, 3e-5], off_value=3e-5),  
+        rate_LF_to_presym =       mtb.RateVec(cutoffs=[0, 15, 25], values=[6e-3, 4.5e-3, 6e-3, 6e-3], off_value=6e-3),  
+        rate_presym_to_active =   mtb.RateVec(cutoffs=[0, 15, 25], values=[3e-2, 5.48e-3, 3e-2, 3e-2], off_value=3e-2),  
+        rate_active_to_clear =    mtb.RateVec(cutoffs=[0, 15, 25], values=[2.4e-4, 2.74e-4, 2.4e-4, 2.4e-4], off_value=2.4e-4),  
+        rate_smpos_to_dead =      mtb.RateVec(cutoffs=[0, 15, 25], values=[4.5e-4, 6.85e-4, 4.5e-4, 4.5e-4], off_value=4.5e-4),  
+        rate_smneg_to_dead =      mtb.RateVec(cutoffs=[0, 15, 25], values=[1.35e-4, 2.74e-4, 1.35e-4, 1.35e-4], off_value=1.35e-4),  
+        rate_exptb_to_dead =      mtb.RateVec(cutoffs=[0, 15, 25], values=[6.75e-5, 2.74e-4, 6.75e-5, 6.75e-5], off_value=6.75e-5),  
+        rate_treatment_to_clear = mtb.RateVec(cutoffs=[0, 15, 25], values=[1/60, 1/180, 1/60, 1/60], off_value=1/60), 
         rel_trans_smpos=1.0,
         rel_trans_smneg=0.3,
         rel_trans_exptb=0.05,
@@ -44,7 +46,7 @@ def make_tb():
     sim_pars = dict(
         # default simulation parameters
         unit='day', dt=30,
-        start=ss.date('1100-01-01'), stop=ss.date('2018-12-31')
+        start=ss.date('2000-01-01'), stop=ss.date('2018-12-31')
         )
 
     # build the sim object 
