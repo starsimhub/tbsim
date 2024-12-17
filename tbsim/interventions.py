@@ -30,11 +30,11 @@ class ActiveCaseFinding(ss.Intervention):
         self.define_pars(
             p_treat = ss.bernoulli(p=1),
 
-            date_cov = {
-                sc.date('2014-06-01'): 0.6,
-                sc.date('2015-06-01'): 0.7,
-                sc.date('2016-06-01'): 0.64,
-                sc.date('2017-06-01'): 0.64, # setting this to the same as 2016 for now
+            date_cov = { # Numbers from Table 1, row "Persons who gave oral consent to participate — no. (%)"
+                sc.date('2014-06-01'): 0.844,
+                sc.date('2015-06-01'): 0.80,
+                sc.date('2016-06-01'): 0.779,
+                sc.date('2017-06-01'): 0.743,
             },
             interp = False,
 

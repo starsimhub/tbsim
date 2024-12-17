@@ -177,6 +177,7 @@ class TB(ss.Infection):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_presymp[new_presymp_uids] = ti
         self.results['new_active'][ti] = len(new_presymp_uids)
+        self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_presymp_uids] >= 15)
 
         # Pre symp --> Active
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
@@ -296,11 +297,13 @@ class TB(ss.Infection):
             ss.Result('n_active_smneg',    dtype=int, label='Active Smear Negative'),
             ss.Result('n_active_exptb',    dtype=int, label='Active Extra-Pulmonary'),
             ss.Result('new_active',        dtype=int, label='New Active'),
+            ss.Result('new_active_15+',    dtype=int, label='New Active'),
             ss.Result('cum_active',        dtype=int, label='Cumulative Active'),
+            ss.Result('cum_active_15+',    dtype=int, label='Cumulative Active'),
             ss.Result('new_deaths',        dtype=int, label='New Deaths'),
             ss.Result('cum_deaths',        dtype=int, label='Cumulative Deaths'),
             ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
-            ss.Result('incidence_ppy',     dtype=float, scale=False, label='Incidence per person-year'),
+            ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
             ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
         )
         return
@@ -310,7 +313,7 @@ class TB(ss.Infection):
         res = self.results
         ti = self.ti
         ti_infctd = self.ti_infected
-        per_year_fctr = 365.25/self.t.dt_year
+        dty = self.sim.t.dt_year
 
         res.n_latent_slow[ti]     = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti]     = np.count_nonzero(self.state == TBS.LATENT_FAST)
@@ -320,16 +323,17 @@ class TB(ss.Infection):
         res.n_active_exptb[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
         res.n_active[ti]          = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
         res.prevalence_active[ti] = res.n_active[ti] / np.count_nonzero(self.sim.people.alive)
-        res.incidence_ppy[ti]     = (np.count_nonzero(ti_infctd == ti) / np.count_nonzero(self.sim.people.alive)) * per_year_fctr
-        res.deaths_ppy[ti]        = res.new_deaths[ti] / np.count_nonzero(self.sim.people.alive) * per_year_fctr
+        res.incidence_kpy[ti]     = 1_000 * np.count_nonzero(ti_infctd == ti) / (np.count_nonzero(self.sim.people.alive) * dty)
+        res.deaths_ppy[ti]        = res.new_deaths[ti] / (np.count_nonzero(self.sim.people.alive) * dty)
 
         return
 
     def finalize_results(self):
         super().finalize_results()
         res = self.results
-        res['cum_deaths'] = np.cumsum(res['new_deaths'])
-        res['cum_active'] = np.cumsum(res['new_active'])
+        res['cum_deaths']     = np.cumsum(res['new_deaths'])
+        res['cum_active']     = np.cumsum(res['new_active'])
+        res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
         
         return
 
