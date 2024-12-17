@@ -224,6 +224,16 @@ def build_sim(sim, calib_pars, **kwargs):
                 if intv.name == 'Passive Care Seeking':
                     for cov in intv.pars.date_cov.values():
                         cov *= v
+        elif k == "stop":
+            sim.pars.stop = v  
+        elif k == "date_cov":
+            for intv in sim.pars.interventions:
+                if intv.name == 'ACT3 Active Case Finding':
+                    intv.pars.date_cov = v
+        elif k == "test_sens":
+            for intv in sim.pars.interventions:
+                if intv.name == 'ACT3 Active Case Finding':
+                    intv.pars.test_sens = v            
         else:
             raise NotImplementedError(f'Parameter {k} not recognized')
 
@@ -246,7 +256,12 @@ def build_sim(sim, calib_pars, **kwargs):
             if intv.name == 'ACT3 Active Case Finding':
                 #intv.pars.p_treat = ss.bernoulli(p=0.0)
                 for year, cov in intv.pars.date_cov.items():
-                    if year < 2017: # Year as float
+                    # removing hardcoding: keep testing zero until the penultimate year
+                    # it should default to 2017 for the basic scenario
+                    if isinstance(year, float) == False:
+                        year = year.year
+                    #assert isinstance(year, float), f"Year is not float: {year}"
+                    if year < (sim.pars.stop.year-1): # Year as float 
                         intv.pars.date_cov[year] = 0.0 # In control arm, no ACF until 2017
         sims.append(sim_ctrl)
 
