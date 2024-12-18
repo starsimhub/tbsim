@@ -18,7 +18,7 @@ n_runs_check = [60, 5][debug] # Num final runs for checking fit
 
 date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
 
-#date = '2024Dec16-032519'
+date = '2024Dec17-230152'
 
 # Check if the results directory exists, if not, create it
 resdir = os.path.join('results', f'ACT3Calib_{date}')
@@ -262,25 +262,26 @@ def make_calibration():
     calib_pars = dict(
         # {'beta': 0.4016615352455662, 'beta_change': 0.7075221406739112, 'beta_change_year': 2001, 'xpcf': 0.14812009041601049, 'rand_seed': 172264}. Best is trial 88 with value: 11479.499964475886.
         #{'beta': 0.445499764760726, 'beta_change': 0.6880249223150746, 'beta_change_year': 1986, 'xpcf': 0.08450198158889916, 'rand_seed': 925220}. Best is trial 1747 with value: 103.93212613894507.
-        beta = dict(low=0.01, high=0.70, guess=0.445499764760726, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
+        #{'beta': 0.62171668825821, 'beta_change': 0.5854341465829178, 'beta_change_year': 1994, 'xpcf': 0.5853718885109126, 'rand_seed': 30314}. Best is trial 119 with value: 77.90330762100335.
+
+        beta = dict(low=0.01, high=0.70, guess=0.62171668825821, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
         #init_prev = dict(low=0.01, high=0.25, guess=0.15), # Default type is suggest_float, no need to re-specify
         #n_contacts = dict(low=2, high=10, guess=3),
-        beta_change = dict(low=0.25, high=1, guess=0.6880249223150746),
-        beta_change_year = dict(low=1986, high=2014, guess=2001, suggest_type='suggest_int'),
-        xpcf = dict(low=0, high=1.0, guess=0.08450198158889916),
+        beta_change = dict(low=0.25, high=1, guess=0.5854341465829178),
+        beta_change_year = dict(low=1986, high=2014, guess=1994, suggest_type='suggest_int'),
+        xpcf = dict(low=0, high=1.0, guess=0.5853718885109126),
     )
 
     # Make the sim and data
     sim = make_sim()
     
     # Define the components - for prevalence
-    prevalence_intv = ss.BetaBinomial(
-        name = 'Prevalence Active (Intervention)',
+    prevalence_intv_bb = ss.BetaBinomial(
+        name = 'Prevalence Active (Intervention BB)',
         include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
-        weight = 1,
+        weight = 0,
         conform = 'step_containing',
         n_boot = 1000,
-        boot_size = 60,
 
         expected = pd.DataFrame({
             'x': [169, 136, 78, 53],           # Number of individuals found to be infectious
@@ -293,10 +294,26 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    prevalence_ctrl = ss.BetaBinomial(
-        name = 'Prevalence Active (Control)',
-        include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
+    prevalence_intv = ss.Binomial(
+        name = 'Prevalence Active (Intervention)',
+        include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
+        conform = 'step_containing',
+
+        expected = pd.DataFrame({
+            'x': [169, 136, 78, 53],           # Number of individuals found to be infectious
+            'n': [43425, 44082, 44311, 42150], # Number of individuals sampled
+        }, index=pd.Index([ss.date(d) for d in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']], name='t')), # On these dates
+
+        extract_fn = lambda sim: pd.DataFrame({
+            'p': (sim.results['ACT3 Active Case Finding'].n_positive + 1) / (sim.results['ACT3 Active Case Finding'].n_tested + 2),
+        }, index=pd.Index(sim.results.timevec, name='t')),
+    )
+
+    prevalence_ctrl_bb = ss.BetaBinomial(
+        name = 'Prevalence Active (Control BB)',
+        include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
+        weight = 0,
         conform = 'step_containing',
 
         expected = pd.DataFrame({
@@ -310,10 +327,26 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
+    prevalence_ctrl = ss.Binomial(
+        name = 'Prevalence Active (Control)',
+        include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
+        weight = 1,
+        conform = 'step_containing',
+
+        expected = pd.DataFrame({
+            'x': [94],      # Number of individuals found to be infectious
+            'n': [41680], # Number of individuals sampled
+        }, index=pd.Index([ss.date(d) for d in ['2017-06-01']], name='t')), # On these dates
+
+        extract_fn = lambda sim: pd.DataFrame({
+            'p': (sim.results['ACT3 Active Case Finding'].n_positive + 1) / (sim.results['ACT3 Active Case Finding'].n_tested + 2),
+        }, index=pd.Index(sim.results.timevec, name='t')),
+    )
+
     incidence = ss.GammaPoisson(
         name = 'Incident Cases 15+ (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
-        weight = 1,
+        weight = 0,
         conform = 'incident',
 
         expected = pd.DataFrame({
@@ -331,7 +364,7 @@ def make_calibration():
 
     historical_incidence = ss.GammaPoisson(
         name = 'Incident Cases 15+ (Historical)',
-        weight = 1,
+        weight = 0,
         conform = 'incident',
         include_fn = lambda sim: np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
 
@@ -351,7 +384,7 @@ def make_calibration():
     infected_5_6_intv = ss.BetaBinomial(
         name = 'Prev Ever Infected Age 5-6 (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
-        weight = 1,
+        weight = 0,
         conform = 'prevalent',
 
         expected = pd.DataFrame({
@@ -368,7 +401,7 @@ def make_calibration():
     infected_5_6_ctrl = ss.BetaBinomial(
         name = 'Prev Ever Infected Age 5-6 (Control)',
         include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
-        weight = 1,
+        weight = 0,
         conform = 'prevalent',
 
         expected = pd.DataFrame({
@@ -385,7 +418,7 @@ def make_calibration():
     infected_6_15_intv = ss.BetaBinomial(
         name = 'Prev Ever Infected Age 6-15 (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
-        weight = 1,
+        weight = 0,
         conform = 'prevalent',
 
         expected = pd.DataFrame({
@@ -402,7 +435,7 @@ def make_calibration():
     infected_6_15_ctrl = ss.BetaBinomial(
         name = 'Prev Ever Infected Age 6-15 (Control)',
         include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
-        weight = 1,
+        weight = 0,
         conform = 'prevalent',
 
         expected = pd.DataFrame({
@@ -419,7 +452,7 @@ def make_calibration():
     infected_15plus = ss.BetaBinomial(
         name = 'Prev Ever Infected 15+ (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
-        weight = 1,
+        weight = 0,
         conform = 'prevalent',
 
         expected = pd.DataFrame({
@@ -433,10 +466,12 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    components = [prevalence_intv, prevalence_ctrl, incidence, historical_incidence, infected_5_6_intv, infected_5_6_ctrl, infected_6_15_intv, infected_6_15_ctrl, infected_15plus]
-    for c in components:
-        c.n_boot = 1000
-        c.boot_size = 60
+    components = [
+        prevalence_ctrl_bb, prevalence_intv_bb,
+        prevalence_intv, prevalence_ctrl, incidence, historical_incidence, infected_5_6_intv, infected_5_6_ctrl, infected_6_15_intv, infected_6_15_ctrl, infected_15plus]
+
+    #for c in components:
+    #    c.n_boot = 1000
 
     # Make the calibration
     calib = ss.Calibration(
