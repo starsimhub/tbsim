@@ -18,7 +18,7 @@ n_runs_check = [60, 5][debug] # Num final runs for checking fit
 
 date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
 
-date = '2024Dec17-230152'
+#date = '2024Dec17-230152'
 
 # Check if the results directory exists, if not, create it
 resdir = os.path.join('results', f'ACT3Calib_{date}')
@@ -299,6 +299,7 @@ def make_calibration():
         include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'step_containing',
+        n_boot = 1000,
 
         expected = pd.DataFrame({
             'x': [169, 136, 78, 53],           # Number of individuals found to be infectious
@@ -306,7 +307,9 @@ def make_calibration():
         }, index=pd.Index([ss.date(d) for d in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']], name='t')), # On these dates
 
         extract_fn = lambda sim: pd.DataFrame({
-            'p': (sim.results['ACT3 Active Case Finding'].n_positive + 1) / (sim.results['ACT3 Active Case Finding'].n_tested + 2),
+            #'p': (sim.results['ACT3 Active Case Finding'].n_positive + 1) / (sim.results['ACT3 Active Case Finding'].n_tested + 2),
+            'x': sim.results['ACT3 Active Case Finding'].n_positive, # sim.results.tb.n_active,
+            'n': sim.results['ACT3 Active Case Finding'].n_tested, # sim.results.n_alive,
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
@@ -332,6 +335,7 @@ def make_calibration():
         include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'step_containing',
+        n_boot = 1000,
 
         expected = pd.DataFrame({
             'x': [94],      # Number of individuals found to be infectious
@@ -339,7 +343,9 @@ def make_calibration():
         }, index=pd.Index([ss.date(d) for d in ['2017-06-01']], name='t')), # On these dates
 
         extract_fn = lambda sim: pd.DataFrame({
-            'p': (sim.results['ACT3 Active Case Finding'].n_positive + 1) / (sim.results['ACT3 Active Case Finding'].n_tested + 2),
+            #'p': (sim.results['ACT3 Active Case Finding'].n_positive + 1) / (sim.results['ACT3 Active Case Finding'].n_tested + 2),
+            'x': sim.results['ACT3 Active Case Finding'].n_positive, # sim.results.tb.n_active,
+            'n': sim.results['ACT3 Active Case Finding'].n_tested, # sim.results.n_alive,
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
