@@ -343,7 +343,7 @@ def test_p_presym_to_active():
     presym_uids = ss.uids([1, 2, 3, 4, 5])
 
     # Expected: Verify that probabilities are correctly calculated based on TB state
-    probabilities = tb.p_presym_to_active(sim, presym_uids)
+    probabilities =  mtb.TB.p_presym_to_active(tb, sim, presym_uids)
 
     # Calculate expected rates using RateVec
     expected_rate = tb.pars.rate_presym_to_active(tb.sim.people.age[presym_uids])
