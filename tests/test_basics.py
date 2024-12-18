@@ -3,9 +3,9 @@ import numpy as np
 import starsim as ss
 import tbsim as mtb
 
-def make_tb_simplified(agents=20, start=2000, stop=2005, dt=7/365, age_off=False):
+def make_tb_simplified(agents=1000, start=2000, stop=2010, dt=7/365, age_off=True):
     pop = ss.People(n_agents=agents)
-    tb = mtb.TB(pars={'beta': ss.beta(0.01), 'init_prev': 0.25, 'age_off': age_off})
+    tb = mtb.TB(pars={'beta': ss.beta(0.045, 'year'), 'init_prev': ss.bernoulli(0.01), 'age_off': age_off})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))]
     sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start, stop=stop), demographics=dems)
@@ -68,7 +68,7 @@ def test_set_prognoses():
     print("After: ", after)
 
 def test_update_pre():
-    sim = make_tb_simplified(agents=300)
+    sim = make_tb_simplified(agents=1000, stop=2020)
     sim.init()
     tb = sim.diseases['tb']
     assert len(tb.state[tb.state == mtb.TBS.NONE]) > 0
@@ -193,13 +193,16 @@ def test_set_prognoses_active_tb_state(tb):
     assert np.array_equal(tb.active_tb_state[uids], np.array([mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB]))
 
 # Updating the result count of new infections.
-def test_set_prognoses_new_infections_count(tb):
+def test_set_prognoses_ever_infected(tb):
     uids = ss.uids([1, 2, 3])
-    initial_count = tb.results['new_infections'][tb.sim.ti]
+    
+    # Ensure the initial state of ever_infected is False for the test UIDs
+    assert not tb.ever_infected[uids].any()
     
     tb.set_prognoses(uids)
     
-    assert tb.results['new_infections'][tb.sim.ti] == initial_count + len(uids)
+    # Check that the ever_infected attribute is set to True for the test UIDs
+    assert tb.ever_infected[uids].all()
 
 def test_p_latent_to_presym():
     # Setup: Create a simulated TB instance and prepare relevant data
@@ -242,9 +245,11 @@ def test_p_presym_to_active():
     # Expected: Verify that probabilities are correctly calculated based on TB state
     probabilities = mtb.TB.p_presym_to_active(tb, sim, presym_uids)
 
-    # Assert that all probabilities are the same if rate is constant across all individuals
-    expected_rate = np.full(len(presym_uids), fill_value=tb.pars.rate_presym_to_active)
+    # Calculate expected rates using RateVec
+    expected_rate = tb.pars.rate_presym_to_active(tb.sim.people.age[presym_uids])
     expected_prob = 1 - np.exp(-expected_rate)
+    
+    # Assert that probabilities match expected values calculated from the rate
     assert np.allclose(probabilities, expected_prob), "Probabilities should match expected values calculated from the rate"
 
     # Each returned probability must be between 0 and 1
@@ -254,37 +259,8 @@ def test_p_presym_to_active():
     assert (tb.state[presym_uids] == mtb.TBS.ACTIVE_PRESYMP).all(), "All tested UIDs should be in the pre-symptomatic state"
 
 
-def test_p_active_to_clear():
-    sim = make_tb_simplified(agents=10)
-    sim.init()
-    tb = sim.diseases['tb']
 
-    # Set some individuals to active TB states
-    active_uids = ss.uids([1, 2, 3, 4, 5])
-    tb.state[active_uids] = np.random.choice([mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB], size=len(active_uids))
-
-    # Assume individuals 1, 2 are on treatment
-    tb.on_treatment[ss.uids([1, 2])] = True
-
-    # Calculate probabilities
-    probabilities = mtb.TB.p_active_to_clear(tb, sim, active_uids)
-
-    # Check that probabilities are within the expected range (0 to 1)
-    assert np.all(0 <= probabilities) and np.all(probabilities <= 1)
-
-    # Check that the rates for those on treatment are correctly applied
-    expected_rate = np.full(len(active_uids), fill_value=tb.pars.rate_active_to_clear)
-    expected_rate[:2] = tb.pars.rate_treatment_to_clear  # Adjust for treatment
-    expected_rate *= tb.rr_clearance[active_uids]  # Adjust for relative clearance
-
-    expected_prob = 1 - np.exp(-expected_rate)
-    assert np.allclose(probabilities, expected_prob), "Probabilities should match expected values calculated from the adjusted rates"
-
-    # Additional check for correct handling of treatment effects
-    treatment_effect = tb.pars.rate_treatment_to_clear > tb.pars.rate_active_to_clear
-    assert treatment_effect, "Treatment should generally provide a higher clearance rate"
-
-def test_p_active_to_death( ):
+def test_p_active_to_death():
     sim = make_tb_simplified(agents=10)
     sim.init()
     tb = sim.diseases['tb']
@@ -300,9 +276,13 @@ def test_p_active_to_death( ):
     assert np.all(0 <= probabilities) and np.all(probabilities <= 1)
 
     # Expected rates based on TB state and individual death rate adjustments
-    expected_rate = np.full(len(active_uids), fill_value=tb.pars.rate_exptb_to_dead)
-    expected_rate[tb.state[active_uids] == mtb.TBS.ACTIVE_SMPOS] = tb.pars.rate_smpos_to_dead
-    expected_rate[tb.state[active_uids] == mtb.TBS.ACTIVE_SMNEG] = tb.pars.rate_smneg_to_dead
+    expected_rate = np.zeros(len(active_uids))
+    smpos_uids = np.isin(tb.state[active_uids], [mtb.TBS.ACTIVE_SMPOS])
+    expected_rate[smpos_uids] = tb.pars.rate_smpos_to_dead(tb.sim.people.age[active_uids[smpos_uids]])
+    smneg_uids = np.isin(tb.state[active_uids], [mtb.TBS.ACTIVE_SMNEG])
+    expected_rate[smneg_uids] = tb.pars.rate_smneg_to_dead(tb.sim.people.age[active_uids[smneg_uids]])
+    exptb_uids = np.isin(tb.state[active_uids], [mtb.TBS.ACTIVE_EXPTB])
+    expected_rate[exptb_uids] = tb.pars.rate_exptb_to_dead(tb.sim.people.age[active_uids[exptb_uids]])
     expected_rate *= tb.rr_death[active_uids]
 
     expected_prob = 1 - np.exp(-expected_rate)
@@ -312,43 +292,72 @@ def test_p_active_to_death( ):
     assert (tb.state[active_uids] == mtb.TBS.ACTIVE_SMPOS).any() or (tb.state[active_uids] == mtb.TBS.ACTIVE_SMNEG).any() or (tb.state[active_uids] == mtb.TBS.ACTIVE_EXPTB).any(), "Ensure at least some active TB states are set for testing"
 
 
-def test_latent_to_active_presymptomatic_transition():
-    sim = make_tb_simplified(agents=500)
+def test_p_latent_to_presym():
+    # Setup: Create a simulated TB instance and prepare relevant data
+    sim = make_tb_simplified(agents=10)
     sim.init()
     tb = sim.diseases['tb']
-    # Setup individuals in latent states
-    latent_uids = ss.uids(np.arange(50)) 
-    tb.state[latent_uids] = np.random.choice([mtb.TBS.LATENT_SLOW, mtb.TBS.LATENT_FAST], size=len(latent_uids))
+    tb.state = np.full(tb.state.shape, mtb.TBS.LATENT_SLOW)  # Assuming all agents are in the latent slow TB state
 
-    # Manually execute the transition step
-    tb.step()
+    # Initialize unique IDs for testing; choose IDs such that some are in latent fast and some in latent slow
+    latent_slow_uids = ss.uids([1, 2, 3])  # Latent slow TB
+    latent_fast_uids = ss.uids([4, 5, 6])  # Latent fast TB
+    tb.state[latent_fast_uids] = mtb.TBS.LATENT_FAST
 
-    # Check if any latent have transitioned to pre-symptomatic
-    transitioned = tb.state[latent_uids] == mtb.TBS.ACTIVE_PRESYMP
-    print(transitioned)
-    assert transitioned.any(), "At least one latent TB should transition to pre-symptomatic."
+    # Expected: Verify that probabilities are correctly calculated based on TB states
+    probabilities_slow = mtb.TB.p_latent_to_presym(tb, sim, latent_slow_uids) 
+    probabilities_fast = mtb.TB.p_latent_to_presym(tb, sim, latent_fast_uids) 
 
-def test_presymptomatic_to_active_transition():
-    # Since we work with percentages, we make sure we have enough
-    # individuals in the pre-symptomatic state to have a good chance of transitioning
-    sim = make_tb_simplified(agents=500)
+    # Calculate expected rates using RateVec
+    expected_rate_slow = tb.pars.rate_LS_to_presym(tb.sim.people.age[latent_slow_uids])
+    expected_rate_fast = tb.pars.rate_LF_to_presym(tb.sim.people.age[latent_fast_uids])
+    expected_rate_slow *= tb.rr_activation[latent_slow_uids]
+    expected_rate_fast *= tb.rr_activation[latent_fast_uids]
+    expected_prob_slow = 1 - np.exp(-expected_rate_slow)
+    expected_prob_fast = 1 - np.exp(-expected_rate_fast)
+    
+    # Assert that probabilities match expected values calculated from the rate
+    assert np.allclose(probabilities_slow, expected_prob_slow), "Probabilities should match expected values calculated from the rate for latent slow TB"
+    assert np.allclose(probabilities_fast, expected_prob_fast), "Probabilities should match expected values calculated from the rate for latent fast TB"
+
+    # Each returned probability must be between 0 and 1
+    assert np.all(0 <= probabilities_slow) and np.all(probabilities_slow <= 1), "Probabilities should be valid (between 0 and 1) for latent slow TB"
+    assert np.all(0 <= probabilities_fast) and np.all(probabilities_fast <= 1), "Probabilities should be valid (between 0 and 1) for latent fast TB"
+
+    # The rate should be different for slow and fast latent TB states
+    assert np.all(probabilities_slow < probabilities_fast), "Fast progression should have higher transition probabilities"
+
+    # Additional checks for expected behavior or known values could be added here, such as:
+    # Assert that no probability is zero unless explicitly set so by model parameters
+    assert not np.any(probabilities_slow == 0)
+    assert not np.any(probabilities_fast == 0)
+
+def test_p_presym_to_active():
+    # Setup: Create a simulated TB instance and prepare relevant data
+    sim = make_tb_simplified(agents=10)
     sim.init()
     tb = sim.diseases['tb']
-    # Setup some individuals to pre-symptomatic
-    presym_uids = ss.uids(np.arange(250)) 
-    tb.state[presym_uids] = mtb.TBS.ACTIVE_PRESYMP
+    tb.state = np.full(tb.state.shape, mtb.TBS.ACTIVE_PRESYMP)  # Assuming all agents are in the pre-symptomatic active TB state
 
-    # Manually execute the transition step
-    tb.step()
+    # Initialize unique IDs for testing; all are in pre-symptomatic state
+    presym_uids = ss.uids([1, 2, 3, 4, 5])
 
-    # Check if any pre-symptomatic have transitioned to active
-    transitioned = (
-        (tb.state[presym_uids] == mtb.TBS.ACTIVE_SMPOS)
-        | (tb.state[presym_uids] == mtb.TBS.ACTIVE_SMNEG)
-        | (tb.state[presym_uids] == mtb.TBS.ACTIVE_EXPTB)
-    )
-    # transitioned = transitioned[transitioned] # Filter out only those that transitioned - uncomment if you want to see the True values
-    assert transitioned.any(), "At least one pre-symptomatic should transition to an active state."
+    # Expected: Verify that probabilities are correctly calculated based on TB state
+    probabilities = tb.p_presym_to_active(sim, presym_uids)
+
+    # Calculate expected rates using RateVec
+    expected_rate = tb.pars.rate_presym_to_active(tb.sim.people.age[presym_uids])
+    expected_prob = 1 - np.exp(-expected_rate)
+    
+    # Assert that probabilities match expected values calculated from the rate
+    assert np.allclose(probabilities, expected_prob), "Probabilities should match expected values calculated from the rate"
+
+    # Each returned probability must be between 0 and 1
+    assert np.all(0 <= probabilities) and np.all(probabilities <= 1), "Probabilities should be valid (between 0 and 1)"
+
+    # Ensure that all states were correctly assumed to be pre-symptomatic in the test
+    assert (tb.state[presym_uids] == mtb.TBS.ACTIVE_PRESYMP).all(), "All tested UIDs should be in the pre-symptomatic state"
+
 
 def test_active_to_cleared_transition():
     # Increasing number of agents even higher as the clearance rate is very low

@@ -43,6 +43,10 @@ class TB(ss.Infection):
             rel_trans_smneg     = 0.3,
             rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5,  # Multiplicative on smpos, smneg, or exptb rel_trans
+            rel_sus_postinfection = 1.0, # Relative susceptibility post-infection
+            reltrans_het = ss.constant(v=1.0),
+            
+            # Rates handling:
             age_off = True,             # Whether to turn off Age specific rates (default is False and value is the first one by default)
             rate_LS_to_presym =       RateVec(cutoffs=[0, 15, 25], values=[3e-5, 2.0548e-6, 3e-5, 3e-5], off_value=3e-5),  
             rate_LF_to_presym =       RateVec(cutoffs=[0, 15, 25], values=[6e-3, 4.5e-3, 6e-3, 6e-3], off_value=6e-3),  
@@ -52,7 +56,6 @@ class TB(ss.Infection):
             rate_smneg_to_dead =      RateVec(cutoffs=[0, 15, 25], values=[1.35e-4, 2.74e-4, 1.35e-4, 1.35e-4], off_value=1.35e-4),  
             rate_exptb_to_dead =      RateVec(cutoffs=[0, 15, 25], values=[6.75e-5, 2.74e-4, 6.75e-5, 6.75e-5], off_value=6.75e-5),  
             rate_treatment_to_clear = RateVec(cutoffs=[0, 15, 25], values=[1/60, 1/180, 1/60, 1/60], off_value=1/60), 
-            reltrans_het = ss.constant(v=1.0),
         )
         self.update_pars(pars, **kwargs) 
 
@@ -67,6 +70,7 @@ class TB(ss.Infection):
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
             ss.State('on_treatment', default=False),
+            ss.State('ever_infected', default=False),           # Flag for ever infected
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
             ss.FloatArr('reltrans_het', default=1.0),           # Individual-level heterogeneity on infectiousness, acts in addition to stage-based rates
@@ -189,6 +193,9 @@ class TB(ss.Infection):
 
         # Update result count of new infections 
         self.ti_infected[uids] = self.ti
+        self.ever_infected[uids] = True
+
+        self.rel_sus[uids] = self.pars.rel_sus_postinfection
         return
 
     def step(self):
@@ -203,6 +210,9 @@ class TB(ss.Infection):
         if len(new_presymp_uids):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_presymp[new_presymp_uids] = ti
+
+        self.results['new_active'][ti] = len(new_presymp_uids)
+        self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_presymp_uids] >= 15)
 
         # Pre symp --> Active
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
@@ -320,16 +330,19 @@ class TB(ss.Infection):
         self.define_results(
             ss.Result('n_latent_slow',     dtype=int, label='Latent Slow'),
             ss.Result('n_latent_fast',     dtype=int, label='Latent Fast'),
+            ss.Result('n_active',          dtype=int, label='Active (Combined)'),
             ss.Result('n_active_presymp',  dtype=int, label='Active Pre-Symptomatic'), 
             ss.Result('n_active_smpos',    dtype=int, label='Active Smear Positive'),
             ss.Result('n_active_smneg',    dtype=int, label='Active Smear Negative'),
             ss.Result('n_active_exptb',    dtype=int, label='Active Extra-Pulmonary'),
-            ss.Result('new_cases',         dtype=int, label='New Cases (Active)'),
-            ss.Result('cum_cases',         dtype=int, label='Cumulative Cases (Active)'),
+            ss.Result('new_active',        dtype=int, label='New Active'),
+            ss.Result('new_active_15+',    dtype=int, label='New Active'),
+            ss.Result('cum_active',        dtype=int, label='Cumulative Active'),
+            ss.Result('cum_active_15+',    dtype=int, label='Cumulative Active'),
             ss.Result('new_deaths',        dtype=int, label='New Deaths'),
             ss.Result('cum_deaths',        dtype=int, label='Cumulative Deaths'),
             ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
-            ss.Result('incidence_ppy',     dtype=float, scale=False, label='Incidence per person-year'),
+            ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
             ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
         )
         return
@@ -339,8 +352,7 @@ class TB(ss.Infection):
         res = self.results
         ti = self.ti
         ti_infctd = self.ti_infected
-        # per_year_fctr = 365.25/self.t.dt_year #TODO: Dan, you changed this value, however it will result in zero
-        per_year_fctr = 365.25/self.t.dt
+        dty = self.sim.t.dt_year
 
         res.n_latent_slow[ti]     = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti]     = np.count_nonzero(self.state == TBS.LATENT_FAST)
@@ -348,24 +360,27 @@ class TB(ss.Infection):
         res.n_active_smpos[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
         res.n_active_smneg[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
         res.n_active_exptb[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
-        res.new_cases[ti]         = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
-        res.prevalence_active[ti] = res.new_cases[ti] / np.count_nonzero(self.sim.people.alive) 
-        res.incidence_ppy[ti]     = (np.count_nonzero(ti_infctd == ti) / np.count_nonzero(self.sim.people.alive)) * per_year_fctr
-        res.deaths_ppy[ti]        = res.new_deaths[ti] / np.count_nonzero(self.sim.people.alive) * per_year_fctr
+        res.n_active[ti]          = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
+        res.prevalence_active[ti] = res.n_active[ti] / np.count_nonzero(self.sim.people.alive)
+        res.incidence_kpy[ti]     = 1_000 * np.count_nonzero(ti_infctd == ti) / (np.count_nonzero(self.sim.people.alive) * dty)
+        res.deaths_ppy[ti]        = res.new_deaths[ti] / (np.count_nonzero(self.sim.people.alive) * dty)
 
         return
 
     def finalize_results(self):
         super().finalize_results()
         res = self.results
-        res['cum_deaths'] = np.cumsum(res['new_deaths'])
-        res['cum_cases'] = np.cumsum(res['new_cases'])
+        res['cum_deaths']     = np.cumsum(res['new_deaths'])
+        res['cum_active']     = np.cumsum(res['new_active'])
+        res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
         
         return
 
     def plot(self):
         fig = plt.figure()
-        for rkey in ['latent_slow', 'latent_fast', 'active_presymp', 'active_smpos', 'active_smneg', 'active_exptb', 'new_cases', 'cum_cases']:
-            plt.plot(self.results['n_'+rkey], label=rkey.title())
+        for rkey in self.results.keys(): #['latent_slow', 'latent_fast', 'active', 'active_presymp', 'active_smpos', 'active_smneg', 'active_exptb']:
+            if rkey == 'timevec':
+                continue
+            plt.plot(self.results['timevec'], self.results[rkey], label=rkey.title())
         plt.legend()
         return fig
