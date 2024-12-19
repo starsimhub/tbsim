@@ -64,7 +64,7 @@ class sigmoidally_varying_parameter(ss.Intervention):
         self.define_pars(
             tb_parameter = 'beta', # The parameter of the TB module to change
             x_initial = 1,     # Will linearly interpolate from 1 at start to rc_endpoint at stop
-            x_final = 0.5,
+            x_final = 1,
             dur_years = 15, # from 10% to 90% of 0 to 1 sigmoid value
             midpoint = sc.date('1995-01-01'),
         )
@@ -221,9 +221,9 @@ def make_sim():
 
     # Time varying parameters
     decrease_beta = sigmoidally_varying_parameter(
-        tb_parameter = 'beta', # The parameter of the TB module to change
-        x_initial = 1,     # Will linearly interpolate from 1 at start to rc_endpoint at stop
-        x_final = 0.3,
+        tb_parameter = 'beta',  # The parameter of the TB module to change
+        x_initial = 1,          # Will linearly interpolate from 1 at start to rc_endpoint at stop
+        x_final = 1.0,          # Off by default
         dur_years = 20,
         midpoint = sc.date('1995-01-01'),
     )
@@ -248,6 +248,12 @@ def make_sim():
     )
 
     return sim
+
+def get_intv(sim, name):
+    for intv in sim.pars.interventions:
+        if intv.name == name:
+            return intv
+    raise ValueError(f'Intervention {name} not found')
 
 def build_sim(sim, calib_pars, **kwargs):
     """ Modify the base simulation by applying calib_pars """
@@ -280,30 +286,30 @@ def build_sim(sim, calib_pars, **kwargs):
                 if isinstance(intv, time_varying_parameter):
                     intv.pars.start = sc.date(v)
         elif k == 'x_pcf':
-            for intv in sim.pars.interventions:
-                if intv.name == 'Passive Care Seeking':
-                    for cov in intv.pars.date_cov.values():
-                        cov *= v
+            intv = get_intv(sim, 'Passive Care Seeking')
+            for cov in intv.pars.date_cov.values():
+                cov *= v
+        elif k in ['x_pcf1', 'x_pcf2']:
+            intv = get_intv(sim, 'Passive Care Seeking')
+            if k == 'x_pcf1':   intv.pars.date_cov[1] = ss.peryear(v)
+            elif k == 'x_pcf2': intv.pars.date_cov[2] = ss.peryear(v)
         elif k == 'x_acf_sens':
-            for intv in sim.pars.interventions:
-                if intv.name == 'ACT3 Active Case Finding':
-                    for sens in intv.pars.test_sens.values():
-                        sens *= v
+            intv = get_intv(sim, 'ACT3 Active Case Finding')
+            for sens in intv.pars.test_sens.values():
+                sens *= v
         elif k == 'p_fast':
             tb.pars.p_latent_fast = ss.bernoulli(v)
         elif k in ['beta_x_final', 'beta_dur', 'beta_mid']:
-            for intv in sim.pars.interventions:
-                if isinstance(intv, sigmoidally_varying_parameter):
-                    if k == 'beta_mid':
-                        v = ss.date(v)
-                    intv.pars[k] = v
+            intv = get_intv(sim, 'sigmoidally_varying_parameter')
+            if k == 'beta_mid':
+                v = ss.date(v)
+            intv.pars[k] = v
         elif k == 'start_yr':
             sim.pars.start = ss.date(v)
         elif k == 'x_acf_cov':
-            for intv in sim.pars.interventions:
-                if intv.name == 'ACT3 Active Case Finding':
-                    for cov in intv.pars.date_cov.values():
-                        cov *= v
+            intv = get_intv(sim, 'ACT3 Active Case Finding')
+            for cov in intv.pars.date_cov.values():
+                cov *= v
         else:
             raise NotImplementedError(f'Parameter {k} not recognized')
 
@@ -340,15 +346,16 @@ def make_calibration():
         #{'beta': 0.445499764760726, 'beta_change': 0.6880249223150746, 'beta_change_year': 1986, 'x_pcf': 0.08450198158889916, 'rand_seed': 925220}. Best is trial 1747 with value: 103.93212613894507.
         #{'beta': 0.62171668825821, 'beta_change': 0.5854341465829178, 'beta_change_year': 1994, 'x_pcf': 0.5853718885109126, 'rand_seed': 30314}. Best is trial 119 with value: 77.90330762100335.
 
-        beta         = dict(low=0.01, high=0.70, guess=0.62171668825821, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
-        x_pcf        = dict(low=0, high=1.0, guess=0.5853718885109126),
-        beta_x_final = dict(low=0.3, high=1.0, guess=0.7),
+        beta         = dict(low=0.01, high=1.0, guess=0.62171668825821, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
+        x_pcf1       = dict(low=0, high=1.0, guess=0.5853718885109126 * 0.7),
+        x_pcf2       = dict(low=0, high=1.0, guess=0.5853718885109126 * 1.0),
+        beta_x_final = dict(low=0.0, high=1.0, guess=0.7),
         beta_dur     = dict(low=5, high=30, guess=20),
-        beta_mid     = dict(low=1960, high=2018, guess=1995),
-        start_yr     = dict(low=1900, high=1990, guess=1960),
-        x_acf_cov    = dict(low=0.5, high=1.0, guess=1.0),
-        p_fast       = dict(low=0.10, high=0.3, guess=0.25), # Fast progressor fraction
+        beta_mid     = dict(low=1960, high=2030, guess=1995),
+        x_acf_cov    = dict(low=0.25, high=1.0, guess=1.0),
+        p_fast       = dict(low=0.0, high=1.0, guess=0.25), # Fast progressor fraction
 
+        #start_yr     = dict(low=1900, high=1990, guess=1960),
         #init_prev = dict(low=0.01, high=0.25, guess=0.15), # Default type is suggest_float, no need to re-specify
         #n_contacts = dict(low=2, high=10, guess=3),
         #beta_change = dict(low=0.25, high=1, guess=0.5854341465829178),
