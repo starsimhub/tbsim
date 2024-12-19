@@ -58,6 +58,45 @@ class time_varying_parameter(ss.Intervention):
         self.sim.diseases.tb.pars[self.pars.tb_parameter] = self.original_value * rc
         return
 
+class sigmoidally_varying_parameter(ss.Intervention):
+    def __init__(self, pars=None, *args, **kwargs):
+        super().__init__()
+        self.define_pars(
+            tb_parameter = 'beta', # The parameter of the TB module to change
+            x_initial = 1,     # Will linearly interpolate from 1 at start to rc_endpoint at stop
+            x_final = 0.5,
+            dur_years = 15, # from 10% to 90% of 0 to 1 sigmoid value
+            midpoint = sc.date('1995-01-01'),
+        )
+        self.update_pars(pars, **kwargs)
+
+        # Calculate k (steepness parameter) from the slope at the midpoint
+        #self.k = (4 * self.pars.slope_peryear_at_mid) / (self.pars.x_final - self.pars.x_initial)
+        y1, y2 = 0.1, 0.9
+        ln_term = np.log(y2 / (1 - y2)) - np.log(y1 / (1 - y1))
+        self.k = ln_term / self.pars.dur_years
+        return
+    
+    def init_pre(self, sim, **kwargs):
+        super().init_pre(sim, **kwargs)
+
+        # Store the original value
+        self.original_value = sim.diseases.tb.pars[self.pars.tb_parameter]
+
+        # Make simulation and input time of the same type
+        self.t_mid = sc.datetoyear(self.pars.midpoint)
+        return
+ 
+    def step(self):
+        # Interpolate the values and modify the parameter
+        t = self.t.now('year')
+        x = self.pars.x_initial + (self.pars.x_final - self.pars.x_initial) / (1 + np.exp(-self.k * (t - self.t_mid)))
+        self.sim.diseases.tb.pars[self.pars.tb_parameter] = self.original_value * x
+        for net in self.sim.networks: # Set MP too
+            if isinstance(net, ss.MixingPool):
+                net.pars.beta = self.original_value * x
+        return x
+
 #%% Analyzer to track age specific infections 
 class AgeInfect(ss.Analyzer):
 
@@ -120,24 +159,39 @@ def make_sim():
         ss.Deaths(death_rate=ss.peryear(6.2), unit='day', dt=30),
     ]
 
-    nets = ss.RandomNet(n_contacts=ss.poisson(lam=3), dur=0)
-
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
     tb_pars = dict(
         beta                  = ss.beta(0.045, unit='year'),
         init_prev             = ss.bernoulli(0.02),
-        p_latent_fast         = ss.bernoulli(0.24), # 11% adult, 5% children?
+        p_latent_fast         = ss.bernoulli(0.24), # [CALIB 10-30%]
         rate_presym_to_active = ss.peryear(1/0.3), # duration of 0.3 years (exponential mean)
         #rate_LS_to_presym     = ss.perday(3e-5), # 3e-5 or 3e-6? per day? per year? Initially was 3e-5 per day...
-        rate_LS_to_presym     = ss.time_prob(0.1, unit='year', self_dt=50), # (50y->2.88e-4 per day) 3e-5 or 3e-6? per day? per year? Initially was 3e-5 per day... 10% over 50 years???
+        rate_LS_to_presym     = ss.time_prob(0.1, unit='year', self_dt=50), # (10% at 50y -> 2.88e-4 per day) 3e-5 or 3e-6? per day? per year? Initially was 3e-5 per day... 10% over 50 years???
+        # ^^^... 
         rate_LF_to_presym     = ss.perday(6e-3),
         rel_trans_smpos       = 1.0,
         rel_trans_smneg       = 0.2,
         rel_trans_exptb       = 0.0,
         rel_trans_presymp     = 0.3,
+
+        #Duration of 3y and death fraction of 70%
+        #rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
+        #rate_active_to_clear    = ss.perday(2.4e-4),               # Active infection to natural clearance (per day)
+        #rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
+        #rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
+        #rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
     )
     tb = mtb.TB(tb_pars)
+
+    #nets = ss.RandomNet(n_contacts=ss.poisson(lam=3), dur=0)
+    nets = ss.MixingPool(
+        diseases='tb',
+        src = ss.AgeGroup(0, None),
+        dst = ss.AgeGroup(0, None),
+        beta = tb.pars.beta,
+        contacts = ss.poisson(3), # ss.constant(1),
+    )
 
     # Analyzer to track age specific infections
     ageinfect = AgeInfect()
@@ -147,7 +201,7 @@ def make_sim():
         p_treat = ss.bernoulli(p=1.0),
         date_cov = {
             sc.date('1994-01-01'): 0.0, # Start of DOTs in Vietnam
-            # Coverage values will be multiplied by xpcf, a calibration parameter
+            # Coverage values will be multiplied by x_pcf, a calibration parameter
             sc.date('2000-01-01'): ss.peryear(0.7), # 2000 reflects completion of DOTS scale-up in Vietnam
             sc.date('2020-01-01'): ss.peryear(1.0), # Coverage continued to scale up through 2020
         },
@@ -166,11 +220,12 @@ def make_sim():
     act3 = mtb.ActiveCaseFinding(name='ACT3 Active Case Finding')
 
     # Time varying parameters
-    decrease_beta = time_varying_parameter(
+    decrease_beta = sigmoidally_varying_parameter(
         tb_parameter = 'beta', # The parameter of the TB module to change
-        rc_endpoint = 1.0,     # Will linearly interpolate from 1 at start to rc_endpoint at stop
-        start = sc.date('1995-01-01'),
-        stop = sc.date('2014-01-01'),
+        x_initial = 1,     # Will linearly interpolate from 1 at start to rc_endpoint at stop
+        x_final = 0.3,
+        dur_years = 20,
+        midpoint = sc.date('1995-01-01'),
     )
 
     # Simulation parameters
@@ -199,9 +254,9 @@ def build_sim(sim, calib_pars, **kwargs):
 
     reps = kwargs.get('n_reps', n_reps)
 
-    sir = sim.pars.diseases # There is only one disease in this simulation and it is a SIR
+    tb = sim.pars.diseases # There is only one disease in this simulation and it is a TB
     net = sim.pars.networks # There is only one network in this simulation and it is a RandomNet
-    intv = sim.pars.interventions # There is only one network in this simulation and it is a RandomNet
+    intv = sim.pars.interventions
 
     for k, pars in calib_pars.items():
         if k == 'rand_seed':
@@ -210,11 +265,12 @@ def build_sim(sim, calib_pars, **kwargs):
 
         v = pars['value']
         if k == 'beta':
-            sir.pars.beta = ss.beta(v, unit='year')
+            tb.pars.beta = ss.beta(v, unit='year')
+            net.pars.beta = ss.beta(v, unit='year')
         elif k == 'init_prev':
-            sir.pars.init_prev = ss.bernoulli(v)
+            tb.pars.init_prev = ss.bernoulli(v)
         elif k == 'n_contacts':
-            net.pars.n_contacts = ss.poisson(v)
+            net.pars.n_contacts = ss.poisson(v) # for RandomNet
         elif k == 'beta_change':
             for intv in sim.pars.interventions:
                 if isinstance(intv, time_varying_parameter):
@@ -222,10 +278,30 @@ def build_sim(sim, calib_pars, **kwargs):
         elif k == 'beta_change_year':
             for intv in sim.pars.interventions:
                 if isinstance(intv, time_varying_parameter):
-                    intv.pars.start = sc.date(f'{v}-01-01')
-        elif k == 'xpcf':
+                    intv.pars.start = sc.date(v)
+        elif k == 'x_pcf':
             for intv in sim.pars.interventions:
                 if intv.name == 'Passive Care Seeking':
+                    for cov in intv.pars.date_cov.values():
+                        cov *= v
+        elif k == 'x_acf_sens':
+            for intv in sim.pars.interventions:
+                if intv.name == 'ACT3 Active Case Finding':
+                    for sens in intv.pars.test_sens.values():
+                        sens *= v
+        elif k == 'p_fast':
+            tb.pars.p_latent_fast = ss.bernoulli(v)
+        elif k in ['beta_x_final', 'beta_dur', 'beta_mid']:
+            for intv in sim.pars.interventions:
+                if isinstance(intv, sigmoidally_varying_parameter):
+                    if k == 'beta_mid':
+                        v = ss.date(v)
+                    intv.pars[k] = v
+        elif k == 'start_yr':
+            sim.pars.start = ss.date(v)
+        elif k == 'x_acf_cov':
+            for intv in sim.pars.interventions:
+                if intv.name == 'ACT3 Active Case Finding':
                     for cov in intv.pars.date_cov.values():
                         cov *= v
         else:
@@ -260,46 +336,35 @@ def build_sim(sim, calib_pars, **kwargs):
 def make_calibration():
     # Define the calibration parameters
     calib_pars = dict(
-        # {'beta': 0.4016615352455662, 'beta_change': 0.7075221406739112, 'beta_change_year': 2001, 'xpcf': 0.14812009041601049, 'rand_seed': 172264}. Best is trial 88 with value: 11479.499964475886.
-        #{'beta': 0.445499764760726, 'beta_change': 0.6880249223150746, 'beta_change_year': 1986, 'xpcf': 0.08450198158889916, 'rand_seed': 925220}. Best is trial 1747 with value: 103.93212613894507.
-        #{'beta': 0.62171668825821, 'beta_change': 0.5854341465829178, 'beta_change_year': 1994, 'xpcf': 0.5853718885109126, 'rand_seed': 30314}. Best is trial 119 with value: 77.90330762100335.
+        # {'beta': 0.4016615352455662, 'beta_change': 0.7075221406739112, 'beta_change_year': 2001, 'x_pcf': 0.14812009041601049, 'rand_seed': 172264}. Best is trial 88 with value: 11479.499964475886.
+        #{'beta': 0.445499764760726, 'beta_change': 0.6880249223150746, 'beta_change_year': 1986, 'x_pcf': 0.08450198158889916, 'rand_seed': 925220}. Best is trial 1747 with value: 103.93212613894507.
+        #{'beta': 0.62171668825821, 'beta_change': 0.5854341465829178, 'beta_change_year': 1994, 'x_pcf': 0.5853718885109126, 'rand_seed': 30314}. Best is trial 119 with value: 77.90330762100335.
 
-        beta = dict(low=0.01, high=0.70, guess=0.62171668825821, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
+        beta         = dict(low=0.01, high=0.70, guess=0.62171668825821, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
+        x_pcf        = dict(low=0, high=1.0, guess=0.5853718885109126),
+        beta_x_final = dict(low=0.3, high=1.0, guess=0.7),
+        beta_dur     = dict(low=5, high=30, guess=20),
+        beta_mid     = dict(low=1960, high=2018, guess=1995),
+        start_yr     = dict(low=1900, high=1990, guess=1960),
+        x_acf_cov    = dict(low=0.5, high=1.0, guess=1.0),
+        p_fast       = dict(low=0.10, high=0.3, guess=0.25), # Fast progressor fraction
+
         #init_prev = dict(low=0.01, high=0.25, guess=0.15), # Default type is suggest_float, no need to re-specify
         #n_contacts = dict(low=2, high=10, guess=3),
-        beta_change = dict(low=0.25, high=1, guess=0.5854341465829178),
-        beta_change_year = dict(low=1986, high=2014, guess=1994, suggest_type='suggest_int'),
-        xpcf = dict(low=0, high=1.0, guess=0.5853718885109126),
+        #beta_change = dict(low=0.25, high=1, guess=0.5854341465829178),
+        #beta_change_year = dict(low=1986, high=2014, guess=1994),# suggest_type='suggest_int'),
+        #x_acf_sens = dict(low=0.0, high=1.0, guess=1.0),
     )
 
     # Make the sim and data
     sim = make_sim()
     
     # Define the components - for prevalence
-    prevalence_intv_bb = ss.BetaBinomial(
-        name = 'Prevalence Active (Intervention BB)',
-        include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
-        weight = 0,
-        conform = 'step_containing',
-        n_boot = 1000,
-
-        expected = pd.DataFrame({
-            'x': [169, 136, 78, 53],           # Number of individuals found to be infectious
-            'n': [43425, 44082, 44311, 42150], # Number of individuals sampled
-        }, index=pd.Index([ss.date(d) for d in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']], name='t')), # On these dates
-
-        extract_fn = lambda sim: pd.DataFrame({
-            'x': sim.results['ACT3 Active Case Finding'].n_positive, # sim.results.tb.n_active,
-            'n': sim.results['ACT3 Active Case Finding'].n_tested, # sim.results.n_alive,
-        }, index=pd.Index(sim.results.timevec, name='t')),
-    )
-
     prevalence_intv = ss.Binomial(
         name = 'Prevalence Active (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'step_containing',
-        n_boot = 1000,
 
         expected = pd.DataFrame({
             'x': [169, 136, 78, 53],           # Number of individuals found to be infectious
@@ -313,29 +378,11 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    prevalence_ctrl_bb = ss.BetaBinomial(
-        name = 'Prevalence Active (Control BB)',
-        include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
-        weight = 0,
-        conform = 'step_containing',
-
-        expected = pd.DataFrame({
-            'x': [94],      # Number of individuals found to be infectious
-            'n': [41680], # Number of individuals sampled
-        }, index=pd.Index([ss.date(d) for d in ['2017-06-01']], name='t')), # On these dates
-
-        extract_fn = lambda sim: pd.DataFrame({
-            'x': sim.results['ACT3 Active Case Finding'].n_positive, # sim.results.tb.n_active,
-            'n': sim.results['ACT3 Active Case Finding'].n_tested, # sim.results.n_alive,
-        }, index=pd.Index(sim.results.timevec, name='t')),
-    )
-
     prevalence_ctrl = ss.Binomial(
         name = 'Prevalence Active (Control)',
         include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 1,
         conform = 'step_containing',
-        n_boot = 1000,
 
         expected = pd.DataFrame({
             'x': [94],      # Number of individuals found to be infectious
@@ -387,7 +434,7 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t'))
     )
 
-    infected_5_6_intv = ss.BetaBinomial(
+    infected_5_6_intv = ss.Binomial(
         name = 'Prev Ever Infected Age 5-6 (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 0,
@@ -404,7 +451,7 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    infected_5_6_ctrl = ss.BetaBinomial(
+    infected_5_6_ctrl = ss.Binomial(
         name = 'Prev Ever Infected Age 5-6 (Control)',
         include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 0,
@@ -421,7 +468,7 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    infected_6_15_intv = ss.BetaBinomial(
+    infected_6_15_intv = ss.Binomial(
         name = 'Prev Ever Infected Age 6-15 (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 0,
@@ -438,7 +485,7 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    infected_6_15_ctrl = ss.BetaBinomial(
+    infected_6_15_ctrl = ss.Binomial(
         name = 'Prev Ever Infected Age 6-15 (Control)',
         include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 0,
@@ -455,14 +502,14 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    infected_15plus = ss.BetaBinomial(
+    infected_15plus = ss.Binomial(
         name = 'Prev Ever Infected 15+ (Intervention)',
         include_fn = lambda sim: sim.label == 'Intervention' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
         weight = 0,
         conform = 'prevalent',
 
         expected = pd.DataFrame({
-            'x': 286,  # Number of individuals found to be infectious
+            'x': 486,  # Number of individuals found to be infectious
             'n': 1319, # Number of individuals sampled
         }, index=pd.Index([ss.date(d) for d in ['2016-01-01']], name='t')), # June 2015 to March 2016.
         
@@ -472,12 +519,12 @@ def make_calibration():
         }, index=pd.Index(sim.results.timevec, name='t')),
     )
 
-    components = [
-        prevalence_ctrl_bb, prevalence_intv_bb,
-        prevalence_intv, prevalence_ctrl, incidence, historical_incidence, infected_5_6_intv, infected_5_6_ctrl, infected_6_15_intv, infected_6_15_ctrl, infected_15plus]
+    components = [ prevalence_intv, prevalence_ctrl, incidence,
+        historical_incidence, infected_5_6_intv, infected_5_6_ctrl,
+        infected_6_15_intv, infected_6_15_ctrl, infected_15plus ]
 
-    #for c in components:
-    #    c.n_boot = 1000
+    for c in components:
+        c.n_boot = 1000
 
     # Make the calibration
     calib = ss.Calibration(
@@ -502,32 +549,6 @@ def make_calibration():
 #%% Run as a script
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-
-    # Useful for generating fake "expected" data
-    if False:
-        sim = make_sim()
-        pars = {
-            'beta'      : dict(value=0.075),
-            'init_prev' : dict(value=0.10),
-            'n_contacts': dict(value=4),
-        }
-        ms = build_sim(sim, pars, n_reps=25)
-        ms.run().plot()
-
-        dfs = []
-        for sim in ms.sims:
-            df = sim.to_df()
-            df['prevalence'] = df['sir_n_infected']/df['n_alive']
-            df['rand_seed'] = sim.pars.rand_seed
-            dfs.append(df)
-        df = pd.concat(dfs)
-
-        import seaborn as sns
-        sns.relplot(data=df, x='timevec', y='prevalence', hue='rand_seed', kind='line')
-        plt.show()
-        import sys
-        sys.exit()
-
     sim, calib = make_calibration()
 
     T = sc.timer()
