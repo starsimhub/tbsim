@@ -8,16 +8,34 @@ import os
 
 from run_act3_calibration import make_sim, build_sim
 
+# TEMP, move to aplt
+import matplotlib.pyplot as plt
+
 do_run = True
 debug = False #NOTE: Debug runs in serial
 
 # Each scenario will be run n_seeds times for each of intervention and control.
-n_seeds = [30, 3][debug] # Results bootstrapped over K=60 seeds (of intv and ctrl)
+n_seeds = [60, 2][debug]
 n_reps = 1 # Default, leave as 1 for now, results will be combined by bootstrapping across seeds
 
 # Check if the results directory exists, if not, create it
 resdir = os.path.join('results', 'ACT3')
 os.makedirs(resdir, exist_ok=True)
+
+class prev_by_age(ss.Intervention):
+    def __init__(self, year, **kwargs):
+        self.year = year
+        super().__init__(**kwargs)
+        return
+    
+    def step(self):
+        if self.year >= self.t.now('year') and  self.year < self.t.now('year')+self.t.dt_year:
+            self.age_bins = np.arange(0, 101, 5)
+            self.n, _        = np.histogram(self.sim.people.age, bins=self.age_bins)
+            self.ever, _     = np.histogram(self.sim.people.age[self.sim.diseases.tb.ever_infected], bins=self.age_bins)
+            self.infected, _ = np.histogram(self.sim.people.age[self.sim.diseases.tb.infected], bins=self.age_bins)
+            self.active, _   = np.histogram(self.sim.people.age[self.sim.diseases.tb.infectious], bins=self.age_bins)
+        return
 
 def run_ACF(base_sim, skey, scen, rand_seed=0):
     """
@@ -28,14 +46,49 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
     # MODIFY THE SIMULATION OBJECT BASED ON THE SCENARIO HERE
     # skey, scen
 
+    sim.pars.interventions += [prev_by_age(year=2013)]
+
     sim.pars.rand_seed = rand_seed # This is the base seed that build_sim will increment from for n_reps
     #########################################################
 
     ms = build_sim(sim, calib_pars=scen['CalibPars'], n_reps=n_reps)
     ms.run()
 
+    ### EVAL LL
+    prevalence_ctrl = ss.Binomial(
+        name = 'Prevalence Active (Control)',
+        include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
+        weight = 1,
+        conform = 'step_containing',
+
+        expected = pd.DataFrame({
+            'x': [94],      # Number of individuals found to be infectious
+            'n': [41680], # Number of individuals sampled
+        }, index=pd.Index([ss.date(d) for d in ['2017-06-01']], name='t')), # On these dates
+
+        extract_fn = lambda sim: pd.DataFrame({
+            # sim.results.tb.n_active / sim.results.n_alive,
+            'p': (sim.results['ACT3 Active Case Finding'].n_positive +1) / (sim.results['ACT3 Active Case Finding'].n_tested + 2)
+        }, index=pd.Index(sim.results.timevec, name='t')),
+    )
+    nLL = prevalence_ctrl(ms)
+
+    '''
+    fig = prevalence_ctrl.plot()
+    plt.subplots_adjust(top=0.9)
+    plt.title(f'LL: {LL:.2f}')
+    plt.savefig(os.path.join(resdir, 'figs', f'll_prevalencectrl_{skey}_{rand_seed}.png'), dpi=600)
+
+    fig = prevalence_ctrl.plot(bootstrap=True)
+    plt.subplots_adjust(top=0.9)
+    plt.title(f'LL: {LL:.2f}')
+    plt.savefig(os.path.join(resdir, 'figs', f'll_prevalencectrl_{skey}_{rand_seed}_bootstrap.png'), dpi=600)
+    '''
+    ####################################################################
+
     tb_res = []
     acf_res = []
+    pba_res = []
     for s in ms.sims:
         df = pd.DataFrame({
             'time_year': s.results.timevec,
@@ -60,13 +113,33 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
         })
         df['scenario'] = skey
         df['arm'] = s.label
+        df['nLL'] = nLL
+        # TEMP
+        df['p'] = prevalence_ctrl.actual['p'].values[0]
+        ######
         df['rand_seed'] = s.pars.rand_seed
         acf_res.append(df)
 
+        intv = s.interventions.get('prev_by_age', None)
+        if intv is None:
+            continue
+        df = pd.DataFrame({
+            'n': intv.n,
+            'ever': intv.ever,
+            'infected': intv.infected,
+            'active': intv.active,
+        }, index = pd.Index([f'{b}-{e}' for b,e in zip(intv.age_bins[:-1], intv.age_bins[1:])], name='age bin'))
+        df['year'] = ss.date(intv.year)
+        df['scenario'] = skey
+        df['arm'] = s.label
+        df['rand_seed'] = s.pars.rand_seed
+        pba_res.append(df)
+
     tb_res = pd.concat(tb_res)
     acf_res = pd.concat(acf_res)
+    pba_res = pd.concat(pba_res)
 
-    return {'TB': tb_res, 'ACT3': acf_res}
+    return {'TB': tb_res, 'ACT3': acf_res, 'PBA': pba_res}
 
 
 def run_scenarios(scens, n_seeds=n_seeds):
@@ -111,30 +184,30 @@ if __name__ == '__main__':
             'TB': None,
             'Simulation': None,
             'CalibPars': dict(
-                #{'beta': 0.445499764760726, 'beta_change': 0.6880249223150746, 'beta_change_year': 1986, 'xpcf': 0.08450198158889916, 'rand_seed': 925220}. Best is trial 1747 with value: 103.93212613894507.
-                beta = dict(low=0.01, high=0.70, value=0.445499764760726, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
-                beta_change = dict(low=0.25, high=1, value=0.6880249223150746),
-                beta_change_year = dict(low=1950, high=1986, value=2001, suggest_type='suggest_int'),
-                xpcf = dict(low=0, high=1.0, value=0.08450198158889916),
+                #{'beta': 0.445499764760726, 'beta_change': 0.6880249223150746, 'beta_change_year': 1986, 'x_pcf': 0.08450198158889916, 'rand_seed': 925220}. Best is trial 1747 with value: 103.93212613894507.
+                #Best pars: {'beta': 0.679827886241803, 'beta_change': 0.8340131719334973, 'beta_change_year': 1994, 'x_pcf': 0.8916141210394346, 'rand_seed': 697307}
+                # Best pars: {'beta': 0.5235567664610593, 'beta_change': 0.9568236366496933, 'beta_change_year': 2005, 'x_pcf': 0.656486775032034, 'rand_seed': 617948}
+                # {'beta': 0.6530572700054, 'beta_change': 0.9505482178242397, 'beta_change_year': 2002, 'x_pcf': 0.4956670121322915, 'rand_seed': 155948}. Best is tr ial 671 with value: 30.603018157833525.
+                #{'beta': 0.6867186215217777, 'beta_change': 0.9867446237476286, 'beta_change_year': 2002, 'x_pcf': 0.531968439702045, 'rand_seed': 249773}. Best is trial 964 with value: 29.912142651617593.
+                # Best pars: {'beta': 0.6740099111635088, 'beta_change': 0.9335147672577179, 'beta_change_year': 2000, 'x_pcf': 0.5837962790450258, 'rand_seed': 670962} --> 29.29142608836463
+                #beta = dict(value=0.6740099111635088),
+                #beta_change = dict(value=0.9335147672577179),
+                #beta_change_year = dict(value=2000),
+                #x_pcf = dict(value=0.5837962790450258),
+
+                # [I 2024-12-19 10:09:41,163] Trial 981 finished with value: 24.833328141810956 and parameters: {'beta': 0.6575108131105362, 'x_pcf': 0.717055858412015, 'beta_x_final': 0.9528881379829458, 'beta_dur': 22.490061634719932, 'beta_mid': 1989.5772039630472, 'start_yr': 1972.6641100096283, 'x_acf_cov': 0.9277067206055629, 'p_fast': 0.28369250313933475, 'rand_seed': 390370}. Best is trial 981 with value: 24.833328141810956.
+                beta         = dict(value=0.6575108131105362), # Log scale and no "path", will be handled by build_sim (above)
+                x_pcf1       = dict(value=0.717055858412015 * 0.7),
+                x_pcf2       = dict(value=0.717055858412015 * 1.0),
+                beta_x_final = dict(value=0.9528881379829458),
+                beta_dur     = dict(value=22.490061634719932),
+                beta_mid     = dict(value=1989.5772039630472),
+                #start_yr     = dict(value=1972.6641100096283),
+                x_acf_cov    = dict(value=0.9277067206055629),
+                p_fast       = dict(value=0.28369250313933475),
             )
         },
     }
-    # Other calib pars:
-    '''
-    'Other calib pars': {
-        # default has been set to basic ACT3
-        'ACT3': None,
-        'TB': None,
-        'Simulation': None,
-        'CalibPars': dict(
-            # {'beta': 0.4016615352455662, 'beta_change': 0.7075221406739112, 'beta_change_year': 2001, 'xpcf': 0.14812009041601049, 'rand_seed': 172264}. Best is trial 88 with value: 11479.499964475886.
-            beta = dict(low=0.01, high=0.70, value=0.4016615352455662, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
-            beta_change = dict(low=0.25, high=1, value=0.7075221406739112),
-            beta_change_year = dict(low=1950, high=2014, value=2001, suggest_type='suggest_int'),
-            xpcf = dict(low=0, high=1.0, value=0.14812009041601049),
-        )
-    },
-    '''
 
     if do_run:
         df_result = run_scenarios(scens)
@@ -152,9 +225,50 @@ if __name__ == '__main__':
 
 
     # MOVE TO aplt:
-
-    # TB time series# ###################################################
     import seaborn as sns
+    import scipy.stats as sps
+    '''
+    ret = df_result.get('ACT3').groupby('rand_seed')[['nLL', 'x', 'n']].mean()
+    for seed, row in ret.groupby('rand_seed'):
+        #a_n, a_x = row['n'], row['x']
+        a_p = row['p']
+        e_n, e_x = 41680, 94
+        q = sps.binom(n=e_n, p=p)
+        print(f'LL: {q.logpmf(e_x)[0]:.2f} vs {row["nLL"].values[0]:.2f}')
+    
+    ret['e_n'] = 41680
+    ret['e_x'] = 94
+
+    q = sps.binom(n=e_n, p=p)
+    ret['LL2'] = q.logpmf(e_x)
+    ret['mean'] = q.mean()
+    ret['median'] = q.median()
+    intv95 = q.interval(0.95)
+    ret['2.5%'] = intv95[0]
+    ret['97.5%'] = intv95[1]
+
+    b = sps.binom(n=e_n, p=(ret['x']+1)/(ret['n']+2)) # Smoothed
+    ret['bLL'] = b.logpmf(e_x)
+    ret['bmean'] = b.mean()
+    ret['bmedian'] = b.median()
+    intv95 = b.interval(0.95)
+    ret['b2.5%'] = intv95[0]
+    ret['b97.5%'] = intv95[1]
+    print(ret)
+    '''
+
+    # TB by age ###################################################
+    ret = df_result.get('PBA')
+    ret['prev ever'] = ret['ever'] / ret['n']
+    ret['prev infected'] = ret['infected'] / ret['n']
+    ret['prev active'] = ret['active'] / ret['n']
+    df = ret.reset_index().melt(id_vars=['age bin', 'scenario', 'arm', 'year', 'rand_seed'], value_vars=['prev ever', 'prev infected', 'prev active'], value_name='value', var_name='variable')
+    g = sns.catplot(kind='bar', data=df.reset_index(), x='age bin', hue='variable', y='value', col='scenario')
+    g.set_titles(col_template="{col_name}")
+    g.fig.tight_layout()
+    g.fig.savefig(os.path.join(resdir, 'figs', 'age.png'), dpi=600)
+
+    # TB time series ###################################################
     ret = df_result.get('TB').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
     g = sns.relplot(data=ret, x='time_year', y='value', hue='arm', col='variable', kind='line', row='scenario', errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='rand_seed'
     g.set_titles(col_template="{col_name}")
@@ -173,98 +287,55 @@ if __name__ == '__main__':
     df.set_index('rand_seed', inplace=True)
     df['time_year'] = pd.to_datetime(df['time_year'])
     seeds = df.index.unique()
-    K = 60
+    K = len(seeds)
     n_boots = 1000
     dfs = []
+
     expected = pd.DataFrame({
         'x': [169, 136, 78, 53],           # Number of individuals found to be infectious
         'n': [43425, 44082, 44311, 42150], # Number of individuals sampled
-    ####}, index=pd.Index([ss.date(d) for d in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']], name='t')) # On these dates
-    }, index=pd.Index([ss.date(d) for d in ['2014-06-16', '2015-06-11', '2016-06-05', '2017-06-30']], name='t')) # On these dates
+    }, index=pd.Index([ss.date(d) for d in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']], name='t')) # On these dates
+
     for bi in range(n_boots):
         boot_seeds = np.random.choice(seeds, K)
         dfb = df.loc[boot_seeds].groupby(['scenario', 'arm', 'time_year']).sum()
-        combined = pd.merge(dfb.reset_index(), expected.reset_index(), left_on='time_year', right_on='t')
+        # Very hacky to get date alignment
+        combined = dfb.copy()
+        for keys, val in combined.groupby(['scenario', 'arm']):
+            combined.loc[keys, 'x'] = expected['x'].values
+            combined.loc[keys, 'n'] = expected['n'].values
+            combined.loc[keys, 't'] = expected.index.values
+        #combined = pd.merge(dfb.reset_index(), expected.reset_index(), left_on='time_year', right_on='t')
 
         #combined['scaled_positive'] = combined['n_positive'] * combined['n']  / combined['n_tested']
-        alpha = combined['n_positive'] + 1
-        beta = combined['n_tested'] - combined['n_positive'] + 1
+        #alpha = combined['n_positive'] + 1
+        #beta = combined['n_tested'] - combined['n_positive'] + 1
+        p = (combined['n_positive'] + 1) / (combined['n_tested'] + 2)
         n = combined['n']
-        combined['scaled_positive'] = n * alpha / (alpha + beta)
+        #combined['scaled_positive'] = n * alpha / (alpha + beta)
+        combined['scaled_positive'] = n * p
         combined.loc[combined['n_tested'] == 0, 'scaled_positive'] = np.nan
 
         combined['bi'] = bi
         dfs.append(combined)
-    df = pd.concat(dfs)
+    df = pd.concat(dfs).reset_index()
 
     def plot_observed(data, **kwargs):
         #df = expected.reset_index()
         #sns.scatterplot(data=df, x='t', y='x')
-        import matplotlib.pyplot as plt
         plt.scatter(np.arange(len(expected)), expected['x'].values, color='orange', edgecolors='black', s=100)
 
         # Control
         plt.plot(3, 94, color='blue', marker='o', mec='black', ms=10)
 
     #ret = df_result.get('ACT3').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
-    d = df[['scenario', 'arm', 'time_year', 'scaled_positive', 'bi']]
+    d = df[['scenario', 'arm', 't', 'scaled_positive', 'bi']]
     d = d.dropna(axis=0)
-    g = sns.catplot(kind='strip', data=d, x='time_year', order=expected.index, y='scaled_positive', hue='arm', col='scenario', estimator=None, units='bi', size=1) # SD for speed, units='rand_seed'
+    g = sns.catplot(kind='strip', data=d, x='t', order=expected.index, y='scaled_positive', hue='arm', col='scenario', estimator=None, units='bi', size=1) # SD for speed, units='rand_seed'
     g.map_dataframe(plot_observed)
     g.set_titles(col_template="{col_name}")
     g.fig.tight_layout()
     g.fig.savefig(os.path.join(resdir, 'figs', 'act3_acf.png'), dpi=600)
-
-
-
-    # Historical incidence ##################################################
-    df = df_result.get('TB')
-    df.set_index('rand_seed', inplace=True)
-    df['time_year'] = pd.to_datetime(df['time_year'])
-    seeds = df.index.unique()
-    K = 60
-    n_boots = 1000
-    dfs = []
-    expected = pd.DataFrame({
-        'x': [169, 136, 78, 53],           # Number of individuals found to be infectious
-        'n': [43425, 44082, 44311, 42150], # Number of individuals sampled
-    ####}, index=pd.Index([ss.date(d) for d in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']], name='t')) # On these dates
-    }, index=pd.Index([ss.date(d) for d in ['2014-06-16', '2015-06-11', '2016-06-05', '2017-06-30']], name='t')) # On these dates
-    for bi in range(n_boots):
-        boot_seeds = np.random.choice(seeds, K)
-        dfb = df.loc[boot_seeds].groupby(['scenario', 'arm', 'time_year']).sum()
-        combined = pd.merge(dfb.reset_index(), expected.reset_index(), left_on='time_year', right_on='t')
-
-        #combined['scaled_positive'] = combined['n_positive'] * combined['n']  / combined['n_tested']
-        alpha = combined['n_positive'] + 1
-        beta = combined['n_tested'] - combined['n_positive'] + 1
-        n = combined['n']
-        combined['scaled_positive'] = n * alpha / (alpha + beta)
-        combined.loc[combined['n_tested'] == 0, 'scaled_positive'] = np.nan
-
-        combined['bi'] = bi
-        dfs.append(combined)
-    df = pd.concat(dfs)
-
-    def plot_observed(data, **kwargs):
-        #df = expected.reset_index()
-        #sns.scatterplot(data=df, x='t', y='x')
-        import matplotlib.pyplot as plt
-        plt.scatter(np.arange(len(expected)), expected['x'].values, color='orange', edgecolors='black', s=100)
-
-        # Control
-        plt.plot(3, 94, color='blue', marker='o', mec='black', ms=10)
-
-    #ret = df_result.get('ACT3').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
-    d = df[['scenario', 'arm', 'time_year', 'scaled_positive', 'bi']]
-    d = d.dropna(axis=0)
-    g = sns.catplot(kind='strip', data=d, x='time_year', order=expected.index, y='scaled_positive', hue='arm', col='scenario', estimator=None, units='bi', size=1) # SD for speed, units='rand_seed'
-    g.map_dataframe(plot_observed)
-    g.set_titles(col_template="{col_name}")
-    g.fig.tight_layout()
-    g.fig.savefig(os.path.join(resdir, 'figs', 'act3_acf.png'), dpi=600)
-
-
 
 
 
