@@ -101,6 +101,7 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
         df['scenario'] = skey
         df['arm'] = s.label
         df['rand_seed'] = s.pars.rand_seed
+        df['include'] = np.any(s.results.tb.n_infected[s.timevec >= ss.date('2013-01-01')] > 0)
         tb_res.append(df)
 
         act3_dates = [ss.date(t) for t in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']]
@@ -117,6 +118,7 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
         # TEMP
         df['p'] = prevalence_ctrl.actual['p'].values[0]
         ######
+        df['include'] = np.any(s.results.tb.n_infected[s.timevec >= ss.date('2013-01-01')] > 0)
         df['rand_seed'] = s.pars.rand_seed
         acf_res.append(df)
 
@@ -183,30 +185,14 @@ if __name__ == '__main__':
             'ACT3': None,
             'TB': None,
             'Simulation': None,
-            'CalibPars': dict(
-                #{'beta': 0.445499764760726, 'beta_change': 0.6880249223150746, 'beta_change_year': 1986, 'x_pcf': 0.08450198158889916, 'rand_seed': 925220}. Best is trial 1747 with value: 103.93212613894507.
-                #Best pars: {'beta': 0.679827886241803, 'beta_change': 0.8340131719334973, 'beta_change_year': 1994, 'x_pcf': 0.8916141210394346, 'rand_seed': 697307}
-                # Best pars: {'beta': 0.5235567664610593, 'beta_change': 0.9568236366496933, 'beta_change_year': 2005, 'x_pcf': 0.656486775032034, 'rand_seed': 617948}
-                # {'beta': 0.6530572700054, 'beta_change': 0.9505482178242397, 'beta_change_year': 2002, 'x_pcf': 0.4956670121322915, 'rand_seed': 155948}. Best is tr ial 671 with value: 30.603018157833525.
-                #{'beta': 0.6867186215217777, 'beta_change': 0.9867446237476286, 'beta_change_year': 2002, 'x_pcf': 0.531968439702045, 'rand_seed': 249773}. Best is trial 964 with value: 29.912142651617593.
-                # Best pars: {'beta': 0.6740099111635088, 'beta_change': 0.9335147672577179, 'beta_change_year': 2000, 'x_pcf': 0.5837962790450258, 'rand_seed': 670962} --> 29.29142608836463
-                #beta = dict(value=0.6740099111635088),
-                #beta_change = dict(value=0.9335147672577179),
-                #beta_change_year = dict(value=2000),
-                #x_pcf = dict(value=0.5837962790450258),
-
-                # [I 2024-12-19 10:09:41,163] Trial 981 finished with value: 24.833328141810956 and parameters: {'beta': 0.6575108131105362, 'x_pcf': 0.717055858412015, 'beta_x_final': 0.9528881379829458, 'beta_dur': 22.490061634719932, 'beta_mid': 1989.5772039630472, 'start_yr': 1972.6641100096283, 'x_acf_cov': 0.9277067206055629, 'p_fast': 0.28369250313933475, 'rand_seed': 390370}. Best is trial 981 with value: 24.833328141810956.
-                beta         = dict(value=0.6575108131105362), # Log scale and no "path", will be handled by build_sim (above)
-                x_pcf1       = dict(value=0.717055858412015 * 0.7),
-                x_pcf2       = dict(value=0.717055858412015 * 1.0),
-                beta_x_final = dict(value=0.9528881379829458),
-                beta_dur     = dict(value=22.490061634719932),
-                beta_mid     = dict(value=1989.5772039630472),
-                #start_yr     = dict(value=1972.6641100096283),
-                x_acf_cov    = dict(value=0.9277067206055629),
-                p_fast       = dict(value=0.28369250313933475),
-            )
-        },
+            'CalibPars': 
+                {k:dict(value=v) for k,v in
+                #'rand_seed': 850549
+                #{'beta': 0.9067522769987235, 'x_pcf1': 0.3231894161330828, 'x_pcf2': 0.5695811456744782, 'beta_x_final': 0.779008573903516, 'beta_dur': 24.30430256638232, 'beta_mid': 1973.2357310549744, 'x_acf_cov': 0.8736961778986055, 'p_fast': 0.17403427420948536}
+                #'rand_seed': 470796
+                {'beta': 0.910396235207257, 'beta_x_final': 0.05737434233165578, 'beta_dur': 24.686880757985698, 'beta_mid': 2015.7462785352063, 'x_acf_cov': 0.8746741743886838, 'p_fast': 0.20701467084246836} \
+                .items() },
+        }
     }
 
     if do_run:
@@ -288,6 +274,10 @@ if __name__ == '__main__':
     df['time_year'] = pd.to_datetime(df['time_year'])
     seeds = df.index.unique()
     K = len(seeds)
+
+    # Seed filtering
+    seeds = seeds[df.groupby('rand_seed')['include'].mean().loc[seeds].values.astype(bool)] # Ugly
+
     n_boots = 1000
     dfs = []
 

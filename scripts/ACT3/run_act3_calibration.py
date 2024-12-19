@@ -291,8 +291,9 @@ def build_sim(sim, calib_pars, **kwargs):
                 cov *= v
         elif k in ['x_pcf1', 'x_pcf2']:
             intv = get_intv(sim, 'Passive Care Seeking')
-            if k == 'x_pcf1':   intv.pars.date_cov[1] = ss.peryear(v)
-            elif k == 'x_pcf2': intv.pars.date_cov[2] = ss.peryear(v)
+            dates = list(intv.pars.date_cov.keys())
+            if k == 'x_pcf1':   intv.pars.date_cov[dates[1]] = ss.peryear(v)
+            elif k == 'x_pcf2': intv.pars.date_cov[dates[2]] = ss.peryear(v)
         elif k == 'x_acf_sens':
             intv = get_intv(sim, 'ACT3 Active Case Finding')
             for sens in intv.pars.test_sens.values():
