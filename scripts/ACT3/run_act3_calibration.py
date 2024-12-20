@@ -160,8 +160,8 @@ def make_sim():
         #ss.Births(birth_rate=ss.peryear(18.5), unit='day', dt=30),  # Matching to simulation's unit and dt, hopefully soon not necessary
         #ss.Deaths(death_rate=ss.peryear(6.2), unit='day', dt=30),
 
-        ss.Births(birth_rate=cbr),  # Matching to simulation's unit and dt, hopefully soon not necessary
-        ss.Deaths(death_rate=asmr),
+        ss.Births(birth_rate=cbr, unit='day', dt=30),  # Matching to simulation's unit and dt, hopefully soon not necessary
+        ss.Deaths(death_rate=asmr, unit='day', dt=30),
     ]
 
     # Modify the defaults to if necessary based on the input scenario 
@@ -355,11 +355,12 @@ def make_calibration():
         beta         = dict(low=0.01, high=1.0, guess=0.62171668825821, suggest_type='suggest_float', log=False), # Log scale and no "path", will be handled by build_sim (above)
         x_pcf1       = dict(low=0, high=1.0, guess=0.5853718885109126 * 0.7),
         x_pcf2       = dict(low=0, high=1.0, guess=0.5853718885109126 * 1.0),
-        beta_x_final = dict(low=0.0, high=1.0, guess=0.7),
-        beta_dur     = dict(low=5, high=30, guess=20),
-        beta_mid     = dict(low=1960, high=2030, guess=1995),
         x_acf_cov    = dict(low=0.25, high=1.0, guess=1.0),
         p_fast       = dict(low=0.0, high=1.0, guess=0.25), # Fast progressor fraction
+
+        #beta_x_final = dict(low=0.0, high=1.0, guess=0.7),
+        #beta_dur     = dict(low=5, high=30, guess=20),
+        #beta_mid     = dict(low=1960, high=2030, guess=1995),
 
         #start_yr     = dict(low=1900, high=1990, guess=1960),
         #init_prev = dict(low=0.01, high=0.25, guess=0.15), # Default type is suggest_float, no need to re-specify
