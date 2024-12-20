@@ -10,12 +10,15 @@ from run_act3_calibration import make_sim, build_sim
 
 # TEMP, move to aplt
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import seaborn as sns
+import scipy.stats as sps
 
 do_run = True
 debug = False #NOTE: Debug runs in serial
 
 # Each scenario will be run n_seeds times for each of intervention and control.
-n_seeds = [60, 2][debug]
+n_seeds = [60*5, 2][debug]
 n_reps = 1 # Default, leave as 1 for now, results will be combined by bootstrapping across seeds
 
 # Check if the results directory exists, if not, create it
@@ -111,6 +114,16 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
             'n_elig': s.results['ACT3 Active Case Finding'].n_elig[inds],
             'n_tested': s.results['ACT3 Active Case Finding'].n_tested[inds],
             'n_positive': s.results['ACT3 Active Case Finding'].n_positive[inds],
+
+            'n_positive_presymp': s.results['ACT3 Active Case Finding'].n_positive_presymp[inds],
+            'n_positive_smpos': s.results['ACT3 Active Case Finding'].n_positive_smpos[inds],
+            'n_positive_smneg': s.results['ACT3 Active Case Finding'].n_positive_smneg[inds],
+            'n_positive_exp': s.results['ACT3 Active Case Finding'].n_positive_exp[inds],
+
+            'n_positive_via_LF': s.results['ACT3 Active Case Finding'].n_positive_via_LF[inds],
+            'n_positive_via_LS': s.results['ACT3 Active Case Finding'].n_positive_via_LS[inds],
+            'n_positive_via_LF_dur': s.results['ACT3 Active Case Finding'].n_positive_via_LF_dur[inds],
+            'n_positive_via_LS_dur': s.results['ACT3 Active Case Finding'].n_positive_via_LS_dur[inds],
         })
         df['scenario'] = skey
         df['arm'] = s.label
@@ -190,7 +203,16 @@ if __name__ == '__main__':
                 #'rand_seed': 850549
                 #{'beta': 0.9067522769987235, 'x_pcf1': 0.3231894161330828, 'x_pcf2': 0.5695811456744782, 'beta_x_final': 0.779008573903516, 'beta_dur': 24.30430256638232, 'beta_mid': 1973.2357310549744, 'x_acf_cov': 0.8736961778986055, 'p_fast': 0.17403427420948536}
                 #'rand_seed': 470796
-                {'beta': 0.910396235207257, 'beta_x_final': 0.05737434233165578, 'beta_dur': 24.686880757985698, 'beta_mid': 2015.7462785352063, 'x_acf_cov': 0.8746741743886838, 'p_fast': 0.20701467084246836} \
+                #{'beta': 0.910396235207257, 'beta_x_final': 0.05737434233165578, 'beta_dur': 24.686880757985698, 'beta_mid': 2015.7462785352063, 'x_acf_cov': 0.8746741743886838, 'p_fast': 0.20701467084246836} \
+                # 'rand_seed': 233965
+                #{'beta': 0.3639402812775401, 'x_pcf1': 0.17422127142544253, 'x_pcf2': 0.8635517496019752, 'beta_x_final': 0.2266611894479731, 'beta_dur': 16.96261135468262, 'beta_mid': 1979.4790117285563, 'x_acf_cov': 0.5672782978680914, 'p_fast': 0.421811292136281} \
+                #{'beta': 0.50, 'x_pcf1': 0.17422127142544253, 'x_pcf2': 0.8635517496019752, 'beta_x_final': 0.2266611894479731, 'beta_dur': 16.96261135468262, 'beta_mid': 1979.4790117285563, 'x_acf_cov': 0.5672782978680914, 'p_fast': 0.421811292136281} \
+                # 'rand_seed': 102211
+                #{'beta': 0.43529159300902504, 'x_pcf1': 0.5156170226355246, 'x_pcf2': 0.9049310957856859, 'beta_x_final': 0.5113042336658371, 'beta_dur': 18.392517993256075, 'beta_mid': 1981.9180527400858, 'x_acf_cov': 0.7155236261871701, 'p_fast': 0.6144963029973003} \
+                # , 'rand_seed': 479997
+                #{'beta': 0.2515466183818931, 'x_pcf1': 0.4422889810210864, 'x_pcf2': 0.8090931524610825, 'beta_x_final': 0.9722331124476845, 'beta_dur': 18.65710753236865, 'beta_mid': 1980.945342039754, 'x_acf_cov': 0.6110592364870079, 'p_fast': 0.7682229846113128} \
+                # , 'rand_seed': 179507
+                {'beta': 0.31013128138223345, 'x_pcf1': 0.238131788244131, 'x_pcf2': 0.9992504136800656, 'beta_x_final': 0.8834600066122873, 'beta_dur': 19.79941839318105, 'beta_mid': 1975.6750295037912, 'x_acf_cov': 0.29885149828207896, 'p_fast': 0.6437272056839243}
                 .items() },
         }
     }
@@ -200,8 +222,10 @@ if __name__ == '__main__':
     else:
         try:
             df_result = {}
-            for k in ['TB', 'ACT3']:
-                df_result[k] = pd.read_csv(os.path.join(resdir, f'{k}.csv'))
+            for k in ['TB', 'ACT3', 'PBA']:
+                df_result[k] = pd.read_csv(os.path.join(resdir, f'{k}.csv'), index_col=0)
+                if 'time_year' in df_result[k]:
+                    df_result[k]['time_year'] = pd.to_datetime(df_result[k]['time_year'])
         except FileNotFoundError:
             print('No results found, please set do_run to True')
             raise
@@ -211,8 +235,6 @@ if __name__ == '__main__':
 
 
     # MOVE TO aplt:
-    import seaborn as sns
-    import scipy.stats as sps
     '''
     ret = df_result.get('ACT3').groupby('rand_seed')[['nLL', 'x', 'n']].mean()
     for seed, row in ret.groupby('rand_seed'):
@@ -263,9 +285,15 @@ if __name__ == '__main__':
 
     # ACT3 time series ##################################################
     ret = df_result.get('ACT3').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
-    g = sns.relplot(data=ret, x='time_year', y='value', hue='arm', col='variable', kind='line', row='scenario', errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='rand_seed'
+    g = sns.relplot(data=ret, x='time_year', y='value', hue='arm', col='variable', col_wrap=4, kind='line', style='scenario', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='rand_seed'
     g.set_titles(col_template="{col_name}")
     g.fig.tight_layout()
+    for ax in g.axes.flat:
+        #locator = mdates.AutoDateLocator()
+        #ax.xaxis.set_major_locator(locator)
+        #ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
+        ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
+
     g.fig.savefig(os.path.join(resdir, 'figs', 'act3.png'), dpi=600)
 
     # ACT3 cases found, scaled to trial #################################
@@ -273,7 +301,8 @@ if __name__ == '__main__':
     df.set_index('rand_seed', inplace=True)
     df['time_year'] = pd.to_datetime(df['time_year'])
     seeds = df.index.unique()
-    K = len(seeds)
+
+    K = min(60, len(seeds))
 
     # Seed filtering
     seeds = seeds[df.groupby('rand_seed')['include'].mean().loc[seeds].values.astype(bool)] # Ugly

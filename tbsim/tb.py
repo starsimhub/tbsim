@@ -58,6 +58,7 @@ class TB(ss.Infection):
         self.define_states(
             # Initialize states specific to TB:
             ss.FloatArr('state', default=TBS.NONE),             # One state to rule them all?
+            ss.FloatArr('latent_tb_state', default=TBS.NONE),   # Form of latent TB (Slow or Fast)
             ss.FloatArr('active_tb_state', default=TBS.NONE),   # Form of active TB (SmPos, SmNeg, or ExpTB)
             ss.FloatArr('rr_activation', default=1.0),          # Multiplier on the latent-to-presymp rate
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
@@ -151,6 +152,8 @@ class TB(ss.Infection):
 
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
+        self.latent_tb_state[fast_uids] = TBS.LATENT_FAST
+        self.latent_tb_state[slow_uids] = TBS.LATENT_SLOW
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
 

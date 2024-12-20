@@ -153,10 +153,15 @@ def make_sim():
     n = np.round(np.random.normal(loc=n_agents, scale=50))
     pop = make_people(n)
 
+    cbr = pd.read_csv(os.path.join('data', 'Vietnam_CBR.csv'))
+    asmr = pd.read_csv(os.path.join('data', 'Vietnam_ASMR.csv'))
     demog = [
         # Crude rates for Vietnam in 2015
-        ss.Births(birth_rate=ss.peryear(18.5), unit='day', dt=30),  # Matching to simulation's unit and dt, hopefully soon not necessary
-        ss.Deaths(death_rate=ss.peryear(6.2), unit='day', dt=30),
+        #ss.Births(birth_rate=ss.peryear(18.5), unit='day', dt=30),  # Matching to simulation's unit and dt, hopefully soon not necessary
+        #ss.Deaths(death_rate=ss.peryear(6.2), unit='day', dt=30),
+
+        ss.Births(birth_rate=cbr),  # Matching to simulation's unit and dt, hopefully soon not necessary
+        ss.Deaths(death_rate=asmr),
     ]
 
     # Modify the defaults to if necessary based on the input scenario 

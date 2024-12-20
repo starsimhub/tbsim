@@ -93,6 +93,16 @@ class ActiveCaseFinding(ss.Intervention):
             ss.Result('n_tested', dtype=int, label='Number tested', scale=True),
             ss.Result('n_positive', dtype=int, label='Number positive', scale=True),
             ss.Result('n_treated', dtype=int, label='Number treated', scale=True),
+
+            ss.Result('n_positive_presymp', dtype=int, label='Number positive: Presymp', scale=True),
+            ss.Result('n_positive_smpos', dtype=int, label='Number positive: SmPos', scale=True),
+            ss.Result('n_positive_smneg', dtype=int, label='Number positive: SmNeg', scale=True),
+            ss.Result('n_positive_exp', dtype=int, label='Number positive: Exp', scale=True),
+
+            ss.Result('n_positive_via_LF', dtype=int, label='Number positive: Fast', scale=True),
+            ss.Result('n_positive_via_LS', dtype=int, label='Number positive: Slow', scale=True),
+            ss.Result('n_positive_via_LF_dur', dtype=float, label='Mean dur from inf (via fast)', scale=False),
+            ss.Result('n_positive_via_LS_dur', dtype=float, label='Mean dur from inf (via slow)', scale=False),
         )
         return
 
@@ -119,8 +129,8 @@ class ActiveCaseFinding(ss.Intervention):
             treated_uids = self.pars.p_treat.filter(positive_uids)
             tb.start_treatment(treated_uids)
         else:
-            positive_uids = []
-            treated_uids = []
+            positive_uids = ss.uids()
+            treated_uids = ss.uids()
 
         # Update the results 
         ti = self.t.ti
@@ -128,6 +138,30 @@ class ActiveCaseFinding(ss.Intervention):
         self.results.n_tested[ti] = len(visit_uids)
         self.results.n_positive[ti] = len(positive_uids)
         self.results.n_treated[ti] = len(treated_uids)
+
+        if len(positive_uids) == 0:
+            return
+
+        presym = tb.state[positive_uids] == TBS.ACTIVE_PRESYMP
+        smpos = tb.state[positive_uids] == TBS.ACTIVE_SMPOS
+        smneg = tb.state[positive_uids] == TBS.ACTIVE_SMNEG
+        exp = tb.state[positive_uids] == TBS.ACTIVE_EXPTB
+
+        self.results.n_positive_presymp[ti] = np.count_nonzero(presym)
+        self.results.n_positive_smpos[ti] = np.count_nonzero(smpos)
+        self.results.n_positive_smneg[ti] = np.count_nonzero(smneg)
+        self.results.n_positive_exp[ti] = np.count_nonzero(exp)
+
+        via_fast = tb.latent_tb_state[positive_uids] == TBS.LATENT_FAST
+        via_slow = tb.latent_tb_state[positive_uids] == TBS.LATENT_SLOW
+        self.results.n_positive_via_LF[ti] = np.count_nonzero(via_fast)
+        self.results.n_positive_via_LS[ti] = np.count_nonzero(via_slow)
+
+        dur = (self.t.ti - tb.ti_infected[positive_uids[via_fast]])*self.t.dt_year
+        self.results.n_positive_via_LF_dur[ti] = np.mean(dur)
+
+        dur = (self.t.ti - tb.ti_infected[positive_uids[via_slow]])*self.t.dt_year
+        self.results.n_positive_via_LS_dur[ti] = np.mean(dur)
 
         return
 
