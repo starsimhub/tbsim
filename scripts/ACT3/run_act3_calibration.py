@@ -18,7 +18,7 @@ n_runs_check = [60, 5][debug] # Num final runs for checking fit
 
 date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
 
-#date = '2024Dec17-230152'
+#date = '2024Dec20-015825'
 
 # Check if the results directory exists, if not, create it
 resdir = os.path.join('results', f'ACT3Calib_{date}')
@@ -134,8 +134,9 @@ def make_people(n):
     age_data = pd.DataFrame({ # Data from WPP, https://population.un.org/wpp/Download/Standard/MostUsed/
         'age': np.arange(0, 101, 5),
         #'value': [3407, 2453, 2376, 2520, 2182, 2045, 1777, 1701, 1465, 1421, 1119, 907, 692, 484, 309, 160, 52, 22, 6, 1, 0], # 1950
+        'value': [5791, 4446, 3130, 2361, 2279, 2375, 2032, 1896, 1635, 1547, 1309, 1234, 927, 693, 460, 258, 116, 36, 5, 1, 0] #1960
         #'value': [8004, 7093, 6048, 5769, 5246, 4049, 2799, 2081, 1998, 2063, 1726, 1551, 1261, 1081, 774, 552, 269, 102, 23, 3, 0], #1980
-        'value': [7955, 7388, 6928, 7061, 8657, 8104, 8006, 7005, 6486, 5927, 5495, 4625, 3198, 2090, 1366, 1109, 830, 402, 153, 34, 4], #2015
+        #'value': [7955, 7388, 6928, 7061, 8657, 8104, 8006, 7005, 6486, 5927, 5495, 4625, 3198, 2090, 1366, 1109, 830, 402, 153, 34, 4], #2015
     })
     pop = ss.People(
         n_agents = n,
@@ -161,7 +162,7 @@ def make_sim():
         #ss.Deaths(death_rate=ss.peryear(6.2), unit='day', dt=30),
 
         ss.Births(birth_rate=cbr, unit='day', dt=30),  # Matching to simulation's unit and dt, hopefully soon not necessary
-        ss.Deaths(death_rate=asmr, unit='day', dt=30),
+        ss.Deaths(death_rate=asmr, unit='day', dt=30, rate_units=1),
     ]
 
     # Modify the defaults to if necessary based on the input scenario 

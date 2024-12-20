@@ -157,11 +157,13 @@ class ActiveCaseFinding(ss.Intervention):
         self.results.n_positive_via_LF[ti] = np.count_nonzero(via_fast)
         self.results.n_positive_via_LS[ti] = np.count_nonzero(via_slow)
 
-        dur = (self.t.ti - tb.ti_infected[positive_uids[via_fast]])*self.t.dt_year
-        self.results.n_positive_via_LF_dur[ti] = np.mean(dur)
+        if np.count_nonzero(via_fast) > 0:
+            dur = (self.t.ti - tb.ti_infected[positive_uids[via_fast]])*self.t.dt_year
+            self.results.n_positive_via_LF_dur[ti] = np.mean(dur)
 
-        dur = (self.t.ti - tb.ti_infected[positive_uids[via_slow]])*self.t.dt_year
-        self.results.n_positive_via_LS_dur[ti] = np.mean(dur)
+        if np.count_nonzero(via_slow) > 0:
+            dur = (self.t.ti - tb.ti_infected[positive_uids[via_slow]])*self.t.dt_year
+            self.results.n_positive_via_LS_dur[ti] = np.mean(dur)
 
         return
 
