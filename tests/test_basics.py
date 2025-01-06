@@ -211,11 +211,11 @@ def test_set_prognoses_active_tb_state(tb):
 # Updating the result count of new infections.
 def test_set_prognoses_new_infections_count(tb):
     uids = ss.uids([1, 2, 3])
-    initial_count = tb.results['new_infections'][tb.sim.ti]
+    initial_count = np.count_nonzero(tb.infected)
     
     tb.set_prognoses(uids)
     
-    assert tb.results['new_infections'][tb.sim.ti] == initial_count + len(uids)
+    assert np.count_nonzero(tb.infected) == initial_count + len(uids)
 
 def test_p_latent_to_presym():
     # Setup: Create a simulated TB instance and prepare relevant data

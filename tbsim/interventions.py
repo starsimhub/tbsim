@@ -24,17 +24,19 @@ class ActiveCaseFinding(ss.Intervention):
         """
         Initialize the intervention.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
         # Updated default parameters with time-aware p_found
         self.define_pars(
             p_treat = ss.bernoulli(p=1),
 
-            date_cov = {
-                sc.date('2014-06-01'): 0.6,
-                sc.date('2015-06-01'): 0.7,
-                sc.date('2016-06-01'): 0.64,
+            date_cov = { # Numbers from Table 1, row "Persons who gave oral consent to participate — no. (%)"
+                sc.date('2014-06-01'): 0.844,
+                sc.date('2015-06-01'): 0.80,
+                sc.date('2016-06-01'): 0.779,
+                sc.date('2017-06-01'): 0.743,
             },
+            interp = False,
 
             age_min = 15,
             age_max = None,
@@ -55,9 +57,38 @@ class ActiveCaseFinding(ss.Intervention):
             for t, v in self.pars.date_cov.items()
         }
 
+        self.visit = ss.bernoulli(p=self.p_visit)
         self.test = ss.bernoulli(p=self.p_pos_test)
 
         return
+
+    @staticmethod
+    def p_visit(self, sim, uids):
+        # Determine which agents to visit based on coverage
+        
+        # NOTE: 
+        # When date_cov inputs are provided as Calibpars, 
+        # the __init__ does not convert them to float years. 
+        # Explicitly making the conversion here
+        if any(isinstance(t, dt.date) for t in self.pars.date_cov.keys()):
+            # Convert datetime to float
+            self.pars.date_cov = {
+                sc.datetoyear(t):v if isinstance(t, dt.date) else t 
+                for t, v in self.pars.date_cov.items()
+                }
+        
+        years = np.array(list(self.pars.date_cov.keys()))
+        year = sim.t.now('year')
+        if self.pars.interp:
+            p_visit = np.interp(year, years, list(self.pars.date_cov.values()))
+        else:
+            in_year = (year >= years) & (year < years + self.t.dt_year)
+            if in_year.any():
+                year = years[in_year][0]
+                p_visit = self.pars.date_cov[year]
+            else:
+                p_visit = 0
+        return p_visit
 
     @staticmethod
     def p_pos_test(self, sim, uids):
@@ -69,12 +100,11 @@ class ActiveCaseFinding(ss.Intervention):
         return p
 
     def init_results(self):
-        npts = len(self.pars.date_cov)
         self.define_results(
-            ss.Result('time', dtype=float, shape=npts, label='Time', scale=True),
-            ss.Result('n_elig', dtype=int, shape=npts, label='Number eligible', scale=True),
-            ss.Result('n_found', dtype=int, shape=npts, label='Number found',scale=True),
-            ss.Result('n_treated', dtype=int, shape=npts, label='Number treated', scale=True),
+            ss.Result('n_elig', dtype=int, label='Number eligible', scale=True),
+            ss.Result('n_tested', dtype=int, label='Number tested', scale=True),
+            ss.Result('n_positive', dtype=int, label='Number positive', scale=True),
+            ss.Result('n_treated', dtype=int, label='Number treated', scale=True),
         )
         return
 
@@ -82,15 +112,6 @@ class ActiveCaseFinding(ss.Intervention):
         """ Apply the intervention """
 
         sim = self.sim
-
-        # Determine when the intervention is active and return if nothing to do
-        years = np.array(list(self.pars.date_cov.keys()))
-        is_active = (
-            (sim.t.now('year') >= years) & (sim.t.now('year') < years + self.sim.t.dt_year)
-        )
-        if not np.any(is_active):
-            return
-
         tb = sim.diseases['tb']
 
         # Filter by treatment and age
@@ -100,19 +121,25 @@ class ActiveCaseFinding(ss.Intervention):
         if self.pars.age_max is not None:
             elig = elig & (sim.people.age < self.pars.age_max)
 
-        # Perform the test on the eligible individuals to find cases
-        found_uids = self.test.filter(elig)
+        visit_uids = self.visit.filter(elig)
 
-        # Apply treatment to the found cases
-        treated_uids = self.pars.p_treat.filter(found_uids)
-        tb.start_treatment(treated_uids)
+        if len(visit_uids) > 0:
+            # Perform the test on the eligible individuals to find cases
+            positive_uids = self.test.filter(visit_uids)
+
+            # Apply treatment to the positive cases
+            treated_uids = self.pars.p_treat.filter(positive_uids)
+            tb.start_treatment(treated_uids)
+        else:
+            positive_uids = []
+            treated_uids = []
 
         # Update the results 
-        timepoint = np.where(is_active)[0][0]
-        self.results.time[timepoint] = sim.t.now('year')
-        self.results.n_elig[timepoint] = np.sum(elig)
-        self.results.n_found[timepoint] = len(found_uids)
-        self.results.n_treated[timepoint] = len(treated_uids)
+        ti = self.t.ti
+        self.results.n_elig[ti] = np.count_nonzero(elig)
+        self.results.n_tested[ti] = len(visit_uids)
+        self.results.n_positive[ti] = len(positive_uids)
+        self.results.n_treated[ti] = len(treated_uids)
 
         return
 
