@@ -65,6 +65,18 @@ class ActiveCaseFinding(ss.Intervention):
     @staticmethod
     def p_visit(self, sim, uids):
         # Determine which agents to visit based on coverage
+        
+        # NOTE: 
+        # When date_cov inputs are provided as Calibpars, 
+        # the __init__ does not convert them to float years. 
+        # Explicitly making the conversion here
+        if any(isinstance(t, dt.date) for t in self.pars.date_cov.keys()):
+            # Convert datetime to float
+            self.pars.date_cov = {
+                sc.datetoyear(t):v if isinstance(t, dt.date) else t 
+                for t, v in self.pars.date_cov.items()
+                }
+        
         years = np.array(list(self.pars.date_cov.keys()))
         year = sim.t.now('year')
         if self.pars.interp:

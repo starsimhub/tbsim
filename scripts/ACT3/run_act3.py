@@ -8,14 +8,8 @@ import os
 
 from run_act3_calibration import make_sim, build_sim
 
-# TEMP, move to aplt
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import seaborn as sns
-import scipy.stats as sps
-
 do_run = True
-debug = False #NOTE: Debug runs in serial
+debug = True #NOTE: Debug runs in serial
 
 # Each scenario will be run n_seeds times for each of intervention and control.
 n_seeds = [60, 2][debug]
@@ -44,7 +38,7 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
     """
     Run n_reps of control and intervention simulations in a single multisim for seed rand_seed
     """
-
+    #print(skey)
     sim = base_sim.copy()
     # MODIFY THE SIMULATION OBJECT BASED ON THE SCENARIO HERE
     # skey, scen
@@ -59,38 +53,6 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
     ms = build_sim(sim, calib_pars=cp, n_reps=n_reps)
     ms.run()
 
-    ### EVAL LL
-    prevalence_ctrl = ss.Binomial(
-        name = 'Prevalence Active (Control)',
-        include_fn = lambda sim: sim.label == 'Control' and np.any(sim.results.tb.n_infected[sim.timevec >= ss.date('2013-01-01')] > 0),
-        weight = 1,
-        conform = 'step_containing',
-
-        expected = pd.DataFrame({
-            'x': [94],      # Number of individuals found to be infectious
-            'n': [41680], # Number of individuals sampled
-        }, index=pd.Index([ss.date(d) for d in ['2017-06-01']], name='t')), # On these dates
-
-        extract_fn = lambda sim: pd.DataFrame({
-            # sim.results.tb.n_active / sim.results.n_alive,
-            'p': (sim.results['ACT3 Active Case Finding'].n_positive +1) / (sim.results['ACT3 Active Case Finding'].n_tested + 2)
-        }, index=pd.Index(sim.results.timevec, name='t')),
-    )
-    nLL = prevalence_ctrl(ms)
-
-    '''
-    fig = prevalence_ctrl.plot()
-    plt.subplots_adjust(top=0.9)
-    plt.title(f'LL: {LL:.2f}')
-    plt.savefig(os.path.join(resdir, 'figs', f'll_prevalencectrl_{skey}_{rand_seed}.png'), dpi=600)
-
-    fig = prevalence_ctrl.plot(bootstrap=True)
-    plt.subplots_adjust(top=0.9)
-    plt.title(f'LL: {LL:.2f}')
-    plt.savefig(os.path.join(resdir, 'figs', f'll_prevalencectrl_{skey}_{rand_seed}_bootstrap.png'), dpi=600)
-    '''
-    ####################################################################
-
     tb_res = []
     acf_res = []
     pba_res = []
@@ -99,9 +61,12 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
             'time_year': s.results.timevec,
             'on_treatment': s.results.tb.n_on_treatment, 
             'prevalence': s.results.tb.prevalence,
+            'prevalence_active': s.results.tb.prevalence_active,
             'active_presymp': s.results.tb.n_active_presymp,
             'active_smpos': s.results.tb.n_active_smpos,
+            'active_smneg': s.results.tb.n_active_smneg,
             'active_exptb': s.results.tb.n_active_exptb,
+            'incidence_kpy': s.results.tb.incidence_kpy,
         })
         df['scenario'] = skey
         df['arm'] = s.label
@@ -109,13 +74,15 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
         df['include'] = np.any(s.results.tb.n_infected[s.timevec >= ss.date('2013-01-01')] > 0)
         tb_res.append(df)
 
-        act3_dates = [ss.date(t) for t in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']]
+        date_cov_keys = list(s.interventions['ACT3 Active Case Finding'].pars.date_cov.keys())
+        act3_dates = [ss.date(t) for t in date_cov_keys]
         inds = np.searchsorted(s.results.timevec, act3_dates, side='left')
         df = pd.DataFrame({
             'time_year': s.results.timevec[inds],
             'n_elig': s.results['ACT3 Active Case Finding'].n_elig[inds],
             'n_tested': s.results['ACT3 Active Case Finding'].n_tested[inds],
             'n_positive': s.results['ACT3 Active Case Finding'].n_positive[inds],
+            'prev_active': s.results.tb.prevalence_active[inds],
 
             'n_positive_presymp': s.results['ACT3 Active Case Finding'].n_positive_presymp[inds],
             'n_positive_smpos': s.results['ACT3 Active Case Finding'].n_positive_smpos[inds],
@@ -129,10 +96,6 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
         })
         df['scenario'] = skey
         df['arm'] = s.label
-        df['nLL'] = nLL
-        # TEMP
-        df['p'] = prevalence_ctrl.actual['p'].values[0]
-        ######
         df['include'] = np.any(s.results.tb.n_infected[s.timevec >= ss.date('2013-01-01')] > 0)
         df['rand_seed'] = s.pars.rand_seed
         acf_res.append(df)
@@ -156,7 +119,40 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
     acf_res = pd.concat(acf_res)
     pba_res = pd.concat(pba_res)
 
-    return {'TB': tb_res, 'ACT3': acf_res, 'PBA': pba_res}
+    # Additional calculations - move elsewhere ################################################################
+
+    # process the results to calculate the effect of the intervention - 
+    # compare the gradients betwen the control and the intervention arms
+    eff_cols = ['time_year', 'prev_active', 'scenario', 'rand_seed', 'replicate']
+    
+    # calculate the change in prevalnce between the first and last time points - control
+    tb_control_prev_res = acf_res[(acf_res['arm'] == 'Control')][eff_cols]
+    tb_control_prev_res = (
+        tb_control_prev_res \
+            .groupby(['rand_seed', 'replicate', 'scenario']) \
+            # for prevalence
+            .apply(lambda group: 
+                   group.loc[group['time_year'].idxmax(), 'prev_active'] - group.loc[group['time_year'].idxmin(), 'prev_active'], 
+                   include_groups=False) \
+            .reset_index(name='prev_gradient_ctrl')
+    )
+    
+    # calculate the change in prevalnce between the first and last time points - intervention
+    tb_intervention_prev_res = acf_res[(acf_res['arm'] == 'Intervention')][eff_cols]
+    tb_intervention_prev_res = (
+        tb_intervention_prev_res \
+            .groupby(['rand_seed', 'scenario']) \
+            .apply(lambda group: 
+                   group.loc[group['time_year'].idxmax(), 'prev_active'] - group.loc[group['time_year'].idxmin(), 'prev_active'], 
+                   include_groups=False) \
+            .reset_index(name='prev_gradient_intv')
+    )
+    
+    # merge the two dataframes to calculate the relative change in prevalence - intervention relative to control
+    acf_effect_res = pd.merge(tb_control_prev_res, tb_intervention_prev_res, on=['rand_seed', 'scenario'])
+    acf_effect_res['relative_prev'] = (acf_effect_res['prev_gradient_intv'] - acf_effect_res['prev_gradient_ctrl'])*100_000
+
+    return {'TB': tb_res, 'ACT3': acf_res, 'PBA': pba_res, 'ACT3 Effect': acf_effect_res}
 
 
 def run_scenarios(scens, n_seeds=n_seeds):
@@ -196,34 +192,97 @@ def run_scenarios(scens, n_seeds=n_seeds):
 
 
 if __name__ == '__main__':
+    # hard coding ain't cool: there should be a way to pull parameter values from a calibration run and feed them into the base scenarios
+    calib_base = {
+        'beta': 0.5138842296279839,
+        'x_pcf1': 0.16269807089242358,
+        'x_pcf2': 0.9658136632225554,
+        'x_acf_cov': 0.34117557685886396,
+        'p_fast': 0.4128032502420532,
+    }
+
+    calib_lowtrans = calib_base.copy() # TODO
+    calib_lowtrans['beta'] *= 0.5
+
+    calib_hightrans = calib_base.copy() # TODO
+    calib_hightrans['beta'] *= 2
+
+
+    # Convert to format expected by the builder
+    calib_base = {k:dict(value=v) for k,v in calib_base.items()} # | {'rand_seed': 165568}
+    calib_lowtrans = {k:dict(value=v) for k,v in calib_lowtrans.items()} # | {'rand_seed': 165568}
+    calib_hightrans = {k:dict(value=v) for k,v in calib_hightrans.items()} # | {'rand_seed': 165568}
 
     scens = {
         'Basic ACT3': {
             # default has been set to basic ACT3
             'ACT3': None,
             'TB': None,
+            'Simulation': dict(stop=sc.date('2027-12-31')),
+            'CalibPars': calib_base,
+        }, 
+        'Low Transmission ACT3': {
+            # reduce the beta by 50% to simulate a low transmission scenario
+            'ACT3': None,
+            'TB': None,
+            'Simulation': dict(stop=sc.date('2027-12-31')),
+            'CalibPars': calib_lowtrans
+        },
+        'High Transmission ACT3': {
+            # increase the beta by 50% to simulate a high transmission scenario
+            'ACT3': None,
+            'TB': None,
             'Simulation': None,
-            'CalibPars': 
-                {k:dict(value=v) for k,v in
-                #'rand_seed': 850549
-                #{'beta': 0.9067522769987235, 'x_pcf1': 0.3231894161330828, 'x_pcf2': 0.5695811456744782, 'beta_x_final': 0.779008573903516, 'beta_dur': 24.30430256638232, 'beta_mid': 1973.2357310549744, 'x_acf_cov': 0.8736961778986055, 'p_fast': 0.17403427420948536}
-                #'rand_seed': 470796
-                #{'beta': 0.910396235207257, 'beta_x_final': 0.05737434233165578, 'beta_dur': 24.686880757985698, 'beta_mid': 2015.7462785352063, 'x_acf_cov': 0.8746741743886838, 'p_fast': 0.20701467084246836} \
-                # 'rand_seed': 233965
-                #{'beta': 0.3639402812775401, 'x_pcf1': 0.17422127142544253, 'x_pcf2': 0.8635517496019752, 'beta_x_final': 0.2266611894479731, 'beta_dur': 16.96261135468262, 'beta_mid': 1979.4790117285563, 'x_acf_cov': 0.5672782978680914, 'p_fast': 0.421811292136281} \
-                #{'beta': 0.50, 'x_pcf1': 0.17422127142544253, 'x_pcf2': 0.8635517496019752, 'beta_x_final': 0.2266611894479731, 'beta_dur': 16.96261135468262, 'beta_mid': 1979.4790117285563, 'x_acf_cov': 0.5672782978680914, 'p_fast': 0.421811292136281} \
-                # 'rand_seed': 102211
-                #{'beta': 0.43529159300902504, 'x_pcf1': 0.5156170226355246, 'x_pcf2': 0.9049310957856859, 'beta_x_final': 0.5113042336658371, 'beta_dur': 18.392517993256075, 'beta_mid': 1981.9180527400858, 'x_acf_cov': 0.7155236261871701, 'p_fast': 0.6144963029973003} \
-                # , 'rand_seed': 479997
-                #{'beta': 0.2515466183818931, 'x_pcf1': 0.4422889810210864, 'x_pcf2': 0.8090931524610825, 'beta_x_final': 0.9722331124476845, 'beta_dur': 18.65710753236865, 'beta_mid': 1980.945342039754, 'x_acf_cov': 0.6110592364870079, 'p_fast': 0.7682229846113128} \
-                # , 'rand_seed': 179507
-                #{'beta': 0.31013128138223345, 'x_pcf1': 0.238131788244131, 'x_pcf2': 0.9992504136800656, 'beta_x_final': 0.8834600066122873, 'beta_dur': 19.79941839318105, 'beta_mid': 1975.6750295037912, 'x_acf_cov': 0.29885149828207896, 'p_fast': 0.6437272056839243}
-                # , 'rand_seed': 696902
-                #{'beta': 0.5099137338144983, 'x_pcf1': 0.2580127087910708, 'x_pcf2': 0.9509957098278411, 'x_acf_cov': 0.37294377763938336, 'p_fast': 0.386576863711198} \
-
-                # 'rand_seed': 165568
-                {'beta': 0.5138842296279839, 'x_pcf1': 0.16269807089242358, 'x_pcf2': 0.9658136632225554, 'x_acf_cov': 0.34117557685886396, 'p_fast': 0.4128032502420532} \
-                .items() },# | {'rand_seed': 165568},
+            'CalibPars': calib_hightrans,
+        },
+        "ACT3 Basic Missed Sub-clinical": {
+            # active case finding is run for 3 years like the basic scenario but we miss the sub-clinical cases
+            'ACT3': {
+                'test_sens': {
+                    mtb.TBS.ACTIVE_SMPOS: 1,
+                    # reduce the ability to detect sub-clinical cases by ~75%
+                    mtb.TBS.ACTIVE_PRESYMP: 0.25,
+                    mtb.TBS.ACTIVE_SMNEG: 0.8,
+                    mtb.TBS.ACTIVE_EXPTB: 0.1
+                    },
+            },
+            'TB': None,
+            'Simulation': None,
+            'CalibPars': calib_base,
+        },
+        'ACT5': {
+            # active case finding is run for 5 years instead of 3 years and the prevalence survey conducted between 2018 and 2019
+            'ACT3': {
+                'date_cov': {
+                    sc.date('2014-06-01'): 0.6,
+                     sc.date('2015-06-01'): 0.7,
+                     sc.date('2016-06-01'): 0.64,
+                     sc.date('2017-06-01'): 0.64, 
+                     sc.date('2018-06-01'): 0.64,
+                     sc.date('2019-06-01'): 0.64
+                }
+            },
+            'TB': None,
+            'Simulation': dict(stop=sc.date('2030-12-31')),
+            'CalibPars': calib_base
+        }, 
+        "ACT7": {
+            # active case finding is run for 7 years instead of 3 years and the prevalence survey conducted between 2020 and 2021
+            'ACT3': {
+                'date_cov': {
+                    sc.date('2014-06-01'): 0.6,
+                    sc.date('2015-06-01'): 0.7,
+                    sc.date('2016-06-01'): 0.64,
+                    sc.date('2017-06-01'): 0.64, 
+                    sc.date('2018-06-01'): 0.64,
+                    sc.date('2019-06-01'): 0.64,
+                    sc.date('2020-06-01'): 0.64,
+                    sc.date('2021-06-01'): 0.64,
+                }
+            },
+            'TB': None,
+            'Simulation': dict(stop=sc.date('2031-12-31')),
+            'CalibPars': calib_base,
         }
     }
 
@@ -244,130 +303,30 @@ if __name__ == '__main__':
     df_result.get('ACT3')
 
 
-    # MOVE TO aplt:
-    '''
-    ret = df_result.get('ACT3').groupby('rand_seed')[['nLL', 'x', 'n']].mean()
-    for seed, row in ret.groupby('rand_seed'):
-        #a_n, a_x = row['n'], row['x']
-        a_p = row['p']
-        e_n, e_x = 41680, 94
-        q = sps.binom(n=e_n, p=p)
-        print(f'LL: {q.logpmf(e_x)[0]:.2f} vs {row["nLL"].values[0]:.2f}')
-    
-    ret['e_n'] = 41680
-    ret['e_x'] = 94
-
-    q = sps.binom(n=e_n, p=p)
-    ret['LL2'] = q.logpmf(e_x)
-    ret['mean'] = q.mean()
-    ret['median'] = q.median()
-    intv95 = q.interval(0.95)
-    ret['2.5%'] = intv95[0]
-    ret['97.5%'] = intv95[1]
-
-    b = sps.binom(n=e_n, p=(ret['x']+1)/(ret['n']+2)) # Smoothed
-    ret['bLL'] = b.logpmf(e_x)
-    ret['bmean'] = b.mean()
-    ret['bmedian'] = b.median()
-    intv95 = b.interval(0.95)
-    ret['b2.5%'] = intv95[0]
-    ret['b97.5%'] = intv95[1]
-    print(ret)
-    '''
-
-    # TB by age ###################################################
-    ret = df_result.get('PBA')
-    ret['prev ever'] = ret['ever'] / ret['n']
-    ret['prev infected'] = ret['infected'] / ret['n']
-    ret['prev active'] = ret['active'] / ret['n']
-    df = ret.reset_index().melt(id_vars=['age bin', 'scenario', 'arm', 'year', 'rand_seed'], value_vars=['prev ever', 'prev infected', 'prev active'], value_name='value', var_name='variable')
-    g = sns.catplot(kind='bar', data=df.reset_index(), x='age bin', hue='variable', y='value', col='scenario')
-    g.set_titles(col_template="{col_name}")
-    g.fig.tight_layout()
-    g.fig.savefig(os.path.join(resdir, 'figs', 'age.png'), dpi=600)
-
-    # TB time series ###################################################
-    ret = df_result.get('TB').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
-    g = sns.relplot(data=ret, x='time_year', y='value', hue='arm', col='variable', kind='line', row='scenario', errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='rand_seed'
-    g.set_titles(col_template="{col_name}")
-    g.fig.tight_layout()
-    g.fig.savefig(os.path.join(resdir, 'figs', 'timeseries.png'), dpi=600)
-
-    # ACT3 time series ##################################################
-    ret = df_result.get('ACT3').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
-    g = sns.relplot(data=ret, x='time_year', y='value', hue='arm', col='variable', col_wrap=4, kind='line', style='scenario', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='rand_seed'
-    g.set_titles(col_template="{col_name}")
-    g.fig.tight_layout()
-    for ax in g.axes.flat:
-        #locator = mdates.AutoDateLocator()
-        #ax.xaxis.set_major_locator(locator)
-        #ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
-        ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
-
-    g.fig.savefig(os.path.join(resdir, 'figs', 'act3.png'), dpi=600)
-
-    # ACT3 cases found, scaled to trial #################################
-    df = df_result.get('ACT3')
-    df.set_index('rand_seed', inplace=True)
-    df['time_year'] = pd.to_datetime(df['time_year'])
-    seeds = df.index.unique()
-
-    K = min(60, len(seeds))
-
-    # Seed filtering
-    seeds = seeds[df.groupby('rand_seed')['include'].mean().loc[seeds].values.astype(bool)] # Ugly
-
-    n_boots = 1000
-    dfs = []
-
-    expected = pd.DataFrame({
-        'x': [169, 136, 78, 53],           # Number of individuals found to be infectious
-        'n': [43425, 44082, 44311, 42150], # Number of individuals sampled
-    }, index=pd.Index([ss.date(d) for d in ['2014-06-01', '2015-06-01', '2016-06-01', '2017-06-01']], name='t')) # On these dates
-
-    for bi in range(n_boots):
-        boot_seeds = np.random.choice(seeds, K)
-        dfb = df.loc[boot_seeds].groupby(['scenario', 'arm', 'time_year']).sum()
-        # Very hacky to get date alignment
-        combined = dfb.copy()
-        for keys, val in combined.groupby(['scenario', 'arm']):
-            combined.loc[keys, 'x'] = expected['x'].values
-            combined.loc[keys, 'n'] = expected['n'].values
-            combined.loc[keys, 't'] = expected.index.values
-        #combined = pd.merge(dfb.reset_index(), expected.reset_index(), left_on='time_year', right_on='t')
-
-        #combined['scaled_positive'] = combined['n_positive'] * combined['n']  / combined['n_tested']
-        #alpha = combined['n_positive'] + 1
-        #beta = combined['n_tested'] - combined['n_positive'] + 1
-        p = (combined['n_positive'] + 1) / (combined['n_tested'] + 2)
-        n = combined['n']
-        #combined['scaled_positive'] = n * alpha / (alpha + beta)
-        combined['scaled_positive'] = n * p
-        combined.loc[combined['n_tested'] == 0, 'scaled_positive'] = np.nan
-
-        combined['bi'] = bi
-        dfs.append(combined)
-    df = pd.concat(dfs).reset_index()
-
-    def plot_observed(data, **kwargs):
-        #df = expected.reset_index()
-        #sns.scatterplot(data=df, x='t', y='x')
-        plt.scatter(np.arange(len(expected)), expected['x'].values, color='orange', edgecolors='black', s=100)
-
-        # Control
-        plt.plot(3, 94, color='blue', marker='o', mec='black', ms=10)
-
-    #ret = df_result.get('ACT3').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
-    d = df[['scenario', 'arm', 't', 'scaled_positive', 'bi']]
-    d = d.dropna(axis=0)
-    g = sns.catplot(kind='strip', data=d, x='t', order=expected.index, y='scaled_positive', hue='arm', col='scenario', estimator=None, units='bi', size=1) # SD for speed, units='rand_seed'
-    g.map_dataframe(plot_observed)
-    g.set_titles(col_template="{col_name}")
-    g.fig.tight_layout()
-    g.fig.savefig(os.path.join(resdir, 'figs', 'act3_acf.png'), dpi=600)
-
-
-
+    plot_TODO(df_result, resdir)
 
     # APLT PLOTS #######################################################
+    # TB time series
+    # import seaborn as sns
+    # ret = df_result.get('TB').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
+    # g = sns.relplot(data=ret, x='time_year', y='value', hue='arm', col='variable', kind='line', row='scenario', errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='rand_seed'
+    # g.set_titles(col_template="{col_name}")
+    # g.fig.tight_layout()
+    # g.fig.savefig(os.path.join(resdir, 'figs', 'timeseries.png'), dpi=600)
+
+    # # ACT3 time series
+    # ret = df_result.get('ACT3').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
+    # g = sns.relplot(data=ret, x='time_year', y='value', hue='arm', col='variable', kind='line', row='scenario', errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='rand_seed'
+    # g.set_titles(col_template="{col_name}")
+    # g.fig.tight_layout()
+    # g.fig.savefig(os.path.join(resdir, 'figs', 'act3.png'), dpi=600)
+
+    # # ACT3 cases found, scaled to trial
+    # ret = df_result.get('ACT3').reset_index(drop=True).melt(id_vars=['scenario', 'time_year', 'arm', 'rand_seed'], value_name='value', var_name='variable')
+    # g = sns.relplot(data=ret, x='time_year', y='value', hue='arm', col='variable', kind='line', row='scenario', errorbar='sd', facet_kws={'sharey': False}, height=3, aspect=1.4) # SD for speed, units='rand_seed'
+    # g.set_titles(col_template="{col_name}")
+    # g.fig.tight_layout()
+    # g.fig.savefig(os.path.join(resdir, 'figs', 'act3.png'), dpi=600)
+    ################
+
     aplt.plot_scenarios(results=df_result.get('TB'))

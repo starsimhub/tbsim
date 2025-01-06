@@ -302,6 +302,10 @@ def build_sim(sim, calib_pars, n_reps=1, **kwargs):
             intv = get_intv(sim, 'ACT3 Active Case Finding')
             for sens in intv.pars.test_sens.values():
                 sens *= v
+        elif k == 'x_acf_cov':
+            intv = get_intv(sim, 'ACT3 Active Case Finding')
+            for cov in intv.pars.date_cov.values():
+                cov *= v
         elif k == 'p_fast':
             tb.pars.p_latent_fast = ss.bernoulli(v)
         elif k in ['beta_x_final', 'beta_dur', 'beta_mid']:
@@ -311,10 +315,6 @@ def build_sim(sim, calib_pars, n_reps=1, **kwargs):
             intv.pars[k] = v
         elif k == 'start_yr':
             sim.pars.start = ss.date(v)
-        elif k == 'x_acf_cov':
-            intv = get_intv(sim, 'ACT3 Active Case Finding')
-            for cov in intv.pars.date_cov.values():
-                cov *= v
         else:
             raise NotImplementedError(f'Parameter {k} not recognized')
 
@@ -335,8 +335,10 @@ def build_sim(sim, calib_pars, n_reps=1, **kwargs):
         sim_ctrl.label = 'Control'
         for intv in sim_ctrl.pars.interventions:
             if intv.name == 'ACT3 Active Case Finding':
+                # Pick the latest intervention date to conduct prevalence survey in the control arm
+                latest_ps_date = list(intv.pars['date_cov'].keys())[-1]
                 intv.pars.date_cov = { # Numbers from Table 1, row "Persons who gave oral consent to participate — no. (%)"
-                    sc.datetoyear(sc.date('2017-06-01')): 0.862, # Control arm had 86.2% in 2017
+                    sc.datetoyear(latest_ps_date): 0.862 # Control arm had 86.2% in 2017 (will be held constant if any year other than 2017)
                 }
         sims.append(sim_ctrl)
 
