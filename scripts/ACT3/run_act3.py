@@ -18,7 +18,7 @@ do_run = True
 debug = False #NOTE: Debug runs in serial
 
 # Each scenario will be run n_seeds times for each of intervention and control.
-n_seeds = [60*5, 2][debug]
+n_seeds = [60, 2][debug]
 n_reps = 1 # Default, leave as 1 for now, results will be combined by bootstrapping across seeds
 
 # Check if the results directory exists, if not, create it
@@ -54,7 +54,9 @@ def run_ACF(base_sim, skey, scen, rand_seed=0):
     sim.pars.rand_seed = rand_seed # This is the base seed that build_sim will increment from for n_reps
     #########################################################
 
-    ms = build_sim(sim, calib_pars=scen['CalibPars'], n_reps=n_reps)
+    cp = scen['CalibPars'].copy()
+    cp['rand_seed'] = rand_seed
+    ms = build_sim(sim, calib_pars=cp, n_reps=n_reps)
     ms.run()
 
     ### EVAL LL
@@ -165,9 +167,12 @@ def run_scenarios(scens, n_seeds=n_seeds):
 
     # Iterate over scenarios and random seeds
     for skey, scen in scens.items():
-        for seed in seeds:
+        for si, seed in enumerate(seeds):
+            if 'rand_seed' in scen['CalibPars']:
+                seed = scen['CalibPars']['rand_seed'] + si
+            else:
+                seed = seeds[si] # Use a random seed because the multisim will increment from this and we don't want to reuse
             # Append configuration for parallel execution
-            seed = np.random.randint(0, 1e6) # Use a random seed because the multisim will increment from this and we don't want to reuse
             cfgs.append({'skey': skey, 'scen': scen, 'rand_seed': seed})
 
     # Run simulations in parallel
@@ -212,8 +217,13 @@ if __name__ == '__main__':
                 # , 'rand_seed': 479997
                 #{'beta': 0.2515466183818931, 'x_pcf1': 0.4422889810210864, 'x_pcf2': 0.8090931524610825, 'beta_x_final': 0.9722331124476845, 'beta_dur': 18.65710753236865, 'beta_mid': 1980.945342039754, 'x_acf_cov': 0.6110592364870079, 'p_fast': 0.7682229846113128} \
                 # , 'rand_seed': 179507
-                {'beta': 0.31013128138223345, 'x_pcf1': 0.238131788244131, 'x_pcf2': 0.9992504136800656, 'beta_x_final': 0.8834600066122873, 'beta_dur': 19.79941839318105, 'beta_mid': 1975.6750295037912, 'x_acf_cov': 0.29885149828207896, 'p_fast': 0.6437272056839243}
-                .items() },
+                #{'beta': 0.31013128138223345, 'x_pcf1': 0.238131788244131, 'x_pcf2': 0.9992504136800656, 'beta_x_final': 0.8834600066122873, 'beta_dur': 19.79941839318105, 'beta_mid': 1975.6750295037912, 'x_acf_cov': 0.29885149828207896, 'p_fast': 0.6437272056839243}
+                # , 'rand_seed': 696902
+                #{'beta': 0.5099137338144983, 'x_pcf1': 0.2580127087910708, 'x_pcf2': 0.9509957098278411, 'x_acf_cov': 0.37294377763938336, 'p_fast': 0.386576863711198} \
+
+                # 'rand_seed': 165568
+                {'beta': 0.5138842296279839, 'x_pcf1': 0.16269807089242358, 'x_pcf2': 0.9658136632225554, 'x_acf_cov': 0.34117557685886396, 'p_fast': 0.4128032502420532} \
+                .items() },# | {'rand_seed': 165568},
         }
     }
 

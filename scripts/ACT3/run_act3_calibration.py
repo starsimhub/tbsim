@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 
 mysql = False
 debug = False
-n_reps = [30, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
-total_trials = [120*25, 2][debug]
+n_reps = [5, 1][debug] # Per trial (and each trial requires 2 simulations - control and intervention)
+total_trials = [10, 2][debug]
 n_agents = 1_000
-n_runs_check = [60, 5][debug] # Num final runs for checking fit
+n_reps_check = [60, 5][debug] # Num final runs for checking fit
 
 date = sc.getdate(dateformat='%Y%b%d-%H%M%S')
 
@@ -261,10 +261,8 @@ def get_intv(sim, name):
             return intv
     raise ValueError(f'Intervention {name} not found')
 
-def build_sim(sim, calib_pars, **kwargs):
+def build_sim(sim, calib_pars, n_reps=1, **kwargs):
     """ Modify the base simulation by applying calib_pars """
-
-    reps = kwargs.get('n_reps', n_reps)
 
     tb = sim.pars.diseases # There is only one disease in this simulation and it is a TB
     net = sim.pars.networks # There is only one network in this simulation and it is a RandomNet
@@ -321,7 +319,7 @@ def build_sim(sim, calib_pars, **kwargs):
             raise NotImplementedError(f'Parameter {k} not recognized')
 
     sims = []
-    for seed in np.arange(sim.pars.rand_seed, sim.pars.rand_seed+reps): #np.random.randint(0, 1e6, reps):
+    for seed in np.arange(sim.pars.rand_seed, sim.pars.rand_seed+n_reps): #np.random.randint(0, 1e6, n_reps):
         sim_intv = sim.copy()
 
         np.random.seed(seed) # Used for initial pop size
@@ -539,13 +537,15 @@ def make_calibration():
         infected_6_15_intv, infected_6_15_ctrl, infected_15plus ]
 
     for c in components:
-        c.n_boot = 1000
+        c.n_boot = 1000 # Bootstrap
+        c.combine_reps = 'sum' # Sum across reps
 
     # Make the calibration
     calib = ss.Calibration(
         calib_pars = calib_pars,
         sim = sim,
         build_fn = build_sim, # Use default builder, Calibration.translate_pars
+        build_kw = dict(n_reps = n_reps), # Feed in n_reps
         reseed = True,
         components = components,
         total_trials = total_trials,
@@ -576,7 +576,8 @@ if __name__ == '__main__':
     T.toc()
 
     # Check fit and make plots
-    calib.check_fit(n_runs=n_runs_check, do_plot=False)
+    calib.build_kw['n_reps'] = n_reps_check
+    calib.check_fit(do_plot=False)
 
     for bootstrap in [True, False]:
         lbl = '_bootstrap' if bootstrap else ''
