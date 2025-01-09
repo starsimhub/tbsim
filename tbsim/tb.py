@@ -19,8 +19,13 @@ class TBS(IntEnum):
 
 
 class TB(ss.Infection):
-    def __init__(self, pars=None, **kwargs):
+    def __init__(self, pars=None, validate_dwell_times=False, **kwargs):
         super().__init__()
+
+        self.validate_dwell_times = validate_dwell_times  # Toggle dwell time validation
+        self.dwell_time_logger = None
+        if self.validate_dwell_times:
+            self.dwell_time_logger = pd.DataFrame(columns=['agent_id', 'state', 'dwell_time'])
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),                            # Initial seed infections
@@ -174,6 +179,10 @@ class TB(ss.Infection):
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
         new_presymp_uids = self.p_latent_to_presym.filter(latent_uids)
         if len(new_presymp_uids):
+
+            # Log dwell times
+            for uid in new_presymp_uids:
+                self.log_dwell_time(agent_id=uid, state=self.state[uid], entry_time=0.0+self.ti_presymp[uid], exit_time=ti)
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_presymp[new_presymp_uids] = ti
         self.results['new_active'][ti] = len(new_presymp_uids)
@@ -183,11 +192,21 @@ class TB(ss.Infection):
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
         new_clear_presymp_uids = ss.uids()
         if len(presym_uids):
+
+            # Log dwell times
+            for uid in presym_uids:
+                self.log_dwell_time(agent_id=uid, state=self.state[uid], entry_time=self.ti_active[uid], exit_time=ti)
+
             # Pre symp --> Clear
             new_clear_presymp_uids = self.p_presym_to_clear.filter(presym_uids)
 
             new_active_uids = self.p_presym_to_active.filter(presym_uids)
             if len(new_active_uids):
+
+                # Log dwell times
+                for uid in new_active_uids:
+                    self.log_dwell_time(agent_id=uid, state=self.state[uid], entry_time=self.ti_active[uid], exit_time=ti)
+
                 active_state = self.active_tb_state[new_active_uids] 
                 self.state[new_active_uids] = active_state
                 self.ti_active[new_active_uids] = ti
@@ -197,6 +216,11 @@ class TB(ss.Infection):
         new_clear_active_uids = self.p_active_to_clear.filter(active_uids)
         new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
+
+            # Log dwell times
+            for uid in new_clear_uids:
+                self.log_dwell_time(agent_id=uid, state=self.state[uid], entry_time=self.ti_active[uid], exit_time=ti)
+
             # Set state and reset timers
             self.susceptible[new_clear_uids] = True
             self.infected[new_clear_uids] = False
@@ -210,6 +234,11 @@ class TB(ss.Infection):
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
         new_death_uids = self.p_active_to_death.filter(active_uids)
         if len(new_death_uids):
+
+            # Log dwell times
+            for uid in new_death_uids:
+                self.log_dwell_time(agent_id=uid, state=self.state[uid], entry_time=self.ti_active[uid], exit_time=ti)
+
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
         self.results['new_deaths'][ti] = len(new_death_uids)
@@ -335,6 +364,13 @@ class TB(ss.Infection):
         res['cum_active']     = np.cumsum(res['new_active'])
         res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
         
+        if self.validate_dwell_times:
+            # Example expected distributions
+            expected_distributions = {
+                TBS.LATENT_SLOW: lambda x: ss.expon(scale=365).cdf(x),  # Exponential, mean 365 days
+                TBS.ACTIVE_PRESYMP: lambda x: ss.norm(loc=30, scale=10).cdf(x),  # Normal, mean 30 days
+            }
+            self.validate_dwell_time_distributions(expected_distributions)
         return
 
     def plot(self):
@@ -345,3 +381,52 @@ class TB(ss.Infection):
             plt.plot(self.results['timevec'], self.results[rkey], label=rkey.title())
         plt.legend()
         return fig
+
+
+
+    def log_dwell_time(self, agent_id, state, entry_time, exit_time):
+        """
+        Logs dwell times for agents transitioning between states.
+        """
+        # if state == 2.0:     # wip - ... uncovering the bug
+        #     if (entry_time <= 0.0) | (np.isnan(entry_time)):
+        #         entry_time = 0.0
+
+        dwell_time = exit_time - entry_time
+
+        if self.validate_dwell_times:
+            self.dwell_time_logger = pd.concat([self.dwell_time_logger, pd.DataFrame([{
+                'agent_id': agent_id,
+                'state': state,
+                'dwell_time': dwell_time
+            }])], ignore_index=True)
+
+    def validate_dwell_time_distributions(self, expected_distributions):
+        """
+        Validate dwell times against expected distributions using statistical tests.
+        """
+        if not self.validate_dwell_times:
+            return
+
+        # Save dwell time logger to file in the same directory as the simulation results
+        import tbsim.config as cfg
+        import os
+        import datetime as ddtt
+        from scipy.stats import ks_1samp, ks_2samp
+        
+        resdir = os.path.dirname( cfg.create_res_dir())
+        t = ddtt.datetime.now()
+        fn = (os.path.join(resdir, f'dwell_time_logger_{t.strftime("%Y%m%d%H%M%S")}.csv'))
+        self.dwell_time_logger.to_csv(fn, index=False)
+
+        print("Validating dwell time distributions...")
+        for state, expected_cdf in expected_distributions.items():
+            dwell_times = self.dwell_time_logger[self.dwell_time_logger['state'] == state]['dwell_time']
+            if dwell_times.empty:
+                print(f"No data available for state {state}")
+                continue
+            stat, p_value = ks_1samp(dwell_times, expected_cdf)
+            print(f"State {state}: KS Statistic={stat:.4f}, p-value={p_value:.4f}")
+            if p_value < 0.05:
+                print(f"WARNING: Dwell times for state {state} deviate significantly from expectations.")
+        return
