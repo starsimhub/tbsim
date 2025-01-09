@@ -72,6 +72,7 @@ class TB(ss.Infection):
 
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
+            ss.FloatArr('ti_latent'),                           # Time of entry into latent state - is this tracked somewhere else? (e.g. as part of time infected)
 
             ss.FloatArr('reltrans_het', default=1.0),           # Individual-level heterogeneity on infectiousness, acts in addition to stage-based rates
         )
@@ -181,8 +182,13 @@ class TB(ss.Infection):
         if len(new_presymp_uids):
 
             # Log dwell times
-            for uid in new_presymp_uids:
-                self.log_dwell_time(agent_id=uid, state=self.state[uid], entry_time=0.0+self.ti_presymp[uid], exit_time=ti)
+            self.log_dwell_time(
+                agent_ids=new_presymp_uids,
+                states=self.state[new_presymp_uids],
+                entry_times=self.ti_latent[new_presymp_uids],  # We don't have a ti_latent yet
+                exit_times=np.full(len(new_presymp_uids), ti)
+            )
+
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_presymp[new_presymp_uids] = ti
         self.results['new_active'][ti] = len(new_presymp_uids)
@@ -194,8 +200,12 @@ class TB(ss.Infection):
         if len(presym_uids):
 
             # Log dwell times
-            for uid in presym_uids:
-                self.log_dwell_time(agent_id=uid, state=self.state[uid], entry_time=self.ti_active[uid], exit_time=ti)
+            self.log_dwell_time(
+                agent_ids=presym_uids,
+                states=self.state[presym_uids],
+                entry_times=self.ti_active[presym_uids],
+                exit_times=np.full(len(presym_uids), ti)
+            )
 
             # Pre symp --> Clear
             new_clear_presymp_uids = self.p_presym_to_clear.filter(presym_uids)
@@ -204,8 +214,12 @@ class TB(ss.Infection):
             if len(new_active_uids):
 
                 # Log dwell times
-                for uid in new_active_uids:
-                    self.log_dwell_time(agent_id=uid, state=self.state[uid], entry_time=self.ti_active[uid], exit_time=ti)
+                self.log_dwell_time(
+                    agent_ids=new_active_uids,
+                    states=self.state[new_active_uids],
+                    entry_times=self.ti_active[new_active_uids],
+                    exit_times=np.full(len(new_active_uids), ti)
+                )
 
                 active_state = self.active_tb_state[new_active_uids] 
                 self.state[new_active_uids] = active_state
@@ -218,8 +232,12 @@ class TB(ss.Infection):
         if len(new_clear_uids):
 
             # Log dwell times
-            for uid in new_clear_uids:
-                self.log_dwell_time(agent_id=uid, state=self.state[uid], entry_time=self.ti_active[uid], exit_time=ti)
+            self.log_dwell_time(
+                agent_ids=new_clear_uids,
+                states=self.state[new_clear_uids],
+                entry_times=self.ti_active[new_clear_uids],
+                exit_times=np.full(len(new_clear_uids), ti)
+            )
 
             # Set state and reset timers
             self.susceptible[new_clear_uids] = True
@@ -236,8 +254,12 @@ class TB(ss.Infection):
         if len(new_death_uids):
 
             # Log dwell times
-            for uid in new_death_uids:
-                self.log_dwell_time(agent_id=uid, state=self.state[uid], entry_time=self.ti_active[uid], exit_time=ti)
+            self.log_dwell_time(
+                agent_ids=new_death_uids,
+                states=self.state[new_death_uids],
+                entry_times=self.ti_active[new_death_uids],
+                exit_times=np.full(len(new_death_uids), ti)
+            )
 
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
@@ -382,24 +404,20 @@ class TB(ss.Infection):
         plt.legend()
         return fig
 
-
-
-    def log_dwell_time(self, agent_id, state, entry_time, exit_time):
+        
+    def log_dwell_time(self, agent_ids, states, entry_times, exit_times):
         """
-        Logs dwell times for agents transitioning between states.
+        Logs dwell times for a group of agents transitioning between states.
         """
-        # if state == 2.0:     # wip - ... uncovering the bug
-        #     if (entry_time <= 0.0) | (np.isnan(entry_time)):
-        #         entry_time = 0.0
-
-        dwell_time = exit_time - entry_time
+        dwell_times = exit_times - entry_times
 
         if self.validate_dwell_times:
-            self.dwell_time_logger = pd.concat([self.dwell_time_logger, pd.DataFrame([{
-                'agent_id': agent_id,
-                'state': state,
-                'dwell_time': dwell_time
-            }])], ignore_index=True)
+            new_logs = pd.DataFrame({
+                'agent_id': agent_ids,
+                'state': states,
+                'dwell_time': dwell_times
+            })
+            self.dwell_time_logger = pd.concat([self.dwell_time_logger, new_logs], ignore_index=True)
 
     def validate_dwell_time_distributions(self, expected_distributions):
         """
