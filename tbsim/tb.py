@@ -323,6 +323,7 @@ class TB(ss.Infection):
         ti = self.ti
         ti_infctd = self.ti_infected
         dty = self.sim.t.dt_year
+        n_alive = np.count_nonzero(self.sim.people.alive)
 
         res.n_latent_slow[ti]     = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti]     = np.count_nonzero(self.state == TBS.LATENT_FAST)
@@ -331,9 +332,10 @@ class TB(ss.Infection):
         res.n_active_smneg[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
         res.n_active_exptb[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
         res.n_active[ti]          = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
-        res.prevalence_active[ti] = res.n_active[ti] / np.count_nonzero(self.sim.people.alive)
-        res.incidence_kpy[ti]     = 1_000 * np.count_nonzero(ti_infctd == ti) / (np.count_nonzero(self.sim.people.alive) * dty)
-        res.deaths_ppy[ti]        = res.new_deaths[ti] / (np.count_nonzero(self.sim.people.alive) * dty)
+        if n_alive > 0:
+            res.prevalence_active[ti] = res.n_active[ti] / n_alive 
+            res.incidence_kpy[ti]     = 1_000 * np.count_nonzero(ti_infctd == ti) / (n_alive * dty)
+            res.deaths_ppy[ti]        = res.new_deaths[ti] / (n_alive * dty)
 
         return
 
