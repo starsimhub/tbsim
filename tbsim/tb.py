@@ -44,7 +44,7 @@ class TB(ss.Infection):
             rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
 
-            rel_sus_postinfection = 1.0, # Relative susceptibility post-infection
+            rel_sus_latentslow = 0.5, # Relative susceptibility of reinfection for slow progressors
 
             reltrans_het = ss.constant(v=1.0),
         )
@@ -143,12 +143,9 @@ class TB(ss.Infection):
 
         p = self.pars
 
-        # Carry out state changes upon new infection
-        self.susceptible[uids] = False
-        self.infected[uids] = True # Not needed, but useful for reporting
-
-        # Set base transmission heterogeneity
-        self.reltrans_het[uids] = p.reltrans_het.rvs(uids)
+        reinfected_uids = uids[self.infected[uids]]
+        assert np.all(self.state[reinfected_uids] == TBS.LATENT_SLOW)
+        self.results['n_reinfected'][self.ti] = len(reinfected_uids)
 
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
@@ -157,14 +154,21 @@ class TB(ss.Infection):
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
 
+        # Carry out state changes upon new infection
+        self.susceptible[fast_uids] = False # N.B. Slow progressors remain susceptible!
+        self.infected[uids] = True # Not needed, but useful for reporting
+        self.rel_sus[slow_uids] = self.pars.rel_sus_latentslow
+
         # Determine active TB state
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
+
+        # Set base transmission heterogeneity
+        self.reltrans_het[uids] = p.reltrans_het.rvs(uids)
 
         # Update result count of new infections 
         self.ti_infected[uids] = self.ti
         self.ever_infected[uids] = True
 
-        self.rel_sus[uids] = self.pars.rel_sus_postinfection
         return
 
     def step(self):
@@ -179,6 +183,7 @@ class TB(ss.Infection):
         if len(new_presymp_uids):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_presymp[new_presymp_uids] = ti
+            self.susceptible[new_presymp_uids] = False # No longer susceptible regardless of the latent form
         self.results['new_active'][ti] = len(new_presymp_uids)
         self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_presymp_uids] >= 15)
 
@@ -308,6 +313,7 @@ class TB(ss.Infection):
             ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
             ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
             ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
+            ss.Result('n_reinfected',      dtype=int, label='Number reinfected'), 
         )
         return
 
