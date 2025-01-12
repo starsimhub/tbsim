@@ -144,6 +144,7 @@ class TB(ss.Infection):
         p = self.pars
 
         reinfected_uids = uids[self.infected[uids]]
+        new_uids = uids[~self.infected[uids]]
         assert np.all(self.state[reinfected_uids] == TBS.LATENT_SLOW)
         self.results['n_reinfected'][self.ti] = len(reinfected_uids)
 
@@ -166,7 +167,8 @@ class TB(ss.Infection):
         self.reltrans_het[uids] = p.reltrans_het.rvs(uids)
 
         # Update result count of new infections 
-        self.ti_infected[uids] = self.ti
+        self.ti_infected[new_uids] = self.ti # Only update ti_infected for new...
+        self.ti_infected[reinfected_uids_uids] = self.ti # ... and reinfection uids
         self.ever_infected[uids] = True
 
         return
