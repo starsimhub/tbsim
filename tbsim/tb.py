@@ -168,7 +168,7 @@ class TB(ss.Infection):
 
         # Update result count of new infections 
         self.ti_infected[new_uids] = self.ti # Only update ti_infected for new...
-        self.ti_infected[reinfected_uids_uids] = self.ti # ... and reinfection uids
+        self.ti_infected[reinfected_uids] = self.ti # ... and reinfection uids
         self.ever_infected[uids] = True
 
         return
