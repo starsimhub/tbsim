@@ -6,4 +6,5 @@ from .malnutrition import Malnutrition
 from .config import *
 from .interventions import *
 from .networks import HouseholdNet
+from .plotdwelltimes import *
 from .connectors import TB_Nutrition_Connector
