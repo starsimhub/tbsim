@@ -2,7 +2,7 @@ import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
 import pandas as pd
-
+import scipy.stats as stats
 from enum import IntEnum
 
 __all__ = ['TB', 'TBS']
@@ -19,7 +19,7 @@ class TBS(IntEnum):
 
 
 class TB(ss.Infection):
-    def __init__(self, pars=None, validate_dwell_times=False, **kwargs):
+    def __init__(self, pars=None, validate_dwell_times=True, **kwargs):
         super().__init__()
 
         self.validate_dwell_times = validate_dwell_times  # Toggle dwell time validation
@@ -151,7 +151,8 @@ class TB(ss.Infection):
         # Carry out state changes upon new infection
         self.susceptible[uids] = False
         self.infected[uids] = True # Not needed, but useful for reporting
-
+        self.ti_latent[uids] = self.ti # Time of entry into latent state -- is this tracked somewhere else? (e.g. as part of time infected)
+  
         # Set base transmission heterogeneity
         self.reltrans_het[uids] = p.reltrans_het.rvs(uids)
 
@@ -388,11 +389,21 @@ class TB(ss.Infection):
         
         if self.validate_dwell_times:
             # Example expected distributions
+   
+
+            # Replace all distributions with scipy.stats exponential, using scale=365 for all
             expected_distributions = {
-                TBS.LATENT_SLOW: lambda x: ss.expon(scale=365).cdf(x),  # Exponential, mean 365 days
-                TBS.ACTIVE_PRESYMP: lambda x: ss.norm(loc=30, scale=10).cdf(x),  # Normal, mean 30 days
+                TBS.LATENT_SLOW: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+                TBS.LATENT_FAST: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+                TBS.ACTIVE_PRESYMP: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+                TBS.ACTIVE_SMPOS: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+                TBS.ACTIVE_SMNEG: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+                TBS.ACTIVE_EXPTB: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+                TBS.DEAD: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
             }
             self.validate_dwell_time_distributions(expected_distributions)
+            self.plot_dwell_time_validation()
+
         return
 
     def plot(self):
@@ -409,7 +420,8 @@ class TB(ss.Infection):
         """
         Logs dwell times for a group of agents transitioning between states.
         """
-        dwell_times = exit_times - entry_times
+        entry_times = np.nan_to_num(entry_times, nan=0)
+        dwell_times = exit_times -  entry_times
 
         if self.validate_dwell_times:
             new_logs = pd.DataFrame({
@@ -431,11 +443,14 @@ class TB(ss.Infection):
         import os
         import datetime as ddtt
         from scipy.stats import ks_1samp, ks_2samp
+        import tbsim.plotdwelltimes as pdt
         
         resdir = os.path.dirname( cfg.create_res_dir())
         t = ddtt.datetime.now()
         fn = (os.path.join(resdir, f'dwell_time_logger_{t.strftime("%Y%m%d%H%M%S")}.csv'))
         self.dwell_time_logger.to_csv(fn, index=False)
+        pdt.stacked_bars_states_per_agent(fn)
+
 
         print("Validating dwell time distributions...")
         for state, expected_cdf in expected_distributions.items():
@@ -448,3 +463,21 @@ class TB(ss.Infection):
             if p_value < 0.05:
                 print(f"WARNING: Dwell times for state {state} deviate significantly from expectations.")
         return
+    
+    # generate a plot with the results of the dwell time validation
+    def plot_dwell_time_validation(self):
+        """
+        Plot the results of the dwell time validation.
+        """
+        if not self.validate_dwell_times:
+            return
+
+        fig, ax = plt.subplots()
+        for state in self.dwell_time_logger['state'].unique():
+            dwell_times = self.dwell_time_logger[self.dwell_time_logger['state'] == state]['dwell_time']
+            if dwell_times.empty:
+                continue
+            ax.hist(dwell_times, bins=50, alpha=0.5, label=f'State {state}')
+        ax.set_xlabel('Dwell Time')
+        ax.set_ylabel('Frequency')
+        ax.legend()

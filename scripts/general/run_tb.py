@@ -8,13 +8,13 @@ def make_tb(sim_pars=None):
         unit = 'day',
         dt = 7, 
         start = sc.date('1980-01-01'), 
-        stop = sc.date('2016-12-31'), 
+        stop = sc.date('2000-12-31'), 
         rand_seed = 123,
     )
     if sim_pars is not None:
         spars.update(sim_pars)
 
-    pop = ss.People(n_agents=5000)
+    pop = ss.People(n_agents=100)
     tb = mtb.TB(dict(
         beta = ss.beta(0.1),
         init_prev = ss.bernoulli(p=0.25),
