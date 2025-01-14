@@ -5,7 +5,7 @@ import pandas as pd
 import scipy.stats as stats
 from enum import IntEnum
 
-__all__ = ['TB', 'TBS']
+__all__ = ['TB', 'TBS', 'DwellTimeAnalyzer']
 
 class TBS(IntEnum):
     NONE            = -1    # No TB
@@ -22,10 +22,8 @@ class TB(ss.Infection):
     def __init__(self, pars=None, validate_dwell_times=True, **kwargs):
         super().__init__()
 
-        self.validate_dwell_times = validate_dwell_times  # Toggle dwell time validation
-        self.dwell_time_logger = None
-        if self.validate_dwell_times:
-            self.dwell_time_logger = pd.DataFrame(columns=['agent_id', 'state', 'dwell_time'])
+        self.validate_dwell_times = validate_dwell_times  # Toggle dwell time validation    
+        self.dwell_time_analyzer = DwellTimeAnalyzer(validate_dwell_times)
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),                            # Initial seed infections
@@ -161,23 +159,6 @@ class TB(ss.Infection):
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
 
-        # # Log dwell times
-        # self.log_dwell_time(
-        #     agent_ids=fast_uids,
-        #     states=self.state[fast_uids],
-        #     to_state=TBS.LATENT_FAST,
-        #     entry_times=np.full(len(fast_uids), 0),  # For now we only assume it comes from susceptible
-        #     exit_times=np.full(len(fast_uids), self.ti)
-        # )
-
-        # # Log dwell times
-        # self.log_dwell_time(
-        #     agent_ids=slow_uids,
-        #     states=self.state[slow_uids],
-        #     to_state=TBS.LATENT_SLOW,
-        #     entry_times=np.full(len(slow_uids), 0),  # For now we only assume it comes from susceptible
-        #     exit_times=np.full(len(slow_uids), self.ti)
-        # )
         # Determine active TB state
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
@@ -408,22 +389,6 @@ class TB(ss.Infection):
         res['cum_deaths']     = np.cumsum(res['new_deaths'])
         res['cum_active']     = np.cumsum(res['new_active'])
         res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
-        
-        if self.validate_dwell_times:
-            # expected distributions: TODO: Update these to reflect the actual distributions - double check with Dan
-            expected_distributions = {
-                TBS.NONE: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 daysasd
-                TBS.LATENT_SLOW: lambda xvar: stats.expon(scale=365).cdf(xvar),  # Exponential, scale 365 days
-                TBS.LATENT_FAST: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-                TBS.ACTIVE_PRESYMP: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-                TBS.ACTIVE_SMPOS: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-                TBS.ACTIVE_SMNEG: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-                TBS.ACTIVE_EXPTB: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-                TBS.DEAD: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-            }
-            self.validate_dwell_time_distributions(expected_distributions)
-            self.plot_dwell_time_validation()
-
         return
 
     def plot(self):
@@ -434,60 +399,97 @@ class TB(ss.Infection):
             plt.plot(self.results['timevec'], self.results[rkey], label=rkey.title())
         plt.legend()
         return fig
+    
+    def log_dwell_time(self, *args, **kwargs):
+        self.dwell_time_analyzer.log_dwell_time(*args, **kwargs)
 
+    def validate_dwell_time_distributions(self):
+        self.dwell_time_analyzer.validate_dwell_time_distributions()
+
+    def plot_dwell_time_validation(self):
+        self.dwell_time_analyzer.plot_dwell_time_validation()
         
+
+class DwellTimeAnalyzer:
+    
+    # expected distributions: TODO: Update these to reflect the actual distributions - double check with Dan
+    expected_distributions = {
+        TBS.NONE: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 daysasd
+        TBS.LATENT_SLOW: lambda xvar: stats.expon(scale=365).cdf(xvar),  # Exponential, scale 365 days
+        TBS.LATENT_FAST: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+        TBS.ACTIVE_PRESYMP: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+        TBS.ACTIVE_SMPOS: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+        TBS.ACTIVE_SMNEG: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+        TBS.ACTIVE_EXPTB: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+        TBS.DEAD: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+    }
+    
+    def __init__(self, validate_dwell_times=True):
+        self.validate_dwell_times = validate_dwell_times
+
+        self.dwell_time_logger = pd.DataFrame(columns=['agent_id', 'state', 'dwell_time']) if validate_dwell_times else None
+
     def log_dwell_time(self, agent_ids, states, to_state, entry_times, exit_times):
-        """
-        Logs dwell times for a group of agents transitioning between states.
-        """
-        entry_times = np.nan_to_num(entry_times, nan=0)
-        dwell_times = exit_times -  entry_times
-
-        if self.validate_dwell_times:
-            new_logs = pd.DataFrame({
-                'agent_id': agent_ids,
-                'state': states,
-                'dwell_time': dwell_times,
-                'entry_time': entry_times,
-                'exit_time': exit_times,
-                'to_state': to_state
-            })
-            self.dwell_time_logger = pd.concat([self.dwell_time_logger, new_logs], ignore_index=True)
-
-    def validate_dwell_time_distributions(self, expected_distributions):
-        """
-        Validate dwell times against expected distributions using statistical tests.
-        """
         if not self.validate_dwell_times:
             return
 
-        # Save dwell time logger to file in the same directory as the simulation results
-        import tbsim.config as cfg
-        import os
-        import datetime as ddtt
-        from scipy.stats import ks_1samp, ks_2samp
-        import tbsim.plotdwelltimes as pdt
+        entry_times = np.nan_to_num(entry_times, nan=0)
+        dwell_times = exit_times - entry_times
+
+        new_logs = pd.DataFrame({
+            'agent_id': agent_ids,
+            'state': states,
+            'dwell_time': dwell_times,
+            'entry_time': entry_times,
+            'exit_time': exit_times,
+            'to_state': to_state,
+            'state_name': TBS(to_state).name.replace('_', ' ').title()
+        })
+        # Map state codes to their corresponding names
+        new_logs['state_name'] = new_logs['state'].apply(lambda x: TBS(x).name.replace('_', ' ').title())
         
-        resdir = os.path.dirname( cfg.create_res_dir())
+        self.dwell_time_logger = pd.concat([self.dwell_time_logger, new_logs], ignore_index=True)
+                # Map state codes to their corresponding names
+
+    def save_to_file(self):
+        import os
+        import tbsim.config as cfg
+        import datetime as ddtt
+        import tbsim.plotdwelltimes as pdt
+
+        if not self.validate_dwell_times:
+            return
+        
+        resdir = os.path.dirname(cfg.create_res_dir())
         t = ddtt.datetime.now()
-        fn = (os.path.join(resdir, f'dwell_time_logger_{t.strftime("%Y%m%d%H%M%S")}.csv'))
+        fn = os.path.join(resdir, f'dwell_time_logger_{t.strftime("%Y%m%d%H%M%S")}.csv')
         self.dwell_time_logger.to_csv(fn, index=False)
-        pdt.stacked_bars_states_per_agent(fn)
+        print(f"Dwell time logs saved to {fn}")
 
+        return fn
 
+    def validate_dwell_time_distributions(self, expected_distributions=None):
+        """
+        Validate dwell times against expected distributions using statistical tests.
+        """
+        from scipy.stats import ks_1samp, ks_2samp
+        
+        expected_distributions = expected_distributions or self.expected_distributions
+
+        if not self.validate_dwell_times:
+            return
+       
         print("Validating dwell time distributions...")
         for state, expected_cdf in expected_distributions.items():
             dwell_times = self.dwell_time_logger[self.dwell_time_logger['state'] == state]['dwell_time']
             if dwell_times.empty:
                 print(f"No data available for state {state}")
                 continue
-            stat, p_value = ks_1samp(dwell_times, expected_cdf)
+            stat, p_value = stats.kstest(dwell_times, expected_cdf)
             print(f"State {state}: KS Statistic={stat:.4f}, p-value={p_value:.4f}")
             if p_value < 0.05:
                 print(f"WARNING: Dwell times for state {state} deviate significantly from expectations.")
-        return
-    
-    # generate a plot with the results of the dwell time validation
+
     def plot_dwell_time_validation(self):
         """
         Plot the results of the dwell time validation.
@@ -500,7 +502,26 @@ class TB(ss.Infection):
             dwell_times = self.dwell_time_logger[self.dwell_time_logger['state'] == state]['dwell_time']
             if dwell_times.empty:
                 continue
-            ax.hist(dwell_times, bins=50, alpha=0.5, label=f'State {state}')
+            state_label = TBS(state).name.replace('_', ' ').title()
+            ax.hist(dwell_times, bins=50, alpha=0.5, label=f'{state_label}')
         ax.set_xlabel('Dwell Time')
         ax.set_ylabel('Frequency')
         ax.legend()
+        plt.show()
+        return
+    
+    def plot_dwell_time_validation_interactive(self):
+        """
+        Plot the results of the dwell time validation interactively using Plotly.
+        """
+        if not self.validate_dwell_times:
+            return
+
+        import plotly.express as px
+        fig = px.histogram(self.dwell_time_logger, x='dwell_time', color='state_name', 
+                            nbins=50, barmode='overlay', 
+                            labels={'dwell_time': 'Dwell Time', 'state_name': 'State'},
+                            title='Dwell Time Validation')
+        fig.update_layout(bargap=0.1)
+        fig.show()
+        return

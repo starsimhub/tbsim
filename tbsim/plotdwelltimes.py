@@ -142,29 +142,50 @@ def p3(file_path):
 
 
 def stacked_bars_states_per_agent(file_path):
-
+    import plotly.express as px
     # Load the CSV file
     df = pd.read_csv(file_path)
+    # Prepare the data for Plotly
+    df['cumulative_dwell_time_days'] = df.groupby(['agent_id', 'state'])['dwell_time'].cumsum() / 24
+    pivot_df = df.pivot_table(index='agent_id', columns='state', values='cumulative_dwell_time_days', aggfunc='max', fill_value=0).reset_index()
 
-    # Calculate cumulative dwell time for each agent and state
-    df['cumulative_dwell_time'] = df.groupby(['agent_id', 'state'])['dwell_time'].cumsum()
+    # Melt the DataFrame for Plotly
+    melted_df = pivot_df.melt(id_vars='agent_id', var_name='state', value_name='cumulative_dwell_time_days')
 
-    # Convert dwell time to days
-    df['cumulative_dwell_time_days'] = df['cumulative_dwell_time']/24
+    # Create the interactive plot
+    fig = px.bar(melted_df, x='agent_id', y='cumulative_dwell_time_days', color='state', title='Cumulative Time in Days on Each State for All Agents', labels={'cumulative_dwell_time_days': 'Cumulative Time (Days)', 'agent_id': 'Agent ID'})
 
-    # Pivot the data to get cumulative dwell time for each state
-    pivot_df = df.pivot_table(index='agent_id', columns='state', values='cumulative_dwell_time_days', aggfunc='max', fill_value=0)
+    # Update layout for better visualization
+    fig.update_layout(barmode='stack', xaxis={'categoryorder':'total descending'}, legend_title_text='State')
 
-    # Plot the data
-    pivot_df.plot(kind='bar', stacked=True, figsize=(15, 7))
-    plt.title('Cumulative Time in Days on Each State for All Agents')
-    plt.xlabel('Agent ID')
-    plt.ylabel('Cumulative Time (Days)')
-    plt.legend(title='State')
-    plt.tight_layout()
-    plt.show()
+    # Show the plot
+    fig.show()
 
-def p0(file_path):
+def stacked_bars_states_per_agent_clean(file_path):
+    import plotly.express as px
+    # Load the CSV file
+    df = pd.read_csv(file_path)
+    
+    # Filter out rows with empty agent_id
+    df = df[df['agent_id'].notna()]
+    
+    # Prepare the data for Plotly
+    df['cumulative_dwell_time_days'] = df.groupby(['agent_id', 'state_name'])['dwell_time'].cumsum() / 24
+    pivot_df = df.pivot_table(index='agent_id', columns='state_name', values='cumulative_dwell_time_days', aggfunc='max', fill_value=0).reset_index()
+
+    # Melt the DataFrame for Plotly
+    melted_df = pivot_df.melt(id_vars='agent_id', var_name='state_name', value_name='cumulative_dwell_time_days')
+
+    # Create the interactive plot
+    fig = px.bar(melted_df, x='agent_id', y='cumulative_dwell_time_days', color='state_name', title='Cumulative Time in Days on Each State for All Agents', labels={'cumulative_dwell_time_days': 'Cumulative Time (Days)', 'agent_id': 'Agent ID'})
+
+    # Update layout for better visualization
+    fig.update_layout(barmode='stack', xaxis={'categoryorder':'total descending', 'type': 'category'}, legend_title_text='State')
+
+    # Show the plot
+    fig.show()
+
+def plot_dwell_time_lines_for_each_agent(file_path):
 
     # Load the CSV data
     data = pd.read_csv(file_path)
@@ -607,3 +628,27 @@ def cumulative_dwell_time_pd8(file_path):
 #     # plt.legend(title='State', loc='upper right')
 #     plt.legend(title='State', loc='upper right', labels=sorted(df['state'].unique()))
 #     plt.show()
+
+
+def stacked_bars_states_per_agent_static(file_path):
+
+    # Load the CSV file
+    df = pd.read_csv(file_path)
+
+    # Calculate cumulative dwell time for each agent and state
+    df['cumulative_dwell_time'] = df.groupby(['agent_id', 'state'])['dwell_time'].cumsum()
+
+    # Convert dwell time to days
+    df['cumulative_dwell_time_days'] = df['cumulative_dwell_time']/24
+
+    # Pivot the data to get cumulative dwell time for each state
+    pivot_df = df.pivot_table(index='agent_id', columns='state', values='cumulative_dwell_time_days', aggfunc='max', fill_value=0)
+
+    # Plot the data
+    pivot_df.plot(kind='bar', stacked=True, figsize=(15, 7))
+    plt.title('Cumulative Time in Days on Each State for All Agents')
+    plt.xlabel('Agent ID')
+    plt.ylabel('Cumulative Time (Days)')
+    plt.legend(title='State')
+    plt.tight_layout()
+    plt.show()

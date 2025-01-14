@@ -14,7 +14,7 @@ def make_tb(sim_pars=None):
     if sim_pars is not None:
         spars.update(sim_pars)
 
-    pop = ss.People(n_agents=100)
+    pop = ss.People(n_agents=500)
     tb = mtb.TB(dict(
         beta = ss.beta(0.1),
         init_prev = ss.bernoulli(p=0.25),
@@ -31,7 +31,6 @@ def make_tb(sim_pars=None):
         demographics=[deaths, births],
         pars=spars,
     )
-
     sim.pars.verbose = sim.pars.dt / 365
 
     return sim
@@ -39,6 +38,16 @@ def make_tb(sim_pars=None):
 if __name__ == '__main__':
     sim_tb = make_tb()
     sim_tb.run()
-    sim_tb.diseases['tb'].plot()
-    # mtb.plot_sim(sim_tb)
-    plt.show()
+    tb = sim_tb.diseases['tb']
+
+    # tb.validate_dwell_time_distributions() # This is an optional step
+    # These are two of the few plots that have been added directly to the DwellTimeAnalyzer class
+    # tb.plot_dwell_time_validation()        
+    # tb.dwell_time_analyzer.plot_dwell_time_validation_interactive()
+
+    # Otherwise, use the function to save the dwell time distributions to a file and then plot them
+
+    file_dwt = tb.dwell_time_analyzer.save_to_file()
+    mtb.stacked_bars_states_per_agent_clean(file_dwt)
+    mtb.plot_dwell_time_lines_for_each_agent(file_dwt)
+    # plt.show()
