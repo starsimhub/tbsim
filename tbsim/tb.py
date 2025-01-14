@@ -161,6 +161,23 @@ class TB(ss.Infection):
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
 
+        # # Log dwell times
+        # self.log_dwell_time(
+        #     agent_ids=fast_uids,
+        #     states=self.state[fast_uids],
+        #     to_state=TBS.LATENT_FAST,
+        #     entry_times=np.full(len(fast_uids), 0),  # For now we only assume it comes from susceptible
+        #     exit_times=np.full(len(fast_uids), self.ti)
+        # )
+
+        # # Log dwell times
+        # self.log_dwell_time(
+        #     agent_ids=slow_uids,
+        #     states=self.state[slow_uids],
+        #     to_state=TBS.LATENT_SLOW,
+        #     entry_times=np.full(len(slow_uids), 0),  # For now we only assume it comes from susceptible
+        #     exit_times=np.full(len(slow_uids), self.ti)
+        # )
         # Determine active TB state
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
@@ -186,6 +203,7 @@ class TB(ss.Infection):
             self.log_dwell_time(
                 agent_ids=new_presymp_uids,
                 states=self.state[new_presymp_uids],
+                to_state=TBS.ACTIVE_PRESYMP,
                 entry_times=self.ti_latent[new_presymp_uids],  # We don't have a ti_latent yet
                 exit_times=np.full(len(new_presymp_uids), ti)
             )
@@ -204,6 +222,7 @@ class TB(ss.Infection):
             self.log_dwell_time(
                 agent_ids=presym_uids,
                 states=self.state[presym_uids],
+                to_state=TBS.ACTIVE_PRESYMP,
                 entry_times=self.ti_active[presym_uids],
                 exit_times=np.full(len(presym_uids), ti)
             )
@@ -218,6 +237,7 @@ class TB(ss.Infection):
                 self.log_dwell_time(
                     agent_ids=new_active_uids,
                     states=self.state[new_active_uids],
+                    to_state=TBS.ACTIVE_PRESYMP,
                     entry_times=self.ti_active[new_active_uids],
                     exit_times=np.full(len(new_active_uids), ti)
                 )
@@ -236,6 +256,7 @@ class TB(ss.Infection):
             self.log_dwell_time(
                 agent_ids=new_clear_uids,
                 states=self.state[new_clear_uids],
+                to_state=TBS.NONE,
                 entry_times=self.ti_active[new_clear_uids],
                 exit_times=np.full(len(new_clear_uids), ti)
             )
@@ -258,6 +279,7 @@ class TB(ss.Infection):
             self.log_dwell_time(
                 agent_ids=new_death_uids,
                 states=self.state[new_death_uids],
+                to_state=TBS.DEAD,
                 entry_times=self.ti_active[new_death_uids],
                 exit_times=np.full(len(new_death_uids), ti)
             )
@@ -388,12 +410,10 @@ class TB(ss.Infection):
         res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
         
         if self.validate_dwell_times:
-            # Example expected distributions
-   
-
-            # Replace all distributions with scipy.stats exponential, using scale=365 for all
+            # expected distributions: TODO: Update these to reflect the actual distributions - double check with Dan
             expected_distributions = {
-                TBS.LATENT_SLOW: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+                TBS.NONE: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 daysasd
+                TBS.LATENT_SLOW: lambda xvar: stats.expon(scale=365).cdf(xvar),  # Exponential, scale 365 days
                 TBS.LATENT_FAST: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
                 TBS.ACTIVE_PRESYMP: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
                 TBS.ACTIVE_SMPOS: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
@@ -416,7 +436,7 @@ class TB(ss.Infection):
         return fig
 
         
-    def log_dwell_time(self, agent_ids, states, entry_times, exit_times):
+    def log_dwell_time(self, agent_ids, states, to_state, entry_times, exit_times):
         """
         Logs dwell times for a group of agents transitioning between states.
         """
@@ -427,7 +447,10 @@ class TB(ss.Infection):
             new_logs = pd.DataFrame({
                 'agent_id': agent_ids,
                 'state': states,
-                'dwell_time': dwell_times
+                'dwell_time': dwell_times,
+                'entry_time': entry_times,
+                'exit_time': exit_times,
+                'to_state': to_state
             })
             self.dwell_time_logger = pd.concat([self.dwell_time_logger, new_logs], ignore_index=True)
 
