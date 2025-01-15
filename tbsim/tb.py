@@ -219,11 +219,11 @@ class TB(ss.Infection):
 
                 # Log dwell times
                 self.log_dwell_time(
-                    agent_ids=new_active_uids,
-                    states=self.state[new_active_uids],
-                    to_state=TBS.ACTIVE_PRESYMP,
-                    entry_times=self.ti_active[new_active_uids],
-                    exit_times=np.full(len(new_active_uids), ti)
+                    agent_ids=new_clear_presymp_uids,
+                    states=self.state[new_clear_presymp_uids],
+                    to_state=TBS.SUSCEPTIBLE,
+                    entry_times=self.ti_presymp[new_clear_presymp_uids],
+                    exit_times=np.full(len(new_clear_presymp_uids), ti)
                 )
 
                 active_state = self.active_tb_state[new_active_uids] 
