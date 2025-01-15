@@ -16,6 +16,7 @@ class TBS(IntEnum):
     ACTIVE_SMNEG    = 4     # Active TB, smear negative
     ACTIVE_EXPTB    = 5     # Active TB, extra-pulmonary
     DEAD            = 8     # TB death
+    SUSCEPTIBLE     = 9     # Susceptible
 
 
 class TB(ss.Infection):
@@ -158,7 +159,7 @@ class TB(ss.Infection):
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
-
+        
         # Determine active TB state
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
@@ -167,6 +168,8 @@ class TB(ss.Infection):
         self.ever_infected[uids] = True
 
         self.rel_sus[uids] = self.pars.rel_sus_postinfection
+
+
         return
 
     def step(self):
@@ -237,7 +240,7 @@ class TB(ss.Infection):
             self.log_dwell_time(
                 agent_ids=new_clear_uids,
                 states=self.state[new_clear_uids],
-                to_state=TBS.NONE,
+                to_state=TBS.SUSCEPTIBLE,
                 entry_times=self.ti_active[new_clear_uids],
                 exit_times=np.full(len(new_clear_uids), ti)
             )
@@ -422,6 +425,7 @@ class DwellTimeAnalyzer:
         TBS.ACTIVE_SMNEG: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
         TBS.ACTIVE_EXPTB: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
         TBS.DEAD: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
+        TBS.SUSCEPTIBLE: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
     }
     
     def __init__(self, validate_dwell_times=True):
@@ -443,7 +447,6 @@ class DwellTimeAnalyzer:
             'entry_time': entry_times,
             'exit_time': exit_times,
             'to_state': to_state,
-            'state_name': TBS(to_state).name.replace('_', ' ').title()
         })
         # Map state codes to their corresponding names
         new_logs['state_name'] = new_logs['state'].apply(lambda x: TBS(x).name.replace('_', ' ').title())
