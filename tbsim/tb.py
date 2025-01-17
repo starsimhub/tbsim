@@ -2,10 +2,10 @@ import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
 import pandas as pd
-import scipy.stats as stats
+
 from enum import IntEnum
 
-__all__ = ['TB', 'TBS', 'DwellTimeAnalyzer']
+__all__ = ['TB', 'TBS']
 
 class TBS(IntEnum):
     NONE            = -1    # No TB
@@ -13,18 +13,14 @@ class TBS(IntEnum):
     LATENT_FAST     = 1     # Latent TB, fast progression
     ACTIVE_PRESYMP  = 2     # Active TB, pre-symptomatic
     ACTIVE_SMPOS    = 3     # Active TB, smear positive
-    ACTIVE_SMNEG    = 4     # Active TB, smear negative
+    ACTIVE_SMNEG    = 4     # Active TB, smear negativea
     ACTIVE_EXPTB    = 5     # Active TB, extra-pulmonary
     DEAD            = 8     # TB death
-    SUSCEPTIBLE     = 9     # Susceptible
 
 
 class TB(ss.Infection):
-    def __init__(self, pars=None, validate_dwell_times=True, **kwargs):
+    def __init__(self, pars=None, **kwargs):
         super().__init__()
-
-        self.validate_dwell_times = validate_dwell_times  # Toggle dwell time validation    
-        self.dwell_time_analyzer = DwellTimeAnalyzer(validate_dwell_times)
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),                            # Initial seed infections
@@ -62,6 +58,7 @@ class TB(ss.Infection):
         self.define_states(
             # Initialize states specific to TB:
             ss.FloatArr('state', default=TBS.NONE),             # One state to rule them all?
+            ss.FloatArr('latent_tb_state', default=TBS.NONE),   # Form of latent TB (Slow or Fast)
             ss.FloatArr('active_tb_state', default=TBS.NONE),   # Form of active TB (SmPos, SmNeg, or ExpTB)
             ss.FloatArr('rr_activation', default=1.0),          # Multiplier on the latent-to-presymp rate
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
@@ -71,7 +68,6 @@ class TB(ss.Infection):
 
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
-            ss.FloatArr('ti_latent'),                           # Time of entry into latent state - is this tracked somewhere else? (e.g. as part of time infected)
 
             ss.FloatArr('reltrans_het', default=1.0),           # Individual-level heterogeneity on infectiousness, acts in addition to stage-based rates
         )
@@ -150,16 +146,17 @@ class TB(ss.Infection):
         # Carry out state changes upon new infection
         self.susceptible[uids] = False
         self.infected[uids] = True # Not needed, but useful for reporting
-        self.ti_latent[uids] = self.ti # Time of entry into latent state -- is this tracked somewhere else? (e.g. as part of time infected)
-  
+
         # Set base transmission heterogeneity
         self.reltrans_het[uids] = p.reltrans_het.rvs(uids)
 
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
+        self.latent_tb_state[fast_uids] = TBS.LATENT_FAST
+        self.latent_tb_state[slow_uids] = TBS.LATENT_SLOW
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
-        
+
         # Determine active TB state
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
@@ -168,8 +165,6 @@ class TB(ss.Infection):
         self.ever_infected[uids] = True
 
         self.rel_sus[uids] = self.pars.rel_sus_postinfection
-
-
         return
 
     def step(self):
@@ -182,16 +177,6 @@ class TB(ss.Infection):
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
         new_presymp_uids = self.p_latent_to_presym.filter(latent_uids)
         if len(new_presymp_uids):
-
-            # Log dwell times
-            self.log_dwell_time(
-                agent_ids=new_presymp_uids,
-                states=self.state[new_presymp_uids],
-                to_state=TBS.ACTIVE_PRESYMP,
-                entry_times=self.ti_latent[new_presymp_uids],  # We don't have a ti_latent yet
-                exit_times=np.full(len(new_presymp_uids), ti)
-            )
-
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_presymp[new_presymp_uids] = ti
         self.results['new_active'][ti] = len(new_presymp_uids)
@@ -201,31 +186,11 @@ class TB(ss.Infection):
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
         new_clear_presymp_uids = ss.uids()
         if len(presym_uids):
-
-            # Log dwell times
-            self.log_dwell_time(
-                agent_ids=presym_uids,
-                states=self.state[presym_uids],
-                to_state=TBS.ACTIVE_PRESYMP,
-                entry_times=self.ti_active[presym_uids],
-                exit_times=np.full(len(presym_uids), ti)
-            )
-
             # Pre symp --> Clear
             new_clear_presymp_uids = self.p_presym_to_clear.filter(presym_uids)
 
             new_active_uids = self.p_presym_to_active.filter(presym_uids)
             if len(new_active_uids):
-
-                # Log dwell times
-                self.log_dwell_time(
-                    agent_ids=new_clear_presymp_uids,
-                    states=self.state[new_clear_presymp_uids],
-                    to_state=TBS.SUSCEPTIBLE,
-                    entry_times=self.ti_presymp[new_clear_presymp_uids],
-                    exit_times=np.full(len(new_clear_presymp_uids), ti)
-                )
-
                 active_state = self.active_tb_state[new_active_uids] 
                 self.state[new_active_uids] = active_state
                 self.ti_active[new_active_uids] = ti
@@ -235,16 +200,6 @@ class TB(ss.Infection):
         new_clear_active_uids = self.p_active_to_clear.filter(active_uids)
         new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
-
-            # Log dwell times
-            self.log_dwell_time(
-                agent_ids=new_clear_uids,
-                states=self.state[new_clear_uids],
-                to_state=TBS.SUSCEPTIBLE,
-                entry_times=self.ti_active[new_clear_uids],
-                exit_times=np.full(len(new_clear_uids), ti)
-            )
-
             # Set state and reset timers
             self.susceptible[new_clear_uids] = True
             self.infected[new_clear_uids] = False
@@ -258,16 +213,6 @@ class TB(ss.Infection):
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
         new_death_uids = self.p_active_to_death.filter(active_uids)
         if len(new_death_uids):
-
-            # Log dwell times
-            self.log_dwell_time(
-                agent_ids=new_death_uids,
-                states=self.state[new_death_uids],
-                to_state=TBS.DEAD,
-                entry_times=self.ti_active[new_death_uids],
-                exit_times=np.full(len(new_death_uids), ti)
-            )
-
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
         self.results['new_deaths'][ti] = len(new_death_uids)
@@ -392,6 +337,7 @@ class TB(ss.Infection):
         res['cum_deaths']     = np.cumsum(res['new_deaths'])
         res['cum_active']     = np.cumsum(res['new_active'])
         res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
+        
         return
 
     def plot(self):
@@ -402,129 +348,3 @@ class TB(ss.Infection):
             plt.plot(self.results['timevec'], self.results[rkey], label=rkey.title())
         plt.legend()
         return fig
-    
-    def log_dwell_time(self, *args, **kwargs):
-        self.dwell_time_analyzer.log_dwell_time(*args, **kwargs)
-
-    def validate_dwell_time_distributions(self):
-        self.dwell_time_analyzer.validate_dwell_time_distributions()
-
-    def plot_dwell_time_validation(self):
-        self.dwell_time_analyzer.plot_dwell_time_validation()
-        
-
-class DwellTimeAnalyzer:
-    
-    # expected distributions: TODO: Update these to reflect the actual distributions - double check with Dan
-    expected_distributions = {
-        TBS.NONE: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 daysasd
-        TBS.LATENT_SLOW: lambda xvar: stats.expon(scale=365).cdf(xvar),  # Exponential, scale 365 days
-        TBS.LATENT_FAST: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-        TBS.ACTIVE_PRESYMP: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-        TBS.ACTIVE_SMPOS: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-        TBS.ACTIVE_SMNEG: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-        TBS.ACTIVE_EXPTB: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-        TBS.DEAD: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-        TBS.SUSCEPTIBLE: lambda x: stats.expon(scale=365).cdf(x),  # Exponential, scale 365 days
-    }
-    
-    def __init__(self, validate_dwell_times=True):
-        self.validate_dwell_times = validate_dwell_times
-
-        self.dwell_time_logger = pd.DataFrame(columns=['agent_id', 'state', 'dwell_time']) if validate_dwell_times else None
-
-    def log_dwell_time(self, agent_ids, states, to_state, entry_times, exit_times):
-        if not self.validate_dwell_times:
-            return
-
-        entry_times = np.nan_to_num(entry_times, nan=0)
-        dwell_times = exit_times - entry_times
-
-        new_logs = pd.DataFrame({
-            'agent_id': agent_ids,
-            'state': states,
-            'dwell_time': dwell_times,
-            'entry_time': entry_times,
-            'exit_time': exit_times,
-            'to_state': to_state,
-        })
-        # Map state codes to their corresponding names
-        new_logs['state_name'] = new_logs['state'].apply(lambda x: TBS(x).name.replace('_', ' ').title())
-        
-        self.dwell_time_logger = pd.concat([self.dwell_time_logger, new_logs], ignore_index=True)
-                # Map state codes to their corresponding names
-
-    def save_to_file(self):
-        import os
-        import tbsim.config as cfg
-        import datetime as ddtt
-        import tbsim.plotdwelltimes as pdt
-
-        if not self.validate_dwell_times:
-            return
-        
-        resdir = os.path.dirname(cfg.create_res_dir())
-        t = ddtt.datetime.now()
-        fn = os.path.join(resdir, f'dwell_time_logger_{t.strftime("%Y%m%d%H%M%S")}.csv')
-        self.dwell_time_logger.to_csv(fn, index=False)
-        print(f"Dwell time logs saved to {fn}")
-
-        return fn
-
-    def validate_dwell_time_distributions(self, expected_distributions=None):
-        """
-        Validate dwell times against expected distributions using statistical tests.
-        """
-        from scipy.stats import ks_1samp, ks_2samp
-        
-        expected_distributions = expected_distributions or self.expected_distributions
-
-        if not self.validate_dwell_times:
-            return
-       
-        print("Validating dwell time distributions...")
-        for state, expected_cdf in expected_distributions.items():
-            dwell_times = self.dwell_time_logger[self.dwell_time_logger['state'] == state]['dwell_time']
-            if dwell_times.empty:
-                print(f"No data available for state {state}")
-                continue
-            stat, p_value = stats.kstest(dwell_times, expected_cdf)
-            print(f"State {state}: KS Statistic={stat:.4f}, p-value={p_value:.4f}")
-            if p_value < 0.05:
-                print(f"WARNING: Dwell times for state {state} deviate significantly from expectations.")
-
-    def plot_dwell_time_validation(self):
-        """
-        Plot the results of the dwell time validation.
-        """
-        if not self.validate_dwell_times:
-            return
-
-        fig, ax = plt.subplots()
-        for state in self.dwell_time_logger['state'].unique():
-            dwell_times = self.dwell_time_logger[self.dwell_time_logger['state'] == state]['dwell_time']
-            if dwell_times.empty:
-                continue
-            state_label = TBS(state).name.replace('_', ' ').title()
-            ax.hist(dwell_times, bins=50, alpha=0.5, label=f'{state_label}')
-        ax.set_xlabel('Dwell Time')
-        ax.set_ylabel('Frequency')
-        ax.legend()
-        plt.show()
-        return
-    
-    def plot_dwell_time_validation_interactive(self):
-        """
-        Plot the results of the dwell time validation interactively using Plotly.
-        """
-        if not self.validate_dwell_times:
-            return
-
-        import plotly.express as px
-        fig = px.histogram(self.dwell_time_logger, x='dwell_time', color='state_name', 
-                            nbins=50, barmode='overlay', 
-                            labels={'dwell_time': 'Dwell Time', 'state_name': 'State'},
-                            title='Dwell Time Validation')
-        fig.update_layout(bargap=0.1)
-        fig.show()
-        return
