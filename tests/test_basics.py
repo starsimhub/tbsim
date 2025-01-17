@@ -179,14 +179,21 @@ def test_start_treatment_exptb(tb):
     assert (tb.rr_death[uids] == 0).all()
 
 def test_set_prognoses_susceptible_to_infected(tb):
-    uids = ss.uids([1, 2, 3])
+    uids = tb.sim.people.auids # All people
     tb.susceptible[uids] = True
     tb.infected[uids] = False
-    
+
     tb.set_prognoses(uids)
-    
-    assert not tb.susceptible[uids].any()
-    assert tb.infected[uids].all()
+
+    assert tb.infected[uids].all() # All should now be infected
+
+    # Fast progressors should not be susceptible
+    fast_uids = uids[tb.state[uids] == mtb.TBS.LATENT_FAST]
+    assert not tb.susceptible[fast_uids].any()
+
+    # Slow progressors should still be susceptible
+    slow_uids = uids[tb.state[uids] == mtb.TBS.LATENT_SLOW]
+    assert tb.susceptible[slow_uids].all()
 
 def test_set_prognoses_reltrans_het(tb):
     uids = ss.uids([1, 2, 3])

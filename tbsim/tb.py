@@ -143,17 +143,18 @@ class TB(ss.Infection):
 
         p = self.pars
 
-        reinfected_uids = uids[self.infected[uids]]
-        new_uids = uids[~self.infected[uids]]
-        assert np.all(self.state[reinfected_uids] == TBS.LATENT_SLOW)
-        self.results['n_reinfected'][self.ti] = len(reinfected_uids)
-
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
         self.latent_tb_state[fast_uids] = TBS.LATENT_FAST
         self.latent_tb_state[slow_uids] = TBS.LATENT_SLOW
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
+
+        new_uids = uids[~self.infected[uids]] # Previously uninfected
+
+        # Only consider as "reinfected" if slow --> fast
+        reinfected_uids = uids[(self.infected[uids]) & (self.state[uids] == TBS.LATENT_FAST) ]
+        self.results['n_reinfected'][self.ti] = len(reinfected_uids)
 
         # Carry out state changes upon new infection
         self.susceptible[fast_uids] = False # N.B. Slow progressors remain susceptible!
