@@ -44,7 +44,7 @@ class TB(ss.Infection):
             rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
 
-            rel_sus_postinfection = 1.0, # Relative susceptibility post-infection
+            rel_sus_latentslow = 0.5, # Relative susceptibility of reinfection for slow progressors
 
             reltrans_het = ss.constant(v=1.0),
         )
@@ -143,13 +143,6 @@ class TB(ss.Infection):
 
         p = self.pars
 
-        # Carry out state changes upon new infection
-        self.susceptible[uids] = False
-        self.infected[uids] = True # Not needed, but useful for reporting
-
-        # Set base transmission heterogeneity
-        self.reltrans_het[uids] = p.reltrans_het.rvs(uids)
-
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
         self.latent_tb_state[fast_uids] = TBS.LATENT_FAST
@@ -157,14 +150,28 @@ class TB(ss.Infection):
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
 
+        new_uids = uids[~self.infected[uids]] # Previously uninfected
+
+        # Only consider as "reinfected" if slow --> fast
+        reinfected_uids = uids[(self.infected[uids]) & (self.state[uids] == TBS.LATENT_FAST) ]
+        self.results['n_reinfected'][self.ti] = len(reinfected_uids)
+
+        # Carry out state changes upon new infection
+        self.susceptible[fast_uids] = False # N.B. Slow progressors remain susceptible!
+        self.infected[uids] = True # Not needed, but useful for reporting
+        self.rel_sus[slow_uids] = self.pars.rel_sus_latentslow
+
         # Determine active TB state
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
 
+        # Set base transmission heterogeneity
+        self.reltrans_het[uids] = p.reltrans_het.rvs(uids)
+
         # Update result count of new infections 
-        self.ti_infected[uids] = self.ti
+        self.ti_infected[new_uids] = self.ti # Only update ti_infected for new...
+        self.ti_infected[reinfected_uids] = self.ti # ... and reinfection uids
         self.ever_infected[uids] = True
 
-        self.rel_sus[uids] = self.pars.rel_sus_postinfection
         return
 
     def step(self):
@@ -179,6 +186,7 @@ class TB(ss.Infection):
         if len(new_presymp_uids):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_presymp[new_presymp_uids] = ti
+            self.susceptible[new_presymp_uids] = False # No longer susceptible regardless of the latent form
         self.results['new_active'][ti] = len(new_presymp_uids)
         self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_presymp_uids] >= 15)
 
@@ -308,6 +316,7 @@ class TB(ss.Infection):
             ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
             ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
             ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
+            ss.Result('n_reinfected',      dtype=int, label='Number reinfected'), 
         )
         return
 
@@ -317,6 +326,7 @@ class TB(ss.Infection):
         ti = self.ti
         ti_infctd = self.ti_infected
         dty = self.sim.t.dt_year
+        n_alive = np.count_nonzero(self.sim.people.alive)
 
         res.n_latent_slow[ti]     = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti]     = np.count_nonzero(self.state == TBS.LATENT_FAST)
@@ -325,9 +335,10 @@ class TB(ss.Infection):
         res.n_active_smneg[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
         res.n_active_exptb[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
         res.n_active[ti]          = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
-        res.prevalence_active[ti] = res.n_active[ti] / np.count_nonzero(self.sim.people.alive)
-        res.incidence_kpy[ti]     = 1_000 * np.count_nonzero(ti_infctd == ti) / (np.count_nonzero(self.sim.people.alive) * dty)
-        res.deaths_ppy[ti]        = res.new_deaths[ti] / (np.count_nonzero(self.sim.people.alive) * dty)
+        if n_alive > 0:
+            res.prevalence_active[ti] = res.n_active[ti] / n_alive 
+            res.incidence_kpy[ti]     = 1_000 * np.count_nonzero(ti_infctd == ti) / (n_alive * dty)
+            res.deaths_ppy[ti]        = res.new_deaths[ti] / (n_alive * dty)
 
         return
 

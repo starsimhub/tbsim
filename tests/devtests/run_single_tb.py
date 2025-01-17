@@ -4,10 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-
-
-
-
 def make_tb():
     # --------- People ----------
     
@@ -22,8 +18,8 @@ def make_tb():
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
     tb_pars = dict(
-        beta=ss.beta(0.02),
-        init_prev=0.25,
+        beta=ss.beta(0.20, unit='year'),
+        init_prev=0.05,
         rate_LS_to_presym=ss.perday(3e-5),
         rate_LF_to_presym=ss.perday(6e-3),
         rate_active_to_clear=ss.perday(2.4e-4),
@@ -33,7 +29,8 @@ def make_tb():
         rel_trans_smpos=1.0,
         rel_trans_smneg=0.3,
         rel_trans_exptb=0.05,
-        rel_trans_presymp=0.10
+        rel_trans_presymp=0.10,
+        rel_sus_latentslow = 0.1,
     )
 
     tb = mtb.TB(tb_pars)
@@ -43,7 +40,8 @@ def make_tb():
     # for the simulation parameters
     sim_pars = dict(
         # default simulation parameters
-        unit='day', dt=30,
+        unit='day',
+        dt=30,
         start=ss.date('1100-01-01'), stop=ss.date('2018-12-31')
         )
 
@@ -53,8 +51,7 @@ def make_tb():
         pars=sim_pars, verbose = 0
     )
 
-    
-    sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 
+    sim.pars.verbose = 1 / 5
 
     return sim
 
@@ -62,8 +59,6 @@ def make_tb():
 if __name__ == '__main__':  
     sim_tb = make_tb()
     sim_tb.run()
-    print(ss.date('2018-12-31') - ss.date('1920-01-01'))
     sim_tb.plot()
     #sim_tb.plot('demographics')
     plt.show()
-
