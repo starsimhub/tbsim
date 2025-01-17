@@ -43,6 +43,48 @@ def state_transition_matrix(file_path):
     plt.show()
 
 
+
+
+def parallel_coordinates(file_path):
+    import pandas as pd
+    import plotly.express as px
+    from ipywidgets import interact, Checkbox
+
+    # Load the CSV file into a DataFrame
+    df = pd.read_csv(file_path)
+
+    # Function to create the plot based on selected dimensions
+    def create_plot(**kwargs):
+        selected_columns = [col for col, selected in kwargs.items() if selected]
+        if not selected_columns:
+            print("Please select at least one dimension.")
+            return
+        fig = px.parallel_coordinates(df, color='state', 
+                                      dimensions=selected_columns,
+                                      color_continuous_scale=px.colors.diverging.Tealrose,
+                                      color_continuous_midpoint=2)
+        fig.show()
+
+    # Create checkboxes for each column
+    checkboxes = {col: Checkbox(value=True, description=col) for col in df.columns}
+
+    # Use interact to create the plot based on selected checkboxes
+    interact(create_plot, **checkboxes)
+
+def parallel_categories(file_path):
+    import pandas as pd
+    import plotly.express as px
+
+    # Load the CSV file into a DataFrame
+    df = pd.read_csv(file_path)
+
+    # Create a parallel categories plot
+    fig = px.parallel_categories(df, dimensions=['agent_id', 'state', 'state_name'],
+                                color='dwell_time', color_continuous_scale=px.colors.sequential.Inferno)
+
+    # Show the plot
+    fig.show()
+
 def sankey(file_path):
     import plotly.graph_objects as go
 
@@ -195,7 +237,7 @@ def plot_dwell_time_lines_for_each_agent(file_path):
 
     # Generate a plot
     plt.figure(figsize=(10, 6))
-
+  
     # Plot dwell time for each agent
     for agent_id in data['agent_id'].unique():
         agent_data = data[data['agent_id'] == agent_id]
@@ -211,6 +253,51 @@ def plot_dwell_time_lines_for_each_agent(file_path):
     # Show the plot
     plt.show()
 
+def interactive_plot_dwell_time_lines_for_each_agent(file_path):
+    import plotly.express as px
+
+    # Load the CSV data
+    data = pd.read_csv(file_path)
+
+    # Create an interactive line plot using Plotly
+    fig = px.line(data, x=data.index, y='dwell_time', color='agent_id', title='Dwell Time for Each Agent')
+
+    # Update layout for better visualization
+    fig.update_layout(
+        xaxis_title='Index',
+        yaxis_title='Dwell Time',
+        legend_title_text='Agent ID'
+    )
+
+    # Show the plot
+    fig.show()
+
+
+def plot_dwell_time_lines_for_each_agent_fixed(file_path):
+
+    # Load the CSV data
+    data = pd.read_csv(file_path)
+
+    # Display the first few rows of the data
+    print(data.head())
+
+    # Generate a plot
+    plt.figure(figsize=(10, 6))
+  
+    # Plot dwell time for each agent
+    for agent_id in data['agent_id'].unique():
+        agent_data = data[data['agent_id'] == agent_id]
+        plt.plot(agent_data['dwell_time'], label=f'Agent {agent_id}')
+
+    # Add labels and title
+    plt.xlabel('Index')
+    plt.ylabel('Dwell Time')
+    plt.title('Dwell Time for Each Agent')
+    plt.legend()
+    plt.grid(True)
+
+    # Show the plot
+    plt.show()
 def group_by_state(file_path):
 
     # Load the CSV file into a DataFrame
