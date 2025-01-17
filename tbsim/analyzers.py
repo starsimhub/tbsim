@@ -19,7 +19,6 @@ class DTAn(ss.Module):
         self.latest_sts_df = pd.DataFrame(columns=['agent_id', 'last_state', 'last_state_time'])
         self.dwell_time_logger = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time'])
         
-        
         agent_ids = self.sim.people.auids
         population = len(agent_ids)
         new_logs = pd.DataFrame({
@@ -51,10 +50,14 @@ class DTAn(ss.Module):
 
         tb = self.sim.diseases.tb
         ti = self.ti
-        # print("new states ====\n")
         uids = self.sim.people.auids
 
-        
+        # Filter rows in latest_sts_df for the relevant agents
+        relevant_rows = self.latest_sts_df[self.latest_sts_df['agent_id'].isin(uids)]
+
+        # Identify agents whose last recorded state is different from the current state
+        different_state_mask = relevant_rows['last_state'].values != tb.state[ss.uids(relevant_rows['agent_id'].values)]
+        uids = ss.uids(relevant_rows['agent_id'].values[different_state_mask])
 
         # Log dwell times
         self.log_dwell_time(
