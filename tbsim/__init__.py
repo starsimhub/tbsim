@@ -8,3 +8,4 @@ from .interventions import *
 from .networks import HouseholdNet
 from .plotdwelltimes import *
 from .connectors import TB_Nutrition_Connector
+from .analyzers import DTAn
