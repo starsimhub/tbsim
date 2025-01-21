@@ -12,6 +12,7 @@ def sample_product():
 def sample_campaign(sample_product):
     return mtb.TBVaccinationCampaign(year=2020, product=sample_product, rate=0.015, target_gender='All', target_age=10, target_state='susceptible')
 
+@pytest.mark.skip(reason='ActiveCaseFinding has moved out of this repository')
 def test_ACF():
     import networkx as nx
     ppl = ss.People(1000)
@@ -23,7 +24,7 @@ def test_ACF():
     sim.run()
     return
 
-@pytest.mark.skip(reason="not working")
+@pytest.mark.skip(reason='not fully implemented yet')
 def test_campaign():
     class TB_Treatment(ss.Product):
         def administer(self, people, uids):
@@ -41,7 +42,6 @@ def test_campaign():
     sim = ss.Sim(unit='day', dt=7, start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'), n_agents=1000, diseases=tb, interventions=campaign)
     sim.run()
     return
-
 
 def test_product_initialization(sample_product):
     assert sample_product.name == "TestVaccine"
@@ -63,6 +63,7 @@ def test_campaign_initialization(sample_campaign, sample_product):
 @pytest.mark.skip(reason="TODO: Implement the test_campaign_apply test")
 def test_campaign_apply():
     pass
+
 
 if __name__ == '__main__':
     sim = ss.Sim(people=ss.People(n_agents=500), networks=ss.RandomNet(), diseases=mtb.TB(), pars=dict(start=1990, stop = 2021, dt=0.5))
