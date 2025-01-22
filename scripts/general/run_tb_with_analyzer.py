@@ -88,7 +88,7 @@ def run_simulation():
     an = sim_tb.analyzers[0]
     # an.plot_state_transition_graph_interactive()
     # an.plot_state_transition_graph_static()
-    an.plot_stacked_bars_by_state()
+    an.plot_stacked_bars_by_state(num_bins=20)
     # # Perform validation and plotting
     # an.validate_dwell_time_distributions(expected_distributions=expected_distributions)  # Optional validation
     # an.plot_dwell_time_validation_interactive()

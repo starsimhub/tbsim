@@ -303,7 +303,7 @@ class DTAn(ss.Module):
         plt.show()
         return
         
-    def plot_stacked_bars_by_state(self, bin_size=50):
+    def plot_stacked_bars_by_state(self, bin_size=50, num_bins=8):
         """
         Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins.
 
@@ -317,7 +317,7 @@ class DTAn(ss.Module):
             return
 
         # Define bins for dwell times
-        bins = np.arange(0, bin_size*8, bin_size)
+        bins = np.arange(0, bin_size*num_bins, bin_size)
         bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
 
         # Create a figure with subplots for each state

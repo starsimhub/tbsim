@@ -739,3 +739,52 @@ def stacked_bars_states_per_agent_static(file_path):
     plt.legend(title='State')
     plt.tight_layout()
     plt.show()
+
+    def plot_stacked_bars_by_state_interactive(self, bin_size=50):
+        """
+        Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins interactively using Plotly.
+
+        Parameters:
+        - bin_size (int): Size of each bin for grouping dwell times. Default is 50 days.
+        """
+        import plotly.express as px
+        import plotly.graph_objects as go
+
+        if self.dwell_time_logger.empty:
+            print("No dwell time data available to plot.")
+            return
+
+        # Define bins for dwell times
+        bins = np.arange(0, bin_size * 8, bin_size)
+        bin_labels = [f"{int(b)}-{int(b + bin_size)} days" for b in bins[:-1]]
+
+        # Create a figure with subplots for each state
+        states = self.dwell_time_logger['state_name'].unique()
+        num_states = len(states)
+        fig = go.Figure()
+
+        for state in states:
+            state_data = self.dwell_time_logger[self.dwell_time_logger['state_name'] == state]
+            state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
+
+            # Group by dwell time bins and going to state
+            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
+
+            for going_to_state in grouped.columns:
+                fig.add_trace(go.Bar(
+                    x=grouped.index,
+                    y=grouped[going_to_state],
+                    name=f"{state} to {going_to_state}",
+                    text=grouped[going_to_state],
+                    textposition='auto'
+                ))
+
+        fig.update_layout(
+            barmode='stack',
+            title="Stacked Bar Charts of Dwell Times by State",
+            xaxis_title="Dwell Time Bins",
+            yaxis_title="Count",
+            legend_title="State Transitions",
+            height=400 + 50 * num_states
+        )
+        fig.show()
