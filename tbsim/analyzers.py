@@ -9,6 +9,7 @@ import tbsim as mtb
 import matplotlib.pyplot as plt
 from scipy import stats
 from pandas.plotting import parallel_coordinates
+import plotly.express as px
 
 class DTAn(ss.Module):
     def __init__(self):
@@ -247,11 +248,12 @@ class DTAn(ss.Module):
         fig.show()
 
 
-    def plot_state_transition_graph(self):
+    def plot_state_transition_graph_static(self):
         """
         Plot a state transition graph with mean and mode dwell times annotated on the edges.
         """
         import networkx as nx
+        import itertools as it
 
         if self.dwell_time_logger.empty:
             print("No data available to plot.")
@@ -285,9 +287,11 @@ class DTAn(ss.Module):
         # Generate a layout for the graph
         pos = nx.spring_layout(G, seed=42)  # Use spring layout for better visualization
 
-        # Draw nodes and edges
-        nx.draw_networkx_nodes(G, pos, node_size=2000, node_color="lightblue", alpha=0.9)
-        nx.draw_networkx_edges(G, pos, arrowstyle="->", arrowsize=20, edge_color="black")
+        # Draw nodes and edges with curved lines
+        colors = plt.cm.get_cmap('tab20', len(G.nodes))
+        node_colors = [colors(i) for i in range(len(G.nodes))]
+        nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, alpha=0.9)
+        nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black") #connectionstyle="arc3,rad=0.2")
         nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
 
         # Annotate edges with mean and mode
@@ -298,5 +302,4 @@ class DTAn(ss.Module):
         plt.title("State Transition Graph with Dwell Times")
         plt.show()
         return
-    
-    
+        
