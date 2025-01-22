@@ -76,28 +76,8 @@ class DTAn(ss.Module):
 
     def finalize(self):
         super().finalize()
-
-        tb = self.sim.diseases.tb
-        ti = self.ti
-        uids = self.sim.people.auids
-
-        # Filter rows in latest_sts_df for the relevant agents
-        relevant_rows = self.latest_sts_df[self.latest_sts_df['agent_id'].isin(uids)]
-
-        # Identify agents whose last recorded state is different from the current state
-        different_state_mask = relevant_rows['last_state'].values != tb.state[ss.uids(relevant_rows['agent_id'].values)]
-        uids = ss.uids(relevant_rows['agent_id'].values[different_state_mask])
-
-        # Log dwell times
-        self.log_dwell_time(
-            agent_ids=uids,
-            states=relevant_rows['last_state'].values[different_state_mask],
-            entry_times=relevant_rows['last_state_time'].values[different_state_mask],
-            exit_times=np.full(len(uids), ti),
-            going_to_states=tb.state[uids]
-        )
-
         self.dwell_time_logger['state_name'] = self.dwell_time_logger['state'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
+        self.dwell_time_logger['going_to_state'] = self.dwell_time_logger['going_to_state'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
         self.file_name = self.save_to_file()
 
     def finalize_results(self):
@@ -266,3 +246,57 @@ class DTAn(ss.Module):
         )
         fig.show()
 
+
+    def plot_state_transition_graph(self):
+        """
+        Plot a state transition graph with mean and mode dwell times annotated on the edges.
+        """
+        import networkx as nx
+
+        if self.dwell_time_logger.empty:
+            print("No data available to plot.")
+            return
+
+        # Calculate mean, mode, and count for each state transition
+        transitions = self.dwell_time_logger.groupby(['state_name', 'going_to_state'])['dwell_time']
+        stats_df = transitions.agg([
+            'mean',
+            lambda x: stats.mode(x, keepdims=True).mode[0] if len(x) > 0 else np.nan,
+            'count'
+        ]).reset_index()
+
+        stats_df.columns = ['state_name', 'going_to_state', 'mean', 'mode', 'count']
+
+        # Create a directed graph
+        G = nx.DiGraph()
+
+        # Add edges with mean and mode annotations
+        for _, row in stats_df.iterrows():
+            from_state = row['state_name']
+            to_state = row['going_to_state']
+            mean_dwell = round(row['mean'], 2) if not pd.isna(row['mean']) else "N/A"
+            mode_dwell = round(row['mode'], 2) if not pd.isna(row['mode']) else "N/A"
+            num_agents = row['count']
+
+            # Add edge to the graph
+            G.add_edge(from_state, to_state,
+                    label=f"Mean: {mean_dwell}\nMode: {mode_dwell}\nAgents: {num_agents}")
+
+        # Generate a layout for the graph
+        pos = nx.spring_layout(G, seed=42)  # Use spring layout for better visualization
+
+        # Draw nodes and edges
+        nx.draw_networkx_nodes(G, pos, node_size=2000, node_color="lightblue", alpha=0.9)
+        nx.draw_networkx_edges(G, pos, arrowstyle="->", arrowsize=20, edge_color="black")
+        nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
+
+        # Annotate edges with mean and mode
+        edge_labels = nx.get_edge_attributes(G, 'label')
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8)
+
+        # Display the graph
+        plt.title("State Transition Graph with Dwell Times")
+        plt.show()
+        return
+    
+    
