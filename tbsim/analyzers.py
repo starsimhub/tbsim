@@ -303,7 +303,6 @@ class DTAn(ss.Module):
         plt.show()
         return
         
-
     def plot_stacked_bars_by_state(self, bin_size=50):
         """
         Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins.
@@ -318,19 +317,17 @@ class DTAn(ss.Module):
             return
 
         # Define bins for dwell times
-        # bins = np.arange(0, self.dwell_time_logger['dwell_time'].max() + bin_size, bin_size)
-        # bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
-
         bins = np.arange(0, bin_size*8, bin_size)
         bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
 
         # Create a figure with subplots for each state
         states = self.dwell_time_logger['state_name'].unique()
         num_states = len(states)
-        fig, axes = plt.subplots(num_states, 1, figsize=(20, 5 * num_states), sharex=True)
+        num_cols = 4
+        num_rows = (num_states + num_cols - 1) // num_cols
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, 5 * num_rows), sharex=True)
 
-        if num_states == 1:
-            axes = [axes]
+        axes = axes.flatten()
 
         for ax, state in zip(axes, states):
             state_data = self.dwell_time_logger[self.dwell_time_logger['state_name'] == state]
@@ -345,6 +342,10 @@ class DTAn(ss.Module):
             ax.set_xlabel('Dwell Time Bins')
             ax.set_ylabel('Count')
             ax.legend(title='Going to State')
+
+        # Remove any empty subplots
+        for i in range(num_states, len(axes)):
+            fig.delaxes(axes[i])
 
         plt.tight_layout()
         plt.show()
