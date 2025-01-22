@@ -224,6 +224,7 @@ class TB(ss.Infection):
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
         self.results['new_deaths'][ti] = len(new_death_uids)
+        self.results['new_deaths_15+'][ti] = np.count_nonzero(self.sim.people.age[new_death_uids] >= 15)
 
         # Set rel_trans
         self.rel_trans[:] = 1 # Reset
@@ -308,11 +309,15 @@ class TB(ss.Infection):
             ss.Result('n_active_smneg',    dtype=int, label='Active Smear Negative'),
             ss.Result('n_active_exptb',    dtype=int, label='Active Extra-Pulmonary'),
             ss.Result('new_active',        dtype=int, label='New Active'),
-            ss.Result('new_active_15+',    dtype=int, label='New Active'),
+            ss.Result('new_active_15+',    dtype=int, label='New Active, 15+'),
             ss.Result('cum_active',        dtype=int, label='Cumulative Active'),
-            ss.Result('cum_active_15+',    dtype=int, label='Cumulative Active'),
+            ss.Result('cum_active_15+',    dtype=int, label='Cumulative Active, 15+'),
             ss.Result('new_deaths',        dtype=int, label='New Deaths'),
+            ss.Result('new_deaths_15+',    dtype=int, label='New Deaths, 15+'),
             ss.Result('cum_deaths',        dtype=int, label='Cumulative Deaths'),
+            ss.Result('cum_deaths_15+',    dtype=int, label='Cumulative Deaths, 15+'),
+            ss.Result('n_infectious',      dtype=int, label='Number Infectious'),
+            ss.Result('n_infectious_15+',  dtype=int, label='Number Infectious, 15+'),
             ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
             ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
             ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
@@ -328,13 +333,16 @@ class TB(ss.Infection):
         dty = self.sim.t.dt_year
         n_alive = np.count_nonzero(self.sim.people.alive)
 
-        res.n_latent_slow[ti]     = np.count_nonzero(self.state == TBS.LATENT_SLOW)
-        res.n_latent_fast[ti]     = np.count_nonzero(self.state == TBS.LATENT_FAST)
-        res.n_active_presymp[ti]  = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
-        res.n_active_smpos[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
-        res.n_active_smneg[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
-        res.n_active_exptb[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
-        res.n_active[ti]          = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
+        res.n_latent_slow[ti]       = np.count_nonzero(self.state == TBS.LATENT_SLOW)
+        res.n_latent_fast[ti]       = np.count_nonzero(self.state == TBS.LATENT_FAST)
+        res.n_active_presymp[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
+        res.n_active_smpos[ti]      = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
+        res.n_active_smneg[ti]      = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
+        res.n_active_exptb[ti]      = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
+        res.n_active[ti]            = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
+        res.n_infectious[ti]        = np.count_nonzero(self.infectious)
+        res['n_infectious_15+'][ti] = np.count_nonzero(self.infectious & (self.sim.people.age>=15))
+
         if n_alive > 0:
             res.prevalence_active[ti] = res.n_active[ti] / n_alive 
             res.incidence_kpy[ti]     = 1_000 * np.count_nonzero(ti_infctd == ti) / (n_alive * dty)
@@ -346,6 +354,7 @@ class TB(ss.Infection):
         super().finalize_results()
         res = self.results
         res['cum_deaths']     = np.cumsum(res['new_deaths'])
+        res['cum_deaths_15+'] = np.cumsum(res['new_deaths_15+'])
         res['cum_active']     = np.cumsum(res['new_active'])
         res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
         
