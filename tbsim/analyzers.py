@@ -303,3 +303,48 @@ class DTAn(ss.Module):
         plt.show()
         return
         
+
+    def plot_stacked_bars_by_state(self, bin_size=50):
+        """
+        Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins.
+
+        Parameters:
+        - bin_size (int): Size of each bin for grouping dwell times. Default is 25 days.
+        """
+        import matplotlib.pyplot as plt
+
+        if self.dwell_time_logger.empty:
+            print("No dwell time data available to plot.")
+            return
+
+        # Define bins for dwell times
+        # bins = np.arange(0, self.dwell_time_logger['dwell_time'].max() + bin_size, bin_size)
+        # bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+
+        bins = np.arange(0, bin_size*8, bin_size)
+        bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+
+        # Create a figure with subplots for each state
+        states = self.dwell_time_logger['state_name'].unique()
+        num_states = len(states)
+        fig, axes = plt.subplots(num_states, 1, figsize=(20, 5 * num_states), sharex=True)
+
+        if num_states == 1:
+            axes = [axes]
+
+        for ax, state in zip(axes, states):
+            state_data = self.dwell_time_logger[self.dwell_time_logger['state_name'] == state]
+            state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
+
+            # Group by dwell time bins and going to state
+            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
+
+            # Plot stacked bar chart
+            grouped.plot(kind='bar', stacked=True, ax=ax, colormap='tab20')
+            ax.set_title(f'State: {state}')
+            ax.set_xlabel('Dwell Time Bins')
+            ax.set_ylabel('Count')
+            ax.legend(title='Going to State')
+
+        plt.tight_layout()
+        plt.show()
