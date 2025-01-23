@@ -16,10 +16,10 @@ class DTAn(ss.Module):
         super().__init__()
         return
 
-    def init_results(self):
+    def init_results(self, ):
         super().init_results()
         self.latest_sts_df = pd.DataFrame(columns=['agent_id', 'last_state', 'last_state_time'])
-        self.dwell_time_logger = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state'])
+        self.dwell_time_logger = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state_id','going_to_state'])
         
         agent_ids = self.sim.people.auids
         population = len(agent_ids)
@@ -67,7 +67,7 @@ class DTAn(ss.Module):
             states=relevant_rows['last_state'].values[different_state_mask],
             entry_times=relevant_rows['last_state_time'].values[different_state_mask],
             exit_times=np.full(len(uids), ti),
-            going_to_states=tb.state[uids]
+            going_to_state_ids=tb.state[uids]
         )
 
         # Update the latest state dataframe
@@ -78,7 +78,8 @@ class DTAn(ss.Module):
     def finalize(self):
         super().finalize()
         self.dwell_time_logger['state_name'] = self.dwell_time_logger['state'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
-        self.dwell_time_logger['going_to_state'] = self.dwell_time_logger['going_to_state'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
+        self.dwell_time_logger['going_to_state'] = self.dwell_time_logger['going_to_state_id'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
+        self.dwell_time_logger['compartment'] = self.dwell_time_logger['going_to_state_id'].apply(self.resolve_compartment)
         self.file_name = self.save_to_file()
 
     def finalize_results(self):
@@ -88,7 +89,7 @@ class DTAn(ss.Module):
         print(self.dwell_time_logger)
         return
 
-    def log_dwell_time(self, agent_ids, states, entry_times, exit_times, going_to_states):
+    def log_dwell_time(self, agent_ids, states, entry_times, exit_times, going_to_state_ids):
         entry_times = np.nan_to_num(entry_times, nan=0)
         dwell_times = exit_times - entry_times
 
@@ -98,10 +99,18 @@ class DTAn(ss.Module):
             'entry_time': entry_times,
             'exit_time': exit_times,
             'dwell_time': dwell_times,
-            'going_to_state': going_to_states
+            'going_to_state_id': going_to_state_ids
         })
         self.dwell_time_logger = pd.concat([self.dwell_time_logger, new_logs], ignore_index=True)
                 # Map state codes to their corresponding names
+    
+    def resolve_compartment(self, going_to_state_id):
+        if going_to_state_id in [0, 1]:      return 'LATENT'
+        elif going_to_state_id in [3, 4, 5]: return 'ACTIVE'
+        elif going_to_state_id == 2:         return 'PRESYMPTOMATIC'
+        elif going_to_state_id == -1:        return 'SUSCEPTIBLE'
+        elif going_to_state_id == 8:         return 'REMOVED'
+        else:                                return 'OTHER'
 
     def save_to_file(self):
         resdir = os.path.dirname(cfg.create_res_dir())
@@ -164,8 +173,7 @@ class DTAn(ss.Module):
         fig.show()
         return
 
-    
-    def plot_agent_dynamics(self, dwell_time_bins=None, filter_states=None):
+    def graph_agent_dynamics(self, dwell_time_bins=None, filter_states=None):
         """
         Plot the state transitions and/or dwell time distributions of agents interactively,
         with dwell times grouped into predefined ranges.
@@ -247,105 +255,77 @@ class DTAn(ss.Module):
         )
         fig.show()
 
+    # def plot_state_transition_graph_static(self):
+    #     """
+    #     Plot a state transition graph with mean and mode dwell times annotated on the edges.
+    #     """
+    #     import networkx as nx
+    #     import itertools as it
 
-    def plot_state_transition_graph_static(self):
-        """
-        Plot a state transition graph with mean and mode dwell times annotated on the edges.
-        """
-        import networkx as nx
-        import itertools as it
+    #     if self.dwell_time_logger.empty:
+    #         print("No data available to plot.")
+    #         return
 
-        if self.dwell_time_logger.empty:
-            print("No data available to plot.")
-            return
+    #     # Calculate mean, mode, and count for each state transition
+    #     transitions = self.dwell_time_logger.groupby(['state_name', 'going_to_state'])['dwell_time']
+    #     stats_df = transitions.agg([
+    #         'mean',
+    #         lambda x: stats.mode(x, keepdims=True).mode[0] if len(x) > 0 else np.nan,
+    #         'count'
+    #     ]).reset_index()
 
-        # Calculate mean, mode, and count for each state transition
-        transitions = self.dwell_time_logger.groupby(['state_name', 'going_to_state'])['dwell_time']
-        stats_df = transitions.agg([
-            'mean',
-            lambda x: stats.mode(x, keepdims=True).mode[0] if len(x) > 0 else np.nan,
-            'count'
-        ]).reset_index()
+    #     stats_df.columns = ['state_name', 'going_to_state', 'mean', 'mode', 'count']
 
-        stats_df.columns = ['state_name', 'going_to_state', 'mean', 'mode', 'count']
+    #     # Create a directed graph
+    #     G = nx.DiGraph()
 
-        # Create a directed graph
-        G = nx.DiGraph()
+    #     # Add edges with mean and mode annotations
+    #     for _, row in stats_df.iterrows():
+    #         from_state = row['state_name']
+    #         to_state = row['going_to_state']
+    #         mean_dwell = round(row['mean'], 2) if not pd.isna(row['mean']) else "N/A"
+    #         mode_dwell = round(row['mode'], 2) if not pd.isna(row['mode']) else "N/A"
+    #         num_agents = row['count']
 
-        # Add edges with mean and mode annotations
-        for _, row in stats_df.iterrows():
-            from_state = row['state_name']
-            to_state = row['going_to_state']
-            mean_dwell = round(row['mean'], 2) if not pd.isna(row['mean']) else "N/A"
-            mode_dwell = round(row['mode'], 2) if not pd.isna(row['mode']) else "N/A"
-            num_agents = row['count']
+    #         # Add edge to the graph
+    #         G.add_edge(from_state, to_state,
+    #                 label=f"Mean: {mean_dwell}\nMode: {mode_dwell}\nAgents: {num_agents}")
 
-            # Add edge to the graph
-            G.add_edge(from_state, to_state,
-                    label=f"Mean: {mean_dwell}\nMode: {mode_dwell}\nAgents: {num_agents}")
+    #     # Generate a layout for the graph
+    #     pos = nx.spring_layout(G, seed=42)  # Use spring layout for better visualization
 
-        # Generate a layout for the graph
-        pos = nx.spring_layout(G, seed=42)  # Use spring layout for better visualization
+    #     # Draw nodes and edges with curved lines
+    #     colors = plt.cm.get_cmap('tab20', len(G.nodes))
+    #     node_colors = [colors(i) for i in range(len(G.nodes))]
+    #     nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, alpha=0.9)
+    #     nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black") #connectionstyle="arc3,rad=0.2")
+    #     nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
 
-        # Draw nodes and edges with curved lines
-        colors = plt.cm.get_cmap('tab20', len(G.nodes))
-        node_colors = [colors(i) for i in range(len(G.nodes))]
-        nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, alpha=0.9)
-        nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black") #connectionstyle="arc3,rad=0.2")
-        nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
+    #     # Annotate edges with mean and mode
+    #     edge_labels = nx.get_edge_attributes(G, 'label')
+    #     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8)
 
-        # Annotate edges with mean and mode
-        edge_labels = nx.get_edge_attributes(G, 'label')
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8)
+    #     # Display the graph
+    #     plt.title("State Transition Graph with Dwell Times")
+    #     plt.show()
+    #     return
 
-        # Display the graph
-        plt.title("State Transition Graph with Dwell Times")
-        plt.show()
+    def graph_state_transitions(self):
+        pdt.graph_state_transitions(self.dwell_time_logger)
         return
-        
-    def plot_stacked_bars_by_state(self, bin_size=50, num_bins=8):
-        """
-        Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins.
 
-        Parameters:
-        - bin_size (int): Size of each bin for grouping dwell times. Default is 25 days.
-        """
-        import matplotlib.pyplot as plt
+    def graph_compartments_transitions(self):
+        pdt.graph_compartments_transitions(self.dwell_time_logger)
+        return
 
-        if self.dwell_time_logger.empty:
-            print("No dwell time data available to plot.")
-            return
+    def plot_binned_stacked_bars_state_transitions(self, bin_size=50, num_bins=8):
+        pdt.plot_binned_stacked_bars_state_transitions(dwell_time_logger=self.dwell_time_logger, bin_size=bin_size, num_bins=num_bins)
+        return
 
-        # Define bins for dwell times
-        bins = np.arange(0, bin_size*num_bins, bin_size)
-        bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+    def plot_binned_by_compartment(self, num_bins=50):
+        pdt.plot_binned_by_compartment(dwell_time_logger=self.dwell_time_logger, num_bins=num_bins)
+        return
 
-        # Create a figure with subplots for each state
-        states = self.dwell_time_logger['state_name'].unique()
-        num_states = len(states)
-        num_cols = 4
-        num_rows = (num_states + num_cols - 1) // num_cols
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, 5 * num_rows), sharex=True)
 
-        axes = axes.flatten()
 
-        for ax, state in zip(axes, states):
-            state_data = self.dwell_time_logger[self.dwell_time_logger['state_name'] == state]
-            state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
 
-            # Group by dwell time bins and going to state
-            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
-
-            # Plot stacked bar chart
-            grouped.plot(kind='bar', stacked=True, ax=ax, colormap='tab20')
-            ax.set_title(f'State: {state}')
-            ax.set_xlabel('Dwell Time Bins')
-            ax.set_ylabel('Count')
-            ax.legend(title='Going to State')
-
-        # Remove any empty subplots
-        for i in range(num_states, len(axes)):
-            fig.delaxes(axes[i])
-
-        plt.tight_layout()
-        plt.show()

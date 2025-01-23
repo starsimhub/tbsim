@@ -18,7 +18,7 @@ def make_tb(sim_pars=None):
         params.update(sim_pars)
 
     np.random.seed()
-    pop = ss.People(n_agents=2000)
+    pop = ss.People(n_agents=200)
     tb = mtb.TB(dict(
         beta=ss.beta(0.1),
         init_prev=ss.bernoulli(p=0.25),
@@ -88,11 +88,17 @@ def run_simulation():
     an = sim_tb.analyzers[0]
     # an.plot_state_transition_graph_interactive()
     # an.plot_state_transition_graph_static()
-    an.plot_stacked_bars_by_state(num_bins=20)
+    
+    # an.plot_combined_rates_area(num_bins=50)
+    # an.plot_binned_stacked_bars_state_transitions(num_bins=20) #DONE
+    # an.plot_binned_by_compartment(num_bins=40)  #DONE
+    # an.graph_state_transitions()    #DONE
+    an.graph_compartments_transitions() 
+
     # # Perform validation and plotting
     # an.validate_dwell_time_distributions(expected_distributions=expected_distributions)  # Optional validation
     # an.plot_dwell_time_validation_interactive()
-    # an.plot_agent_dynamics()
+    # an.graph_agent_dynamics()
     # an.plot_dwell_time_validation()
 
     # # External plotting
