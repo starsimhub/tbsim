@@ -10,7 +10,7 @@ TBS = mtb.TBS
 def make_tb(sim_pars=None):
     params = dict(
         unit='day',
-        dt=1,
+        dt=23,
         start=sc.date('1990-01-01'),
         stop=sc.date('2016-12-31'),
     )
@@ -83,20 +83,19 @@ def run_simulation():
     # Calculate expected distributions
     expected_distributions = calculate_expected_distributions(start, stop)
 
-    print("Expected distributions:", expected_distributions)
     # Extract the analyzer
-    an = sim_tb.analyzers[0]
-    an.graph_state_transitions()
-
+    dwelltime_an = sim_tb.analyzers[0]
+    dwelltime_an.graph_state_transitions()
+    dwelltime_an.interactive_all_state_transitions()
 
     # # Perform validation and plotting
-    # an.validate_dwell_time_distributions(expected_distributions=expected_distributions)  # Optional validation
-    # an.plot_dwell_time_validation_interactive()
-    # an.graph_agent_dynamics()
-    # an.plot_dwell_time_validation()
+    dwelltime_an.validate_dwell_time_distributions(expected_distributions=expected_distributions)  # Optional validation
+    # dwelltime_an.plot_dwell_time_validation_interactive()
+    # dwelltime_an.graph_agent_dynamics()
+    # dwelltime_an.plot_dwell_time_validation()
 
     # External plotting
-    file_name = an.file_name
+    file_name = dwelltime_an.file_name
 
     transitions_dict = {
         'None': ['Latent Slow', 'Latent Fast'],
@@ -105,15 +104,15 @@ def run_simulation():
     }
     mtb.sankey(file_path=file_name)
     mtb.state_transition_matrix(file_path=file_name)
-
-    dwell_time_logger = pd.read_csv(file_name, na_values=[], keep_default_na=False)
     
-    mtb.interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=dwell_time_logger, bin_size=50)
-    mtb.plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)
-    mtb.graph_state_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Latent Slow', 'Latent Fast', 'Active Presymp', 'Active Smpos', 'Active Smneg', 'Active Exptb'], pos=0 )
-    mtb.graph_compartments_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Active Presymp']) 
-    mtb.plot_binned_by_compartment(dwell_time_logger=dwell_time_logger,  bin_size=50, num_bins=8)
-    mtb.plot_binned_stacked_bars_state_transitions(dwell_time_logger=dwell_time_logger, bin_size=50, num_bins=8)
+    # dwell_time_logger = pd.read_csv(file_name, na_values=[], keep_default_na=False)
+    
+    # mtb.interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=dwell_time_logger, bin_size=50)
+    # mtb.plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)
+    # mtb.graph_state_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Latent Slow', 'Latent Fast', 'Active Presymp', 'Active Smpos', 'Active Smneg', 'Active Exptb'], pos=0 )
+    # mtb.graph_compartments_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Active Presymp']) 
+    # mtb.plot_binned_by_compartment(dwell_time_logger=dwell_time_logger,  bin_size=50, num_bins=8)
+    # mtb.plot_binned_stacked_bars_state_transitions(dwell_time_logger=dwell_time_logger, bin_size=50, num_bins=8)
 
 if __name__ == '__main__':
     run_simulation()

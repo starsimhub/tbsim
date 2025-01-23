@@ -12,8 +12,10 @@ from pandas.plotting import parallel_coordinates
 import plotly.express as px
 
 class DTAn(ss.Module):
-    def __init__(self):
+    def __init__(self, adjust_to_days=True, unit='days'):
         super().__init__()
+        self.adjust_to_days = adjust_to_days
+        self.unit = unit
         return
 
     def init_results(self, ):
@@ -80,6 +82,9 @@ class DTAn(ss.Module):
         self.dwell_time_logger['state_name'] = self.dwell_time_logger['state'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
         self.dwell_time_logger['going_to_state'] = self.dwell_time_logger['going_to_state_id'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
         self.dwell_time_logger['compartment'] = self.dwell_time_logger['going_to_state_id'].apply(self.resolve_compartment)
+        if self.adjust_to_days:
+            self.dwell_time_logger['dwell_time'] = self.dwell_time_logger['dwell_time'] * self.sim.pars.dt
+
         self.file_name = self.save_to_file()
 
     def finalize_results(self):
@@ -173,142 +178,87 @@ class DTAn(ss.Module):
         fig.show()
         return
 
-    def graph_agent_dynamics(self, dwell_time_bins=None, filter_states=None):
-        """
-        Plot the state transitions and/or dwell time distributions of agents interactively,
-        with dwell times grouped into predefined ranges.
-
-        Parameters:
-        - dwell_time_bins (list): List of bin edges for grouping dwell times.
-                                  Default is [0, 50, 100, 150, 200, 250, np.inf].
-        - filter_states (list): List of states to include in the plot. If None, include all states.
-        """
-        import numpy as np
-        import plotly.express as px
-        import plotly.graph_objects as go
-
-        if self.dwell_time_logger.empty:
-            print("No dwell time data available to plot.")
-            return
-
-        # Set default bins if none are provided
-        if dwell_time_bins is None:
-            dwell_time_bins = [0, 50, 100, 150, 200, 250, np.inf]
-
-        # Create bin labels, handling infinity separately
-        dwell_time_labels = [
-            f"{int(b)}-{int(d)} days" if d != np.inf else f"{int(b)}+ days"
-            for b, d in zip(dwell_time_bins[:-1], dwell_time_bins[1:])
-        ]
-
-        # Create a dwell time category column
-        self.dwell_time_logger['dwell_time_category'] = pd.cut(
-            self.dwell_time_logger['dwell_time'],
-            bins=dwell_time_bins,
-            labels=dwell_time_labels,
-            include_lowest=True
-        )
-
-        # Apply state filter if provided
-        if filter_states is not None:
-            filtered_logger = self.dwell_time_logger[
-                self.dwell_time_logger['state_name'].isin(filter_states) |
-                self.dwell_time_logger['going_to_state'].isin(filter_states)
-            ]
-        else:
-            filtered_logger = self.dwell_time_logger
-
-        # Group by state transitions and dwell time category
-        grouped = filtered_logger.groupby(
-            ['state_name', 'going_to_state', 'dwell_time_category']
-        ).size().reset_index(name='count')
-
-        # Filter out empty ranges
-        grouped = grouped[grouped['count'] > 0]
-
-        # Interactive state transitions
-        fig = go.Figure()
-
-        for _, row in grouped.iterrows():
-            state_label = row['state_name']
-            going_to_state_label = mtb.TBS(row['going_to_state']).name.replace('_', ' ').title()
-            dwell_time_category = row['dwell_time_category']
-            count = row['count']
-            unique_transition = f"{state_label} → {going_to_state_label} ({dwell_time_category})"
-
-            # Add transition as a bar
-            fig.add_trace(go.Bar(
-                y=[unique_transition],
-                x=[count],
-                name=unique_transition,
-                text=[count],
-                textposition='auto',
-                orientation='h'
-            ))
-
-        fig.update_layout(
-            title="State Transitions Grouped by Dwell Time Categories",
-            yaxis_title="State Transitions",
-            xaxis_title="Count",
-            legend_title="Transitions",
-            height=100 + 30 * len(grouped),
-        )
-        fig.show()
-
-    # def plot_state_transition_graph_static(self):
+    # def graph_agent_dynamics(self, dwell_time_bins=None, filter_states=None):
     #     """
-    #     Plot a state transition graph with mean and mode dwell times annotated on the edges.
+    #     Plot the state transitions and/or dwell time distributions of agents interactively,
+    #     with dwell times grouped into predefined ranges.
+
+    #     Parameters:
+    #     - dwell_time_bins (list): List of bin edges for grouping dwell times.
+    #                               Default is [0, 50, 100, 150, 200, 250, np.inf].
+    #     - filter_states (list): List of states to include in the plot. If None, include all states.
     #     """
-    #     import networkx as nx
-    #     import itertools as it
+    #     import numpy as np
+    #     import plotly.express as px
+    #     import plotly.graph_objects as go
 
     #     if self.dwell_time_logger.empty:
-    #         print("No data available to plot.")
+    #         print("No dwell time data available to plot.")
     #         return
 
-    #     # Calculate mean, mode, and count for each state transition
-    #     transitions = self.dwell_time_logger.groupby(['state_name', 'going_to_state'])['dwell_time']
-    #     stats_df = transitions.agg([
-    #         'mean',
-    #         lambda x: stats.mode(x, keepdims=True).mode[0] if len(x) > 0 else np.nan,
-    #         'count'
-    #     ]).reset_index()
+    #     # Set default bins if none are provided
+    #     if dwell_time_bins is None:
+    #         dwell_time_bins = [0, 50, 100, 150, 200, 250, np.inf]
 
-    #     stats_df.columns = ['state_name', 'going_to_state', 'mean', 'mode', 'count']
+    #     # Create bin labels, handling infinity separately
+    #     dwell_time_labels = [
+    #         f"{int(b)}-{int(d)} days" if d != np.inf else f"{int(b)}+ days"
+    #         for b, d in zip(dwell_time_bins[:-1], dwell_time_bins[1:])
+    #     ]
 
-    #     # Create a directed graph
-    #     G = nx.DiGraph()
+    #     # Create a dwell time category column
+    #     self.dwell_time_logger['dwell_time_category'] = pd.cut(
+    #         self.dwell_time_logger['dwell_time'],
+    #         bins=dwell_time_bins,
+    #         labels=dwell_time_labels,
+    #         include_lowest=True
+    #     )
 
-    #     # Add edges with mean and mode annotations
-    #     for _, row in stats_df.iterrows():
-    #         from_state = row['state_name']
-    #         to_state = row['going_to_state']
-    #         mean_dwell = round(row['mean'], 2) if not pd.isna(row['mean']) else "N/A"
-    #         mode_dwell = round(row['mode'], 2) if not pd.isna(row['mode']) else "N/A"
-    #         num_agents = row['count']
+    #     # Apply state filter if provided
+    #     if filter_states is not None:
+    #         filtered_logger = self.dwell_time_logger[
+    #             self.dwell_time_logger['state_name'].isin(filter_states) |
+    #             self.dwell_time_logger['going_to_state'].isin(filter_states)
+    #         ]
+    #     else:
+    #         filtered_logger = self.dwell_time_logger
 
-    #         # Add edge to the graph
-    #         G.add_edge(from_state, to_state,
-    #                 label=f"Mean: {mean_dwell}\nMode: {mode_dwell}\nAgents: {num_agents}")
+    #     # Group by state transitions and dwell time category
+    #     grouped = filtered_logger.groupby(
+    #         ['state_name', 'going_to_state', 'dwell_time_category']
+    #     ).size().reset_index(name='count')
 
-    #     # Generate a layout for the graph
-    #     pos = nx.spring_layout(G, seed=42)  # Use spring layout for better visualization
+    #     # Filter out empty ranges
+    #     grouped = grouped[grouped['count'] > 0]
 
-    #     # Draw nodes and edges with curved lines
-    #     colors = plt.cm.get_cmap('tab20', len(G.nodes))
-    #     node_colors = [colors(i) for i in range(len(G.nodes))]
-    #     nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, alpha=0.9)
-    #     nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black") #connectionstyle="arc3,rad=0.2")
-    #     nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
+    #     # Interactive state transitions
+    #     fig = go.Figure()
 
-    #     # Annotate edges with mean and mode
-    #     edge_labels = nx.get_edge_attributes(G, 'label')
-    #     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8)
+    #     for _, row in grouped.iterrows():
+    #         state_label = row['state_name']
+    #         going_to_state_label = row['going_to_state']
+    #         dwell_time_category = row['dwell_time_category']
+    #         count = row['count']
+    #         unique_transition = f"{state_label} → {going_to_state_label} ({dwell_time_category})"
 
-    #     # Display the graph
-    #     plt.title("State Transition Graph with Dwell Times")
-    #     plt.show()
-    #     return
+    #         # Add transition as a bar
+    #         fig.add_trace(go.Bar(
+    #             y=[unique_transition],
+    #             x=[count],
+    #             name=unique_transition,
+    #             text=[count],
+    #             textposition='auto',
+    #             orientation='h'
+    #         ))
+
+    #     fig.update_layout(
+    #         title="State Transitions Grouped by Dwell Time Categories",
+    #         yaxis_title="State Transitions",
+    #         xaxis_title="Count",
+    #         legend_title="Transitions",
+    #         height=100 + 30 * len(grouped),
+    #     )
+    #     fig.show()
 
     def graph_state_transitions(self):
         pdt.graph_state_transitions(self.dwell_time_logger)
@@ -325,7 +275,10 @@ class DTAn(ss.Module):
     def plot_binned_by_compartment(self, num_bins=50):
         pdt.plot_binned_by_compartment(dwell_time_logger=self.dwell_time_logger, num_bins=num_bins)
         return
-
+    def interactive_all_state_transitions(self, dwell_time_bins=None, filter_states=None):
+        pdt.interactive_all_state_transitions(dwell_time_logger=self.dwell_time_logger, dwell_time_bins=dwell_time_bins, filter_states=filter_states)
+        return
+        
 
 
 

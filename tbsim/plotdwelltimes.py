@@ -105,6 +105,89 @@ def sankey(file_path=None, dwell_time_logger=None):
     fig.update_layout(title_text="Sankey Diagram of State Transitions and Dwell Times", font_size=10)
     fig.show()
 
+
+def interactive_all_state_transitions(dwell_time_logger=None, dwell_time_bins=None, filter_states=None):
+    """
+    Plot the state transitions and/or dwell time distributions of agents interactively,
+    with dwell times grouped into predefined ranges.
+
+    Parameters:
+    - dwell_time_bins (list): List of bin edges for grouping dwell times.
+                                Default is [0, 50, 100, 150, 200, 250, np.inf].
+    - filter_states (list): List of states to include in the plot. If None, include all states.
+    """
+    import numpy as np
+    import plotly.express as px
+    import plotly.graph_objects as go
+
+    if dwell_time_logger is None or dwell_time_logger.empty or 'dwell_time' not in dwell_time_logger.columns:
+        print("No dwell time data available to plot.")
+        return
+
+    # Set default bins if none are provided
+    if dwell_time_bins is None:
+        dwell_time_bins = [0, 50, 100, 150, 200, 250, np.inf]
+
+    # Create bin labels, handling infinity separately
+    dwell_time_labels = [
+        f"{int(b)}-{int(d)} days" if d != np.inf else f"{int(b)}+ days"
+        for b, d in zip(dwell_time_bins[:-1], dwell_time_bins[1:])
+    ]
+
+    # Create a dwell time category column
+    dwell_time_logger['dwell_time_category'] = pd.cut(
+        dwell_time_logger['dwell_time'],
+        bins=dwell_time_bins,
+        labels=dwell_time_labels,
+        include_lowest=True
+    )
+
+    # Apply state filter if provided
+    if filter_states is not None:
+        filtered_logger = dwell_time_logger[
+            dwell_time_logger['state_name'].isin(filter_states) |
+            dwell_time_logger['going_to_state'].isin(filter_states)
+        ]
+    else:
+        filtered_logger = dwell_time_logger
+
+    # Group by state transitions and dwell time category
+    grouped = filtered_logger.groupby(
+        ['state_name', 'going_to_state', 'dwell_time_category']
+    ).size().reset_index(name='count')
+
+    # Filter out empty ranges
+    grouped = grouped[grouped['count'] > 0]
+
+    # Interactive state transitions
+    fig = go.Figure()
+
+    for _, row in grouped.iterrows():
+        state_label = row['state_name']
+        going_to_state_label = row['going_to_state']
+        dwell_time_category = row['dwell_time_category']
+        count = row['count']
+        unique_transition = f"{state_label} → {going_to_state_label} ({dwell_time_category})"
+
+        # Add transition as a bar
+        fig.add_trace(go.Bar(
+            y=[unique_transition],
+            x=[count],
+            name=unique_transition,
+            text=[count],
+            textposition='auto',
+            orientation='h'
+        ))
+
+    fig.update_layout(
+        title="State Transitions Grouped by Dwell Time Categories",
+        yaxis_title="State Transitions",
+        xaxis_title="Count",
+        legend_title="Transitions",
+        height=100 + 30 * len(grouped),
+    )
+    fig.show()
+
 # looks good - although crowded
 def stacked_bars_states_per_agent_static(file_path):
 
