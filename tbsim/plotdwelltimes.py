@@ -5,10 +5,30 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
+#looks good
+def state_transition_matrix(file_path=None, dwell_time_logger=None):
+    """
+    Generates and plots a state transition matrix from the provided data.
+    Parameters:
+    file_path (str, optional): Path to the CSV file containing the data. The CSV file should have columns 'agent_id' and 'state'.
+    dwell_time_logger (pd.DataFrame, optional): DataFrame containing the data. Should have columns 'agent_id' and 'state'.
+    Returns:
+    None: The function plots the state transition matrix using seaborn's heatmap.
+    Notes:
+    - This is using plain 'state' columns recorded in the data - no need to 'going_to_state' column.
+    - If both file_path and dwell_time_logger are provided, file_path will be used.
+    - If neither file_path nor dwell_time_logger are provided, the function will print "No data provided." and return.
+    - The transition matrix is normalized to show proportions. To display raw counts, comment out the normalization step.
+    """
 
-def state_transition_matrix(file_path):
+    if file_path is not None:
+        df = pd.read_csv(file, na_values=[], keep_default_na=False)
+    elif dwell_time_logger is not None:
+        df = dwell_time_logger
+    else:
+        print("No data provided.")
+        return
 
-    df = pd.read_csv(file_path)
     # Create a transition matrix
     # Get the unique states
     unique_states = sorted(df['state'].dropna().unique())
@@ -41,9 +61,6 @@ def state_transition_matrix(file_path):
     plt.xlabel("Next State")
     plt.ylabel("Current State")
     plt.show()
-
-
-
 
 def parallel_coordinates(file_path):
     import pandas as pd
@@ -723,12 +740,24 @@ def stacked_bars_states_per_agent_static(file_path):
     plt.tight_layout()
     plt.show()
 
-def plot_stacked_bars_by_state_interactive(self, bin_size=50, dwell_time_logger=None):
+# looks good
+def interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=None, bin_size=50, num_bins=20):
     """
-    Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins interactively using Plotly.
+    Generates an interactive stacked bar chart of dwell times by state using Plotly.
 
     Parameters:
-    - bin_size (int): Size of each bin for grouping dwell times. Default is 50 days.
+    bin_size (int): The size of each bin for dwell times. Default is 50.
+    num_bins (int): The number of bins to divide the dwell times into. Default is 20.
+    dwell_time_logger (DataFrame): A pandas DataFrame containing dwell time data with columns 'state_name', 'dwell_time', and 'going_to_state'.
+    
+    Returns:
+    None: Displays an interactive Plotly figure.
+    
+    Notes:
+    - If the dwell_time_logger DataFrame is empty, the function will print a message and return without plotting.
+    - The function creates bins for dwell times and labels them in days.
+    - It generates a stacked bar chart for each state, showing the count of transitions to other states within each dwell time bin.
+    - The height of the figure is dynamically adjusted based on the number of states.
     """
     import plotly.express as px
     import plotly.graph_objects as go
@@ -738,7 +767,7 @@ def plot_stacked_bars_by_state_interactive(self, bin_size=50, dwell_time_logger=
         return
 
     # Define bins for dwell times
-    bins = np.arange(0, bin_size * 8, bin_size)
+    bins = np.arange(0, bin_size * num_bins, bin_size)
     bin_labels = [f"{int(b)}-{int(b + bin_size)} days" for b in bins[:-1]]
 
     # Create a figure with subplots for each state
@@ -772,53 +801,66 @@ def plot_stacked_bars_by_state_interactive(self, bin_size=50, dwell_time_logger=
     )
     fig.show()
 
-def plot_combined_rates_individual_lines(dwell_time_logger=None):
+# looks good
+def plot_state_transition_lengths_custom(dwell_time_logger=None, transitions_dict=None):
+    """
+    Plots the cumulative distribution of dwell times for different state transitions.
+
+    This function generates a plot with individual lines representing the cumulative 
+    distribution of dwell times for each specified state transition. If no transitions 
+    dictionary is provided, a default one is used.
+
+    Parameters:
+    dwell_time_logger (pandas.DataFrame): A DataFrame containing the dwell time data. 
+        It should have columns 'state_name', 'going_to_state', and 'dwell_time'.
+    transitions_dict (dict): A dictionary where keys are state names and values are 
+        lists of states to which transitions are considered. If None, a default 
+        dictionary is used.
+
+        i.e.:
+
+        transitions_dict = {
+            'None': ['Latent Slow', 'Latent Fast'],
+            'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
+        }
+    Returns:
+    None: The function displays the plot and does not return any value.
+    """
 
     import matplotlib.pyplot as plt
     import numpy as np
 
-    if dwell_time_logger is None:
-        dwell_time_logger = dwell_time_logger
-
-    if dwell_time_logger.empty:
+    if dwell_time_logger is None or dwell_time_logger.empty:
         print("No dwell time data available to plot.")
         return
 
-    latent_transitions = dwell_time_logger[
-        (dwell_time_logger['state_name'] == 'None') &
-        (dwell_time_logger['going_to_state'].isin(['Latent Slow', 'Latent Fast']))
-    ]
-
-    active_transitions = dwell_time_logger[
-        (dwell_time_logger['state_name']=='Active Presymp') &
-        (dwell_time_logger['going_to_state'].isin(['Active Smpos', 'Active Smneg', 'Active Exptb']))
-    ]
+    if transitions_dict is None:
+        transitions_dict = {
+            'None': ['Latent Slow', 'Latent Fast'],
+            'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
+        }
 
     # Create subplots
-    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    num_plots = len(transitions_dict)
+    fig, axes = plt.subplots(1, num_plots, figsize=(6 * num_plots, 6))
 
-    # Plot for None -> Latent
-    for transition in ['Latent Slow', 'Latent Fast']:
-        data = latent_transitions[latent_transitions['going_to_state'] == transition]['dwell_time']
-        axes[0].plot(np.sort(data), np.linspace(0, 1, len(data)), label=f"None -> {transition}")
-    axes[0].set_title("Latent Transitions")
-    axes[0].set_xlabel("Time")
-    axes[0].set_ylabel("Cumulative Distribution")
-    axes[0].legend()
+    if num_plots == 1:
+        axes = [axes]
 
-    # Plot for Active Presym
-    for transition in ['Active Smpos', 'Active Smneg', 'Active Exptb']:
-        data = active_transitions[active_transitions['going_to_state'] == transition]['dwell_time']
-        axes[1].plot(np.sort(data), np.linspace(0, 1, len(data)), label=f"Active Presymp -> {transition}")
-    axes[1].set_title("Active Presym Transitions")
-    axes[1].set_xlabel("Time")
-    axes[1].set_ylabel("Cumulative Distribution")
-    axes[1].legend()
-
+    for ax, (state_name, going_to_states) in zip(axes, transitions_dict.items()):
+        for transition in going_to_states:
+            data = dwell_time_logger[
+                (dwell_time_logger['state_name'] == state_name) &
+                (dwell_time_logger['going_to_state'] == transition)
+            ]['dwell_time']
+            ax.plot(np.sort(data), np.linspace(0, 1, len(data)), label=f"{state_name} -> {transition}")
+        ax.set_title(f"Transitions from {state_name}")
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Cumulative Distribution")
+        ax.legend()
     plt.tight_layout()
     plt.show()
 
-# ---------------------------- verified ---------------
 # looks good
 def plot_binned_by_compartment(dwell_time_logger=None,  bin_size=50, num_bins=8):
     """
@@ -1081,11 +1123,16 @@ if __name__ == "__main__":
     # Load the dwell time logger
     dwell_time_logger = pd.read_csv(file, na_values=[], keep_default_na=False)
 
-    plot_combined_rates_individual_lines(dwell_time_logger=dwell_time_logger)
-
+    transitions_dict = {
+        'None': ['Latent Slow', 'Latent Fast'],
+        'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
+        'Active Smpos': ['Dead', 'None'],
+    }
+    state_transition_matrix(dwell_time_logger=dwell_time_logger)
+    # interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=dwell_time_logger, bin_size=50)
+    # plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)
     # graph_state_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Latent Slow', 'Latent Fast', 'Active Presymp', 'Active Smpos', 'Active Smneg', 'Active Exptb'], pos=0 )
     # graph_compartments_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Active Presymp', 
-    #                                                                             'Active Smpos', 'Active Smneg', 'Active Exptb'], pos=4)
     # plot_binned_by_compartment(dwell_time_logger=dwell_time_logger,  bin_size=50, num_bins=8)
     # plot_binned_stacked_bars_state_transitions(dwell_time_logger=dwell_time_logger, bin_size=50, num_bins=8)
     
