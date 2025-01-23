@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
-#looks good
+# looks good
 def state_transition_matrix(file_path=None, dwell_time_logger=None):
     """
     Generates and plots a state transition matrix from the provided data.
@@ -31,7 +31,7 @@ def state_transition_matrix(file_path=None, dwell_time_logger=None):
 
     # Create a transition matrix
     # Get the unique states
-    unique_states = sorted(df['state'].dropna().unique())
+    unique_states = sorted(df['state_name'].dropna().unique())
 
     # Initialize a matrix of zeros
     transition_matrix = pd.DataFrame(
@@ -40,7 +40,7 @@ def state_transition_matrix(file_path=None, dwell_time_logger=None):
 
     # Fill the matrix with transitions
     for agent_id, group in df.groupby('agent_id'):
-        states = group['state'].values
+        states = group['state_name'].values
         for i in range(len(states) - 1):
             transition_matrix.loc[states[i], states[i + 1]] += 1
 
@@ -62,56 +62,21 @@ def state_transition_matrix(file_path=None, dwell_time_logger=None):
     plt.ylabel("Current State")
     plt.show()
 
-def parallel_coordinates(file_path):
-    import pandas as pd
-    import plotly.express as px
-    from ipywidgets import interact, Checkbox
-
-    # Load the CSV file into a DataFrame
-    df = pd.read_csv(file_path)
-
-    # Function to create the plot based on selected dimensions
-    def create_plot(**kwargs):
-        selected_columns = [col for col, selected in kwargs.items() if selected]
-        if not selected_columns:
-            print("Please select at least one dimension.")
-            return
-        fig = px.parallel_coordinates(df, color='state', 
-                                      dimensions=selected_columns,
-                                      color_continuous_scale=px.colors.diverging.Tealrose,
-                                      color_continuous_midpoint=2)
-        fig.show()
-
-    # Create checkboxes for each column
-    checkboxes = {col: Checkbox(value=True, description=col) for col in df.columns}
-
-    # Use interact to create the plot based on selected checkboxes
-    interact(create_plot, **checkboxes)
-
-def parallel_categories(file_path):
-    import pandas as pd
-    import plotly.express as px
-
-    # Load the CSV file into a DataFrame
-    df = pd.read_csv(file_path)
-
-    # Create a parallel categories plot
-    fig = px.parallel_categories(df, dimensions=['agent_id', 'state', 'state_name'],
-                                color='dwell_time', color_continuous_scale=px.colors.sequential.Inferno)
-
-    # Show the plot
-    fig.show()
-
-def sankey(file_path):
+#looks better- but still not perfect
+def sankey(file_path=None, dwell_time_logger=None):
     import plotly.graph_objects as go
 
-    # Load the data
-
-    df = pd.read_csv(file_path)
+    if file_path is not None:
+        df = pd.read_csv(file_path, na_values=[], keep_default_na=False)
+    elif dwell_time_logger is not None:
+        df = dwell_time_logger
+    else:
+        print("No data provided.")
+        return
 
     # Prepare data for Sankey plot
-    source = df['agent_id'].astype(str) + '-' + df['state'].astype(str)
-    target = df['agent_id'].astype(str) + '-' + df['state'].shift(-1).fillna(df['state']).astype(str)
+    source = df['state_name']
+    target = df['going_to_state']
     value = df['dwell_time']
 
     # Create a dictionary to map unique labels to indices
@@ -127,7 +92,7 @@ def sankey(file_path):
         node=dict(
             pad=15,
             thickness=20,
-            line=dict(color="gray", width=0.3),
+            line=dict(color="gray", width=0.5),
             label=labels
         ),
         link=dict(
@@ -137,586 +102,10 @@ def sankey(file_path):
         )
     ))
 
-    fig.update_layout(title_text="Sankey Diagram of Agent States and Dwell Times", font_size=10)
+    fig.update_layout(title_text="Sankey Diagram of State Transitions and Dwell Times", font_size=10)
     fig.show()
 
-def p3(file_path):
-
-    # Load the CSV file
-    df = pd.read_csv(file_path)
-
-    # Calculate cumulative dwell time for each state
-    cumulative_dwell_time = df.groupby('state')['dwell_time'].sum()
-
-    # Convert dwell time from hours to years (assuming dwell_time is in hours)
-    cumulative_dwell_time_years = cumulative_dwell_time / (24 * 365)
-
-    # Plot the cumulative dwell time for each state
-    plt.figure(figsize=(10, 6))
-    cumulative_dwell_time_years.plot(kind='bar')
-    plt.title('Cumulative Dwell Time in Years for Each State')
-    plt.xlabel('State')
-    plt.ylabel('Cumulative Dwell Time (Years)')
-    plt.xticks(rotation=0)
-    plt.show()
-
-
-
-    import plotly.express as px
-
-    # Calculate cumulative dwell time for each state in days
-    cumulative_dwell_time_days = cumulative_dwell_time
-
-    # Create an interactive plot using Plotly
-    fig = px.bar(cumulative_dwell_time_days, 
-                x=cumulative_dwell_time_days.index, 
-                y=cumulative_dwell_time_days.values, 
-                labels={'x': 'State', 'y': 'Cumulative Dwell Time (Days)'},
-                title='Cumulative Dwell Time in Days for Each State')
-
-    # Add dropdown to select states
-    fig.update_layout(
-        updatemenus=[
-            dict(
-                buttons=list([
-                    dict(label="All",
-                        method="update",
-                        args=[{"visible": [True] * len(cumulative_dwell_time_days)},
-                            {"title": "Cumulative Dwell Time in Days for Each State"}]),
-                    dict(label="Top 5",
-                        method="update",
-                        args=[{"visible": [True] * 5 + [False] * (len(cumulative_dwell_time_days) - 5)},
-                            {"title": "Top 5 States by Cumulative Dwell Time"}]),
-                    dict(label="Bottom 5",
-                        method="update",
-                        args=[{"visible": [False] * (len(cumulative_dwell_time_days) - 5) + [True] * 5},
-                            {"title": "Bottom 5 States by Cumulative Dwell Time"}]),
-                ]),
-                direction="down",
-            )
-        ]
-    )
-
-    fig.show()
-
-
-def stacked_bars_states_per_agent(file_path):
-    import plotly.express as px
-    # Load the CSV file
-    df = pd.read_csv(file_path)
-    # Prepare the data for Plotly
-    df['cumulative_dwell_time_days'] = df.groupby(['agent_id', 'state'])['dwell_time'].cumsum() / 24
-    pivot_df = df.pivot_table(index='agent_id', columns='state', values='cumulative_dwell_time_days', aggfunc='max', fill_value=0).reset_index()
-
-    # Melt the DataFrame for Plotly
-    melted_df = pivot_df.melt(id_vars='agent_id', var_name='state', value_name='cumulative_dwell_time_days')
-
-    # Create the interactive plot
-    fig = px.bar(melted_df, x='agent_id', y='cumulative_dwell_time_days', color='state', title='Cumulative Time in Days on Each State for All Agents', labels={'cumulative_dwell_time_days': 'Cumulative Time (Days)', 'agent_id': 'Agent ID'})
-
-    # Update layout for better visualization
-    fig.update_layout(barmode='stack', xaxis={'categoryorder':'total descending'}, legend_title_text='State')
-
-    # Show the plot
-    fig.show()
-
-def stacked_bars_states_per_agent_clean(file_path):
-    import plotly.express as px
-    # Load the CSV file
-    df = pd.read_csv(file_path)
-    
-    # Filter out rows with empty agent_id
-    df = df[df['agent_id'].notna()]
-    
-    # Prepare the data for Plotly
-    df['cumulative_dwell_time_days'] = df.groupby(['agent_id', 'state_name'])['dwell_time'].cumsum() / 24
-    pivot_df = df.pivot_table(index='agent_id', columns='state_name', values='cumulative_dwell_time_days', aggfunc='max', fill_value=0).reset_index()
-
-    # Melt the DataFrame for Plotly
-    melted_df = pivot_df.melt(id_vars='agent_id', var_name='state_name', value_name='cumulative_dwell_time_days')
-
-    # Create the interactive plot
-    fig = px.bar(melted_df, x='agent_id', y='cumulative_dwell_time_days', color='state_name', title='Cumulative Time in Days on Each State for All Agents', labels={'cumulative_dwell_time_days': 'Cumulative Time (Days)', 'agent_id': 'Agent ID'})
-
-    # Update layout for better visualization
-    fig.update_layout(barmode='stack', xaxis={'categoryorder':'total descending', 'type': 'category'}, legend_title_text='State')
-
-    # Show the plot
-    fig.show()
-
-def plot_dwell_time_lines_for_each_agent(file_path):
-
-    # Load the CSV data
-    data = pd.read_csv(file_path)
-
-    # Display the first few rows of the data
-    print(data.head())
-
-    # Generate a plot
-    plt.figure(figsize=(10, 6))
-  
-    # Plot dwell time for each agent
-    for agent_id in data['agent_id'].unique():
-        agent_data = data[data['agent_id'] == agent_id]
-        plt.plot(agent_data['dwell_time'], label=f'Agent {agent_id}')
-
-    # Add labels and title
-    plt.xlabel('Index')
-    plt.ylabel('Dwell Time')
-    plt.title('Dwell Time for Each Agent')
-    plt.legend()
-    plt.grid(True)
-
-    # Show the plot
-    plt.show()
-
-def interactive_plot_dwell_time_lines_for_each_agent(file_path):
-    import plotly.express as px
-
-    # Load the CSV data
-    data = pd.read_csv(file_path)
-
-    # Create an interactive line plot using Plotly
-    fig = px.line(data, x=data.index, y='dwell_time', color='agent_id', title='Dwell Time for Each Agent')
-
-    # Update layout for better visualization
-    fig.update_layout(
-        xaxis_title='Index',
-        yaxis_title='Dwell Time',
-        legend_title_text='Agent ID'
-    )
-
-    # Show the plot
-    fig.show()
-
-
-def plot_dwell_time_lines_for_each_agent_fixed(file_path):
-
-    # Load the CSV data
-    data = pd.read_csv(file_path)
-
-    # Display the first few rows of the data
-    print(data.head())
-
-    # Generate a plot
-    plt.figure(figsize=(10, 6))
-  
-    # Plot dwell time for each agent
-    for agent_id in data['agent_id'].unique():
-        agent_data = data[data['agent_id'] == agent_id]
-        plt.plot(agent_data['dwell_time'], label=f'Agent {agent_id}')
-
-    # Add labels and title
-    plt.xlabel('Index')
-    plt.ylabel('Dwell Time')
-    plt.title('Dwell Time for Each Agent')
-    plt.legend()
-    plt.grid(True)
-
-    # Show the plot
-    plt.show()
-def group_by_state(file_path):
-
-    # Load the CSV file into a DataFrame
-    df = pd.read_csv(file_path)
-
-    # Group by state and count the occurrences
-    state_counts = df['state'].value_counts().sort_index()
-
-    # Plot the frequency of each state
-    plt.figure(figsize=(10, 6))
-    state_counts.plot(kind='bar')
-    plt.xlabel('State')
-    plt.ylabel('Frequency')
-    plt.title('Frequency of Each State')
-    plt.xticks(rotation=0)
-    plt.show()
-
-def interactive_dwell_time_by_state(file_path):
-    # Load the data with error handling
-    try:
-        df = pd.read_csv(file_path)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"The file at {file_path} was not found. Please check the path.")
-
-    # Ensure the 'dwell_time', 'agent_id', and 'state' columns exist
-    required_columns = {'dwell_time', 'agent_id', 'state'}
-    if not required_columns.issubset(df.columns):
-        raise ValueError(f"The required columns {required_columns} are missing from the file.")
-
-    # Convert dwell_time to days (adjust logic if needed)
-    df['dwell_time_days'] = df['dwell_time']
-
-    # Group by agent_id and state, summing dwell_time_days
-    grouped_df = df.groupby(['agent_id', 'state'])['dwell_time_days'].sum().reset_index()
-
-    # Get unique states and initialize the figure
-    unique_states = grouped_df['state'].unique()
-    fig = go.Figure()
-
-    # Add a bar trace for each state
-    for state in unique_states:
-        state_df = grouped_df[grouped_df['state'] == state]
-        fig.add_trace(
-            go.Bar(
-                x=state_df['agent_id'],
-                y=state_df['dwell_time_days'],
-                name=f"State {state}",
-                visible=True  # All traces visible initially
-            )
-        )
-
-    # Initialize visibility for all states
-    visibility = [True] * len(unique_states)
-
-    # Define buttons for each state to toggle visibility
-    dropdown_buttons = [
-        dict(
-            label=f"Toggle State {state}",
-            method="update",
-            args=[
-                {
-                    "visible": [
-                        not visibility[idx] if unique_states[idx] == state else visibility[idx]
-                        for idx in range(len(unique_states))
-                    ]
-                },
-                {"title": f"States Visible: {[s for s, v in zip(unique_states, visibility) if v]}"}  # Update title
-            ],
-        )
-        for state in unique_states
-    ]
-
-    # Add a "Show All" button to reset visibility
-    dropdown_buttons.insert(
-        0,
-        dict(
-            label="Show All",
-            method="update",
-            args=[
-                {"visible": [True] * len(unique_states)},
-                {"title": "Cumulative Dwell Time in Days by State for Each Agent"}
-            ],
-        )
-    )
-
-    # Add a "Hide All" button to hide all traces
-    dropdown_buttons.insert(
-        1,
-        dict(
-            label="Hide All",
-            method="update",
-            args=[
-                {"visible": [False] * len(unique_states)},
-                {"title": "No States Visible"}
-            ],
-        )
-    )
-
-    # Update figure layout with dropdown menu
-    fig.update_layout(
-        title="Cumulative Dwell Time in Days by State for Each Agent",
-        xaxis_title="Agent ID",
-        yaxis_title="Cumulative Dwell Time (Days)",
-        barmode="stack",
-        updatemenus=[
-            dict(
-                buttons=dropdown_buttons,
-                direction="down",
-                showactive=True,
-                x=0.1,  # Position of the dropdown menu
-                y=1.15,
-            )
-        ]
-    )
-
-    # Render the figure
-    fig.show()
-
-def cumulative_dwell_time_by_state(file_path):
-    # Load the data with error handling
-    try:
-        df = pd.read_csv(file_path)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"The file at {file_path} was not found. Please check the path.")
-
-    # Ensure the required columns exist
-    required_columns = {'dwell_time', 'agent_id', 'state'}
-    if not required_columns.issubset(df.columns):
-        raise ValueError(f"The required columns {required_columns} are missing from the file.")
-
-    # Convert dwell_time to days (adjust logic if needed)
-    df['dwell_time_days'] = df['dwell_time']
-
-    # Group by agent_id and state, summing dwell_time_days
-    grouped_df = df.groupby(['agent_id', 'state'])['dwell_time_days'].sum().reset_index()
-
-    # Get unique states and initialize the figure
-    unique_states = grouped_df['state'].unique()
-    fig = go.Figure()
-
-    # Add a bar trace for each state
-    for state in unique_states:
-        state_df = grouped_df[grouped_df['state'] == state]
-        fig.add_trace(
-            go.Bar(
-                x=state_df['agent_id'],
-                y=state_df['dwell_time_days'],
-                name=f"State {state}",
-                visible=True  # All traces visible initially
-            )
-        )
-
-    # Create dropdown buttons for multi-selection
-    dropdown_buttons = []
-    for i, state in enumerate(unique_states):
-        visibility_array = [True] * len(unique_states)  # Start with all traces visible
-        visibility_array[i] = False  # Toggle visibility for the current state
-        dropdown_buttons.append(
-            dict(
-                label=f"Toggle State {state}",
-                method="update",
-                args=[
-                    {"visible": visibility_array},
-                    {"title": f"Cumulative Dwell Time in Days (Toggle State {state})"}
-                ]
-            )
-        )
-
-    # Add a "Show All" button to display all states
-    dropdown_buttons.insert(
-        0,
-        dict(
-            label="Show All",
-            method="update",
-            args=[
-                {"visible": [True] * len(unique_states)},
-                {"title": "Cumulative Dwell Time in Days by State for Each Agent"}
-            ]
-        )
-    )
-
-    # Add a "Hide All" button to hide all states
-    dropdown_buttons.insert(
-        1,
-        dict(
-            label="Hide All",
-            method="update",
-            args=[
-                {"visible": [False] * len(unique_states)},
-                {"title": "Cumulative Dwell Time in Days (All States Hidden)"}
-            ]
-        )
-    )
-
-    # Update figure layout with dropdown menu
-    fig.update_layout(
-        title="Cumulative Dwell Time in Days by State for Each Agent",
-        xaxis_title="Agent ID",
-        yaxis_title="Cumulative Dwell Time (Days)",
-        barmode="stack",
-        updatemenus=[
-            dict(
-                buttons=dropdown_buttons,
-                direction="down",
-                showactive=True,
-                x=0.1,  # Position of the dropdown menu
-                y=1.15,
-            )
-        ]
-    )
-
-    # Render the figure
-    fig.show()
-
-
-def cumulative_dwell_time_toggle(file_path):
-
-    # Load the data with error handling
-    try:
-        df = pd.read_csv(file_path)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"The file at {file_path} was not found. Please check the path.")
-
-    # Ensure the required columns exist
-    required_columns = {'dwell_time', 'agent_id', 'state'}
-    if not required_columns.issubset(df.columns):
-        raise ValueError(f"The required columns {required_columns} are missing from the file.")
-
-    # Convert dwell_time to days (adjust logic if needed)
-    df['dwell_time_days'] = df['dwell_time']
-
-    # Group by agent_id and state, summing dwell_time_days
-    grouped_df = df.groupby(['agent_id', 'state'])['dwell_time_days'].sum().reset_index()
-
-    # Get unique states and initialize the figure
-    unique_states = grouped_df['state'].unique()
-    fig = go.Figure()
-
-    # Add a bar trace for each state
-    for state in unique_states:
-        state_df = grouped_df[grouped_df['state'] == state]
-        fig.add_trace(
-            go.Bar(
-                x=state_df['agent_id'],
-                y=state_df['dwell_time_days'],
-                name=f"State {state}",
-                visible=True  # All traces visible initially
-            )
-        )
-
-    # Initialize visibility list (all traces visible initially)
-    visibility_list = [True] * len(unique_states)
-
-    # Create dropdown buttons for toggling states
-    dropdown_buttons = []
-
-    for i, state in enumerate(unique_states):
-        # Create a button to toggle the specific state
-        dropdown_buttons.append(
-            dict(
-                label=f"Toggle State {state}",
-                method="update",
-                args=[
-                    {"visible": [
-                        not visibility_list[j] if j == i else visibility_list[j]
-                        for j in range(len(unique_states))
-                    ]},
-                    {"title": "Cumulative Dwell Time in Days by Selected States"}
-                ]
-            )
-        )
-
-    # Add a "Reset All" button to display all states
-    dropdown_buttons.insert(
-        0,
-        dict(
-            label="Reset All",
-            method="update",
-            args=[
-                {"visible": [True] * len(unique_states)},
-                {"title": "Cumulative Dwell Time in Days by State for Each Agent"}
-            ]
-        )
-    )
-
-    # Update figure layout with dropdown menu
-    fig.update_layout(
-        title="Cumulative Dwell Time in Days by State for Each Agent",
-        xaxis_title="Agent ID",
-        yaxis_title="Cumulative Dwell Time (Days)",
-        barmode="stack",
-        updatemenus=[
-            dict(
-                buttons=dropdown_buttons,
-                direction="down",
-                showactive=True,
-                x=0.1,  # Position of the dropdown menu
-                y=1.15,
-            )
-        ]
-    )
-
-    # Render the figure
-    fig.show()
-
-def cumulative_dwell_time_pd8(file_path):
-
-    # Load the data
-    try:
-        df = pd.read_csv(file_path)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"The file at {file_path} was not found. Please check the path.")
-
-    # Ensure required columns exist
-    required_columns = {'dwell_time', 'agent_id', 'state'}
-    if not required_columns.issubset(df.columns):
-        raise ValueError(f"The required columns {required_columns} are missing from the file.")
-
-    # Prepare the data
-    df['dwell_time_days'] = df['dwell_time']/30
-    grouped_df = df.groupby(['agent_id', 'state'])['dwell_time_days'].sum().reset_index()
-    unique_states = grouped_df['state'].unique()
-
-    # Create traces for each state
-    traces = []
-    for state in unique_states:
-        state_df = grouped_df[grouped_df['state'] == state]
-        traces.append(
-            go.Bar(
-                x=state_df['agent_id'],
-                y=state_df['dwell_time_days'],
-                name=f"State {state}",
-                visible=True  # Initially visible
-            )
-        )
-
-    # Create layout and dropdown buttons
-    buttons = []
-
-    # Add 'Show All' button
-    buttons.append(
-        dict(
-            label="Show PD 8 All",
-            method="update",
-            args=[
-                {"visible": [True] * len(unique_states)},  # Show all traces
-                {"title": "Cumulative Dwell Time in Days by State for Each Agent"}
-            ]
-        )
-    )
-
-    # Add 'Hide All' button
-    buttons.append(
-        dict(
-            label="Hide All",
-            method="update",
-            args=[
-                {"visible": [False] * len(unique_states)},  # Hide all traces
-                {"title": "Cumulative Dwell Time (No States Visible)"}
-            ]
-        )
-    )
-
-    # Add a button for each state to toggle visibility
-    for i, state in enumerate(unique_states):
-        st = str(state)
-        visibility = [trace.name.endswith(st) for trace in traces]
-        buttons.append(
-            dict(
-                label=f"Toggle {state}",
-                method="update",
-                args=[
-                    {"visible": [not vis if j == i else vis for j, vis in enumerate(visibility)]},
-                    {"title": f"modified Cumulative Dwell Time (State {state} Toggled)"}
-                ]
-            )
-        )
-
-    # Build the figure
-    fig = go.Figure(data=traces)
-
-    fig.update_layout(
-        title="Cumulative Dwell Time ooooo in Days by State for Each Agent",
-        xaxis_title="Agent ID",
-        yaxis_title="Cumulative Dwell Time (Days)",
-        barmode="stack",
-        updatemenus=[
-            dict(
-                buttons=buttons,
-                direction="down",
-                showactive=True,
-                x=0.1,
-                y=1.15,
-            )
-        ]
-    )
-
-    # Show the plot
-    fig.show()
-
-
-
+# looks good - although crowded
 def stacked_bars_states_per_agent_static(file_path):
 
     # Load the CSV file
@@ -1117,23 +506,22 @@ def select_graph_pos(G, pos, states=None):
     return pos
 
 if __name__ == "__main__":
-    
     file = f'/Users/mine/git/tbsim/tbsim/results/dwell_time_logger_20250122185948.csv'
-
     # Load the dwell time logger
     dwell_time_logger = pd.read_csv(file, na_values=[], keep_default_na=False)
-
-    transitions_dict = {
-        'None': ['Latent Slow', 'Latent Fast'],
-        'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
-        'Active Smpos': ['Dead', 'None'],
-    }
-    state_transition_matrix(dwell_time_logger=dwell_time_logger)
+    # stacked_bars_states_per_agent_static(file)
+    # transitions_dict = {
+    #     'None': ['Latent Slow', 'Latent Fast'],
+    #     'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
+    #     'Active Smpos': ['Dead', 'None'],
+    # }
+    # sankey(dwell_time_logger=dwell_time_logger)
+    # state_transition_matrix(dwell_time_logger=dwell_time_logger)
     # interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=dwell_time_logger, bin_size=50)
     # plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)
     # graph_state_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Latent Slow', 'Latent Fast', 'Active Presymp', 'Active Smpos', 'Active Smneg', 'Active Exptb'], pos=0 )
     # graph_compartments_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Active Presymp', 
     # plot_binned_by_compartment(dwell_time_logger=dwell_time_logger,  bin_size=50, num_bins=8)
     # plot_binned_stacked_bars_state_transitions(dwell_time_logger=dwell_time_logger, bin_size=50, num_bins=8)
-    
-    pass
+
+

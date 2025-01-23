@@ -71,7 +71,7 @@ def calculate_expected_distributions(start, stop):
 
 
 def run_simulation():
-
+    import pandas as pd
     # Create and run the simulation
     sim_tb = make_tb()
     sim_tb.run()
@@ -86,14 +86,8 @@ def run_simulation():
     print("Expected distributions:", expected_distributions)
     # Extract the analyzer
     an = sim_tb.analyzers[0]
-    # an.plot_state_transition_graph_interactive()
-    # an.plot_state_transition_graph_static()
-    
-    # an.plot_combined_rates_area(num_bins=50)
-    # an.plot_binned_stacked_bars_state_transitions(num_bins=20) #DONE
-    # an.plot_binned_by_compartment(num_bins=40)  #DONE
-    # an.graph_state_transitions()    #DONE
-    an.graph_compartments_transitions() 
+    an.graph_state_transitions()
+
 
     # # Perform validation and plotting
     # an.validate_dwell_time_distributions(expected_distributions=expected_distributions)  # Optional validation
@@ -101,13 +95,25 @@ def run_simulation():
     # an.graph_agent_dynamics()
     # an.plot_dwell_time_validation()
 
-    # # External plotting
-    # file_dwt = an.file_name
-    # mtb.stacked_bars_states_per_agent_clean(file_dwt)
-    # mtb.plot_dwell_time_lines_for_each_agent(file_dwt)
-    # mtb.parallel_coordinates(file_dwt)
-    # mtb.parallel_categories(file_dwt)
+    # External plotting
+    file_name = an.file_name
 
+    transitions_dict = {
+        'None': ['Latent Slow', 'Latent Fast'],
+        'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
+        'Active Smpos': ['Dead', 'None'],
+    }
+    mtb.sankey(file_path=file_name)
+    mtb.state_transition_matrix(file_path=file_name)
+
+    dwell_time_logger = pd.read_csv(file_name, na_values=[], keep_default_na=False)
+    
+    mtb.interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=dwell_time_logger, bin_size=50)
+    mtb.plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)
+    mtb.graph_state_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Latent Slow', 'Latent Fast', 'Active Presymp', 'Active Smpos', 'Active Smneg', 'Active Exptb'], pos=0 )
+    mtb.graph_compartments_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Active Presymp']) 
+    mtb.plot_binned_by_compartment(dwell_time_logger=dwell_time_logger,  bin_size=50, num_bins=8)
+    mtb.plot_binned_stacked_bars_state_transitions(dwell_time_logger=dwell_time_logger, bin_size=50, num_bins=8)
 
 if __name__ == '__main__':
     run_simulation()
