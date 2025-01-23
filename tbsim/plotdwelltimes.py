@@ -22,7 +22,7 @@ def state_transition_matrix(file_path=None, dwell_time_logger=None):
     """
 
     if file_path is not None:
-        df = pd.read_csv(file, na_values=[], keep_default_na=False)
+        df = pd.read_csv(file_path, na_values=[], keep_default_na=False)
     elif dwell_time_logger is not None:
         df = dwell_time_logger
     else:
