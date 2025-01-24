@@ -11,7 +11,7 @@ from scipy import stats
 from pandas.plotting import parallel_coordinates
 import plotly.express as px
 
-class DTAn(ss.Module):
+class DwtAnalyzer(ss.Module):
     def __init__(self, adjust_to_days=True, unit='days'):
         """
         Initializes the analyzer with optional adjustments to days and unit specification.
@@ -30,7 +30,7 @@ class DTAn(ss.Module):
         Example:
         ```
         sim = tb.Sim()
-        sim.add_analyzer(DTAn())
+        sim.add_analyzer(DwtAnalyzer())
         sim.run()
         analyzer = sim.analyzers[0]
         analyzer.plot_dwell_time_validation()

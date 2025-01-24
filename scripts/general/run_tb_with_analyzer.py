@@ -25,7 +25,7 @@ def make_tb(sim_pars=None):
         unit='day',
         rel_sus_latentslow=0.1,
     ))
-    dwell_analyzer = mtb.DTAn()
+    dwell_analyzer = mtb.DwtAnalyzer()
 
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     births = ss.Births(pars=dict(birth_rate=5))
