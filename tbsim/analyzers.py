@@ -47,7 +47,7 @@ class DwtAnalyzer(ss.Analyzer):
         return
     
     def initialize_dfs(self):
-
+        # Initialize the latest state dataframe
         agent_ids = self.sim.people.auids
         population = len(agent_ids)
         new_logs = pd.DataFrame({
@@ -73,14 +73,13 @@ class DwtAnalyzer(ss.Analyzer):
                 'last_state_time': np.zeros(len(new_agent_ids))
             })
             self._latest_sts_df = pd.concat([self._latest_sts_df, new_logs], ignore_index=True)
+        self._update_data(ti)
         return
     
-    def update_results(self):
-        super().update_results()
-
+    def _update_data(self, ti):
+        # Get the current state of the agents
         tb = self.sim.diseases.tb
-        ti = self.ti
-        uids = self.sim.people.auids
+        uids = self.sim.people.auids  # People Alive
 
         # Filter rows in _latest_sts_df for the relevant agents
         relevant_rows = self._latest_sts_df[self._latest_sts_df['agent_id'].isin(uids)]
@@ -112,14 +111,6 @@ class DwtAnalyzer(ss.Analyzer):
             self.data['dwell_time'] = self.data['dwell_time'] * self.sim.pars.dt
 
         self.file_name = self.save_to_file()
-
-    def finalize_results(self):
-        super().finalize_results()
-        print(self.ti)
-        print(self._latest_sts_df)
-        print(self.data)
-        return
-    
 
     
     def log_dwell_time(self, agent_ids, states, entry_times, exit_times, going_to_state_ids):
@@ -175,39 +166,17 @@ class DwtAnalyzer(ss.Analyzer):
         return
 
     def plot_dwell_time_validation(self):
-        """
-        Plot the results of the dwell time validation.
-        """
-
-        fig, ax = plt.subplots()
-        for state in self.data['state'].unique():
-            dwell_times = self.data[self.data['state'] == state]['dwell_time']
-            if dwell_times.empty:
-                continue
-            state_label = mtb.TBS(state).name.replace('_', ' ').title()
-            ax.hist(dwell_times, bins=50, alpha=0.5, label=f'{state_label}')
-            ax.hist(dwell_times, bins=50, alpha=0.5, label=f'{state}')
-        ax.set_xlabel('Dwell Time')
-        ax.set_ylabel('Frequency')
-        ax.legend()
-        plt.show()
+        # Plot the results of the dwell time validation.
+        pdt.plot_dwell_time_validation(data = self.data)   
         return
     
     def plot_dwell_time_validation_interactive(self):
-        """
-        Plot the results of the dwell time validation interactively using Plotly.
-        """
-        import plotly.express as px
-        fig = px.histogram(self.data, x='dwell_time', color='state_name', 
-                            nbins=50, barmode='overlay', 
-                            labels={'dwell_time': 'Dwell Time', 'state_name': 'State'},
-                            title='Dwell Time Validation')
-        fig.update_layout(bargap=0.1)
-        fig.show()
+        # Plot the results of the dwell time validation interactively using Plotly.
+        pdt.plot_dwell_time_validation_interactive(data = self.data)
         return
-
-    def graph_state_transitions(self, states=None, pos=None):
-        pdt.graph_state_transitions(dwell_time_logger=self.data, states=states, pos=pos)
+    
+    def graph_state_transitions(self, states=None, pos=None, curved_ratio=0.0):
+        pdt.graph_state_transitions(dwell_time_logger=self.data, states=states, pos=pos, curved_ratio=curved_ratio)
         return
 
     def graph_compartments_transitions(self, states=None, pos=None):

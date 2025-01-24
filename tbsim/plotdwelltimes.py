@@ -128,7 +128,7 @@ def sankey(file_path=None, dwell_time_logger=None):
         node=dict(
             pad=15,
             thickness=20,
-            line=dict(color="gray", width=0.5),
+            line=dict(color="gray", width=0.1),
             label=labels
         ),
         link=dict(
@@ -477,7 +477,7 @@ def plot_binned_stacked_bars_state_transitions(dwell_time_logger, bin_size=50, n
     plt.show()
 
 # looks good /
-def graph_state_transitions(dwell_time_logger=None, states=None, pos=None):
+def graph_state_transitions(dwell_time_logger=None, states=None, pos=None, curved_ratio=0.0):
     """
     Plot a state transition graph with mean and mode dwell times annotated on the edges.
 
@@ -526,7 +526,7 @@ def graph_state_transitions(dwell_time_logger=None, states=None, pos=None):
 
         # Add edge to the graph
         G.add_edge(from_state, to_state,
-                label=f"Mean: {mean_dwell}\nMode: {mode_dwell}\nAgents: {num_agents}")
+            label=f"Mean: {mean_dwell}\nMo: {mode_dwell}\nAgents: {num_agents}")
 
     # Generate a layout for the graph
     if pos is None:
@@ -534,13 +534,13 @@ def graph_state_transitions(dwell_time_logger=None, states=None, pos=None):
     else:
         pos = select_graph_pos(G, pos)
 
-    colors = plt.cm.get_cmap('tab20', len(G.nodes))
+    colors =plt.colormaps.get_cmap('tab20') 
     node_colors = [colors(i) for i in range(len(G.nodes))]
     nx.draw_networkx_nodes(G, pos, node_size=200, node_color=node_colors, alpha=0.9)
     
     # Draw edges with the same color as the origin node
     edge_colors = [node_colors[list(G.nodes).index(edge[0])] for edge in G.edges]
-    nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=30, edge_color=edge_colors) #, connectionstyle="arc3,rad=0.1")
+    nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=30, edge_color=edge_colors, connectionstyle=f"arc3,rad={curved_ratio}")
     
     nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
 
@@ -609,7 +609,7 @@ def graph_compartments_transitions(dwell_time_logger=None, states=None, pos=0):
     pos = select_graph_pos(G, pos)
 
     # Draw nodes and edges with curved lines
-    colors = plt.cm.get_cmap('tab20', len(G.nodes))
+    colors =plt.colormaps.get_cmap('tab20')
     node_colors = [colors(i) for i in range(len(G.nodes))]
     nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, alpha=0.9)
     nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black", connectionstyle="arc3,rad=0.1")
@@ -622,6 +622,36 @@ def graph_compartments_transitions(dwell_time_logger=None, states=None, pos=0):
     # Display the graph
     plt.title("State->Compartment Graph with Dwell Times")
     plt.show()
+    return
+
+def plot_dwell_time_validation(data):
+    # Plot the results of the dwell time validation.
+    fig, ax = plt.subplots()
+    model_states = data['state_name'].unique()
+    for state in model_states:
+        dwell_times = data[data['state_name'] == state]['dwell_time']
+        if dwell_times.empty:
+            continue
+        state_label = state
+        ax.hist(dwell_times, bins=50, alpha=0.5, label=f'{state_label}')
+        ax.hist(dwell_times, bins=50, alpha=0.5, label=f'{state}')
+    ax.set_xlabel('Dwell Time')
+    ax.set_ylabel('Frequency')
+    ax.legend()
+    plt.show()
+    return
+
+def plot_dwell_time_validation_interactive(data):
+    """
+    Plot the results of the dwell time validation interactively using Plotly.
+    """
+    import plotly.express as px
+    fig = px.histogram(data, x='dwell_time', color='state_name', 
+                        nbins=50, barmode='overlay', 
+                        labels={'dwell_time': 'Dwell Time', 'state_name': 'State'},
+                        title='Dwell Time Validation')
+    fig.update_layout(bargap=0.1)
+    fig.show()
     return
 
 def select_graph_pos(G, pos, states=None):
