@@ -10,7 +10,7 @@ TBS = mtb.TBS
 def make_tb(sim_pars=None):
     params = dict(
         unit='day',
-        dt=23,
+        dt=7,
         start=sc.date('1990-01-01'),
         stop=sc.date('2016-12-31'),
     )
@@ -18,12 +18,12 @@ def make_tb(sim_pars=None):
         params.update(sim_pars)
 
     np.random.seed()
-    pop = ss.People(n_agents=200)
+    pop = ss.People(n_agents=1000)
     tb = mtb.TB(dict(
         beta=ss.beta(0.1),
         init_prev=ss.bernoulli(p=0.25),
         unit='day',
-        rel_sus_latentslow=0.5,
+        rel_sus_latentslow=0.1,
     ))
     dwell_analyzer = mtb.DTAn()
 
@@ -69,7 +69,6 @@ def calculate_expected_distributions(start, stop):
         for state, scale in scales.items()
     }
 
-
 def run_simulation():
     import pandas as pd
     # Create and run the simulation
@@ -79,39 +78,43 @@ def run_simulation():
     # Define start and stop times
     start = sim_tb.pars.start
     stop = sim_tb.pars.stop
-
     # Calculate expected distributions
     expected_distributions = calculate_expected_distributions(start, stop)
-
-    # Extract the analyzer
-    dwelltime_an = sim_tb.analyzers[0]
-    dwelltime_an.graph_state_transitions()
-    dwelltime_an.interactive_all_state_transitions()
-
-    # # Perform validation and plotting
-    dwelltime_an.validate_dwell_time_distributions(expected_distributions=expected_distributions)  # Optional validation
-    # dwelltime_an.plot_dwell_time_validation_interactive()
-    # dwelltime_an.graph_agent_dynamics()
-    # dwelltime_an.plot_dwell_time_validation()
-
-    # External plotting
-    file_name = dwelltime_an.file_name
-
     transitions_dict = {
         'None': ['Latent Slow', 'Latent Fast'],
         'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
-        'Active Smpos': ['Dead', 'None'],
     }
-    mtb.sankey(file_path=file_name)
-    mtb.state_transition_matrix(file_path=file_name)
+
+    # Extract the analyzer
+    ana_dwt = sim_tb.analyzers[0]    #shortuct to the dwell time analyzer
+    # ana_dwt.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
+    # ana_dwt.graph_state_transitions()
+    # ana_dwt.graph_compartments_transitions(pos=0)
+    ana_dwt.interactive_all_state_transitions()
+    ana_dwt.stacked_bars_states_per_agent_static()
+    ana_dwt.interactive_stacked_bar_charts_dt_by_state()
+    ana_dwt.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
+    ana_dwt.plot_binned_by_compartment(num_bins=50)
+    ana_dwt.sankey()
+
+    # # Perform validation and plotting
+    # ana_dwt.validate_dwell_time_distributions(expected_distributions=expected_distributions)  # Optional validation
+    # ana_dwt.plot_dwell_time_validation_interactive()
+    # ana_dwt.plot_dwell_time_validation()
+
+
     
+    # TODO: validate these ones:  *************
+    # External plotting
+    # file_name = ana_dwt.file_name
+    # mtb.sankey(file_path=file_name)
     # dwell_time_logger = pd.read_csv(file_name, na_values=[], keep_default_na=False)
-    
     # mtb.interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=dwell_time_logger, bin_size=50)
     # mtb.plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)
     # mtb.graph_state_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Latent Slow', 'Latent Fast', 'Active Presymp', 'Active Smpos', 'Active Smneg', 'Active Exptb'], pos=0 )
     # mtb.graph_compartments_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Active Presymp']) 
     # mtb.plot_binned_by_compartment(dwell_time_logger=dwell_time_logger,  bin_size=50, num_bins=8)
+    # mtb.state_transition_matrix(file_path=file_name)
     # mtb.plot_binned_stacked_bars_state_transitions(dwell_time_logger=dwell_time_logger, bin_size=50, num_bins=8)
 
 if __name__ == '__main__':

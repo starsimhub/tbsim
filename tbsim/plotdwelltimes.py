@@ -3,7 +3,43 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+from lifelines import KaplanMeierFitter
 
+
+
+# TODO: Kaplan-Meier
+def plot_kaplan_meier(data, dwell_time_col, event_observed_col=None):
+    """
+    Plots a Kaplan-Meier survival curve for the given data.
+
+    Parameters:
+        data (pd.DataFrame): Input DataFrame containing survival data.
+        dwell_time_col (str): Column name representing dwell times.
+        event_observed_col (str, optional): Column indicating if the event was observed (1) or censored (0).
+            If None, assumes all events are observed.
+
+    Returns:
+        None: Displays the Kaplan-Meier survival plot.
+    """
+    # Prepare the data
+    durations = data[dwell_time_col]
+    event_observed = data[event_observed_col] if event_observed_col else [1] * len(data)
+
+    # Initialize Kaplan-Meier fitter
+    kmf = KaplanMeierFitter()
+
+    # Fit the data
+    kmf.fit(durations, event_observed=event_observed)
+
+    # Plot the survival function
+    plt.figure(figsize=(10, 6))
+    kmf.plot_survival_function()
+    plt.title("TBSim Kaplan-Meier Survival Curve", fontsize=16)
+    plt.xlabel(f"Time ({dwell_time_col})", fontsize=14)
+    plt.ylabel("Survival Probability", fontsize=14)
+    plt.grid(True)
+    plt.show()
 
 # looks good
 def state_transition_matrix(file_path=None, dwell_time_logger=None):
@@ -105,7 +141,7 @@ def sankey(file_path=None, dwell_time_logger=None):
     fig.update_layout(title_text="Sankey Diagram of State Transitions and Dwell Times", font_size=10)
     fig.show()
 
-
+# looks good /
 def interactive_all_state_transitions(dwell_time_logger=None, dwell_time_bins=None, filter_states=None):
     """
     Plot the state transitions and/or dwell time distributions of agents interactively,
@@ -188,29 +224,35 @@ def interactive_all_state_transitions(dwell_time_logger=None, dwell_time_bins=No
     )
     fig.show()
 
-# looks good - although crowded
-def stacked_bars_states_per_agent_static(file_path):
+# looks good - although crowded /
+def stacked_bars_states_per_agent_static(dwell_time_logger=None, file_path=None):
 
-    # Load the CSV file
-    df = pd.read_csv(file_path)
+    if file_path is not None:
+        df = pd.read_csv(file_path, na_values=[], keep_default_na=False)
+    elif dwell_time_logger is not None:
+        df = dwell_time_logger
+    else:
+        print("No data provided.")
+        return
 
     # Calculate cumulative dwell time for each agent and state
-    df['cumulative_dwell_time'] = df.groupby(['agent_id', 'state'])['dwell_time'].cumsum()
+    df['cumulative_dwell_time'] = df.groupby(['agent_id', 'state_name'])['dwell_time'].cumsum()
 
     # Convert dwell time to days
-    df['cumulative_dwell_time_days'] = df['cumulative_dwell_time']/24
+    df['cumulative_dwell_time_days'] = df['cumulative_dwell_time']#/24
 
     # Pivot the data to get cumulative dwell time for each state
-    pivot_df = df.pivot_table(index='agent_id', columns='state', values='cumulative_dwell_time_days', aggfunc='max', fill_value=0)
+    pivot_df = df.pivot_table(index='agent_id', columns='state_name', values='cumulative_dwell_time_days', aggfunc='max', fill_value=0)
 
     # Plot the data
     pivot_df.plot(kind='bar', stacked=True, figsize=(15, 7))
     plt.title('Cumulative Time in Days on Each State for All Agents')
     plt.xlabel('Agent ID')
     plt.ylabel('Cumulative Time (Days)')
-    plt.legend(title='State')
+    plt.legend(title='State Name')
     plt.tight_layout()
     plt.show()
+    return
 
 # looks good
 def interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=None, bin_size=50, num_bins=20):
@@ -333,7 +375,7 @@ def plot_state_transition_lengths_custom(dwell_time_logger=None, transitions_dic
     plt.tight_layout()
     plt.show()
 
-# looks good
+# looks good /
 def plot_binned_by_compartment(dwell_time_logger=None,  bin_size=50, num_bins=8):
     """
     Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins.
@@ -384,7 +426,7 @@ def plot_binned_by_compartment(dwell_time_logger=None,  bin_size=50, num_bins=8)
     plt.tight_layout()
     plt.show()
 
-# looks good
+# looks good /
 def plot_binned_stacked_bars_state_transitions(dwell_time_logger, bin_size=50, num_bins=8):
     """
     Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins.
@@ -434,7 +476,7 @@ def plot_binned_stacked_bars_state_transitions(dwell_time_logger, bin_size=50, n
     plt.tight_layout()
     plt.show()
 
-# looks good
+# looks good /
 def graph_state_transitions(dwell_time_logger=None, states=None, pos=None):
     """
     Plot a state transition graph with mean and mode dwell times annotated on the edges.
@@ -484,7 +526,7 @@ def graph_state_transitions(dwell_time_logger=None, states=None, pos=None):
 
         # Add edge to the graph
         G.add_edge(from_state, to_state,
-                label=f"Mean: {mean_dwell}, Mode: {mode_dwell}\nAgents: {num_agents}")
+                label=f"Mean: {mean_dwell}\nMode: {mode_dwell}\nAgents: {num_agents}")
 
     # Generate a layout for the graph
     pos = select_graph_pos(G, pos)
@@ -493,7 +535,7 @@ def graph_state_transitions(dwell_time_logger=None, states=None, pos=None):
     colors = plt.cm.get_cmap('tab20', len(G.nodes))
     node_colors = [colors(i) for i in range(len(G.nodes))]
     nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, alpha=0.9)
-    nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black") #connectionstyle="arc3,rad=0.2")
+    nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black", connectionstyle="arc3,rad=0.1")
     nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
 
     # Annotate edges with mean and mode
@@ -505,7 +547,7 @@ def graph_state_transitions(dwell_time_logger=None, states=None, pos=None):
     plt.show()
     return
 
-# Looks good
+# Looks good /
 def graph_compartments_transitions(dwell_time_logger=None, states=None, pos=0):
     """
     Plots a directed graph of state transitions with dwell times.
@@ -562,7 +604,7 @@ def graph_compartments_transitions(dwell_time_logger=None, states=None, pos=0):
     colors = plt.cm.get_cmap('tab20', len(G.nodes))
     node_colors = [colors(i) for i in range(len(G.nodes))]
     nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, alpha=0.9)
-    nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black")  # connectionstyle="arc3,rad=0.2")
+    nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black", connectionstyle="arc3,rad=0.1")
     nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
 
     # Annotate edges with mean and mode
@@ -588,19 +630,23 @@ def select_graph_pos(G, pos, states=None):
     else: pos = nx.spring_layout(G, seed=42)
     return pos
 
+
 if __name__ == "__main__":
-    file = f'/Users/mine/git/tbsim/tbsim/results/dwell_time_logger_20250122185948.csv'
+    file = f'/Users/mine/git/tbsim/results/dwell_time_logger_20250123160047.csv'
+
     # Load the dwell time logger
     dwell_time_logger = pd.read_csv(file, na_values=[], keep_default_na=False)
     # stacked_bars_states_per_agent_static(file)
-    # transitions_dict = {
-    #     'None': ['Latent Slow', 'Latent Fast'],
-    #     'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
-    #     'Active Smpos': ['Dead', 'None'],
-    # }
+    plot_kaplan_meier(dwell_time_logger, dwell_time_col='dwell_time')
+    transitions_dict = {
+        'None': ['Latent Slow', 'Latent Fast'],
+        'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
+    }    
+    plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)    
+
     # sankey(dwell_time_logger=dwell_time_logger)
     # state_transition_matrix(dwell_time_logger=dwell_time_logger)
-    # interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=dwell_time_logger, bin_size=50)
+    interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=dwell_time_logger, bin_size=50)
     # plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)
     # graph_state_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Latent Slow', 'Latent Fast', 'Active Presymp', 'Active Smpos', 'Active Smneg', 'Active Exptb'], pos=0 )
     # graph_compartments_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Active Presymp', 

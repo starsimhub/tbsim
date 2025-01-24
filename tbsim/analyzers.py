@@ -13,15 +13,42 @@ import plotly.express as px
 
 class DTAn(ss.Module):
     def __init__(self, adjust_to_days=True, unit='days'):
+        """
+        Initializes the analyzer with optional adjustments to days and unit specification.
+
+        Args:
+            adjust_to_days (bool): If True, adjusts the dwell times to days by multiplying the recorded dwell_time by the sim.pars.dt.
+            Default is True.
+            
+            unit (str): The unit of time for the analysis. Default is 'days'. TODO: Implement its use.
+
+        How to use it:
+        1. Add the analyzer to the sim object.
+        2. Run the simulation.
+        3. Optional: Create an instance of the analyzer and call the method you want to use.
+        
+        Example:
+        ```
+        sim = tb.Sim()
+        sim.add_analyzer(DTAn())
+        sim.run()
+        analyzer = sim.analyzers[0]
+        analyzer.plot_dwell_time_validation()
+        ```
+        
+        """
         super().__init__()
         self.adjust_to_days = adjust_to_days
         self.unit = unit
+        self.file_name = None
+        self.data = None
+
         return
 
     def init_results(self, ):
         super().init_results()
         self.latest_sts_df = pd.DataFrame(columns=['agent_id', 'last_state', 'last_state_time'])
-        self.dwell_time_logger = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state_id','going_to_state'])
+        self.data = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state_id','going_to_state'])
         
         agent_ids = self.sim.people.auids
         population = len(agent_ids)
@@ -79,11 +106,11 @@ class DTAn(ss.Module):
 
     def finalize(self):
         super().finalize()
-        self.dwell_time_logger['state_name'] = self.dwell_time_logger['state'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
-        self.dwell_time_logger['going_to_state'] = self.dwell_time_logger['going_to_state_id'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
-        self.dwell_time_logger['compartment'] = self.dwell_time_logger['going_to_state_id'].apply(self.resolve_compartment)
+        self.data['state_name'] = self.data['state'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
+        self.data['going_to_state'] = self.data['going_to_state_id'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
+        self.data['compartment'] = self.data['going_to_state_id'].apply(self.resolve_compartment)
         if self.adjust_to_days:
-            self.dwell_time_logger['dwell_time'] = self.dwell_time_logger['dwell_time'] * self.sim.pars.dt
+            self.data['dwell_time'] = self.data['dwell_time'] * self.sim.pars.dt
 
         self.file_name = self.save_to_file()
 
@@ -91,10 +118,11 @@ class DTAn(ss.Module):
         super().finalize_results()
         print(self.ti)
         print(self.latest_sts_df)
-        print(self.dwell_time_logger)
+        print(self.data)
         return
 
     def log_dwell_time(self, agent_ids, states, entry_times, exit_times, going_to_state_ids):
+
         entry_times = np.nan_to_num(entry_times, nan=0)
         dwell_times = exit_times - entry_times
 
@@ -106,7 +134,7 @@ class DTAn(ss.Module):
             'dwell_time': dwell_times,
             'going_to_state_id': going_to_state_ids
         })
-        self.dwell_time_logger = pd.concat([self.dwell_time_logger, new_logs], ignore_index=True)
+        self.data = pd.concat([self.data, new_logs], ignore_index=True)
                 # Map state codes to their corresponding names
     
     def resolve_compartment(self, going_to_state_id):
@@ -121,9 +149,8 @@ class DTAn(ss.Module):
         resdir = os.path.dirname(cfg.create_res_dir())
         t = ddtt.datetime.now()
         fn = os.path.join(resdir, f'dwell_time_logger_{t.strftime("%Y%m%d%H%M%S")}.csv')
-        self.dwell_time_logger.to_csv(fn, index=False)
-        print(f"Dwell time logs saved to {fn}")
-
+        self.data.to_csv(fn, index=False)
+        print(f"Dwell time logs saved to:\n {fn}\n")
         return fn
 
     def validate_dwell_time_distributions(self, expected_distributions=None):
@@ -137,7 +164,7 @@ class DTAn(ss.Module):
        
         print("Validating dwell time distributions...")
         for state, expected_cdf in expected_distributions.items():
-            dwell_times = self.dwell_time_logger[self.dwell_time_logger['state'] == state]['dwell_time']
+            dwell_times = self.data[self.data['state'] == state]['dwell_time']
             if dwell_times.empty:
                 print(f"No data available for state {state}")
                 continue
@@ -145,6 +172,7 @@ class DTAn(ss.Module):
             print(f"State {state}: KS Statistic={stat:.4f}, p-value={p_value:.4f}")
             if p_value < 0.05:
                 print(f"WARNING: Dwell times for state {state} deviate significantly from expectations.")
+        return
 
     def plot_dwell_time_validation(self):
         """
@@ -152,8 +180,8 @@ class DTAn(ss.Module):
         """
 
         fig, ax = plt.subplots()
-        for state in self.dwell_time_logger['state'].unique():
-            dwell_times = self.dwell_time_logger[self.dwell_time_logger['state'] == state]['dwell_time']
+        for state in self.data['state'].unique():
+            dwell_times = self.data[self.data['state'] == state]['dwell_time']
             if dwell_times.empty:
                 continue
             state_label = mtb.TBS(state).name.replace('_', ' ').title()
@@ -170,7 +198,7 @@ class DTAn(ss.Module):
         Plot the results of the dwell time validation interactively using Plotly.
         """
         import plotly.express as px
-        fig = px.histogram(self.dwell_time_logger, x='dwell_time', color='state_name', 
+        fig = px.histogram(self.data, x='dwell_time', color='state_name', 
                             nbins=50, barmode='overlay', 
                             labels={'dwell_time': 'Dwell Time', 'state_name': 'State'},
                             title='Dwell Time Validation')
@@ -178,107 +206,46 @@ class DTAn(ss.Module):
         fig.show()
         return
 
-    # def graph_agent_dynamics(self, dwell_time_bins=None, filter_states=None):
-    #     """
-    #     Plot the state transitions and/or dwell time distributions of agents interactively,
-    #     with dwell times grouped into predefined ranges.
-
-    #     Parameters:
-    #     - dwell_time_bins (list): List of bin edges for grouping dwell times.
-    #                               Default is [0, 50, 100, 150, 200, 250, np.inf].
-    #     - filter_states (list): List of states to include in the plot. If None, include all states.
-    #     """
-    #     import numpy as np
-    #     import plotly.express as px
-    #     import plotly.graph_objects as go
-
-    #     if self.dwell_time_logger.empty:
-    #         print("No dwell time data available to plot.")
-    #         return
-
-    #     # Set default bins if none are provided
-    #     if dwell_time_bins is None:
-    #         dwell_time_bins = [0, 50, 100, 150, 200, 250, np.inf]
-
-    #     # Create bin labels, handling infinity separately
-    #     dwell_time_labels = [
-    #         f"{int(b)}-{int(d)} days" if d != np.inf else f"{int(b)}+ days"
-    #         for b, d in zip(dwell_time_bins[:-1], dwell_time_bins[1:])
-    #     ]
-
-    #     # Create a dwell time category column
-    #     self.dwell_time_logger['dwell_time_category'] = pd.cut(
-    #         self.dwell_time_logger['dwell_time'],
-    #         bins=dwell_time_bins,
-    #         labels=dwell_time_labels,
-    #         include_lowest=True
-    #     )
-
-    #     # Apply state filter if provided
-    #     if filter_states is not None:
-    #         filtered_logger = self.dwell_time_logger[
-    #             self.dwell_time_logger['state_name'].isin(filter_states) |
-    #             self.dwell_time_logger['going_to_state'].isin(filter_states)
-    #         ]
-    #     else:
-    #         filtered_logger = self.dwell_time_logger
-
-    #     # Group by state transitions and dwell time category
-    #     grouped = filtered_logger.groupby(
-    #         ['state_name', 'going_to_state', 'dwell_time_category']
-    #     ).size().reset_index(name='count')
-
-    #     # Filter out empty ranges
-    #     grouped = grouped[grouped['count'] > 0]
-
-    #     # Interactive state transitions
-    #     fig = go.Figure()
-
-    #     for _, row in grouped.iterrows():
-    #         state_label = row['state_name']
-    #         going_to_state_label = row['going_to_state']
-    #         dwell_time_category = row['dwell_time_category']
-    #         count = row['count']
-    #         unique_transition = f"{state_label} → {going_to_state_label} ({dwell_time_category})"
-
-    #         # Add transition as a bar
-    #         fig.add_trace(go.Bar(
-    #             y=[unique_transition],
-    #             x=[count],
-    #             name=unique_transition,
-    #             text=[count],
-    #             textposition='auto',
-    #             orientation='h'
-    #         ))
-
-    #     fig.update_layout(
-    #         title="State Transitions Grouped by Dwell Time Categories",
-    #         yaxis_title="State Transitions",
-    #         xaxis_title="Count",
-    #         legend_title="Transitions",
-    #         height=100 + 30 * len(grouped),
-    #     )
-    #     fig.show()
-
-    def graph_state_transitions(self):
-        pdt.graph_state_transitions(self.dwell_time_logger)
+    def graph_state_transitions(self, states=None, pos=None):
+        pdt.graph_state_transitions(dwell_time_logger=self.data, states=states, pos=pos)
         return
 
-    def graph_compartments_transitions(self):
-        pdt.graph_compartments_transitions(self.dwell_time_logger)
+    def graph_compartments_transitions(self, states=None, pos=None):
+        pdt.graph_compartments_transitions(dwell_time_logger=self.data, states=states, pos=pos)
         return
 
     def plot_binned_stacked_bars_state_transitions(self, bin_size=50, num_bins=8):
-        pdt.plot_binned_stacked_bars_state_transitions(dwell_time_logger=self.dwell_time_logger, bin_size=bin_size, num_bins=num_bins)
+        pdt.plot_binned_stacked_bars_state_transitions(dwell_time_logger=self.data, bin_size=bin_size, num_bins=num_bins)
         return
 
     def plot_binned_by_compartment(self, num_bins=50):
-        pdt.plot_binned_by_compartment(dwell_time_logger=self.dwell_time_logger, num_bins=num_bins)
+        pdt.plot_binned_by_compartment(dwell_time_logger=self.data, num_bins=num_bins)
         return
+    
     def interactive_all_state_transitions(self, dwell_time_bins=None, filter_states=None):
-        pdt.interactive_all_state_transitions(dwell_time_logger=self.dwell_time_logger, dwell_time_bins=dwell_time_bins, filter_states=filter_states)
+        pdt.interactive_all_state_transitions(dwell_time_logger=self.data, dwell_time_bins=dwell_time_bins, filter_states=filter_states)
+        return
+    
+    def stacked_bars_states_per_agent_static(self):
+        pdt.stacked_bars_states_per_agent_static(dwell_time_logger=self.data)
         return
         
+    def interactive_stacked_bar_charts_dt_by_state(self):
+        pdt.interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=self.data)
+        return
+    
+    def sankey(self):
+        pdt.sankey(dwell_time_logger=self.data)
+        return
+    
+    def plot_state_transition_lengths_custom(self, transitions_dict):
+        pdt.plot_state_transition_lengths_custom(dwell_time_logger=self.data, transitions_dict=transitions_dict)
+        return
 
-
-
+    def plot_binned_by_compartment(self, bin_size=50, num_bins=50):
+        pdt.plot_binned_by_compartment(dwell_time_logger=self.data, bin_size=bin_size, num_bins=num_bins)
+        return
+    
+    def plot_binned_stacked_bars_state_transitions(self, bin_size=50, num_bins=20):
+        pdt.plot_binned_stacked_bars_state_transitions(dwell_time_logger=self.data, bin_size=bin_size, num_bins=num_bins)
+        return
