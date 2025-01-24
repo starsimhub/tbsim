@@ -11,7 +11,7 @@ from scipy import stats
 from pandas.plotting import parallel_coordinates
 import plotly.express as px
 
-class DwtAnalyzer(ss.Module):
+class DwtAnalyzer(ss.Analyzer):
     def __init__(self, adjust_to_days=True, unit='days'):
         """
         Initializes the analyzer with optional adjustments to days and unit specification.
@@ -41,15 +41,13 @@ class DwtAnalyzer(ss.Module):
         self.adjust_to_days = adjust_to_days
         self.unit = unit
         self.file_name = None
-        self.data = None
-
-        return
-
-    def init_results(self, ):
-        super().init_results()
-        self.latest_sts_df = pd.DataFrame(columns=['agent_id', 'last_state', 'last_state_time'])
         self.data = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state_id','going_to_state'])
-        
+        self._latest_sts_df = pd.DataFrame(columns=['agent_id', 'last_state', 'last_state_time'])      
+        # self.initialize_dfs() <-- This is called in the step method to ensure that 'people object' is available
+        return
+    
+    def initialize_dfs(self):
+
         agent_ids = self.sim.people.auids
         population = len(agent_ids)
         new_logs = pd.DataFrame({
@@ -57,23 +55,24 @@ class DwtAnalyzer(ss.Module):
             'last_state': np.full(population, -1),
             'last_state_time': np.zeros(population)
         })
-        self.latest_sts_df = pd.concat([self.latest_sts_df, new_logs], ignore_index=True)
+        self._latest_sts_df = pd.concat([self._latest_sts_df, new_logs], ignore_index=True)
         return
-
+    
     def step(self):
+        if not self.sim.ti: self.initialize_dfs()
         sim = self.sim
         ti = sim.ti
         
         # check if the number of agents has changed
-        if len(self.sim.people.auids) != len(self.latest_sts_df):
-            #identify which agent ids are new and add them to the latest_sts_df
-            new_agent_ids = list(set(self.sim.people.auids) - set(self.latest_sts_df.agent_id))
+        if len(self.sim.people.auids) != len(self._latest_sts_df):
+            #identify which agent ids are new and add them to the _latest_sts_df
+            new_agent_ids = list(set(self.sim.people.auids) - set(self._latest_sts_df.agent_id))
             new_logs = pd.DataFrame({
                 'agent_id': new_agent_ids,
                 'last_state': np.full(len(new_agent_ids), -1),
                 'last_state_time': np.zeros(len(new_agent_ids))
             })
-            self.latest_sts_df = pd.concat([self.latest_sts_df, new_logs], ignore_index=True)
+            self._latest_sts_df = pd.concat([self._latest_sts_df, new_logs], ignore_index=True)
         return
     
     def update_results(self):
@@ -83,8 +82,8 @@ class DwtAnalyzer(ss.Module):
         ti = self.ti
         uids = self.sim.people.auids
 
-        # Filter rows in latest_sts_df for the relevant agents
-        relevant_rows = self.latest_sts_df[self.latest_sts_df['agent_id'].isin(uids)]
+        # Filter rows in _latest_sts_df for the relevant agents
+        relevant_rows = self._latest_sts_df[self._latest_sts_df['agent_id'].isin(uids)]
 
         # Identify agents whose last recorded state is different from the current state
         different_state_mask = relevant_rows['last_state'].values != tb.state[ss.uids(relevant_rows['agent_id'].values)]
@@ -100,8 +99,8 @@ class DwtAnalyzer(ss.Module):
         )
 
         # Update the latest state dataframe
-        self.latest_sts_df.loc[self.latest_sts_df['agent_id'].isin(uids), 'last_state'] = tb.state[uids]
-        self.latest_sts_df.loc[self.latest_sts_df['agent_id'].isin(uids), 'last_state_time'] = ti
+        self._latest_sts_df.loc[self._latest_sts_df['agent_id'].isin(uids), 'last_state'] = tb.state[uids]
+        self._latest_sts_df.loc[self._latest_sts_df['agent_id'].isin(uids), 'last_state_time'] = ti
 
 
     def finalize(self):
@@ -117,12 +116,13 @@ class DwtAnalyzer(ss.Module):
     def finalize_results(self):
         super().finalize_results()
         print(self.ti)
-        print(self.latest_sts_df)
+        print(self._latest_sts_df)
         print(self.data)
         return
+    
 
+    
     def log_dwell_time(self, agent_ids, states, entry_times, exit_times, going_to_state_ids):
-
         entry_times = np.nan_to_num(entry_times, nan=0)
         dwell_times = exit_times - entry_times
 
