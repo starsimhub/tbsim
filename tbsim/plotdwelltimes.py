@@ -529,13 +529,19 @@ def graph_state_transitions(dwell_time_logger=None, states=None, pos=None):
                 label=f"Mean: {mean_dwell}\nMode: {mode_dwell}\nAgents: {num_agents}")
 
     # Generate a layout for the graph
-    pos = select_graph_pos(G, pos)
+    if pos is None:
+        pos = nx.spring_layout(G, seed=42)  # Fixed layout for consistency
+    else:
+        pos = select_graph_pos(G, pos)
 
-    # Draw nodes and edges with curved lines
     colors = plt.cm.get_cmap('tab20', len(G.nodes))
     node_colors = [colors(i) for i in range(len(G.nodes))]
-    nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, alpha=0.9)
-    nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black", connectionstyle="arc3,rad=0.1")
+    nx.draw_networkx_nodes(G, pos, node_size=200, node_color=node_colors, alpha=0.9)
+    
+    # Draw edges with the same color as the origin node
+    edge_colors = [node_colors[list(G.nodes).index(edge[0])] for edge in G.edges]
+    nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=30, edge_color=edge_colors) #, connectionstyle="arc3,rad=0.1")
+    
     nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
 
     # Annotate edges with mean and mode
@@ -543,9 +549,11 @@ def graph_state_transitions(dwell_time_logger=None, states=None, pos=None):
     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8)
 
     # Display the graph
+    plt.tight_layout()
     plt.title("State Transition Graph with Dwell Times")
     plt.show()
     return
+
 
 # Looks good /
 def graph_compartments_transitions(dwell_time_logger=None, states=None, pos=0):
@@ -636,17 +644,18 @@ if __name__ == "__main__":
 
     # Load the dwell time logger
     dwell_time_logger = pd.read_csv(file, na_values=[], keep_default_na=False)
+    graph_state_transitions(dwell_time_logger=dwell_time_logger )
     # stacked_bars_states_per_agent_static(file)
-    plot_kaplan_meier(dwell_time_logger, dwell_time_col='dwell_time')
-    transitions_dict = {
-        'None': ['Latent Slow', 'Latent Fast'],
-        'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
-    }    
-    plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)    
+    # plot_kaplan_meier(dwell_time_logger, dwell_time_col='dwell_time')
+    # transitions_dict = {
+    #     'None': ['Latent Slow', 'Latent Fast'],
+    #     'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
+    # }    
+    # plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)    
 
-    # sankey(dwell_time_logger=dwell_time_logger)
-    # state_transition_matrix(dwell_time_logger=dwell_time_logger)
-    interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=dwell_time_logger, bin_size=50)
+    # # sankey(dwell_time_logger=dwell_time_logger)
+    # # state_transition_matrix(dwell_time_logger=dwell_time_logger)
+    # interactive_stacked_bar_charts_dt_by_state(dwell_time_logger=dwell_time_logger, bin_size=50)
     # plot_state_transition_lengths_custom(dwell_time_logger=dwell_time_logger, transitions_dict=transitions_dict)
     # graph_state_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Latent Slow', 'Latent Fast', 'Active Presymp', 'Active Smpos', 'Active Smneg', 'Active Exptb'], pos=0 )
     # graph_compartments_transitions(dwell_time_logger=dwell_time_logger, states=['None', 'Active Presymp', 
