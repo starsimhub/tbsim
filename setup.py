@@ -49,5 +49,8 @@ setup(
         'setuptools',
         'seaborn',
         'pytest',
+        'plotly',
+        'lifelines',
+        'tqdm',
     ],
 )
