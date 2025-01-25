@@ -8,6 +8,7 @@ import tbsim.plotdwelltimes as plotter
 import tbsim as mtb
 from scipy import stats
 from pandas.plotting import parallel_coordinates
+from enum import IntEnum
 
 class DwtAnalyzer(ss.Analyzer, plotter.DwtPlotter):
     def __init__(self, adjust_to_days=False, unit=None, states_ennumerator=None):
@@ -19,6 +20,7 @@ class DwtAnalyzer(ss.Analyzer, plotter.DwtPlotter):
             Default is True.
             
             unit (str): The unit of time for the analysis. Default is 'days'. TODO: Implement its use.
+            states_ennumerator (IntEnum): An IntEnum class that enumerates the states in the simulation. Default is None which will result in the use of the mtb.TBS class.
 
         How to use it:
         1. Add the analyzer to the sim object.
@@ -36,9 +38,12 @@ class DwtAnalyzer(ss.Analyzer, plotter.DwtPlotter):
         
         """
         ss.Analyzer.__init__(self)
+        self.eSTATES = states_ennumerator
+        if self.eSTATES is None:
+            self.eSTATES = mtb.TBS
         self.adjust_to_days = adjust_to_days
         self.unit = unit
-        self.file_name = None
+        self.file_path = None
         self.data = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state_id','going_to_state'])
         self._latest_sts_df = pd.DataFrame(columns=['agent_id', 'last_state', 'last_state_time'])      
         plotter.DwtPlotter.__init__(self, data=self.data)
@@ -103,14 +108,14 @@ class DwtAnalyzer(ss.Analyzer, plotter.DwtPlotter):
 
     def finalize(self):
         super().finalize()
-        self.data['state_name'] = self.data['state'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
-        self.data['going_to_state'] = self.data['going_to_state_id'].apply(lambda x: mtb.TBS(x).name.replace('_', ' ').title())
-        self.data['compartment'] = self.data['going_to_state_id'].apply(self._resolve_compartment)
+        self.data['state_name'] = self.data['state'].apply(lambda x: self.eSTATES(x).name.replace('_', ' ').title())
+        self.data['going_to_state'] = self.data['going_to_state_id'].apply(lambda x: self.eSTATES(x).name.replace('_', ' ').title())
+        self.data['compartment'] = 'tbd'
         if self.adjust_to_days:
             self.data['dwell_time_recorded'] = self.data['dwell_time']
             self.data['dwell_time'] = self.data['dwell_time'] * self.sim.pars.dt
         
-        self.file_name = self._save_to_file()
+        self.file_path = self._save_to_file()
         return
     
     def _log_dwell_time(self, agent_ids, states, entry_times, exit_times, going_to_state_ids):
@@ -127,15 +132,8 @@ class DwtAnalyzer(ss.Analyzer, plotter.DwtPlotter):
         })
         self.data = pd.concat([self.data, new_logs], ignore_index=True)
                 # Map state codes to their corresponding names
+        return
     
-    def _resolve_compartment(self, going_to_state_id):
-        if going_to_state_id in [0, 1]:      return 'LATENT'
-        elif going_to_state_id in [3, 4, 5]: return 'ACTIVE'
-        elif going_to_state_id == 2:         return 'PRESYMPTOMATIC'
-        elif going_to_state_id == -1:        return 'SUSCEPTIBLE'
-        elif going_to_state_id == 8:         return 'REMOVED'
-        else:                                return 'OTHER'
-
     def _save_to_file(self):
         resdir = os.path.dirname(cfg.create_res_dir())
         t = ddtt.datetime.now()

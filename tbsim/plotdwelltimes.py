@@ -11,7 +11,6 @@ import itertools as it
 from scipy import stats
 
 
-
 class DwtPlotter:
     def __init__(self, data=None, file_path=None):
         if data is not None:
@@ -493,6 +492,57 @@ class DwtPlotter:
         plt.tight_layout()
         plt.show()
 
+    def histogram_with_kde(self, num_bins=50, bin_size=30):
+        if self.data.empty:
+            print("No dwell time data available to plot.")
+            return
+
+        # Create DataFrame
+        df = self.data
+
+        # Define bins for dwell times
+        bins = np.arange(0, bin_size * num_bins + bin_size, bin_size)
+        bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+        # Create a figure with subplots for each state
+        states = df['state_name'].unique()
+        num_states = len(states)
+        num_cols = 4
+        num_rows = (num_states + num_cols - 1) // num_cols
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, 5 * num_rows), sharex=False)
+
+        axes = axes.flatten()
+        fig.suptitle('State Transitions by Dwell Time Bins', fontsize=16)
+
+        for ax, state in zip(axes, states):
+
+            state_data = df[df['state_name'] == state]
+            state_data['dwell_time_bin'] = pd.cut(
+                state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True
+            )
+            sns.histplot(data=state_data, 
+                         x='dwell_time', 
+                         bins=bins,
+                         hue='going_to_state', 
+                         kde=True, 
+                         palette='tab10',
+                         multiple='stack',
+                         legend=True,
+                         ax=ax)
+
+            ax.set_title(f'State: {state}')
+            ax.set_xlabel('Dwell Time Bins')
+            ax.set_ylabel('Count')
+            handles, labels = ax.get_legend_handles_labels()
+            if len(handles) > 0:
+                ax.legend(title='Going to State', loc='upper right')
+
+        # Remove any unused subplots
+        for i in range(num_states, len(axes)):
+            fig.delaxes(axes[i])
+
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.show()
+
     # looks good /
     def graph_state_transitions(self, states=None, layout=None, curved_ratio=0.05, colormap='tab20c'):
         """
@@ -574,7 +624,7 @@ class DwtPlotter:
         return
 
     # Looks good /
-    def graph_compartments_transitions(self, states=None, layout=0):
+    def graph_compartments_transitions(self, states=None, layout=0, groups=[[]]):
         """
         Plots a directed graph of state transitions with dwell times.
 
@@ -701,3 +751,16 @@ class DwtPlotter:
             return nx.spring_layout(G, seed=42)
 
         return pos
+
+
+# Example usage
+if __name__ == '__main__':
+
+    # Create a sample DataFrame
+    file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250124160857.csv'
+    # Initialize the DwtPlotter with the file name
+    plotter = DwtPlotter(file_path=file)
+    plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
+    plotter.histogram_with_kde(num_bins=10, bin_size=30)
+
+
