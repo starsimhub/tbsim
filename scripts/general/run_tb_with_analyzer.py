@@ -13,6 +13,7 @@ def make_tb(sim_pars=None):
         dt=7,
         start=sc.date('1990-01-01'),
         stop=sc.date('2016-12-31'),
+        rand_seed=123,
     )
     if sim_pars is not None:
         params.update(sim_pars)
@@ -87,9 +88,11 @@ def run_simulation():
 
     # Extract the analyzer
     ana_dwt = sim_tb.analyzers[0]    #shortuct to the dwell time analyzer
-    # ana_dwt.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
-    # ana_dwt.graph_state_transitions()
-    # ana_dwt.graph_compartments_transitions(pos=0)
+    ana_dwt.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
+    ana_dwt.graph_state_transitions(states=['None', 'Latent Slow', 'Latent Fast', 'Active Presymp', 'Active Smpos', 'Active Smneg'], layout=0)
+    ana_dwt.plot_dwell_time_validation()
+    ana_dwt.plot_dwell_time_validation_interactive()
+    ana_dwt.graph_compartments_transitions(layout=0)
     ana_dwt.interactive_all_state_transitions()
     ana_dwt.stacked_bars_states_per_agent_static()
     ana_dwt.interactive_stacked_bar_charts_dt_by_state()
@@ -98,9 +101,9 @@ def run_simulation():
     ana_dwt.sankey()
 
     # # Perform validation and plotting
-    # ana_dwt.validate_dwell_time_distributions(expected_distributions=expected_distributions)  # Optional validation
-    # ana_dwt.plot_dwell_time_validation_interactive()
-    # ana_dwt.plot_dwell_time_validation()
+    ana_dwt.validate_dwell_time_distributions(expected_distributions=expected_distributions)  # Optional validation
+    ana_dwt.plot_dwell_time_validation_interactive()
+    ana_dwt.plot_dwell_time_validation()
 
 
     
