@@ -10,7 +10,7 @@ TBS = mtb.TBS
 def make_tb(sim_pars=None):
     params = dict(
         unit='day',
-        dt=30,
+        dt=7,
         start=sc.date('1940-01-01'),
         stop=sc.date('2016-12-31'),
         rand_seed=123,
@@ -26,7 +26,7 @@ def make_tb(sim_pars=None):
         unit='day',
         rel_sus_latentslow=0.5,
     ))
-    dwell_analyzer = mtb.DwtAnalyzer()
+    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=7/365)
 
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     births = ss.Births(pars=dict(birth_rate=5))
