@@ -4,19 +4,769 @@ import numpy as np
 import os
 import tbsim.config as cfg
 import datetime as ddtt
-import tbsim.plotdwelltimes as plotter
 import tbsim as mtb
 from scipy import stats
-from pandas.plotting import parallel_coordinates
 from enum import IntEnum
+import seaborn as sns
+import matplotlib.pyplot as plt
+from lifelines import KaplanMeierFitter
+import networkx as nx
+import plotly.graph_objects as go
 
-class DwtAnalyzer(ss.Analyzer, plotter.DwtPlotter):
-    def __init__(self, adjust_to_days=False, unit=None, states_ennumerator=None):
+
+__all__ = ['DwtAnalyzer', 'DwtPlotter']
+
+class DwtPlotter:
+    def __init__(self, data=None, file_path=None):
+        if data is not None:
+            self.data = data
+        elif file_path is not None:
+            self.data = pd.read_csv(file_path, na_values=[], keep_default_na=False)
+        else:
+            raise ValueError("Either data or file_path must be provided.")
+
+    # TODO: Kaplan-Meier
+    def plot_kaplan_meier(self, dwell_time_col, event_observed_col=None):
+        """
+        Plots a Kaplan-Meier survival curve for the given data.
+
+        Parameters:
+            data (pd.DataFrame): Input DataFrame containing survival data.
+            dwell_time_col (str): Column name representing dwell times.
+            event_observed_col (str, optional): Column indicating if the event was observed (1) or censored (0).
+                If None, assumes all events are observed.
+
+        Returns:
+            None: Displays the Kaplan-Meier survival plot.
+        """
+        data = self.data
+        # Prepare the data
+        durations = data[dwell_time_col]
+        event_observed = data[event_observed_col] if event_observed_col else [1] * len(data)
+
+        # Initialize Kaplan-Meier fitter
+        kmf = KaplanMeierFitter()
+
+        # Fit the data
+        kmf.fit(durations, event_observed=event_observed)
+
+        # Plot the survival function
+        plt.figure(figsize=(10, 6))
+        kmf.plot_survival_function()
+        plt.title("TBSim Kaplan-Meier Survival Curve", fontsize=16)
+        plt.xlabel(f"Time ({dwell_time_col})", fontsize=14)
+        plt.ylabel("Survival Probability", fontsize=14)
+        plt.grid(True)
+        plt.show()
+
+    # looks good
+    def state_transition_matrix(self, file_path=None):
+        """
+        Generates and plots a state transition matrix from the provided data.
+        Parameters:
+        file_path (str, optional): Path to the CSV file containing the data. The CSV file should have columns 'agent_id' and 'state'.
+        self.data (pd.DataFrame, optional): DataFrame containing the data. Should have columns 'agent_id' and 'state'.
+        Returns:
+        None: The function plots the state transition matrix using seaborn's heatmap.
+        Notes:
+        - This is using plain 'state' columns recorded in the data - no need to 'going_to_state' column.
+        - If both file_path and self.data are provided, file_path will be used.
+        - If neither file_path nor self.data are provided, the function will print "No data provided." and return.
+        - The transition matrix is normalized to show proportions. To display raw counts, comment out the normalization step.
+        """
+
+        if file_path is not None:
+            df = pd.read_csv(file_path, na_values=[], keep_default_na=False)
+        elif self.data is not None:
+            df = self.data
+        else:
+            print("No data provided.")
+            return
+
+        # Create a transition matrix
+        # Get the unique states
+        unique_states = sorted(df['state_name'].dropna().unique())
+
+        # Initialize a matrix of zeros
+        transition_matrix = pd.DataFrame(
+            data=0, index=unique_states, columns=unique_states, dtype=int
+        )
+
+        # Fill the matrix with transitions
+        for agent_id, group in df.groupby('agent_id'):
+            states = group['state_name'].values
+            for i in range(len(states) - 1):
+                transition_matrix.loc[states[i], states[i + 1]] += 1
+
+        # Normalize rows to show proportions (optional, can comment this out if counts are preferred)
+        transition_matrix_normalized = transition_matrix.div(transition_matrix.sum(axis=1), axis=0).fillna(0)
+
+        # Plot the state transition matrix
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(
+            transition_matrix_normalized, 
+            annot=True, 
+            fmt=".2f", 
+            cmap="Blues", 
+            xticklabels=unique_states, 
+            yticklabels=unique_states
+        )
+        plt.title("State Transition Matrix (Normalized)")
+        plt.xlabel("Next State")
+        plt.ylabel("Current State")
+        plt.show()
+
+    #looks better- but still not perfect
+    def sankey(self, file_path=None):
+        import plotly.graph_objects as go
+
+        if file_path is not None:
+            df = pd.read_csv(file_path, na_values=[], keep_default_na=False)
+        elif self.data is not None:
+            df = self.data
+        else:
+            print("No data provided.")
+            return
+
+        # Prepare data for Sankey plot
+        source = df['state_name']
+        target = df['going_to_state']
+        value = df['dwell_time']
+
+        # Create a dictionary to map unique labels to indices
+        labels = list(set(source) | set(target))
+        label_to_index = {label: i for i, label in enumerate(labels)}
+
+        # Map source and target to indices
+        source_indices = source.map(label_to_index)
+        target_indices = target.map(label_to_index)
+
+        # Create the Sankey plot
+        fig = go.Figure(go.Sankey(
+            node=dict(
+                pad=15,
+                thickness=20,
+                line=dict(color="black", width=0.2),
+                label=labels
+            ),
+            link=dict(
+                source=source_indices,
+                target=target_indices,
+                value=value,
+                hovertemplate='%{source.label} → %{target.label}: %{value} days<br>',
+                line=dict(color="lightgray", width=0.1),
+            )
+        ))
+
+        fig.update_layout(title_text="Sankey Diagram of State Transitions and Dwell Times", font_size=10)
+        fig.show()
+
+    # looks good /
+    def interactive_all_state_transitions(self, dwell_time_bins=None, filter_states=None):
+        """
+        Plot the state transitions and/or dwell time distributions of agents interactively,
+        with dwell times grouped into predefined ranges.
+
+        Parameters:
+        - dwell_time_bins (list): List of bin edges for grouping dwell times.
+                                    Default is [0, 50, 100, 150, 200, 250, np.inf].
+        - filter_states (list): List of states to include in the plot. If None, include all states.
+        """
+        import numpy as np
+        import plotly.express as px
+        import plotly.graph_objects as go
+
+        if self.data is None or self.data.empty or 'dwell_time' not in self.data.columns:
+            print("No dwell time data available to plot.")
+            return
+
+        # Set default bins if none are provided
+        if dwell_time_bins is None:
+            dwell_time_bins = [0, 50, 100, 150, 200, 250]
+
+        #appemd infinity to the bins
+        dwell_time_bins.append(np.inf)
+
+        # Create bin labels, handling infinity separately
+        dwell_time_labels = [
+            f"{int(b)}-{int(d)} days" if d != np.inf else f"{int(b)}+ days"
+            for b, d in zip(dwell_time_bins[:-1], dwell_time_bins[1:])
+        ]
+
+        # Create a dwell time category column
+        self.data['dwell_time_category'] = pd.cut(
+            self.data['dwell_time'],
+            bins=dwell_time_bins,
+            labels=dwell_time_labels,
+            include_lowest=True
+        )
+
+        # Apply state filter if provided
+        if filter_states is not None:
+            filtered_logger = self.data[
+                self.data['state_name'].isin(filter_states) |
+                self.data['going_to_state'].isin(filter_states)
+            ]
+        else:
+            filtered_logger = self.data
+
+        # Group by state transitions and dwell time category
+        grouped = filtered_logger.groupby(
+            ['state_name', 'going_to_state', 'dwell_time_category']
+        ).size().reset_index(name='count')
+
+        # Filter out empty ranges
+        grouped = grouped[grouped['count'] > 0]
+
+        # Interactive state transitions
+        fig = go.Figure()
+
+        for _, row in grouped.iterrows():
+            state_label = row['state_name']
+            going_to_state_label = row['going_to_state']
+            dwell_time_category = row['dwell_time_category']
+            count = row['count']
+            unique_transition = f"{state_label} → {going_to_state_label} ({dwell_time_category})"
+
+            # Add transition as a bar
+            fig.add_trace(go.Bar(
+                y=[unique_transition],
+                x=[count],
+                name=unique_transition,
+                text=[count],
+                textposition='auto',
+                orientation='h'
+            ))
+
+        fig.update_layout(
+            title="State Transitions Grouped by Dwell Time Categories",
+            yaxis_title="State Transitions",
+            xaxis_title="Count",
+            legend_title="Transitions",
+            height=100 + 30 * len(grouped),
+        )
+        fig.show()
+
+    # looks good - although crowded /
+    def stacked_bars_states_per_agent_static(self, file_path=None):
+
+        if file_path is not None:
+            df = pd.read_csv(file_path, na_values=[], keep_default_na=False)
+        elif self.data is not None:
+            df = self.data
+        else:
+            print("No data provided.")
+            return
+
+        # Calculate cumulative dwell time for each agent and state
+        df['cumulative_dwell_time'] = df.groupby(['agent_id', 'state_name'])['dwell_time'].cumsum()
+
+        # Convert dwell time to days
+        df['cumulative_dwell_time_days'] = df['cumulative_dwell_time']#/24
+
+        # Pivot the data to get cumulative dwell time for each state
+        pivot_df = df.pivot_table(index='agent_id', columns='state_name', values='cumulative_dwell_time_days', aggfunc='max', fill_value=0)
+
+        # Plot the data
+        pivot_df.plot(kind='bar', stacked=True, figsize=(15, 7))
+        plt.title('Cumulative Time in Days on Each State for All Agents')
+        plt.xlabel('Agent ID')
+        plt.ylabel('Cumulative Time (Days)')
+        plt.legend(title='State Name')
+        plt.tight_layout()
+        plt.show()
+        return
+
+    # looks good
+    def interactive_stacked_bar_charts_dt_by_state(self, bin_size=50, num_bins=20):
+        """
+        Generates an interactive stacked bar chart of dwell times by state using Plotly.
+
+        Parameters:
+        bin_size (int): The size of each bin for dwell times. Default is 50.
+        num_bins (int): The number of bins to divide the dwell times into. Default is 20.
+        self.data (DataFrame): A pandas DataFrame containing dwell time data with columns 'state_name', 'dwell_time', and 'going_to_state'.
+        
+        Returns:
+        None: Displays an interactive Plotly figure.
+        
+        Notes:
+        - If the self.data DataFrame is empty, the function will print a message and return without plotting.
+        - The function creates bins for dwell times and labels them in days.
+        - It generates a stacked bar chart for each state, showing the count of transitions to other states within each dwell time bin.
+        - The height of the figure is dynamically adjusted based on the number of states.
+        """
+        import plotly.express as px
+        import plotly.graph_objects as go
+
+        if self.data.empty:
+            print("No dwell time data available to plot.")
+            return
+
+        # Define bins for dwell times
+        bins = np.arange(0, bin_size * num_bins, bin_size)
+        bin_labels = [f"{int(b)}-{int(b + bin_size)} days" for b in bins[:-1]]
+
+        # Create a figure with subplots for each state
+        states = self.data['state_name'].unique()
+        num_states = len(states)
+        fig = go.Figure()
+
+        for state in states:
+            state_data = self.data[self.data['state_name'] == state]
+            state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
+
+            # Group by dwell time bins and going to state
+            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
+
+            for going_to_state in grouped.columns:
+                fig.add_trace(go.Bar(
+                    x=grouped.index,
+                    y=grouped[going_to_state],
+                    name=f"{state} to {going_to_state}",
+                    text=grouped[going_to_state],
+                    textposition='auto'
+                ))
+
+        fig.update_layout(
+            barmode='stack',
+            title="Stacked Bar Charts of Dwell Times by State",
+            xaxis_title="Dwell Time Bins",
+            yaxis_title="Count",
+            legend_title="State Transitions",
+            height=400 + 50 * num_states
+        )
+        fig.show()
+
+    # looks good
+    def plot_state_transition_lengths_custom(self, transitions_dict=None):
+        """
+        Plots the cumulative distribution of dwell times for different state transitions.
+
+        This function generates a plot with individual lines representing the cumulative 
+        distribution of dwell times for each specified state transition. If no transitions 
+        dictionary is provided, a default one is used.
+
+        Parameters:
+        self.data (pandas.DataFrame): A DataFrame containing the dwell time data. 
+            It should have columns 'state_name', 'going_to_state', and 'dwell_time'.
+        transitions_dict (dict): A dictionary where keys are state names and values are 
+            lists of states to which transitions are considered. If None, a default 
+            dictionary is used.
+
+            i.e.:
+
+            transitions_dict = {
+                'None': ['Latent Slow', 'Latent Fast'],
+                'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
+            }
+        Returns:
+        None: The function displays the plot and does not return any value.
+        """
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        if self.data is None or self.data.empty:
+            print("No dwell time data available to plot.")
+            return
+
+        if transitions_dict is None:
+            transitions_dict = {
+                'None': ['Latent Slow', 'Latent Fast'],
+                'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
+            }
+
+        # Create subplots
+        num_plots = len(transitions_dict)
+        fig, axes = plt.subplots(1, num_plots, figsize=(6 * num_plots, 6))
+
+        if num_plots == 1:
+            axes = [axes]
+
+        for ax, (state_name, going_to_states) in zip(axes, transitions_dict.items()):
+            for transition in going_to_states:
+                data = self.data[
+                    (self.data['state_name'] == state_name) &
+                    (self.data['going_to_state'] == transition)
+                ]['dwell_time']
+                ax.plot(np.sort(data), np.linspace(0, 1, len(data)), label=f"{state_name} -> {transition}")
+            ax.set_title(f"Transitions from {state_name}")
+            ax.set_xlabel("Time")
+            ax.set_ylabel("Cumulative Distribution")
+            ax.legend()
+        plt.tight_layout()
+        plt.show()
+
+    # looks good /
+    def plot_binned_by_compartment(self,  bin_size=50, num_bins=8):
+        """
+        Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins.
+
+        Parameters:
+        - self.data (pd.DataFrame): DataFrame containing dwell time data with columns 'state_name', 'dwell_time', and 'going_to_state'.
+        - bin_size (int): Size of each bin for grouping dwell times. Default is 50 days.
+        - num_bins (int): Number of bins to divide the dwell times into. Default is 10 bins.
+        """
+        import matplotlib.pyplot as plt
+
+        if self.data.empty:
+            print("No dwell time data available to plot.")
+            return
+
+        # Define bins for dwell times
+        bins = np.arange(0, bin_size*num_bins, bin_size)
+        bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+
+        # Create a figure with subplots for each state
+        states = self.data['state_name'].unique()
+
+        num_states = len(states)
+        num_cols = 4
+        num_rows = (num_states + num_cols - 1) // num_cols
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, 5 * num_rows), sharex=True)
+        fig.suptitle(f'State - Compartment Transitions)', fontsize=16)
+        axes = axes.flatten()
+
+        for ax, state in zip(axes, states):
+            state_data = self.data[self.data['state_name'] == state]
+            state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
+
+            # Group by dwell time bins and going to state
+            grouped = state_data.groupby(['dwell_time_bin', 'compartment']).size().unstack(fill_value=0)
+
+            # Plot stacked bar chart
+            grouped.plot(kind='bar', stacked=True, ax=ax, colormap='tab20')
+            ax.set_title(f'State: {state}')
+            ax.set_xlabel('Dwell Time Bins')
+            ax.set_ylabel('Count')
+            ax.legend(title='compartment')
+
+        # Remove any empty subplots
+        for i in range(num_states, len(axes)):
+            fig.delaxes(axes[i])
+
+        plt.tight_layout()
+        plt.show()
+
+    # looks good /
+    def plot_binned_stacked_bars_state_transitions(self, bin_size=50, num_bins=8):
+        """
+        Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins.
+
+        Parameters:
+        - self.data (pd.DataFrame): DataFrame containing dwell time data with columns 'state_name', 'dwell_time', and 'going_to_state'.
+        - bin_size (int): Size of each bin for grouping dwell times. Default is 50 days.
+        - num_bins (int): Number of bins to divide the dwell times into. Default is 10 bins.
+        """
+        import matplotlib.pyplot as plt
+
+        if self.data.empty:
+            print("No dwell time data available to plot.")
+            return
+
+        # Define bins for dwell times
+        bins = np.arange(0, bin_size*num_bins, bin_size)
+        bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+
+        # Create a figure with subplots for each state
+        states = self.data['state_name'].unique()
+        num_states = len(states)
+        num_cols = 4
+        num_rows = (num_states + num_cols - 1) // num_cols
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, 5 * num_rows), sharex=True)
+
+        axes = axes.flatten()
+        fig.suptitle(f'State Transitions by Dwell Time Bins)', fontsize=16)
+        for ax, state in zip(axes, states):
+            state_data = self.data[self.data['state_name'] == state]
+            state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
+
+            # Group by dwell time bins and going to state
+            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
+
+            # Plot stacked bar chart
+            grouped.plot(kind='bar', stacked=True, ax=ax, colormap='tab20')
+            ax.set_title(f'State: {state}')
+            ax.set_xlabel('Dwell Time Bins')
+            ax.set_ylabel('Count')
+            ax.legend(title='Going to State')
+
+        # Remove any empty subplots
+        for i in range(num_states, len(axes)):
+            fig.delaxes(axes[i])
+
+        plt.tight_layout()
+        plt.show()
+
+    def histogram_with_kde(self, num_bins=50, bin_size=30):
+        if self.data.empty:
+            print("No dwell time data available to plot.")
+            return
+
+        # Create DataFrame
+        df = self.data
+
+        # Define bins for dwell times
+        bins = np.arange(0, bin_size * num_bins + bin_size, bin_size)
+        bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+        # Create a figure with subplots for each state
+        states = df['state_name'].unique()
+        num_states = len(states)
+        num_cols = 4
+        num_rows = (num_states + num_cols - 1) // num_cols
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, 5 * num_rows), sharex=False)
+
+        axes = axes.flatten()
+        fig.suptitle('State Transitions by Dwell Time Bins', fontsize=16)
+
+        for ax, state in zip(axes, states):
+
+            state_data = df[df['state_name'] == state]
+            state_data['dwell_time_bin'] = pd.cut(
+                state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True
+            )
+            sns.histplot(data=state_data, 
+                         x='dwell_time', 
+                         bins=bins,
+                         hue='going_to_state', 
+                         kde=True, 
+                         palette='tab10',
+                         multiple='stack',
+                         legend=True,
+                         ax=ax)
+
+            ax.set_title(f'State: {state}')
+            ax.set_xlabel('Dwell Time Bins')
+            ax.set_ylabel('Count')
+            handles, labels = ax.get_legend_handles_labels()
+            if len(handles) > 0:
+                ax.legend(title='Going to State', loc='upper right')
+
+        # Remove any unused subplots
+        for i in range(num_states, len(axes)):
+            fig.delaxes(axes[i])
+
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.show()
+
+    # looks good /
+    def graph_state_transitions(self, states=None, layout=None, curved_ratio=0.05, colormap='tab20c'):
+        """
+        Plot a state transition graph with mean and mode dwell times annotated on the edges.
+
+        Parameters:
+        self.data (pd.DataFrame): A DataFrame containing columns 'state_name', 'going_to_state', and 'dwell_time'.
+                                        This DataFrame logs the dwell times for state transitions.
+        states (list, optional): A list of states to include in the graph. If None, all states in the self.data will be included.
+        Returns:
+        None: This function does not return any value. It displays a plot of the state transition graph.
+        Notes:
+        - The function uses NetworkX to create a directed graph where nodes represent states and edges represent transitions.
+        - Each edge is annotated with the mean and mode dwell times, as well as the number of agents that made the transition.
+        - If the self.data is empty, the function prints a message and returns without plotting.
+        - The graph layout is generated using a spring layout for better visualization.
+        - Nodes are colored using a colormap, and edges are drawn with arrows to indicate direction.
+        - The graph is displayed using Matplotlib.
+        """
+        import networkx as nx
+        import itertools as it
+        from scipy import stats
+
+        if self.data.empty:
+            print("No data available to plot.")
+            return
+        if states is not None:
+            self.data = self.data[self.data['state_name'].isin(states)]
+
+        # Calculate mean, mode, and count for each state transition
+        transitions = self.data.groupby(['state_name', 'going_to_state'])['dwell_time']
+        stats_df = transitions.agg([
+            'mean',
+            lambda x: stats.mode(x, keepdims=True).mode[0] if len(x) > 0 else np.nan,
+            'count'
+        ]).reset_index()
+
+        stats_df.columns = ['state_name', 'going_to_state', 'mean', 'mode', 'count']
+
+        # Create a directed graph
+        G = nx.DiGraph()
+
+        # Add edges with mean and mode annotations
+        for _, row in stats_df.iterrows():
+            from_state = row['state_name']
+            to_state = row['going_to_state']
+            mean_dwell = round(row['mean'], 2) if not pd.isna(row['mean']) else "N/A"
+            mode_dwell = round(row['mode'], 2) if not pd.isna(row['mode']) else "N/A"
+            num_agents = row['count']
+
+            # Add edge to the graph
+            G.add_edge(from_state, to_state,
+                label=f"Mean: {mean_dwell}\nMo: {mode_dwell}\nAgents: {num_agents}")
+
+        # Generate a layout for the graph
+        if layout is None:
+            pos = nx.spring_layout(G, seed=42)  # Fixed layout for consistency
+        else:
+            pos = self.select_graph_pos(G, layout=layout)
+
+        colors =plt.colormaps.get_cmap(colormap) 
+        node_colors = [colors(i) for i in range(len(G.nodes))]
+        nx.draw_networkx_nodes(G, pos, node_size=200, node_color=node_colors, alpha=0.9)
+        
+        # Draw edges with the same color as the origin node
+        edge_colors = [node_colors[list(G.nodes).index(edge[0])] for edge in G.edges]
+        nx.draw_networkx_edges(G, pos, width=1, arrowstyle="-|>", arrowsize=30, edge_color=edge_colors, connectionstyle=f"arc3,rad={curved_ratio}")
+        
+        nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
+
+        # Annotate edges with mean and mode
+        edge_labels = nx.get_edge_attributes(G, 'label')
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8)
+
+        # Display the graph
+        plt.tight_layout()
+        plt.title("State Transition Graph with Dwell Times")
+        plt.show()
+        return
+
+    # Looks good /
+    def graph_compartments_transitions(self, states=None, layout=0, groups=[[]]):
+        """
+        Plots a directed graph of state transitions with dwell times.
+
+        Parameters:
+        self.data (DataFrame): A pandas DataFrame containing columns 'state_name', 'compartment', and 'dwell_time'.
+                                    This DataFrame logs the dwell times for each state transition.
+        states (list, optional): A list of state names to filter the self.data. If None, all states are included.
+        layout (int, optional): The layout type for the graph. Default is 0 (spring layout).
+        Returns:
+        None: The function displays a plot of the state transition graph with annotations for mean, mode, and count of dwell times.
+        """
+
+        import networkx as nx
+        import itertools as it
+        from scipy import stats
+
+        if self.data.empty:
+            print("No data available to plot.")
+            return
+
+        if states is not None:
+            self.data = self.data[self.data['state_name'].isin(states)]
+
+        # Calculate mean, mode, and count for each state transition
+        transitions = self.data.groupby(['state_name', 'compartment'])['dwell_time']
+        stats_df = transitions.agg([
+            'mean',
+            lambda x: stats.mode(x, keepdims=True).mode[0] if len(x) > 0 else np.nan,
+            'count'
+        ]).reset_index()
+
+        stats_df.columns = ['state_name', 'compartment', 'mean', 'mode', 'count']
+
+        # Create a directed graph
+        G = nx.DiGraph()
+
+        # Add edges with mean and mode annotations
+        for _, row in stats_df.iterrows():
+            from_state = row['state_name']
+            to_compartment = row['compartment']
+            mean_dwell = round(row['mean'], 2) if not pd.isna(row['mean']) else "N/A"
+            mode_dwell = round(row['mode'], 2) if not pd.isna(row['mode']) else "N/A"
+            num_agents = row['count']
+
+            # Add edge to the graph
+            G.add_edge(from_state, to_compartment,
+                        label=f"Mean: {mean_dwell}, Mode: {mode_dwell}\nAgents: {num_agents}")
+
+        # Generate a layout for the graph
+        pos = self.select_graph_pos(G, layout)
+
+        # Draw nodes and edges with curved lines
+        colors =plt.colormaps.get_cmap('tab20')
+        node_colors = [colors(i) for i in range(len(G.nodes))]
+        nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, alpha=0.9)
+        nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black", connectionstyle="arc3,rad=0.1")
+        nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
+
+        # Annotate edges with mean and mode
+        edge_labels = nx.get_edge_attributes(G, 'label')
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=7)
+
+        # Display the graph
+        plt.title("State->Compartment Graph with Dwell Times")
+        plt.show()
+        return
+
+    def plot_dwell_time_validation(self):
+        # Plot the results of the dwell time validation.
+        fig, ax = plt.subplots()
+        data = self.data
+        model_states = data['state_name'].unique()
+        for state in model_states:
+            dwell_times = data[data['state_name'] == state]['dwell_time']
+            if dwell_times.empty:
+                continue
+            state_label = state
+            ax.hist(dwell_times, bins=50, alpha=0.5, label=f'{state_label}')
+            ax.hist(dwell_times, bins=50, alpha=0.5, label=f'{state}')
+        ax.set_xlabel('Dwell Time')
+        ax.set_ylabel('Frequency')
+        ax.legend()
+        plt.show()
+        return
+
+    def plot_dwell_time_validation_interactive(self):
+        """
+        Plot the results of the dwell time validation interactively using Plotly.
+        """
+        import plotly.express as px
+        data = self.data
+        fig = px.histogram(data, x='dwell_time', color='state_name', 
+                            nbins=50, barmode='overlay', 
+                            labels={'dwell_time': 'Dwell Time', 'state_name': 'State'},
+                            title='Dwell Time Validation')
+        fig.update_layout(bargap=0.1)
+        fig.show()
+        return
+    
+    @staticmethod
+    def select_graph_pos(G, layout):
+        import networkx as nx
+        
+        if layout == 1: 
+            return nx.circular_layout(G)
+            return pos
+        elif layout == 2: 
+            return nx.spiral_layout(G)
+            return pos
+        elif layout == 3: 
+            return nx.spectral_layout(G)
+            return pos
+        elif layout == 4: 
+            return nx.shell_layout(G)
+        elif layout == 5: 
+            return nx.kamada_kawai_layout(G)
+        elif layout == 6: 
+            return nx.planar_layout(G)
+        elif layout == 7: 
+            return nx.random_layout(G)
+        elif layout == 9: 
+            return nx.fruchterman_reingold_layout(G)
+        else: 
+            return nx.spring_layout(G, seed=42)
+
+        return pos
+
+
+class DwtAnalyzer(ss.Analyzer, DwtPlotter):
+    def __init__(self, adjust_to_unit=False, unit=0.0, states_ennumerator=None):
         """
         Initializes the analyzer with optional adjustments to days and unit specification.
 
         Args:
-            adjust_to_days (bool): If True, adjusts the dwell times to days by multiplying the recorded dwell_time by the sim.pars.dt.
+            adjust_to_unit (bool): If True, adjusts the dwell times to days by multiplying the recorded dwell_time by the sim.pars.dt.
             Default is True.
             
             unit (str): The unit of time for the analysis. Default is 'days'. TODO: Implement its use.
@@ -41,12 +791,12 @@ class DwtAnalyzer(ss.Analyzer, plotter.DwtPlotter):
         self.eSTATES = states_ennumerator
         if self.eSTATES is None:
             self.eSTATES = mtb.TBS
-        self.adjust_to_days = adjust_to_days
+        self.adjust_to_unit = adjust_to_unit
         self.unit = unit
         self.file_path = None
         self.data = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state_id','going_to_state'])
         self._latest_sts_df = pd.DataFrame(columns=['agent_id', 'last_state', 'last_state_time'])      
-        plotter.DwtPlotter.__init__(self, data=self.data)
+        DwtPlotter.__init__(self, data=self.data)
         return
     
     def _initialize_dataframes(self):
@@ -111,9 +861,9 @@ class DwtAnalyzer(ss.Analyzer, plotter.DwtPlotter):
         self.data['state_name'] = self.data['state'].apply(lambda x: self.eSTATES(x).name.replace('_', ' ').title())
         self.data['going_to_state'] = self.data['going_to_state_id'].apply(lambda x: self.eSTATES(x).name.replace('_', ' ').title())
         self.data['compartment'] = 'tbd'
-        if self.adjust_to_days:
+        if self.adjust_to_unit:
             self.data['dwell_time_recorded'] = self.data['dwell_time']
-            self.data['dwell_time'] = self.data['dwell_time'] * self.sim.pars.dt
+            self.data['dwell_time'] = self.data['dwell_time'] * self.unit
         
         self.file_path = self._save_to_file()
         return
@@ -139,20 +889,16 @@ class DwtAnalyzer(ss.Analyzer, plotter.DwtPlotter):
         t = ddtt.datetime.now()
         fn = os.path.join(resdir, f'dwell_time_logger_{t.strftime("%Y%m%d%H%M%S")}.csv')
         self.data.to_csv(fn, index=False)
+
         fn_meta = os.path.join(resdir, f'dwell_time_logger_{t.strftime("%Y%m%d%H%M%S")}.json')
         with open(fn_meta, 'w') as f:
-            f.write('{"sim_units": "%s", "specified_units": "%s"}' % (self.sim.pars.unit, self.unit))
+            f.write(f'{self.sim.pars}')
 
         print(f"Dwell time logs saved to:\n {fn}\n")
         return fn
 
     def validate_dwell_time_distributions(self, expected_distributions=None):
-        """
-        Validate dwell times against expected distributions using statistical tests.
-        """
         from scipy.stats import ks_1samp, ks_2samp
-
-        
         expected_distributions = expected_distributions or self.expected_distributions
        
         print("Validating dwell time distributions...")
@@ -166,3 +912,18 @@ class DwtAnalyzer(ss.Analyzer, plotter.DwtPlotter):
             if p_value < 0.05:
                 print(f"WARNING: Dwell times for state {state} deviate significantly from expectations.")
         return
+
+
+
+# Example usage
+if __name__ == '__main__':
+
+    # Create a sample DataFrame
+    file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250124160857.csv'
+    # Initialize the DwtPlotter with the file name
+    plotter = DwtPlotter(file_path=file)
+    plotter.sankey()
+    # plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
+    # plotter.histogram_with_kde(num_bins=10, bin_size=30)
+
+
