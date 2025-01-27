@@ -39,6 +39,9 @@ class DwtPlotter:
         Returns:
             None: Displays the Kaplan-Meier survival plot.
         """
+        if self.data_error():
+            return
+        
         data = self.data
         # Prepare the data
         durations = data[dwell_time_col]
@@ -60,7 +63,7 @@ class DwtPlotter:
         plt.show()
 
     # looks good
-    def state_transition_matrix(self, file_path=None):
+    def state_transition_matrix(self):
         """
         Generates and plots a state transition matrix from the provided data.
         Parameters:
@@ -75,13 +78,9 @@ class DwtPlotter:
         - The transition matrix is normalized to show proportions. To display raw counts, comment out the normalization step.
         """
 
-        if file_path is not None:
-            df = pd.read_csv(file_path, na_values=[], keep_default_na=False)
-        elif self.data is not None:
-            df = self.data
-        else:
-            print("No data provided.")
+        if self.data_error():
             return
+        df = self.data
 
         # Create a transition matrix
         # Get the unique states
@@ -117,16 +116,29 @@ class DwtPlotter:
         plt.show()
 
     #looks better- but still not perfect
-    def sankey(self, file_path=None):
+    def sankey(self):
+        """
+        Generates and displays a Sankey diagram of state transitions and dwell times.
+
+        Parameters:
+        file_path (str, optional): The path to a CSV file containing the data. If not provided, 
+                                   the method will use the data stored in self.data.
+
+        The CSV file or self.data should contain the following columns:
+        - 'state_name': The name of the current state.
+        - 'going_to_state': The name of the state to which the transition is made.
+        - 'dwell_time': The time spent in the current state before transitioning.
+
+        If neither file_path nor self.data is provided, the method will print "No data provided." and return.
+
+        The method uses Plotly to create and display the Sankey diagram.
+        """
         import plotly.graph_objects as go
 
-        if file_path is not None:
-            df = pd.read_csv(file_path, na_values=[], keep_default_na=False)
-        elif self.data is not None:
-            df = self.data
-        else:
-            print("No data provided.")
+        if self.data_error():
             return
+        
+        df = self.data
 
         # Prepare data for Sankey plot
         source = df['state_name']
@@ -164,20 +176,22 @@ class DwtPlotter:
     # looks good /
     def interactive_all_state_transitions(self, dwell_time_bins=None, filter_states=None):
         """
-        Plot the state transitions and/or dwell time distributions of agents interactively,
-        with dwell times grouped into predefined ranges.
+        Generates an interactive bar chart of state transitions grouped by dwell time categories.
 
         Parameters:
-        - dwell_time_bins (list): List of bin edges for grouping dwell times.
-                                    Default is [0, 50, 100, 150, 200, 250, np.inf].
-        - filter_states (list): List of states to include in the plot. If None, include all states.
+        dwell_time_bins (list, optional): List of bin edges for categorizing dwell times. 
+                                          Defaults to [0, 50, 100, 150, 200, 250].
+        filter_states (list, optional): List of states to filter the data by. If None, no filtering is applied.
+
+        Returns:
+        None: Displays an interactive Plotly bar chart.
         """
+
         import numpy as np
         import plotly.express as px
         import plotly.graph_objects as go
 
-        if self.data is None or self.data.empty or 'dwell_time' not in self.data.columns:
-            print("No dwell time data available to plot.")
+        if self.data_error():
             return
 
         # Set default bins if none are provided
@@ -248,16 +262,25 @@ class DwtPlotter:
         fig.show()
 
     # looks good - although crowded /
-    def stacked_bars_states_per_agent_static(self, file_path=None):
+    def stacked_bars_states_per_agent_static(self):
+        """
+        Plots a stacked bar chart showing the cumulative dwell time in days for each state per agent.
 
-        if file_path is not None:
-            df = pd.read_csv(file_path, na_values=[], keep_default_na=False)
-        elif self.data is not None:
-            df = self.data
-        else:
-            print("No data provided.")
+        This function reads data from a CSV file or uses an existing DataFrame to calculate the cumulative dwell time
+        for each agent and state. It then converts the dwell time to days and creates a pivot table to get the cumulative
+        dwell time for each state. Finally, it plots a stacked bar chart to visualize the cumulative time in days spent
+        in each state for all agents.
+
+        Parameters:
+        file_path (str, optional): The path to the CSV file containing the data. If not provided, the function will use
+                                   the data stored in `self.data`.
+
+        Returns:
+        None
+        """
+        if self.data_error():
             return
-
+        df = self.data
         # Calculate cumulative dwell time for each agent and state
         df['cumulative_dwell_time'] = df.groupby(['agent_id', 'state_name'])['dwell_time'].cumsum()
 
@@ -278,14 +301,13 @@ class DwtPlotter:
         return
 
     # looks good
-    def interactive_stacked_bar_charts_dt_by_state(self, bin_size=50, num_bins=20):
+    def interactive_stacked_bar_charts_dt_by_state(self, bin_size=1, num_bins=20):
         """
         Generates an interactive stacked bar chart of dwell times by state using Plotly.
 
         Parameters:
         bin_size (int): The size of each bin for dwell times. Default is 50.
         num_bins (int): The number of bins to divide the dwell times into. Default is 20.
-        self.data (DataFrame): A pandas DataFrame containing dwell time data with columns 'state_name', 'dwell_time', and 'going_to_state'.
         
         Returns:
         None: Displays an interactive Plotly figure.
@@ -299,8 +321,7 @@ class DwtPlotter:
         import plotly.express as px
         import plotly.graph_objects as go
 
-        if self.data.empty:
-            print("No dwell time data available to plot.")
+        if self.data_error():
             return
 
         # Define bins for dwell times
@@ -348,8 +369,7 @@ class DwtPlotter:
         dictionary is provided, a default one is used.
 
         Parameters:
-        self.data (pandas.DataFrame): A DataFrame containing the dwell time data. 
-            It should have columns 'state_name', 'going_to_state', and 'dwell_time'.
+        -----------
         transitions_dict (dict): A dictionary where keys are state names and values are 
             lists of states to which transitions are considered. If None, a default 
             dictionary is used.
@@ -367,8 +387,7 @@ class DwtPlotter:
         import matplotlib.pyplot as plt
         import numpy as np
 
-        if self.data is None or self.data.empty:
-            print("No dwell time data available to plot.")
+        if self.data_error():
             return
 
         if transitions_dict is None:
@@ -399,24 +418,38 @@ class DwtPlotter:
         plt.show()
 
     # looks good /
-    def plot_binned_by_compartment(self,  bin_size=50, num_bins=8):
+    def plot_binned_by_compartment(self,  bin_size=1, num_bins=50):
         """
-        Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins.
+        Plots the dwell time data binned by compartment for each state.
 
         Parameters:
-        - self.data (pd.DataFrame): DataFrame containing dwell time data with columns 'state_name', 'dwell_time', and 'going_to_state'.
-        - bin_size (int): Size of each bin for grouping dwell times. Default is 50 days.
-        - num_bins (int): Number of bins to divide the dwell times into. Default is 10 bins.
+        -----------
+        bin_size : int, optional
+            The size of each bin for dwell times in days. Default is 50.
+        num_bins : int, optional
+            The number of bins to create. Default is 8.
+
+        Returns:
+        --------
+        None
+            This function does not return any value. It generates and displays a plot.
+
+        Notes:
+        ------
+        - The function uses matplotlib to create a figure with subplots for each unique state in the data.
+        - Each subplot shows a stacked bar chart of the count of dwell times binned by the specified bin size and grouped by compartment.
+        - If the data is empty, the function prints a message and returns without plotting.
+        - The function automatically adjusts the layout to fit all subplots and removes any empty subplots.
         """
+
         import matplotlib.pyplot as plt
 
-        if self.data.empty:
-            print("No dwell time data available to plot.")
+        if self.data_error():
             return
 
         # Define bins for dwell times
         bins = np.arange(0, bin_size*num_bins, bin_size)
-        bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+        bin_labels = [f"{int(b)}-{int(b+bin_size)}" for b in bins[:-1]]
 
         # Create a figure with subplots for each state
         states = self.data['state_name'].unique()
@@ -450,24 +483,33 @@ class DwtPlotter:
         plt.show()
 
     # looks good /
-    def plot_binned_stacked_bars_state_transitions(self, bin_size=50, num_bins=8):
+    def plot_binned_stacked_bars_state_transitions(self, bin_size=1, num_bins=50):
         """
-        Plot stacked bar charts for each state showing the distribution of dwell times in configurable bins.
+        Plots binned stacked bar charts for state transitions based on dwell times.
 
         Parameters:
-        - self.data (pd.DataFrame): DataFrame containing dwell time data with columns 'state_name', 'dwell_time', and 'going_to_state'.
-        - bin_size (int): Size of each bin for grouping dwell times. Default is 50 days.
-        - num_bins (int): Number of bins to divide the dwell times into. Default is 10 bins.
+        bin_size (int): The size of each bin for dwell times in days. Default is 50.
+        num_bins (int): The number of bins to create. Default is 8.
+
+        Returns:
+        None: This function does not return any value. It displays a plot.
+
+        Notes:
+        - The function checks if the data is empty and prints a message if no data is available.
+        - It creates bins for dwell times and labels them accordingly.
+        - A figure with subplots is created for each unique state in the data.
+        - Each subplot shows a stacked bar chart of state transitions grouped by dwell time bins.
+        - Any empty subplots are removed before displaying the plot.
         """
+
         import matplotlib.pyplot as plt
 
-        if self.data.empty:
-            print("No dwell time data available to plot.")
+        if self.data_error():
             return
 
         # Define bins for dwell times
         bins = np.arange(0, bin_size*num_bins, bin_size)
-        bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+        bin_labels = [f"{int(b)}-{int(b+bin_size)}" for b in bins[:-1]]
 
         # Create a figure with subplots for each state
         states = self.data['state_name'].unique()
@@ -499,9 +541,22 @@ class DwtPlotter:
         plt.tight_layout()
         plt.show()
 
-    def histogram_with_kde(self, num_bins=50, bin_size=30):
-        if self.data.empty:
-            print("No dwell time data available to plot.")
+    def histogram_with_kde(self, num_bins=50, bin_size=1):
+        """
+        Plots histograms with Kernel Density Estimation (KDE) for dwell times of different states.
+        Parameters:
+        num_bins (int): Number of bins for the histogram. Default is 50.
+        bin_size (int): Size of each bin. Default is 30.
+        Returns:
+        None: Displays the histogram with KDE plots.
+        Notes:
+        - If the data is empty, the function will print a message and return without plotting.
+        - The function creates subplots for each unique state in the data.
+        - Each subplot shows the distribution of dwell times for a state, with KDE and stacked histograms based on the 'going_to_state' column.
+        - Unused subplots are removed from the figure.
+        """
+
+        if self.data_error():
             return
 
         # Create DataFrame
@@ -554,14 +609,30 @@ class DwtPlotter:
     def graph_state_transitions(self, states=None, layout=None, curved_ratio=0.05, colormap='tab20c'):
         """
         Plot a state transition graph with mean and mode dwell times annotated on the edges.
-
+        
         Parameters:
-        self.data (pd.DataFrame): A DataFrame containing columns 'state_name', 'going_to_state', and 'dwell_time'.
-                                        This DataFrame logs the dwell times for state transitions.
+        -----------
+        curved_ratio (float, optional): Ratio to curve the edges. Default is 0.05.
+        colormap (str, optional): Name of the colormap to use for coloring nodes. Default is 'tab20c'.
         states (list, optional): A list of states to include in the graph. If None, all states in the self.data will be included.
+        layout (dict, optional): A dictionary specifying the layout positions of nodes. If None, a spring layout is used.
+                0: (Default) Spring layout.
+                1: Circular layout
+                2: Spiral layout
+                3: Spectral layout
+                4: Shell layout
+                5: Kamada-Kawai layout
+                6: Planar layout
+                7: Random layout
+                8: Circular layout
+                9: Fruchterman-Reingold layout
+
         Returns:
+        --------
         None: This function does not return any value. It displays a plot of the state transition graph.
+
         Notes:
+        -------
         - The function uses NetworkX to create a directed graph where nodes represent states and edges represent transitions.
         - Each edge is annotated with the mean and mode dwell times, as well as the number of agents that made the transition.
         - If the self.data is empty, the function prints a message and returns without plotting.
@@ -573,9 +644,9 @@ class DwtPlotter:
         import itertools as it
         from scipy import stats
 
-        if self.data.empty:
-            print("No data available to plot.")
+        if self.data_error():
             return
+        
         if states is not None:
             self.data = self.data[self.data['state_name'].isin(states)]
 
@@ -633,13 +704,28 @@ class DwtPlotter:
     # Looks good /
     def graph_compartments_transitions(self, states=None, layout=0, groups=[[]]):
         """
+        /* UNDER CONSTRUCTION */
         Plots a directed graph of state transitions with dwell times.
 
         Parameters:
-        self.data (DataFrame): A pandas DataFrame containing columns 'state_name', 'compartment', and 'dwell_time'.
-                                    This DataFrame logs the dwell times for each state transition.
-        states (list, optional): A list of state names to filter the self.data. If None, all states are included.
-        layout (int, optional): The layout type for the graph. Default is 0 (spring layout).
+            states (list, optional): A list of state names to filter the self.data. If None, all states are included.
+            groups (list of lists, optional): A list of groups for custom node coloring. Default is [[]].
+            layout (int, optional): The layout type for the graph. 
+                Default is 0 (spring layout).
+                1: Circular layout
+                2: Spiral layout
+                3: Spectral layout
+                4: Shell layout
+                5: Kamada-Kawai layout
+                6: Planar layout
+                7: Random layout
+                8: Circular layout
+                9: Fruchterman-Reingold layout
+            Notes:
+            - The function expects self.data to be a pandas DataFrame containing columns 'state_name', 'compartment', and 'dwell_time'.
+            - It uses NetworkX for graph creation and Matplotlib for plotting.
+            - Then calculates mean, mode, and count of dwell times for each state transition.
+
         Returns:
         None: The function displays a plot of the state transition graph with annotations for mean, mode, and count of dwell times.
         """
@@ -648,8 +734,7 @@ class DwtPlotter:
         import itertools as it
         from scipy import stats
 
-        if self.data.empty:
-            print("No data available to plot.")
+        if self.data_error():
             return
 
         if states is not None:
@@ -700,7 +785,28 @@ class DwtPlotter:
         return
 
     def plot_dwell_time_validation(self):
+        """
+        Plot the results of the dwell time validation.
+
+        This method generates a histogram for the dwell times of different states
+        in the dataset. Each state's dwell time is plotted in a separate histogram
+        with a unique label.
+
+        The method performs the following steps:
+        1. Creates a figure and axis for the plot.
+        2. Retrieves the unique states from the dataset.
+        3. Iterates over each state and extracts the dwell times for that state.
+        4. Plots a histogram of the dwell times for each state.
+        5. Sets the x-axis label to 'Dwell Time' and the y-axis label to 'Frequency'.
+        6. Adds a legend to the plot.
+        7. Displays the plot.
+
+        Returns:
+            None
+        """
         # Plot the results of the dwell time validation.
+        if self.data_error():
+            return
         fig, ax = plt.subplots()
         data = self.data
         model_states = data['state_name'].unique()
@@ -719,9 +825,24 @@ class DwtPlotter:
 
     def plot_dwell_time_validation_interactive(self):
         """
-        Plot the results of the dwell time validation interactively using Plotly.
+        Plots an interactive histogram for dwell time validation using Plotly.
+
+        This method generates an interactive histogram plot of the dwell time data,
+        categorized by state names. The histogram is overlaid with different colors
+        representing different states, and the plot includes labels and a title for
+        better readability.
+
+        The histogram is displayed using Plotly's `show` method, which opens the plot
+        in a web browser.
+
+        Returns:
+            None
         """
+
         import plotly.express as px
+        if self.data_error():
+            return
+        
         data = self.data
         fig = px.histogram(data, x='dwell_time', color='state_name', 
                             nbins=50, barmode='overlay', 
@@ -731,6 +852,14 @@ class DwtPlotter:
         fig.show()
         return
     
+    def data_error(self):
+        # data error handling - check if data is available
+
+        if self.data is None or self.data.empty or 'dwell_time' not in self.data.columns:
+            print("No dwell time data available to plot.")
+            return True
+        return False
+
     @staticmethod
     def select_graph_pos(G, layout):
         import networkx as nx
@@ -761,7 +890,7 @@ class DwtPlotter:
 
 
 class DwtAnalyzer(ss.Analyzer, DwtPlotter):
-    def __init__(self, adjust_to_unit=False, unit=0.0, states_ennumerator=None):
+    def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=None):
         """
         Initializes the analyzer with optional adjustments to days and unit specification.
 
@@ -769,7 +898,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             adjust_to_unit (bool): If True, adjusts the dwell times to days by multiplying the recorded dwell_time by the sim.pars.dt.
             Default is True.
             
-            unit (str): The unit of time for the analysis. Default is 'days'. TODO: Implement its use.
+            unit (float):  TODO: Implement its use.
             states_ennumerator (IntEnum): An IntEnum class that enumerates the states in the simulation. Default is None which will result in the use of the mtb.TBS class.
 
         How to use it:

@@ -26,7 +26,8 @@ def make_tb(sim_pars=None):
         unit='day',
         rel_sus_latentslow=0.5,
     ))
-    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=7/365)
+    # ANALYZER:
+    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=7/365) # Adjust to years
 
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     births = ss.Births(pars=dict(birth_rate=5))
@@ -93,17 +94,18 @@ def run_simulation():
 
 
     # Plotting
-    ana_dwt.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
-    # ana_dwt.graph_state_transitions(states=['None', 'Latent Slow', 'Latent Fast', 'Active Presymp', 'Active Smpos', 'Active Smneg'], layout=0)
-    # ana_dwt.plot_dwell_time_validation()
-    # ana_dwt.plot_dwell_time_validation_interactive()
-    # ana_dwt.graph_compartments_transitions(layout=0)
-    # ana_dwt.interactive_all_state_transitions()
-    # ana_dwt.stacked_bars_states_per_agent_static()
-    # ana_dwt.interactive_stacked_bar_charts_dt_by_state()
-    # ana_dwt.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
-    # ana_dwt.plot_binned_by_compartment(num_bins=50)
-    # ana_dwt.sankey()
+    ana_dwt.histogram_with_kde(num_bins=50, bin_size=1)
+    ana_dwt.graph_state_transitions(layout=0)
+    ana_dwt.plot_dwell_time_validation()
+    ana_dwt.plot_dwell_time_validation_interactive()
+    ana_dwt.graph_compartments_transitions(layout=0)
+    ana_dwt.interactive_all_state_transitions()
+    ana_dwt.stacked_bars_states_per_agent_static()
+    ana_dwt.interactive_stacked_bar_charts_dt_by_state()
+    ana_dwt.plot_binned_stacked_bars_state_transitions(bin_size=1, num_bins=50)
+    ana_dwt.plot_binned_by_compartment(num_bins=50)
+    ana_dwt.sankey()
+    # ana_dwt.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
 
     # Perform validation and plotting
 
@@ -111,21 +113,21 @@ def run_simulation():
     # file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250124160857.csv'   # Option #1:  MANUALLY PASS THE FILE PATH
     file = ana_dwt.file_path                                                        # Option #2:  Get the file path from the analyzer   
 
-    # Initialize the DwtPlotter
+    # # Initialize the DwtPlotter
     plotter = mtb.DwtPlotter(file_path=file)
 
-    plotter.histogram_with_kde(num_bins=10, bin_size=30)
-    plotter.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
-    plotter.graph_state_transitions()
-    plotter.plot_dwell_time_validation()
-    plotter.plot_dwell_time_validation_interactive()
-    plotter.graph_compartments_transitions(layout=0)
-    plotter.interactive_all_state_transitions()
-    plotter.stacked_bars_states_per_agent_static()
+    # plotter.histogram_with_kde(num_bins=10, bin_size=30)
+    # plotter.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
+    # plotter.graph_state_transitions()
+    # plotter.plot_dwell_time_validation()
+    # plotter.plot_dwell_time_validation_interactive()
+    # plotter.graph_compartments_transitions(layout=0)
+    # plotter.interactive_all_state_transitions()
+    # plotter.stacked_bars_states_per_agent_static()
     plotter.interactive_stacked_bar_charts_dt_by_state()
-    plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
-    plotter.plot_binned_by_compartment(num_bins=50)
-    plotter.sankey()
+    # plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
+    # plotter.plot_binned_by_compartment(num_bins=50)
+    # plotter.sankey()
 
 if __name__ == '__main__':
     run_simulation()
