@@ -14,7 +14,7 @@ import networkx as nx
 import plotly.graph_objects as go
 
 
-__all__ = ['DwtAnalyzer', 'DwtPlotter']
+__all__ = ['DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor']
 
 class DwtPlotter:
     def __init__(self, data=None, file_path=None):
@@ -891,6 +891,86 @@ class DwtPlotter:
 
         return pos
 
+class DwtPostProcessor(DwtPlotter):
+    def __init__(self, directory='', prefix='', data=None, **kwargs):
+        """
+        Initializes the post-analyzer with the data from the DwtAnalyzer.
+
+        Args:
+            data (pd.DataFrame): A DataFrame containing the dwell time data. Default is None.
+
+        How to use it:
+        1. Create an instance of the post-analyzer with the data from the DwtAnalyzer.
+        2. Call the method you want to use.
+
+        Example:
+        ```
+        postproc = DwtPostProcessor(directory='results', prefix='BaselineLSHTM')
+        postproc.sandkey()
+        ```
+        """
+        self.directory = directory
+        self.prefix = prefix
+
+        if data is None:
+            data = self.aggregate_simulation_results(self.directory, self.prefix)
+        DwtPlotter.__init__(self, data=data)
+        
+        return
+
+
+    def aggregate_simulation_results(self, directory: str, prefix: str) -> pd.DataFrame:
+        """
+        Aggregates all CSV files of the same kind (e.g., BaselineLSHTM, BaselineTBSim)
+        into a single DataFrame.
+
+        Args:
+            directory (str): The path to the directory containing the CSV files.
+            prefix (str): The common prefix identifying the group of files to aggregate
+                          (e.g., "BaselineLSHTM" or "BaselineTBSim").
+
+        Returns:
+            pd.DataFrame: A concatenated DataFrame containing all data from matching files.
+        """
+        import os
+        import pandas as pd
+        import glob
+
+        file_pattern = os.path.join(directory, f"{prefix}-*.csv")
+        file_list = glob.glob(file_pattern)
+
+        if not file_list:
+            print(f"No files found matching pattern: {file_pattern}")
+            return pd.DataFrame()
+        else:
+            print(f"Found {len(file_list)} files matching pattern: {file_pattern}")
+            print("\n".join(file_list))
+
+        data_frames = []
+        for index, file in enumerate(file_list):
+            try:
+                # Read the file into a DataFrame
+                df = pd.read_csv(file)
+                
+                # Add the file index to the 'agent_id'
+                df['agent_id'] = (index * 10) + df['agent_id']
+                
+                # Add file identifier for reference
+                df['source_file'] = os.path.basename(file)
+                
+                # Append the DataFrame to the list
+                data_frames.append(df)
+            except Exception as e:
+                print(f"Error reading {file}: {e}")
+
+        if not data_frames:
+            print(f"No valid CSV files to aggregate for prefix: {prefix}")
+            return pd.DataFrame()
+
+        combined_df = pd.concat(data_frames, ignore_index=True)
+        return combined_df
+
+
 
 class DwtAnalyzer(ss.Analyzer, DwtPlotter):
     def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=mtb.TBS, scenario_name=''):
@@ -1034,10 +1114,11 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         prefix = f'{self.to_filename_friendly(self.scenario_name)}'
         if prefix == '' or prefix is None: 
             prefix = 'dwt_logs'
-        fn = os.path.join(resdir, f'{prefix}-{t.strftime("%Y%m%d%H%M%S")}.csv')
+        t = t.strftime("%m%d%H%M%S")
+        fn = os.path.join(resdir, f'{prefix}-{t}.csv')
         self.data.to_csv(fn, index=False)
 
-        fn_meta = os.path.join(resdir, f'{prefix}-{t.strftime("%Y%m%d%H%M%S")}.json')
+        fn_meta = os.path.join(resdir, f'{prefix}-{t}.json')
         with open(fn_meta, 'w') as f:
             f.write(f'{self.sim.pars}')
 
@@ -1074,11 +1155,20 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
 if __name__ == '__main__':
 
     # Create a sample DataFrame
-    file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250127151951.csv'
-    # Initialize the DwtPlotter with the file name
-    plotter = DwtPlotter(file_path=file)
-    # plotter.sankey()
-    # plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
-    plotter.histogram_with_kde()
+    # file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250127151951.csv'
+    # # Initialize the DwtPlotter with the file name
+    # plotter = DwtPlotter(file_path=file)
+    # # plotter.sankey()
+    # # plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
+    # plotter.histogram_with_kde()
+
+
+    directory = '/Users/mine/git/tb_acf/results/' 
+
+    # analyzer = mtb.DwtPostProcessor(directory= directory, prefix= 'BaselineTBsim')
+    # analyzer.sankey()
+
+    london = mtb.DwtPostProcessor(directory=directory, prefix= 'BaselineLSHTM')
+    london.sankey()
 
 

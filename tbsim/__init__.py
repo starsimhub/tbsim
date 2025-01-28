@@ -7,4 +7,4 @@ from .config import *
 from .interventions import *
 from .networks import HouseholdNet
 from .connectors import TB_Nutrition_Connector
-from .analyzers import DwtAnalyzer, DwtPlotter
+from .analyzers import DwtAnalyzer, DwtPlotter, DwtPostProcessor
