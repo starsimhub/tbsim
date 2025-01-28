@@ -84,8 +84,8 @@ class DwtPlotter:
 
         # Create a transition matrix
         # Get the unique states
-        unique_states = sorted(df['state_name'].dropna().unique())
-
+        # unique_states = sorted(df['state'].dropna().unique())
+        unique_states = sorted(df['state'].unique())
         # Initialize a matrix of zeros
         transition_matrix = pd.DataFrame(
             data=0, index=unique_states, columns=unique_states, dtype=int
@@ -93,7 +93,7 @@ class DwtPlotter:
 
         # Fill the matrix with transitions
         for agent_id, group in df.groupby('agent_id'):
-            states = group['state_name'].values
+            states = group['state'].values
             for i in range(len(states) - 1):
                 transition_matrix.loc[states[i], states[i + 1]] += 1
 
@@ -953,11 +953,8 @@ class DwtPostProcessor(DwtPlotter):
                 df = pd.read_csv(file)
                 
                 # Add the file index to the 'agent_id'
-                df['agent_id'] = (index * 10) + df['agent_id']
-                
-                # Add file identifier for reference
-                df['source_file'] = os.path.basename(file)
-                
+                df['agent_id'] = df['agent_id'] + ((index+1) * 10000)    # Add 10000 to avoid overlap or agent_ids
+                                
                 # Append the DataFrame to the list
                 data_frames.append(df)
             except Exception as e:
@@ -971,7 +968,26 @@ class DwtPostProcessor(DwtPlotter):
         return combined_df
 
 
+    def save_combined_dataframe(self, output_file):
+        """
+        Saves the combined DataFrame to a specified CSV file.
 
+        Args:
+            output_file (str): The path to the output CSV file.
+
+        Returns:
+            None
+        """
+        if self.data is None or self.data.empty:
+            print("No data available to save.")
+            return
+
+        try:
+            self.data.to_csv(output_file, index=False)
+            print(f"Combined DataFrame saved to {output_file}")
+        except Exception as e:
+            print(f"Error saving DataFrame to {output_file}: {e}")
+            
 class DwtAnalyzer(ss.Analyzer, DwtPlotter):
     def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=mtb.TBS, scenario_name=''):
         """
@@ -1079,6 +1095,9 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             self.eSTATES = tbacf.TBSL
 
         self.data['state_name'] = self.data['state'].apply(lambda x: self.eSTATES(x).name.replace('_', ' ').title())
+        # Replace any state_name with 'None' with "Susceptible"
+        self.data['state_name'] = self.data['state_name'].replace('None', 'Susceptible')    # TODO: This is a temporary fix, we should fix it directly in the TBSim ennumerator.
+
         self.data['going_to_state'] = self.data['going_to_state_id'].apply(lambda x: self.eSTATES(x).name.replace('_', ' ').title())
         # self.data['compartment'] = 'tbd'
         if self.adjust_to_unit:
@@ -1167,8 +1186,25 @@ if __name__ == '__main__':
 
     # analyzer = mtb.DwtPostProcessor(directory= directory, prefix= 'BaselineTBsim')
     # analyzer.sankey()
+    # analyzer.graph_state_transitions()
 
-    london = mtb.DwtPostProcessor(directory=directory, prefix= 'BaselineLSHTM')
-    london.sankey()
+    # plotter = DwtPlotter(file_path='/Users/mine/git/tb_acf/results/tbsim.csv')
+    # # plotter.state_transition_matrix()
+    # plotter.interactive_all_state_transitions()
+    # plotter.sankey()
+    # plotter.graph_state_transitions()
 
+    # analyzer.save_combined_dataframe(os.path.join(directory, 'tbsim.csv'))
+
+    # london.sankey()
+    # london.graph_state_transitions()
+    # london.state_transition_matrix()
+    # london.save_combined_dataframe(os.path.join(directory, 'london.csv'))
+
+
+    londonplotter = DwtPlotter(file_path='/Users/mine/git/tb_acf/results/london.csv')
+    londonplotter.state_transition_matrix()
+    londonplotter.interactive_all_state_transitions()
+    londonplotter.sankey()
+    londonplotter.graph_state_transitions()
 

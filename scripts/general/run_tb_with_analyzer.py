@@ -8,37 +8,38 @@ import scipy.stats as stats
 TBS = mtb.TBS
 
 def make_tb(sim_pars=None):
-    params = dict(
-        unit='day',
-        dt=7,
-        start=sc.date('1940-01-01'),
+    sim_params = dict(
+        start=sc.date('1990-01-01'),
         stop=sc.date('2016-12-31'),
         rand_seed=123,
     )
     if sim_pars is not None:
-        params.update(sim_pars)
+        sim_params.update(sim_pars)
 
     np.random.seed()
     pop = ss.People(n_agents=1000)
-    tb = mtb.TB(dict(
+
+    tb_params = dict(
         beta=ss.beta(0.1),
         init_prev=ss.bernoulli(p=0.25),
         unit='day',
+        dt=7,
         rel_sus_latentslow=0.5,
-    ))
-    # ANALYZER:
-    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=7/365) # Adjust to years
-
+    )
+    tb = mtb.TB(tb_params)
+    
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     births = ss.Births(pars=dict(birth_rate=5))
     deaths = ss.Deaths(pars=dict(death_rate=5))
+
+    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=1.0, scenario_name='aaaa( 234)99ii') # ANALYZER
 
     sim = ss.Sim(
         people=pop,
         networks=net,
         diseases=tb,
         demographics=[deaths, births],
-        pars=params,
+        pars=sim_params,
         analyzers=dwell_analyzer,
     )
     sim.pars.verbose = sim.pars.dt / 365
@@ -94,29 +95,29 @@ def run_simulation():
 
 
     # Plotting
-    ana_dwt.histogram_with_kde(num_bins=50, bin_size=1)
-    ana_dwt.graph_state_transitions(layout=0)
-    ana_dwt.plot_dwell_time_validation()
-    ana_dwt.plot_dwell_time_validation_interactive()
-    ana_dwt.graph_compartments_transitions(layout=0)
-    ana_dwt.interactive_all_state_transitions()
-    ana_dwt.stacked_bars_states_per_agent_static()
-    ana_dwt.interactive_stacked_bar_charts_dt_by_state()
-    ana_dwt.plot_binned_stacked_bars_state_transitions(bin_size=1, num_bins=50)
-    ana_dwt.plot_binned_by_compartment(num_bins=50)
-    ana_dwt.sankey()
+    # ana_dwt.histogram_with_kde(num_bins=20, bin_size=1)
+    # ana_dwt.graph_state_transitions(layout=0)
+    # ana_dwt.plot_dwell_time_validation()
+    # ana_dwt.plot_dwell_time_validation_interactive()
+    # ana_dwt.graph_compartments_transitions(layout=0)
+    # ana_dwt.interactive_all_state_transitions()
+    # ana_dwt.stacked_bars_states_per_agent_static()
+    # ana_dwt.interactive_stacked_bar_charts_dt_by_state()
+    # ana_dwt.plot_binned_stacked_bars_state_transitions(bin_size=1, num_bins=50)
+    # ana_dwt.plot_binned_by_compartment(num_bins=50)
+    # ana_dwt.sankey()
     # ana_dwt.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
 
     # Perform validation and plotting
 
     # Create a sample DataFrame
-    # file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250124160857.csv'   # Option #1:  MANUALLY PASS THE FILE PATH
+    file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250127151951.csv'   # Option #1:  MANUALLY PASS THE FILE PATH
     file = ana_dwt.file_path                                                        # Option #2:  Get the file path from the analyzer   
 
     # # Initialize the DwtPlotter
     plotter = mtb.DwtPlotter(file_path=file)
 
-    # plotter.histogram_with_kde(num_bins=10, bin_size=30)
+    plotter.histogram_with_kde()
     # plotter.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
     # plotter.graph_state_transitions()
     # plotter.plot_dwell_time_validation()
@@ -124,7 +125,7 @@ def run_simulation():
     # plotter.graph_compartments_transitions(layout=0)
     # plotter.interactive_all_state_transitions()
     # plotter.stacked_bars_states_per_agent_static()
-    plotter.interactive_stacked_bar_charts_dt_by_state()
+    # plotter.interactive_stacked_bar_charts_dt_by_state()
     # plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
     # plotter.plot_binned_by_compartment(num_bins=50)
     # plotter.sankey()
