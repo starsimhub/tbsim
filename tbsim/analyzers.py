@@ -541,7 +541,7 @@ class DwtPlotter:
         plt.tight_layout()
         plt.show()
 
-    def histogram_with_kde(self, num_bins=50, bin_size=1):
+    def histogram_with_kde(self):
         """
         Plots histograms with Kernel Density Estimation (KDE) for dwell times of different states.
         Parameters:
@@ -562,9 +562,6 @@ class DwtPlotter:
         # Create DataFrame
         df = self.data
 
-        # Define bins for dwell times
-        bins = np.arange(0, bin_size * num_bins + bin_size, bin_size)
-        bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
         # Create a figure with subplots for each state
         states = df['state_name'].unique()
         num_states = len(states)
@@ -576,20 +573,26 @@ class DwtPlotter:
         fig.suptitle('State Transitions by Dwell Time Bins', fontsize=16)
 
         for ax, state in zip(axes, states):
-
             state_data = df[df['state_name'] == state]
+
+            # Automatically define the number of bins and bin size based on the data
+            max_dwell_time = state_data['dwell_time'].max()
+            bin_size = max(1, max_dwell_time // 15)  # Ensure at least 15 bins
+            bins = np.arange(0, max_dwell_time + bin_size, bin_size)
+            bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+
             state_data['dwell_time_bin'] = pd.cut(
-                state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True
+            state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True,
             )
             sns.histplot(data=state_data, 
-                         x='dwell_time', 
-                         bins=bins,
-                         hue='going_to_state', 
-                         kde=True, 
-                         palette='tab10',
-                         multiple='stack',
-                         legend=True,
-                         ax=ax)
+                 x='dwell_time', 
+                 bins=bins,
+                 hue='going_to_state', 
+                 kde=True, 
+                 palette='tab10',
+                 multiple='stack',
+                 legend=True,
+                 ax=ax)
 
             ax.set_title(f'State: {state}')
             ax.set_xlabel('Dwell Time Bins')
@@ -890,7 +893,7 @@ class DwtPlotter:
 
 
 class DwtAnalyzer(ss.Analyzer, DwtPlotter):
-    def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=None):
+    def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=mtb.TBS, scenario_name=''):
         """
         Initializes the analyzer with optional adjustments to days and unit specification.
 
@@ -898,8 +901,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             adjust_to_unit (bool): If True, adjusts the dwell times to days by multiplying the recorded dwell_time by the sim.pars.dt.
             Default is True.
             
-            unit (float):  TODO: Implement its use.
-            states_ennumerator (IntEnum): An IntEnum class that enumerates the states in the simulation. Default is None which will result in the use of the mtb.TBS class.
+            unit (float | ss.t ):  TODO: Implement its use.
+            states_ennumerator (IntEnum): An IntEnum class that enumerates the states in the simulation. Default is mtb.TBS but it will accept any equivalent IntEnum class.
 
         How to use it:
         1. Add the analyzer to the sim object.
@@ -918,11 +921,10 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         """
         ss.Analyzer.__init__(self)
         self.eSTATES = states_ennumerator
-        if self.eSTATES is None:
-            self.eSTATES = mtb.TBS
         self.adjust_to_unit = adjust_to_unit
         self.unit = unit
         self.file_path = None
+        self.scenario_name = scenario_name
         self.data = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state_id','going_to_state'])
         self._latest_sts_df = pd.DataFrame(columns=['agent_id', 'last_state', 'last_state_time'])      
         DwtPlotter.__init__(self, data=self.data)
@@ -987,12 +989,25 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
 
     def finalize(self):
         super().finalize()
+        
+        # TODO: this is a temporary solution to get the enum name, ideally this information 
+        # should be available in the disease class
+        # feel free to suggest an alternate way to do this:
+        if 'LSHTM' in str(self.sim.diseases[0].__class__):
+            print("Using model: str(self.sim.diseases[0].__class__)")
+            import tb_acf as tbacf
+            self.eSTATES = tbacf.TBSL
+
         self.data['state_name'] = self.data['state'].apply(lambda x: self.eSTATES(x).name.replace('_', ' ').title())
         self.data['going_to_state'] = self.data['going_to_state_id'].apply(lambda x: self.eSTATES(x).name.replace('_', ' ').title())
-        self.data['compartment'] = 'tbd'
+        # self.data['compartment'] = 'tbd'
         if self.adjust_to_unit:
-            self.data['dwell_time_recorded'] = self.data['dwell_time']
-            self.data['dwell_time'] = self.data['dwell_time'] * self.unit
+            self.data['dwell_time_raw'] = self.data['dwell_time']   # Save the original recorded values for comparison or later use
+            if isinstance(self.unit, (float, int)):
+                self.data['dwell_time'] = self.data['dwell_time'] * self.unit   
+            elif isinstance(self.unit, str):
+                self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / ss.rate(self.unit))
+                # self.data['dwell_time'] = self.data['dwell_time'].apply(lambda x: eval(f"{x} {self.unit}"))
         
         self.file_path = self._save_to_file()
         return
@@ -1016,15 +1031,26 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
     def _save_to_file(self):
         resdir = os.path.dirname(cfg.create_res_dir())
         t = ddtt.datetime.now()
-        fn = os.path.join(resdir, f'dwell_time_logger_{t.strftime("%Y%m%d%H%M%S")}.csv')
+        prefix = f'{self.to_filename_friendly(self.scenario_name)}'
+        if prefix == '' or prefix is None: 
+            prefix = 'dwt_logs'
+        fn = os.path.join(resdir, f'{prefix}-{t.strftime("%Y%m%d%H%M%S")}.csv')
         self.data.to_csv(fn, index=False)
 
-        fn_meta = os.path.join(resdir, f'dwell_time_logger_{t.strftime("%Y%m%d%H%M%S")}.json')
+        fn_meta = os.path.join(resdir, f'{prefix}-{t.strftime("%Y%m%d%H%M%S")}.json')
         with open(fn_meta, 'w') as f:
             f.write(f'{self.sim.pars}')
 
         print(f"Dwell time logs saved to:\n {fn}\n")
         return fn
+
+    @staticmethod
+    def to_filename_friendly(string=''):
+        import re
+        string = "".join([c if c.isalpha() else "_" for c in string])
+
+        return re.sub(r'[^a-zA-Z0-9]', '', string)
+
 
     def validate_dwell_time_distributions(self, expected_distributions=None):
         from scipy.stats import ks_1samp, ks_2samp
@@ -1048,11 +1074,11 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
 if __name__ == '__main__':
 
     # Create a sample DataFrame
-    file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250124160857.csv'
+    file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250127151951.csv'
     # Initialize the DwtPlotter with the file name
     plotter = DwtPlotter(file_path=file)
-    plotter.sankey()
+    # plotter.sankey()
     # plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
-    # plotter.histogram_with_kde(num_bins=10, bin_size=30)
+    plotter.histogram_with_kde()
 
 
