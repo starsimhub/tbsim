@@ -115,6 +115,78 @@ class DwtPlotter:
         plt.ylabel("Current State")
         plt.show()
 
+    def sankey_agents(self):
+        """
+        Generates and displays a Sankey diagram of state transitions based on the count of agents.
+
+        Parameters:
+        file_path (str, optional): The path to a CSV file containing the data. If not provided, 
+                                    the method will use the data stored in self.data.
+
+        The CSV file or self.data should contain the following columns:
+        - 'state_name': The name of the current state.
+        - 'going_to_state': The name of the state to which the transition is made.
+
+        If neither file_path nor self.data is provided, the method will print "No data provided." and return.
+
+        The method uses Plotly to create and display the Sankey diagram.
+        """
+        import plotly.graph_objects as go
+        if self.data_error():
+            return
+        
+        df = self.data
+
+        # Prepare data for Sankey plot
+        source = df['state_name']
+        target = df['going_to_state']
+
+        # Count the number of agents for each transition
+        transition_counts = df.groupby(['state_name', 'going_to_state']).size().reset_index(name='count')
+
+        # Create a dictionary to map unique labels to indices
+        labels = list(set(source) | set(target))
+        label_to_index = {label: i for i, label in enumerate(labels)}
+
+        # Map source and target to indices
+        source_indices = transition_counts['state_name'].map(label_to_index)
+        target_indices = transition_counts['going_to_state'].map(label_to_index)
+        values = transition_counts['count']
+
+        # Generate colors for nodes
+        colors = plt.cm.tab20(np.linspace(0, 1, len(labels)))
+        node_colors = [f'rgba({c[0]*255}, {c[1]*255}, {c[2]*255}, 1.0)' for c in colors]
+
+        # Generate lighter colors for links
+        link_colors = [f'rgba({c[0]*255}, {c[1]*255}, {c[2]*255}, 0.5)' for c in colors]
+
+        # Map source indices to link colors
+        link_color_map = {i: link_colors[i] for i in range(len(labels))}
+        link_colors = [link_color_map[idx] for idx in source_indices]
+
+        # Create the Sankey plot
+        fig = go.Figure(go.Sankey(
+            node=dict(
+            pad=15,
+            thickness=20,
+            line=dict(color="black", width=0.2),
+            label=labels,
+            color=node_colors
+            ),
+            link=dict(
+            source=source_indices,
+            target=target_indices,
+            value=values,
+            color=link_colors,
+            hovertemplate='%{source.label} → %{target.label}: %{value} agents<br>',
+            line=dict(color="lightgray", width=0.1),
+            label=values,  # Add labels to the links
+            )
+        ))
+
+        fig.update_layout(title_text="Sankey Diagram of State Transitions by Agent Count", font_size=10)
+        fig.show()
+
     #looks better- but still not perfect
     def sankey(self):
         """
@@ -1172,39 +1244,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
 
 # Example usage
 if __name__ == '__main__':
-
-    # Create a sample DataFrame
-    # file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250127151951.csv'
-    # # Initialize the DwtPlotter with the file name
-    # plotter = DwtPlotter(file_path=file)
-    # # plotter.sankey()
-    # # plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
-    # plotter.histogram_with_kde()
-
-
-    directory = '/Users/mine/git/tb_acf/results/' 
-
-    # analyzer = mtb.DwtPostProcessor(directory= directory, prefix= 'BaselineTBsim')
-    # analyzer.sankey()
-    # analyzer.graph_state_transitions()
-
-    # plotter = DwtPlotter(file_path='/Users/mine/git/tb_acf/results/tbsim.csv')
-    # # plotter.state_transition_matrix()
-    # plotter.interactive_all_state_transitions()
-    # plotter.sankey()
-    # plotter.graph_state_transitions()
-
-    # analyzer.save_combined_dataframe(os.path.join(directory, 'tbsim.csv'))
-
-    # london.sankey()
-    # london.graph_state_transitions()
-    # london.state_transition_matrix()
-    # london.save_combined_dataframe(os.path.join(directory, 'london.csv'))
-
-
-    londonplotter = DwtPlotter(file_path='/Users/mine/git/tb_acf/results/london.csv')
-    londonplotter.state_transition_matrix()
-    londonplotter.interactive_all_state_transitions()
-    londonplotter.sankey()
-    londonplotter.graph_state_transitions()
-
+    results_path = '/Users/mine/git/tb_acf/results/'
+    londonpp = DwtPostProcessor(directory=results_path, prefix='BaselineLSHTM')        # sample: results/BaselineLSHTM-20250128115433.csv
+    londonpp.save_combined_dataframe('london_combined_01281704.csv')
+    londonpp.sankey_agents()
