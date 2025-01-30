@@ -136,7 +136,8 @@ class TB(ss.Infection):
         """
         Infectious if in any of the active states
         """
-        return (self.on_treatment) | (self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)
+        ###return (self.on_treatment) | (self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)
+        return (~self.on_treatment) & ((self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB))
 
     def set_prognoses(self, uids, from_uids=None):
         super().set_prognoses(uids, from_uids)
@@ -158,7 +159,7 @@ class TB(ss.Infection):
 
         # Carry out state changes upon new infection
         self.susceptible[fast_uids] = False # N.B. Slow progressors remain susceptible!
-        self.infected[uids] = True # Not needed, but useful for reporting
+        self.infected[uids] = True
         self.rel_sus[slow_uids] = self.pars.rel_sus_latentslow
 
         # Determine active TB state
@@ -226,8 +227,12 @@ class TB(ss.Infection):
         self.results['new_deaths'][ti] = len(new_death_uids)
         self.results['new_deaths_15+'][ti] = np.count_nonzero(self.sim.people.age[new_death_uids] >= 15)
 
-        # Set rel_trans
-        self.rel_trans[:] = 1 # Reset
+        # Recalculate relative rates for the next time step
+        uids = self.sim.people.auids
+        self.rel_trans[uids] = 1 # Reset
+        self.rr_activation[uids] = 1
+        self.rr_clearance[uids] = 1
+        self.rr_death[uids] = 1
 
         state_reltrans = [
             (TBS.ACTIVE_PRESYMP, p.rel_trans_presymp),
@@ -244,20 +249,21 @@ class TB(ss.Infection):
         uids = self.infectious
         self.rel_trans[uids] *= self.reltrans_het[uids]
 
-        # Treatment can reduce transmissibility
+        # Treatment can reduce transmissibility and mortality
         uids = self.on_treatment
         self.rel_trans[uids] *= self.pars.rel_trans_treatment
-
-        # Reset relative rates for the next time step, they will be recalculated
-        uids = self.sim.people.auids
-        self.rr_activation[uids] = 1
-        self.rr_clearance[uids] = 1
-        self.rr_death[uids] = 1
+        self.rr_death[uids] = 0  # People on treatment have zero death rate
 
         return
 
     def start_treatment(self, uids):
-        """ Start treatment for active TB """
+        """
+        Start treatment for active TB
+
+        Note that interventions are called (step) before diseases step, and
+        therefore any agents put on treatment on the current step will be
+        subject to the changes on the current step.
+        """
         if len(uids) == 0:
             return 0  # No one to treat
 
