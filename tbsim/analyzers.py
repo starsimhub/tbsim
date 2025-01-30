@@ -1116,6 +1116,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         if not self.sim.ti: self._initialize_dataframes()
         sim = self.sim
         ti = sim.ti
+        self._check_for_new_borns()       
         
         # check if the number of agents has changed
         if len(self.sim.people.auids) != len(self._latest_sts_df):
@@ -1127,10 +1128,11 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
                 'last_state_time': np.zeros(len(new_agent_ids))
             })
             self._latest_sts_df = pd.concat([self._latest_sts_df, new_logs], ignore_index=True)
-        self._update_data(ti)
+        self._update_state_change_data(ti)
+        self._record_natural_deaths(ti)
         return
     
-    def _update_data(self, ti):
+    def _update_state_change_data(self, ti):
         # Get the current state of the agents
         tb = self.sim.diseases.tb
         uids = self.sim.people.auids  # People Alive
@@ -1154,7 +1156,40 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         # Update the latest state dataframe
         self._latest_sts_df.loc[self._latest_sts_df['agent_id'].isin(uids), 'last_state'] = tb.state[uids]
         self._latest_sts_df.loc[self._latest_sts_df['agent_id'].isin(uids), 'last_state_time'] = ti
+        return
 
+    # TODO:  IN PROGRESS
+    def _record_natural_deaths(self, ti):
+        # Get the current state of the agents
+        dead_uids = ss.uids(self.sim.people.dead)
+        if not dead_uids.all():
+            return
+        # Filter rows in _latest_sts_df for the relevant agents
+        relevant_rows = self._latest_sts_df[self._latest_sts_df['agent_id'].isin(dead_uids) & (self._latest_sts_df['last_state'] == -1)]
+
+        # identify only those ones that are not already recorded
+        relevant_rows = relevant_rows[~relevant_rows['agent_id'].isin(ss.uids(self.data['agent_id']))]
+        if not relevant_rows.empty:
+            self._log_dwell_time(
+                agent_ids=relevant_rows['agent_id'].values,
+                states=relevant_rows['last_state'].values,
+                entry_times=relevant_rows['last_state_time'].values,
+                exit_times=np.full(len(relevant_rows), ti),
+                going_to_state_ids=np.full(len(relevant_rows), 100)  # State 100 is to represent Natural Death
+            )
+            
+    def _check_for_new_borns(self):
+        # check if the number of agents has changed
+        if len(self.sim.people.auids) != len(self._latest_sts_df):
+            #identify which agent ids are new and add them to the _latest_sts_df
+            new_agent_ids = list(set(self.sim.people.auids) - set(self._latest_sts_df.agent_id))
+            new_logs = pd.DataFrame({
+                'agent_id': new_agent_ids,
+                'last_state': np.full(len(new_agent_ids), -1),
+                'last_state_time': np.zeros(len(new_agent_ids))
+            })
+            self._latest_sts_df = pd.concat([self._latest_sts_df, new_logs], ignore_index=True) # Add new agents to the _latest_sts_df - more likely new borns
+    
     def finalize(self):
         super().finalize()
         
@@ -1166,11 +1201,15 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             import tb_acf as tbacf
             self.eSTATES = tbacf.TBSL
 
-        self.data['state_name'] = self.data['state'].apply(lambda x: self.eSTATES(x).name.replace('_', ' ').title())
-        # Replace any state_name with 'None' with "Susceptible"
-        self.data['state_name'] = self.data['state_name'].replace('None', 'Susceptible')    # TODO: This is a temporary fix, we should fix it directly in the TBSim ennumerator.
+        # Create a dictionary to map state values to their names
+        state_dict = {state.value: state.name.replace('_', ' ').title() for state in self.eSTATES}
+        state_dict[100] = 'NON-TB DEATH'  # Add a value for NaturalCauseDeath
 
-        self.data['going_to_state'] = self.data['going_to_state_id'].apply(lambda x: self.eSTATES(x).name.replace('_', ' ').title())
+        self.data['state_name'] = self.data['state'].map(state_dict)
+        # Replace any state_name with 'None' with "Susceptible"
+        self.data['state_name'] = self.data['state_name'].replace('None', 'Susceptible')
+
+        self.data['going_to_state'] = self.data['going_to_state_id'].map(state_dict)
         # self.data['compartment'] = 'tbd'
         if self.adjust_to_unit:
             self.data['dwell_time_raw'] = self.data['dwell_time']   # Save the original recorded values for comparison or later use
@@ -1182,7 +1221,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         
         self.file_path = self._save_to_file()
         return
-    
+
     def _log_dwell_time(self, agent_ids, states, entry_times, exit_times, going_to_state_ids):
         entry_times = np.nan_to_num(entry_times, nan=0)
         dwell_times = exit_times - entry_times
