@@ -68,6 +68,7 @@ class TB(ss.Infection):
 
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
+            ss.FloatArr('ti_cur', default=0),                   # Time index of transition into the current state
 
             ss.FloatArr('reltrans_het', default=1.0),           # Individual-level heterogeneity on infectiousness, acts in addition to stage-based rates
         )
@@ -149,6 +150,7 @@ class TB(ss.Infection):
         self.latent_tb_state[slow_uids] = TBS.LATENT_SLOW
         self.state[slow_uids] = TBS.LATENT_SLOW
         self.state[fast_uids] = TBS.LATENT_FAST
+        self.ti_cur[uids] = self.ti
 
         new_uids = uids[~self.infected[uids]] # Previously uninfected
 
@@ -185,6 +187,7 @@ class TB(ss.Infection):
         new_presymp_uids = self.p_latent_to_presym.filter(latent_uids)
         if len(new_presymp_uids):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
+            self.ti_cur[new_presymp_uids] = ti
             self.ti_presymp[new_presymp_uids] = ti
             self.susceptible[new_presymp_uids] = False # No longer susceptible regardless of the latent form
         self.results['new_active'][ti] = len(new_presymp_uids)
@@ -201,6 +204,7 @@ class TB(ss.Infection):
             if len(new_active_uids):
                 active_state = self.active_tb_state[new_active_uids] 
                 self.state[new_active_uids] = active_state
+                self.ti_cur[new_active_uids] = ti
                 self.ti_active[new_active_uids] = ti
 
         # Active --> Susceptible via natural recovery or as accelerated by treatment (clear)
@@ -212,6 +216,7 @@ class TB(ss.Infection):
             self.susceptible[new_clear_uids] = True
             self.infected[new_clear_uids] = False
             self.state[new_clear_uids] = TBS.NONE
+            self.ti_cur[new_clear_uids] = ti
             self.active_tb_state[new_clear_uids] = TBS.NONE
             self.ti_presymp[new_clear_uids] = np.nan
             self.ti_active[new_clear_uids] = np.nan
@@ -223,6 +228,7 @@ class TB(ss.Infection):
         if len(new_death_uids):
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
+            self.ti_cur[new_death_uids] = ti
         self.results['new_deaths'][ti] = len(new_death_uids)
         self.results['new_deaths_15+'][ti] = np.count_nonzero(self.sim.people.age[new_death_uids] >= 15)
 
