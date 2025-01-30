@@ -269,6 +269,8 @@ class TB(ss.Infection):
         # Get the corresponding UIDs that match the active state
         tx_uids = uids[is_active]
 
+        self.results['new_notifications_15+'][self.ti] = np.count_nonzero(self.sim.people.age[tx_uids] >= 15)
+
         if len(tx_uids) == 0:
             return 0  # No one to treat
 
@@ -322,6 +324,7 @@ class TB(ss.Infection):
             ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
             ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
             ss.Result('n_reinfected',      dtype=int, label='Number reinfected'), 
+            ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'), 
         )
         return
 
