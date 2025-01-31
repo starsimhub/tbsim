@@ -330,7 +330,8 @@ class TB(ss.Infection):
             ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
             ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
             ss.Result('n_reinfected',      dtype=int, label='Number reinfected'), 
-            ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'), 
+            ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'),
+            ss.Result('n_symptomatic_culturepos_15+', dtype=int, label='Symptomatic & Culture+, 15+'), 
         )
         return
 
@@ -351,6 +352,9 @@ class TB(ss.Infection):
         res.n_active[ti]            = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
         res.n_infectious[ti]        = np.count_nonzero(self.infectious)
         res['n_infectious_15+'][ti] = np.count_nonzero(self.infectious & (self.sim.people.age>=15))
+
+        # At least 15yo and sm+ or sm-
+        res['n_symptomatic_culturepos_15+'][ti] = np.count_nonzero((self.sim.people.age >= 15) & ((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG)))
 
         if n_alive > 0:
             res.prevalence_active[ti] = res.n_active[ti] / n_alive 
