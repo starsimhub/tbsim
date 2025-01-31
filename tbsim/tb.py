@@ -309,29 +309,32 @@ class TB(ss.Infection):
         super().init_results()
         
         self.define_results(
-            ss.Result('n_latent_slow',     dtype=int, label='Latent Slow'),
-            ss.Result('n_latent_fast',     dtype=int, label='Latent Fast'),
-            ss.Result('n_active',          dtype=int, label='Active (Combined)'),
-            ss.Result('n_active_presymp',  dtype=int, label='Active Pre-Symptomatic'), 
-            ss.Result('n_active_smpos',    dtype=int, label='Active Smear Positive'),
-            ss.Result('n_active_smneg',    dtype=int, label='Active Smear Negative'),
-            ss.Result('n_active_exptb',    dtype=int, label='Active Extra-Pulmonary'),
-            ss.Result('new_active',        dtype=int, label='New Active'),
-            ss.Result('new_active_15+',    dtype=int, label='New Active, 15+'),
-            ss.Result('cum_active',        dtype=int, label='Cumulative Active'),
-            ss.Result('cum_active_15+',    dtype=int, label='Cumulative Active, 15+'),
-            ss.Result('new_deaths',        dtype=int, label='New Deaths'),
-            ss.Result('new_deaths_15+',    dtype=int, label='New Deaths, 15+'),
-            ss.Result('cum_deaths',        dtype=int, label='Cumulative Deaths'),
-            ss.Result('cum_deaths_15+',    dtype=int, label='Cumulative Deaths, 15+'),
-            ss.Result('n_infectious',      dtype=int, label='Number Infectious'),
-            ss.Result('n_infectious_15+',  dtype=int, label='Number Infectious, 15+'),
-            ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
-            ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
-            ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
-            ss.Result('n_reinfected',      dtype=int, label='Number reinfected'), 
+            ss.Result('n_latent_slow',         dtype=int, label='Latent Slow'),
+            ss.Result('n_latent_fast',         dtype=int, label='Latent Fast'),
+            ss.Result('n_active',              dtype=int, label='Active (Combined)'),
+            ss.Result('n_active_presymp',      dtype=int, label='Active Pre-Symptomatic'),
+            ss.Result('n_active_presymp_15+',  dtype=int, label='Active Pre-Symptomatic, 15+'),
+            ss.Result('n_active_smpos',        dtype=int, label='Active Smear Positive'),
+            ss.Result('n_active_smpos_15+',    dtype=int, label='Active Smear Positive, 15+'),
+            ss.Result('n_active_smneg',        dtype=int, label='Active Smear Negative'),
+            ss.Result('n_active_smneg_15+',    dtype=int, label='Active Smear Negative, 15+'),
+            ss.Result('n_active_exptb',        dtype=int, label='Active Extra-Pulmonary'),
+            ss.Result('n_active_exptb_15+',    dtype=int, label='Active Extra-Pulmonary, 15+'),
+            ss.Result('new_active',            dtype=int, label='New Active'),
+            ss.Result('new_active_15+',        dtype=int, label='New Active, 15+'),
+            ss.Result('cum_active',            dtype=int, label='Cumulative Active'),
+            ss.Result('cum_active_15+',        dtype=int, label='Cumulative Active, 15+'),
+            ss.Result('new_deaths',            dtype=int, label='New Deaths'),
+            ss.Result('new_deaths_15+',        dtype=int, label='New Deaths, 15+'),
+            ss.Result('cum_deaths',            dtype=int, label='Cumulative Deaths'),
+            ss.Result('cum_deaths_15+',        dtype=int, label='Cumulative Deaths, 15+'),
+            ss.Result('n_infectious',          dtype=int, label='Number Infectious'),
+            ss.Result('n_infectious_15+',      dtype=int, label='Number Infectious, 15+'),
+            ss.Result('prevalence_active',     dtype=float, scale=False, label='Prevalence (Active)'),
+            ss.Result('incidence_kpy',         dtype=float, scale=False, label='Incidence per 1,000 person-years'),
+            ss.Result('deaths_ppy',            dtype=float, label='Death per person-year'), 
+            ss.Result('n_reinfected',          dtype=int, label='Number reinfected'), 
             ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'),
-            ss.Result('n_symptomatic_culturepos_15+', dtype=int, label='Symptomatic & Culture+, 15+'), 
         )
         return
 
@@ -346,15 +349,18 @@ class TB(ss.Infection):
         res.n_latent_slow[ti]       = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti]       = np.count_nonzero(self.state == TBS.LATENT_FAST)
         res.n_active_presymp[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
+        res['n_active_presymp_15+'][ti] = np.count_nonzero((self.sim.people.age>=15) & (self.state == TBS.ACTIVE_PRESYMP))
         res.n_active_smpos[ti]      = np.count_nonzero(self.state == TBS.ACTIVE_SMPOS) 
+        res['n_active_smpos_15+'][ti] = np.count_nonzero((self.sim.people.age>=15) & (self.state == TBS.ACTIVE_SMPOS))
         res.n_active_smneg[ti]      = np.count_nonzero(self.state == TBS.ACTIVE_SMNEG)
+        res['n_active_smneg_15+'][ti] = np.count_nonzero((self.sim.people.age>=15) & (self.state == TBS.ACTIVE_SMNEG))
         res.n_active_exptb[ti]      = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
+        res['n_active_exptb_15+'][ti] = np.count_nonzero((self.sim.people.age>=15) & (self.state == TBS.ACTIVE_EXPTB))
         res.n_active[ti]            = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
         res.n_infectious[ti]        = np.count_nonzero(self.infectious)
         res['n_infectious_15+'][ti] = np.count_nonzero(self.infectious & (self.sim.people.age>=15))
 
         # At least 15yo and sm+ or sm-
-        res['n_symptomatic_culturepos_15+'][ti] = np.count_nonzero((self.sim.people.age >= 15) & ((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG)))
 
         if n_alive > 0:
             res.prevalence_active[ti] = res.n_active[ti] / n_alive 
