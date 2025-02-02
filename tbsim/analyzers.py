@@ -681,14 +681,14 @@ class DwtPlotter:
         plt.show()
 
     # looks good /
-    def graph_state_transitions(self, states=None, layout=None, curved_ratio=0.0, colormap='tab20', onlymodel=True):
+    def graph_state_transitions(self, states=None, layout=None, curved_ratio=0.1, colormap='Accent', onlymodel=True):
         """
         Plot a state transition graph with mean and mode dwell times annotated on the edges.
         
         Parameters:
         -----------
         curved_ratio (float, optional): Ratio to curve the edges. Default is 0.05.
-        colormap (str, optional): Name of the colormap to use for coloring nodes. Default is 'tab20c'.
+        colormap (str, optional): Name of the colormap to use for coloring nodes. Default is 'tab20'.
         states (list, optional): A list of states to include in the graph. If None, all states in the self.data will be included.
         layout (dict, optional): A dictionary specifying the layout positions of nodes. If None, a spring layout is used.
                 0: (Default) Spring layout.
@@ -755,9 +755,9 @@ class DwtPlotter:
         edge_colors = [node_colors[list(G.nodes).index(edge[0])] for edge in G.edges]
         edge_labels = nx.get_edge_attributes(G, 'label')
 
-        nx.draw_networkx_nodes(G, pos, node_size=400, node_color=node_colors, edgecolors= "black", alpha=0.9)
-        nx.draw_networkx_edges(G, pos, width=2, alpha=5, arrowstyle="-|>", arrowsize=30, edge_color=edge_colors)
-        nx.draw_networkx_labels(G, pos, font_size=9, font_color="black", font_weight="bold")
+        nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, edgecolors= "lightgray", alpha=0.9)
+        nx.draw_networkx_edges(G, pos, width=1, alpha=0.7, arrowstyle="-|>", arrowsize=30, edge_color=edge_colors)
+        nx.draw_networkx_labels(G, pos, font_size=11, font_color="black", font_weight="bold")
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6)
 
         # Display the graph
@@ -766,88 +766,6 @@ class DwtPlotter:
         plt.show()
         return
 
-    # # Looks good /
-    # def graph_compartments_transitions(self, states=None, layout=0, groups=[[]]):
-    #     """
-    #     /* UNDER CONSTRUCTION */
-    #     Plots a directed graph of state transitions with dwell times.
-
-    #     Parameters:
-    #         states (list, optional): A list of state names to filter the self.data. If None, all states are included.
-    #         groups (list of lists, optional): A list of groups for custom node coloring. Default is [[]].
-    #         layout (int, optional): The layout type for the graph. 
-    #             Default is 0 (spring layout).
-    #             1: Circular layout
-    #             2: Spiral layout
-    #             3: Spectral layout
-    #             4: Shell layout
-    #             5: Kamada-Kawai layout
-    #             6: Planar layout
-    #             7: Random layout
-    #             8: Circular layout
-    #             9: Fruchterman-Reingold layout
-    #         Notes:
-    #         - The function expects self.data to be a pandas DataFrame containing columns 'state_name', 'compartment', and 'dwell_time'.
-    #         - It uses NetworkX for graph creation and Matplotlib for plotting.
-    #         - Then calculates mean, mode, and count of dwell times for each state transition.
-
-    #     Returns:
-    #     None: The function displays a plot of the state transition graph with annotations for mean, mode, and count of dwell times.
-    #     """
-
-    #     import networkx as nx
-    #     import itertools as it
-    #     from scipy import stats
-
-    #     if self.data_error():
-    #         return
-
-    #     if states is not None:
-    #         self.data = self.data[self.data['state_name'].isin(states)]
-
-    #     # Calculate mean, mode, and count for each state transition
-    #     transitions = self.data.groupby(['state_name', 'compartment'])['dwell_time']
-    #     stats_df = transitions.agg([
-    #         'mean',
-    #         lambda x: stats.mode(x, keepdims=True).mode[0] if len(x) > 0 else np.nan,
-    #         'count'
-    #     ]).reset_index()
-
-    #     stats_df.columns = ['state_name', 'compartment', 'mean', 'mode', 'count']
-
-    #     # Create a directed graph
-    #     G = nx.DiGraph()
-
-    #     # Add edges with mean and mode annotations
-    #     for _, row in stats_df.iterrows():
-    #         from_state = row['state_name']
-    #         to_compartment = row['compartment']
-    #         mean_dwell = round(row['mean'], 2) if not pd.isna(row['mean']) else "N/A"
-    #         mode_dwell = round(row['mode'], 2) if not pd.isna(row['mode']) else "N/A"
-    #         num_agents = row['count']
-
-    #         # Add edge to the graph
-    #         G.add_edge(from_state, to_compartment,
-    #                     label=f"Mean: {mean_dwell}, Mode: {mode_dwell}\nAgents: {num_agents}")
-
-    #     # Generate a layout for the graph
-    #     pos = self.select_graph_pos(G, layout)
-
-    #     # Draw nodes and edges with curved lines
-    #     colors =plt.colormaps.get_cmap('tab20')
-    #     node_colors = [colors(i) for i in range(len(G.nodes))]
-    #     nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, alpha=0.9)
-    #     nx.draw_networkx_edges(G, pos, arrowstyle="-|>", arrowsize=10, edge_color="black", connectionstyle="arc3,rad=0.1")
-    #     nx.draw_networkx_labels(G, pos, font_size=10, font_color="black", font_weight="bold")
-
-    #     # Annotate edges with mean and mode
-    #     edge_labels = nx.get_edge_attributes(G, 'label')
-    #     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=7)
-
-    #     # Display the graph
-    #     plt.title("State->Compartment Graph with Dwell Times")
-    #     plt.show()
-    #     return
 
     def plot_dwell_time_validation(self):
         """
