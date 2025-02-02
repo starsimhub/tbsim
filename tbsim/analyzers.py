@@ -681,7 +681,7 @@ class DwtPlotter:
         plt.show()
 
     # looks good /
-    def graph_state_transitions(self, states=None, layout=None, curved_ratio=0.1, colormap='Accent', onlymodel=True):
+    def graph_state_transitions(self, states=None, subtitle="", layout=None, curved_ratio=0.1, colormap='Accent', onlymodel=True):
         """
         Plot a state transition graph with mean and mode dwell times annotated on the edges.
         
@@ -762,7 +762,7 @@ class DwtPlotter:
 
         # Display the graph
         plt.tight_layout()
-        plt.title("State Transition Graph with Dwell Times")
+        plt.title(f"State Transition Graph with Dwell Times: {subtitle}")
         plt.show()
         return
 
