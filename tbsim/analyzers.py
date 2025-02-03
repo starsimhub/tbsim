@@ -681,7 +681,7 @@ class DwtPlotter:
         plt.show()
 
     # looks good /
-    def graph_state_transitions(self, states=None, subtitle="", layout=None, curved_ratio=0.1, colormap='Accent', onlymodel=True):
+    def graph_state_transitions(self, states=None, subtitle="", layout=None, curved_ratio=0.1, colormap='Paired', onlymodel=True):
         """
         Plot a state transition graph with mean and mode dwell times annotated on the edges.
         
@@ -765,7 +765,66 @@ class DwtPlotter:
         plt.title(f"State Transition Graph with Dwell Times: {subtitle}")
         plt.show()
         return
+    
+    def graph_state_transitions_curved(self, states=None, subtitle="", layout=None, curved_ratio=0.2, colormap='Paired', onlymodel=True):
 
+        import networkx as nx
+        import itertools as it
+        from scipy import stats
+
+        if self.data_error():  return
+        if states is not None: self.data = self.data[self.data['state_name'].isin(states)]
+        if onlymodel: self.data = self.data[~self.data['going_to_state_id'].isin([-3.0, -2.0])]
+
+        # Calculate mean, mode, and count for each state transition
+        transitions = self.data.groupby(['state_name', 'going_to_state'])['dwell_time']   #Dweell time 
+
+        stats_df = transitions.agg([
+            'mean',
+            lambda x: stats.mode(x, keepdims=True).mode[0] if len(x) > 0 else np.nan,
+            'count'
+        ]).reset_index()
+
+        stats_df.columns = ['state_name', 'going_to_state', 'mean', 'mode', 'count']
+
+        # Create a directed graph
+        G = nx.DiGraph()
+
+        # Add edges with mean and mode annotations
+        for _, row in stats_df.iterrows():
+            from_state = row['state_name']
+            to_state = row['going_to_state']
+            mean_dwell = round(row['mean'], 2) if not pd.isna(row['mean']) else "N/A"
+            mode_dwell = round(row['mode'], 2) if not pd.isna(row['mode']) else "N/A"
+            num_agents = row['count']
+
+            # Add edge to the graph
+            G.add_edge(from_state, to_state,
+                label=f"Mean: {mean_dwell} -- Mode: {mode_dwell}\nAgents: {num_agents}")
+
+        pos = nx.spring_layout(G, seed=42)  # Fixed layout for consistency
+        colors = plt.colormaps.get_cmap(colormap) 
+        node_colors = [colors(i) for i in range(len(G.nodes))]
+        edge_colors = [node_colors[list(G.nodes).index(edge[0])] for edge in G.edges]
+        edge_labels = nx.get_edge_attributes(G, 'label')
+
+        plt.figure(facecolor='black')
+        nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, edgecolors= "lightgray")
+        nx.draw_networkx_edges(G, pos, width=1, alpha=0.8, arrowstyle="-|>", arrowsize=30, edge_color=edge_colors, connectionstyle=f'arc3,rad={curved_ratio}')
+        nx.draw_networkx_labels(G, pos, font_size=11, font_color="black", font_weight="bold")
+        import random
+        # Draw edge labels with matching colors
+        for (n1, n2), label in edge_labels.items():
+            x = (pos[n1][0] + pos[n2][0]) / 2
+            y = (pos[n1][1] + pos[n2][1]) / 2
+            plt.text(x, y, label, fontsize=9, color=edge_colors[list(G.edges).index((n1, n2))], ha='center', va='center')
+
+
+        # Display the graph
+        plt.tight_layout()
+        plt.title(f"State Transition Graph with Dwell Times: {subtitle}", color='white')
+        plt.show()
+        return
 
     def plot_dwell_time_validation(self):
         """
@@ -844,7 +903,7 @@ class DwtPlotter:
         return False
 
     @staticmethod
-    def select_graph_pos(G, layout):
+    def select_graph_pos(G, layout, seed=42):
         import networkx as nx
         
         if layout == 1: 
@@ -867,7 +926,7 @@ class DwtPlotter:
         elif layout == 9: 
             return nx.fruchterman_reingold_layout(G)
         else: 
-            return nx.spring_layout(G, seed=42)
+            return nx.spring_layout(G, seed=seed)
 
         return pos
 
@@ -1012,6 +1071,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
     
     def _initialize_dataframes(self):
         # Initialize the latest state dataframe
+        # NOTE: This module assumes the default state is '-1'
         if self.unit is None:
             self.unit = self.sim.pars.unit
         agent_ids = self.sim.people.auids
@@ -1025,32 +1085,18 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
     
     def step(self):
         if not self.sim.ti: self._initialize_dataframes()
-        sim = self.sim
-        ti = sim.ti
         self._check_for_new_borns()       
-        
-        # check if the number of agents has changed
-        if len(self.sim.people.auids) != len(self._latest_sts_df):
-            #identify which agent ids are new and add them to the _latest_sts_df
-            new_agent_ids = list(set(self.sim.people.auids) - set(self._latest_sts_df.agent_id))
-            new_logs = pd.DataFrame({
-                'agent_id': new_agent_ids,
-                'last_state': np.full(len(new_agent_ids), -1.0),      # Never infected
-                'last_state_time': np.zeros(len(new_agent_ids))
-            })
-            if not new_logs.empty:
-                self._latest_sts_df = pd.concat([self._latest_sts_df, new_logs.loc[:, ~new_logs.isna().all()]], 
-                                            ignore_index=True, copy=False)
-        self._update_state_change_data(ti)
-        self._record_natural_deaths(ti)
+        self._update_state_change_data()
+        self._record_natural_deaths()
         return
     
-    def _update_state_change_data(self, ti):
+    def _update_state_change_data(self):
         # Get the current state of the agents
+        ti = self.ti
         tb = self.sim.diseases.tb
         uids = self.sim.people.auids  # People Alive
 
-        # Filter rows in _latest_sts_df for the relevant agents
+        # Filter rows in _latest_sts_df for the relevant agents (alive)
         relevant_rows = self._latest_sts_df[self._latest_sts_df['agent_id'].isin(uids)]
 
         # Identify agents whose last recorded state is different from the current state
@@ -1067,14 +1113,15 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             age=self.sim.people.age[uids]
         )
 
-        # Update the latest state dataframe
+        # Update the latest state dataframe with the new state
         self._latest_sts_df.loc[self._latest_sts_df['agent_id'].isin(uids), 'last_state'] = tb.state[uids]
         self._latest_sts_df.loc[self._latest_sts_df['agent_id'].isin(uids), 'last_state_time'] = ti
         return
 
     # TODO:  IN PROGRESS
-    def _record_natural_deaths(self, ti):
+    def _record_natural_deaths(self):
         # Get the current state of the agents
+        ti = self.ti
         dead_uids = ss.uids(self.sim.people.dead)
         if not dead_uids.all():
             return
@@ -1105,12 +1152,26 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             })
             self._latest_sts_df = pd.concat([self._latest_sts_df, new_logs], ignore_index=True) # Add new agents to the _latest_sts_df - more likely new borns
     
+
+        # check if the number of agents has changed
+        if len(self.sim.people.auids) != len(self._latest_sts_df):
+            #identify which agent ids are new and add them to the _latest_sts_df
+            new_agent_ids = list(set(self.sim.people.auids) - set(self._latest_sts_df.agent_id))
+            new_logs = pd.DataFrame({
+                'agent_id': new_agent_ids,
+                'last_state': np.full(len(new_agent_ids), -1.0),      # Never infected
+                'last_state_time': np.zeros(len(new_agent_ids))
+            })
+            if not new_logs.empty:
+                self._latest_sts_df = pd.concat([self._latest_sts_df, new_logs.loc[:, ~new_logs.isna().all()]], 
+                                            ignore_index=True, copy=False)
+        return
+
     def finalize(self):
         super().finalize()
-        
-        # Identify agents with last_state == -1
-        relevant_rows = self._latest_sts_df[self._latest_sts_df['last_state'] == -1]
-
+        # record Never Infected (-2):
+        # Identify agents with last_state == -1 (Not a single change of state was recorded)
+        relevant_rows = self._latest_sts_df[(self._latest_sts_df['last_state'] == -1) & (self._latest_sts_df['last_state_time'] == 0.0)]
         if not relevant_rows.empty:
             self._log_dwell_time(
                 agent_ids=relevant_rows['agent_id'].values,
@@ -1120,8 +1181,6 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
                 going_to_state_ids=np.full(len(relevant_rows), -2.0) , # never infected
                 age= self.sim.people.age[ss.uids(relevant_rows['agent_id'].values)]
             )
-
-
         # TODO: this is a temporary solution to get the enum name, ideally this information 
         # should be available in the disease class
         # feel free to suggest an alternate way to do this:
@@ -1134,7 +1193,6 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         state_dict = {state.value: state.name.replace('_', ' ').title() for state in self.eSTATES}
         state_dict[-3] = 'NON-TB DEATH'  # Add a value for NaturalCauseDeath
         state_dict[-2] = 'NEVER INFECTED'
-
         self.data['state_name'] = self.data['state'].map(state_dict)
         self.data['going_to_state'] = self.data['going_to_state_id'].map(state_dict)
         self.data['going_to_state'] = self.data.apply(lambda row: f"{row['going_to_state_id']}.{row['going_to_state']}", axis=1 )
@@ -1148,14 +1206,12 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             elif isinstance(self.unit, str):
                 self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / ss.rate(self.unit))
                 # self.data['dwell_time'] = self.data['dwell_time'].apply(lambda x: eval(f"{x} {self.unit}"))
-
         self.file_path = self._save_to_file()
         return
 
     def _log_dwell_time(self, agent_ids, states, entry_times, exit_times, going_to_state_ids, age):
         entry_times = np.nan_to_num(entry_times, nan=0)
         dwell_times = exit_times - entry_times
-
         new_logs = pd.DataFrame({
             'agent_id': agent_ids,
             'state': states,
@@ -1165,8 +1221,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             'going_to_state_id': going_to_state_ids,
             'age': age
         })
+        # append 
         self.data = pd.concat([self.data, new_logs], ignore_index=True)
-                # Map state codes to their corresponding names
         return
     
     def _save_to_file(self):
