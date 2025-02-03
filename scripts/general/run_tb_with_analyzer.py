@@ -1,6 +1,6 @@
 import tbsim as mtb
 import starsim as ss
-import sciris as sc
+import sciris as sc 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as stats
@@ -9,9 +9,11 @@ TBS = mtb.TBS
 
 def make_tb(sim_pars=None):
     sim_params = dict(
-        start=sc.date('1980-01-01'),
-        stop=sc.date('2010-12-31'),
+        start=sc.date('1940-01-01'),
+        stop=sc.date('2025-12-31'),
         rand_seed=123,
+        unit='year',
+        dt=1,
     )
     if sim_pars is not None:
         sim_params.update(sim_pars)
@@ -22,9 +24,7 @@ def make_tb(sim_pars=None):
     tb_params = dict(
         beta=ss.beta(0.1),
         init_prev=ss.bernoulli(p=0.25),
-        unit='year',
-        dt=1,
-        rel_sus_latentslow=0.5,
+        rel_sus_latentslow=0.0,
     )
     tb = mtb.TB(tb_params)
     
@@ -93,15 +93,19 @@ if __name__ == '__main__':
 
     # Plotting
     # ana_dwt.histogram_with_kde(num_bins=20, bin_size=1)
-    # ana_dwt.graph_state_transitions()
+
+    
+
+    ana_dwt.graph_state_transitions_curved()
+    # generate a new color map for the graph:
+
     # ana_dwt.plot_dwell_time_validation()
-    # ana_dwt.plot_dwell_time_validation_interactive()
-    # ana_dwt.graph_compartments_transitions(layout=0)
-    # ana_dwt.interactive_all_state_transitions()
-    # ana_dwt.stacked_bars_states_per_agent_static()
-    # ana_dwt.interactive_stacked_bar_charts_dt_by_state()
-    # ana_dwt.plot_binned_stacked_bars_state_transitions(bin_size=1, num_bins=50)
-    # ana_dwt.plot_binned_by_compartment(num_bins=50)
+    #ana_dwt.plot_dwell_time_validation_interactive()
+    ana_dwt.interactive_all_state_transitions()
+    ana_dwt.stacked_bars_states_per_agent_static()
+    ana_dwt.interactive_stacked_bar_charts_dt_by_state()
+    ana_dwt.plot_binned_stacked_bars_state_transitions(bin_size=1, num_bins=50)
+    ana_dwt.plot_binned_by_compartment(num_bins=50)
     ana_dwt.sankey_agents()
     # ana_dwt.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
 
