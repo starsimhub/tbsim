@@ -12,10 +12,12 @@ import matplotlib.pyplot as plt
 from lifelines import KaplanMeierFitter
 import networkx as nx
 import plotly.graph_objects as go
+import warnings
 
 
 __all__ = ['DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor']
 
+warnings.simplefilter(action='ignore', category=FutureWarning)
 class DwtPlotter:
     def __init__(self, data=None, file_path=None):
         if data is not None:
@@ -183,7 +185,6 @@ class DwtPlotter:
             label=values,  # Add labels to the links
             )
         ))
-
         fig.update_layout(title_text=f"Sankey Diagram of State Transitions by Agent Count \n{subtitle}", font_size=10)
         fig.show()
 
@@ -237,12 +238,12 @@ class DwtPlotter:
                 source=source_indices,
                 target=target_indices,
                 value=value,
-                hovertemplate='%{source.label} → %{target.label}: %{value} days<br>',
+                hovertemplate='%{source.label} → %{target.label}: %{value} step_time_units<br>',
                 line=dict(color="lightgray", width=0.1),
             )
         ))
 
-        fig.update_layout(title_text="Sankey Diagram of State Transitions and Dwell Times", font_size=10)
+        fig.update_layout(title_text="Sankey Diagram of State Transitions -  DWELL TIME", font_size=10)
         fig.show()
 
     # looks good /
@@ -275,7 +276,7 @@ class DwtPlotter:
 
         # Create bin labels, handling infinity separately
         dwell_time_labels = [
-            f"{int(b)}-{int(d)} days" if d != np.inf else f"{int(b)}+ days"
+            f"{int(b)}-{int(d)} step_time_units" if d != np.inf else f"{int(b)}+ step_time_units"
             for b, d in zip(dwell_time_bins[:-1], dwell_time_bins[1:])
         ]
 
@@ -336,11 +337,11 @@ class DwtPlotter:
     # looks good - although crowded /
     def stacked_bars_states_per_agent_static(self):
         """
-        Plots a stacked bar chart showing the cumulative dwell time in days for each state per agent.
+        Plots a stacked bar chart showing the cumulative dwell time in step_time_units for each state per agent.
 
         This function reads data from a CSV file or uses an existing DataFrame to calculate the cumulative dwell time
-        for each agent and state. It then converts the dwell time to days and creates a pivot table to get the cumulative
-        dwell time for each state. Finally, it plots a stacked bar chart to visualize the cumulative time in days spent
+        for each agent and state. It then converts the dwell time to step_time_units and creates a pivot table to get the cumulative
+        dwell time for each state. Finally, it plots a stacked bar chart to visualize the cumulative time in step_time_units spent
         in each state for all agents.
 
         Parameters:
@@ -356,17 +357,17 @@ class DwtPlotter:
         # Calculate cumulative dwell time for each agent and state
         df['cumulative_dwell_time'] = df.groupby(['agent_id', 'state_name'])['dwell_time'].cumsum()
 
-        # Convert dwell time to days
-        df['cumulative_dwell_time_days'] = df['cumulative_dwell_time']#/24
+        # Convert dwell time to suplied step_time_units
+        df['cumulative_dwell_time_units'] = df['cumulative_dwell_time']#/24
 
         # Pivot the data to get cumulative dwell time for each state
-        pivot_df = df.pivot_table(index='agent_id', columns='state_name', values='cumulative_dwell_time_days', aggfunc='max', fill_value=0)
+        pivot_df = df.pivot_table(index='agent_id', columns='state_name', values='cumulative_dwell_time_units', aggfunc='max', fill_value=0)
 
         # Plot the data
         pivot_df.plot(kind='bar', stacked=True, figsize=(15, 7))
-        plt.title('Cumulative Time in Days on Each State for All Agents')
+        plt.title('Cumulative Time in step_time_units on Each State for All Agents')
         plt.xlabel('Agent ID')
-        plt.ylabel('Cumulative Time (Days)')
+        plt.ylabel('Cumulative Time (step_time_units)')
         plt.legend(title='State Name')
         plt.tight_layout()
         plt.show()
@@ -386,7 +387,7 @@ class DwtPlotter:
         
         Notes:
         - If the self.data DataFrame is empty, the function will print a message and return without plotting.
-        - The function creates bins for dwell times and labels them in days.
+        - The function creates bins for dwell times and labels them in step_time_units.
         - It generates a stacked bar chart for each state, showing the count of transitions to other states within each dwell time bin.
         - The height of the figure is dynamically adjusted based on the number of states.
         """
@@ -398,7 +399,7 @@ class DwtPlotter:
 
         # Define bins for dwell times
         bins = np.arange(0, bin_size * num_bins, bin_size)
-        bin_labels = [f"{int(b)}-{int(b + bin_size)} days" for b in bins[:-1]]
+        bin_labels = [f"{int(b)}-{int(b + bin_size)} step_time_units" for b in bins[:-1]]
 
         # Create a figure with subplots for each state
         states = self.data['state_name'].unique()
@@ -497,7 +498,7 @@ class DwtPlotter:
         Parameters:
         -----------
         bin_size : int, optional
-            The size of each bin for dwell times in days. Default is 50.
+            The size of each bin for dwell times in step_time_units. Default is 50.
         num_bins : int, optional
             The number of bins to create. Default is 8.
 
@@ -560,7 +561,7 @@ class DwtPlotter:
         Plots binned stacked bar charts for state transitions based on dwell times.
 
         Parameters:
-        bin_size (int): The size of each bin for dwell times in days. Default is 50.
+        bin_size (int): The size of each bin for dwell times in step_time_units. Default is 50.
         num_bins (int): The number of bins to create. Default is 8.
 
         Returns:
@@ -651,7 +652,7 @@ class DwtPlotter:
             max_dwell_time = state_data['dwell_time'].max()
             bin_size = max(1, max_dwell_time // 15)  # Ensure at least 15 bins
             bins = np.arange(0, max_dwell_time + bin_size, bin_size)
-            bin_labels = [f"{int(b)}-{int(b+bin_size)} days" for b in bins[:-1]]
+            bin_labels = [f"{int(b)}-{int(b+bin_size)} step_time_units" for b in bins[:-1]]
 
             state_data['dwell_time_bin'] = pd.cut(
             state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True,
@@ -1030,10 +1031,10 @@ class DwtPostProcessor(DwtPlotter):
 class DwtAnalyzer(ss.Analyzer, DwtPlotter):
     def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=mtb.TBS, scenario_name=''):
         """
-        Initializes the analyzer with optional adjustments to days and unit specification.
+        Initializes the analyzer with optional adjustments to step_time_units.
 
         Args:
-            adjust_to_unit (bool): If True, adjusts the dwell times to days by multiplying the recorded dwell_time by the sim.pars.dt.
+            adjust_to_unit (bool): If True, adjusts the dwell times to step_time_units by multiplying the recorded dwell_time by the provided multiplier.
             Default is True.
             
             unit (float | ss.t ):  TODO: Implement its use.
