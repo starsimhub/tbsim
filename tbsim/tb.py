@@ -45,6 +45,8 @@ class TB(ss.Infection):
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
 
             rel_sus_latentslow = 0.5, # Relative susceptibility of reinfection for slow progressors
+            
+            cxr_asymp_sens = 1.0, # Sensitivity of chest x-ray for screening asymptomatic cases
 
             reltrans_het = ss.constant(v=1.0),
         )
@@ -335,6 +337,7 @@ class TB(ss.Infection):
             ss.Result('deaths_ppy',            dtype=float, label='Death per person-year'), 
             ss.Result('n_reinfected',          dtype=int, label='Number reinfected'), 
             ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'),
+            ss.Result('n_detectable_15+',      dtype=int, label='Sm+ plus SM- plus cxr_asymp_sens * pre-symptomatic'),  # Move to analyzer?
         )
         return
 
@@ -360,7 +363,9 @@ class TB(ss.Infection):
         res.n_infectious[ti]        = np.count_nonzero(self.infectious)
         res['n_infectious_15+'][ti] = np.count_nonzero(self.infectious & (self.sim.people.age>=15))
 
-        # At least 15yo and sm+ or sm-
+        res['n_detectable_15+'][ti] = np.dot( self.sim.people.age >= 15,
+            np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]) + \
+                self.pars.cxr_asymp_sens * (self.state == TBS.ACTIVE_PRESYMP) )
 
         if n_alive > 0:
             res.prevalence_active[ti] = res.n_active[ti] / n_alive 
