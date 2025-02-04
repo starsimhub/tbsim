@@ -767,7 +767,7 @@ class DwtPlotter:
         plt.show()
         return
     
-    def graph_state_transitions_curved(self, states=None, subtitle="", layout=None, curved_ratio=0.2, colormap='Paired', onlymodel=True):
+    def graph_state_transitions_curved(self, states=None, subtitle="", layout=None, curved_ratio=0.1, colormap='Paired', onlymodel=True, graphseed=42):
 
         import networkx as nx
         import itertools as it
@@ -803,7 +803,7 @@ class DwtPlotter:
             G.add_edge(from_state, to_state,
                 label=f"Mean: {mean_dwell} -- Mode: {mode_dwell}\nAgents: {num_agents}")
 
-        pos = nx.spring_layout(G, seed=42)  # Fixed layout for consistency
+        pos = nx.spring_layout(G, seed=graphseed)  # Fixed layout for consistency
         colors = plt.colormaps.get_cmap(colormap) 
         node_colors = [colors(i) for i in range(len(G.nodes))]
         edge_colors = [node_colors[list(G.nodes).index(edge[0])] for edge in G.edges]
@@ -813,17 +813,11 @@ class DwtPlotter:
         nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, edgecolors= "lightgray")
         nx.draw_networkx_edges(G, pos, width=1, alpha=0.8, arrowstyle="-|>", arrowsize=30, edge_color=edge_colors, connectionstyle=f'arc3,rad={curved_ratio}')
         nx.draw_networkx_labels(G, pos, font_size=11, font_color="black", font_weight="bold")
-        import random
-        # Draw edge labels with matching colors
-        for (n1, n2), label in edge_labels.items():
-            x = (pos[n1][0] + pos[n2][0]) / 2
-            y = (pos[n1][1] + pos[n2][1]) / 2
-            plt.text(x, y, label, fontsize=9, color=edge_colors[list(G.edges).index((n1, n2))], ha='center', va='center')
-
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6)
 
         # Display the graph
         plt.tight_layout()
-        plt.title(f"State Transition Graph with Dwell Times: {subtitle}", color='white')
+        plt.title(f"State Transition Graph - By Agents count: {subtitle}", color='white')
         plt.show()
         return
 
@@ -1271,7 +1265,30 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
 
 # Example usage
 if __name__ == '__main__':
-    results_path = '/Users/mine/git/tb_acf/results/'
-    londonpp = DwtPostProcessor(directory=results_path, prefix='BaselineLSHTM')        # sample: results/BaselineLSHTM-20250128115433.csv
-    londonpp.save_combined_dataframe('london_combined_01281704.csv')
-    londonpp.sankey_agents()
+
+    debug = 2
+
+    if debug == 1:
+            results_path = '/Users/mine/git/tb_acf/results/'
+            londonpp = DwtPostProcessor(directory=results_path, prefix='BaselineLSHTM')        # sample: results/BaselineLSHTM-20250128115433.csv
+            londonpp.save_combined_dataframe('london_combined_01281704.csv')
+            londonpp.sankey_agents()
+
+    if debug == 2:
+        # # # Initialize the DwtPlotter
+        file = '/Users/mine/git/tbsim/results/runTBDwellanalyzer-0204005127.csv'
+        plotter = mtb.DwtPlotter(file_path=file)
+        plotter.graph_state_transitions_curved(graphseed=39)
+        #  plotter.histogram_with_kde()
+        # plotter
+        # plotter.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
+        # plotter.graph_state_transitions_curved(graphseed=10)  # 6, 7, 9, 11, 12, 23,31, 36, 37, 39, 40 
+        # plotter.plot_dwell_time_validation()
+        # plotter.plot_dwell_time_validation_interactive()
+        # plotter.graph_compartments_transitions(layout=0)
+        # plotter.interactive_all_state_transitions()
+        # plotter.stacked_bars_states_per_agent_static()
+        # plotter.interactive_stacked_bar_charts_dt_by_state()
+        # plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
+        # plotter.plot_binned_by_compartment(num_bins=50)
+        # plotter.sankey()
