@@ -337,7 +337,7 @@ class TB(ss.Infection):
             ss.Result('deaths_ppy',            dtype=float, label='Death per person-year'), 
             ss.Result('n_reinfected',          dtype=int, label='Number reinfected'), 
             ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'),
-            ss.Result('n_detectable_15+',      dtype=int, label='Sm+ plus SM- plus cxr_asymp_sens * pre-symptomatic'),  # Move to analyzer?
+            ss.Result('n_detectable_15+',      dtype=float, label='Sm+ plus SM- plus cxr_asymp_sens * pre-symptomatic'),  # Move to analyzer?
         )
         return
 
