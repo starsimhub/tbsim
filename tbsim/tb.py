@@ -364,7 +364,7 @@ class TB(ss.Infection):
         res['n_infectious_15+'][ti] = np.count_nonzero(self.infectious & (self.sim.people.age>=15))
 
         res['n_detectable_15+'][ti] = np.dot( self.sim.people.age >= 15,
-            np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]) + \
+            np.isin(self.state, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG]) + \
                 self.pars.cxr_asymp_sens * (self.state == TBS.ACTIVE_PRESYMP) )
 
         if n_alive > 0:
