@@ -45,6 +45,7 @@ class TB(ss.Infection):
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
 
             rel_sus_latentslow = 0.5, # Relative susceptibility of reinfection for slow progressors
+            res_sus_cleared = 1.0, # Relative susceptibility of individuals who have cleared infection
             
             cxr_asymp_sens = 1.0, # Sensitivity of chest x-ray for screening asymptomatic cases
 
@@ -149,9 +150,9 @@ class TB(ss.Infection):
         # Decide which agents go to latent fast vs slow
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
         self.latent_tb_state[fast_uids] = TBS.LATENT_FAST
+        self.state[fast_uids] = TBS.LATENT_FAST
         self.latent_tb_state[slow_uids] = TBS.LATENT_SLOW
         self.state[slow_uids] = TBS.LATENT_SLOW
-        self.state[fast_uids] = TBS.LATENT_FAST
         self.ti_cur[uids] = self.ti
 
         new_uids = uids[~self.infected[uids]] # Previously uninfected
@@ -162,8 +163,9 @@ class TB(ss.Infection):
 
         # Carry out state changes upon new infection
         self.susceptible[fast_uids] = False # N.B. Slow progressors remain susceptible!
-        self.infected[uids] = True # Not needed, but useful for reporting
-        self.rel_sus[slow_uids] = self.pars.rel_sus_latentslow
+        self.infected[uids] = True
+        self.rel_sus[uids] = 1 # Reset relative susceptibility to 1 in case of reinfection
+        self.rel_sus[slow_uids] = self.pars.rel_sus_latentslow # And set relative susceptibility to "reinfection" for slow progressors
 
         # Determine active TB state
         self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
@@ -223,6 +225,7 @@ class TB(ss.Infection):
             self.ti_presymp[new_clear_uids] = np.nan
             self.ti_active[new_clear_uids] = np.nan
             self.on_treatment[new_clear_uids] = False
+            self.rel_sus[new_clear_uids] = self.pars.res_sus_cleared # Reset relative susceptibility back to 1
 
         # Active --> Death
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
@@ -262,6 +265,9 @@ class TB(ss.Infection):
         self.rr_clearance[uids] = 1
         self.rr_death[uids] = 1
 
+        uids = self.on_treatment
+        self.rr_death[uids] = 0 # People on treatment have zero death rate
+
         return
 
     def start_treatment(self, uids):
@@ -286,7 +292,7 @@ class TB(ss.Infection):
         self.on_treatment[tx_uids] = True
 
         # Adjust death and clearance rates for those starting treatment
-        self.rr_death[tx_uids] = 0  # People on treatment have zero death rate
+        self.rr_death[tx_uids] = 0 # People on treatment have zero death rate
 
         # Reduce transmission rates for people on treatment
         self.rel_trans[tx_uids] *= self.pars.rel_trans_treatment
