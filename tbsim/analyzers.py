@@ -42,12 +42,13 @@ class DwtPlotter:
             "dwell_time": float,
             "state_name": str,
             "going_to_state_id": float,
-            "going_to_state": str,
+            "going_to_state": float,
             "age": float
         }
 
         # Read CSV as raw text to avoid errors during import
         df = pd.read_csv(filename, dtype=str)  # Read everything as strings first
+        df = df.dropna(subset=["agent_id"])
 
         # Convert numeric columns, coercing invalid values to NaN
         numeric_columns = ["agent_id", "state", "entry_time", "exit_time", "dwell_time", "going_to_state_id", "age"]
@@ -57,9 +58,9 @@ class DwtPlotter:
         # Drop rows with NaN in any of the expected numeric columns
         df_cleaned = df.dropna(subset=numeric_columns)
 
-        # Convert integer columns after filtering invalid data
-        df_cleaned["agent_id"] = df_cleaned["agent_id"].astype(int)
-        df_cleaned["exit_time"] = df_cleaned["exit_time"].astype(int)
+        # # Convert integer columns after filtering invalid data
+        # df_cleaned["agent_id"] = df_cleaned["agent_id"].astype(int)
+        # df_cleaned["exit_time"] = df_cleaned["exit_time"].astype(int)
 
         # Reset index after dropping rows
         df_cleaned.reset_index(drop=True, inplace=True)
@@ -1047,18 +1048,66 @@ class DwtPlotter:
         plt.show()
         return
     
-    def generate_reinfection_data(self, file_path=""):
+    def plot_max_reinfections(self):
+        """
+        Plots the maximum number of reinfections for agents and groups them.
 
-        df = pd.read_csv(file_path)
+        This method calculates the maximum number of reinfections for each agent
+        and generates a bar plot to visualize the distribution of reinfections.
+
+        Returns:
+            None
+        """
+        if self.data_error():
+            return
+
+        # Ensure the 'infection_num' column exists
+        if 'infection_num' not in self.data.columns:
+            self.generate_reinfection_data()
+
+        reinfections = self.data  #[self.data['infection_num'] > 0]  # Filter out agents with no reinfections
+
+        # Calculate the maximum number of reinfections for each agent
+        max_reinfections = reinfections.groupby('agent_id')['infection_num'].max()
+
+        # Group by the number of reinfections
+        reinfection_counts = max_reinfections.value_counts().sort_index()
+
+        reinfection_counts = reinfection_counts* 100/reinfection_counts.sum()
+        
+        # Print the percentage of agents with no reinfections
+        print(f"Percentage of agents with no reinfections: {reinfection_counts.get(0, 0):.2f}%")
+
+        # Plot the distribution of reinfections
+        plt.figure(figsize=(10, 6))
+        reinfection_counts.plot(kind='bar', color='skyblue')
+        plt.title('Distribution of Maximum Reinfections per Agent')
+        plt.xlabel('Number of Reinfections')
+        plt.ylabel('Number of Agents')
+        plt.xticks(rotation=0)
+        plt.grid(axis='y')
+        plt.show()
+
+    def generate_reinfection_data(self, file_path=None): 
+        if file_path is None:
+            df = self.data
+        else:
+            file_path = self.data_file
+            df = self.cleandata(file_path)
+
         df_filtered = df[~((df['state'] == -1.0) & (df['going_to_state_id'] == 0.0))]
         df_sorted = df_filtered.sort_values(by=['agent_id', 'entry_time'])
         df_sorted['infection_num'] = df_sorted.groupby('agent_id')['entry_time'].rank(method='first').astype(int) - 1
-        df_sorted['isreinfection'] = df_sorted['isreinfection'].apply(lambda x: True if x > 0 else False)
-        processed_file = file_path.replace(".csv", "_WithReinfection.csv")
-        df_sorted.to_csv(processed_file, index=False)
+        if file_path != None:
+            processed_file = file_path.replace(".csv", "_WithReinfection.csv")
+            df_sorted.to_csv(processed_file, index=False)
 
-        print(f"Processing complete. The output is saved as {processed_file}.")
-        return df_sorted
+        if file_path is None:
+            self.data = df_sorted
+        else:
+            print(f"Processing complete. The output is saved as {processed_file}.")
+            return df_sorted
+        return
 
     def plot_dwell_time_validation_interactive(self):
         """
@@ -1124,7 +1173,6 @@ class DwtPlotter:
             return nx.spring_layout(G, seed=seed)
 
         return pos
-
 
 class DwtPostProcessor(DwtPlotter):
     def __init__(self, directory='', prefix='', data=None, debug=False, **kwargs) :
@@ -1480,9 +1528,10 @@ if __name__ == '__main__':
         # # # Initialize the DwtPlotter
         file = '/Users/mine/git/tbsim/results/runTBDwellanalyzer-0204011702.csv'
         plotter = mtb.DwtPlotter(file_path=file)
-
-        plotter.graph_state_transitions()
-        plotter.graph_state_transitions_curved(graphseed=9)
+        plotter.cleandata(filename=file)
+        plotter.plot_max_reinfections()
+        # plotter.graph_state_transitions()
+        # plotter.graph_state_transitions_curved(graphseed=9)
         #  plotter.histogram_with_kde()
         # plotter
         # plotter.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
