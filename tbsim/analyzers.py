@@ -23,138 +23,132 @@ class DwtPlotter:
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif file_path is not None:
-            self.data = self.cleandata(file_path)
+            self.data = self.__cleandata__(file_path)
         else:
             raise ValueError("Either data or file_path must be provided.")
-        if self.data_error():
+        if self.__data_error__():
             print("No data provided, or data is corrupted")
             
-            
-    def cleandata(self, filename):
-        import pandas as pd
-
-        # Define column types as expected
-        dtype_dict = {
-            "agent_id": float,  # Using float initially to avoid casting errors
-            "state": float,
-            "entry_time": float,
-            "exit_time": float,  # Keep as float first, will convert later
-            "dwell_time": float,
-            "state_name": str,
-            "going_to_state_id": float,
-            "going_to_state": float,
-            "age": float
-        }
-
-        # Read CSV as raw text to avoid errors during import
-        df = pd.read_csv(filename, dtype=str)  # Read everything as strings first
-        df = df.dropna(subset=["agent_id"])
-
-        # Convert numeric columns, coercing invalid values to NaN
-        numeric_columns = ["agent_id", "state", "entry_time", "exit_time", "dwell_time", "going_to_state_id", "age"]
-        for col in numeric_columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')  # Convert and replace invalid with NaN
-
-        # Drop rows with NaN in any of the expected numeric columns
-        df_cleaned = df.dropna(subset=numeric_columns)
-
-        # # Convert integer columns after filtering invalid data
-        # df_cleaned["agent_id"] = df_cleaned["agent_id"].astype(int)
-        # df_cleaned["exit_time"] = df_cleaned["exit_time"].astype(int)
-
-        # Reset index after dropping rows
-        df_cleaned.reset_index(drop=True, inplace=True)
-        return df_cleaned
-
-    # TODO: Kaplan-Meier
-    def plot_kaplan_meier(self, dwell_time_col, event_observed_col=None):
+    def sankey_agents_by_age_subplots(self,bins=[0, 5, 16, 200], includecycles=False):
         """
-        Plots a Kaplan-Meier survival curve for the given data.
+        Generates and displays a single figure with multiple Sankey diagrams of state transitions,
+        filtering data by age bins .
 
         Parameters:
-            data (pd.DataFrame): Input DataFrame containing survival data.
-            dwell_time_col (str): Column name representing dwell times.
-            event_observed_col (str, optional): Column indicating if the event was observed (1) or censored (0).
-                If None, assumes all events are observed.
-
-        Returns:
-            None: Displays the Kaplan-Meier survival plot.
-        """
-        if self.data_error():
-            return
+        - data (pd.DataFrame): A DataFrame containing columns:
+        - 'state_name': The name of the current state.
+        - 'going_to_state': The name of the state to which the transition is made.
+        - 'age': The age of the agents.
         
+        This function automatically determines four age bins and arranges them
+        in a 2x2 subplot layout.
+        """
         data = self.data
-        # Prepare the data
-        durations = data[dwell_time_col]
-        event_observed = data[event_observed_col] if event_observed_col else [1] * len(data)
+        data['age'] = data['age'].astype(float)
+        num_bins = 0
+        # Define age bins
+        age_min, age_max = data["age"].min(), data["age"].max()
+        if bins is None:
+            bin_width = (age_max - age_min) / 4
+            bins = [age_min + i * bin_width for i in range(num_bins + 1)]
+            # make sure the bins are integers 
+            bins = [int(b) for b in bins]
+        
+        # fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+        # axes = axes.flatten()
+        num_bins = len(bins) - 1
+        for i in range(num_bins):
+            # Filter data for the age bin
+            bin_min, bin_max = bins[i], bins[i + 1]
+            df_bin = data[(data["age"] >= bin_min) & (data["age"] < bin_max)]
 
-        # Initialize Kaplan-Meier fitter
-        kmf = KaplanMeierFitter()
+            if not df_bin.empty:
+                transition_counts = df_bin.groupby(["state_name", "going_to_state"]).size().reset_index(name="count")
 
-        # Fit the data
-        kmf.fit(durations, event_observed=event_observed)
+                # Create a dictionary to map unique labels to indices
+                labels = list(set(df_bin["state_name"]) | set(df_bin["going_to_state"]))
+                label_to_index = {label: idx for idx, label in enumerate(labels)}
 
-        # Plot the survival function
-        plt.figure(figsize=(10, 6))
-        kmf.plot_survival_function()
-        plt.title("TBSim Kaplan-Meier Survival Curve", fontsize=16)
-        plt.xlabel(f"Time ({dwell_time_col})", fontsize=14)
-        plt.ylabel("Survival Probability", fontsize=14)
-        plt.grid(True)
-        plt.show()
+                # Map source and target to indices
+                source_indices = transition_counts["state_name"].map(label_to_index)
+                target_indices = transition_counts["going_to_state"].map(label_to_index)
+                values = transition_counts["count"]
 
-    # looks good
-    def state_transition_matrix(self):
+                # Create Sankey plot
+                sankey = go.Sankey(
+                    node=dict(
+                        pad=15,
+                        thickness=20,
+                        label=labels
+                    ),
+                    link=dict(
+                        source=source_indices,
+                        target=target_indices,
+                        value=values
+                    )
+                )
+
+                sankey_fig = go.Figure(sankey)
+                sankey_fig.update_layout(title_text=f"Sankey Diagram (Ages >= {bin_min} and <{bin_max}), <br> DwtPlotter.sankey_agents_by_age_subplots()")
+                sankey_fig.show()
+
+    def sankey_agents_even_age_ranges(self, number_of_plots=8):
         """
-        Generates and plots a state transition matrix from the provided data.
+        Generates and displays multiple Sankey diagrams of state transitions,
+        filtering data by age bins.
+
         Parameters:
-        file_path (str, optional): Path to the CSV file containing the data. The CSV file should have columns 'agent_id' and 'state'.
-        self.data (pd.DataFrame, optional): DataFrame containing the data. Should have columns 'agent_id' and 'state'.
-        Returns:
-        None: The function plots the state transition matrix using seaborn's heatmap.
-        Notes:
-        - This is using plain 'state' columns recorded in the data - no need to 'going_to_state' column.
-        - If both file_path and self.data are provided, file_path will be used.
-        - If neither file_path nor self.data are provided, the function will print "No data provided." and return.
-        - The transition matrix is normalized to show proportions. To display raw counts, comment out the normalization step.
+        - data (pd.DataFrame): A DataFrame containing columns:
+        - 'state_name': The name of the current state.
+        - 'going_to_state': The name of the state to which the transition is made.
+        - 'age': The age of the agents.
+
+        This function automatically determines four age bins and generates
+        separate Sankey diagrams for each bin.
         """
+        data = self.data
+        # Define age bins
+        age_min, age_max = data["age"].min(), data["age"].max()
+        num_bins = number_of_plots
+        bin_width = (age_max - age_min) / num_bins
+        bins = [age_min + i * bin_width for i in range(num_bins + 1)]
 
-        if self.data_error():
-            return
-        df = self.data
+        for i in range(num_bins):
+            # Filter data for the age bin
+            bin_min, bin_max = bins[i], bins[i + 1]
+            df_bin = data[(data["age"] >= bin_min) & (data["age"] < bin_max)]
 
-        # Create a transition matrix
-        # Get the unique states
-        # unique_states = sorted(df['state'].dropna().unique())
-        unique_states = sorted(df['state'].unique())
-        # Initialize a matrix of zeros
-        transition_matrix = pd.DataFrame(
-            data=0, index=unique_states, columns=unique_states, dtype=int
-        )
+            if not df_bin.empty:
+                transition_counts = df_bin.groupby(["state_name", "going_to_state"]).size().reset_index(name="count")
 
-        # Fill the matrix with transitions
-        for agent_id, group in df.groupby('agent_id'):
-            states = group['state'].values
-            for i in range(len(states) - 1):
-                transition_matrix.loc[states[i], states[i + 1]] += 1
+                # Create a dictionary to map unique labels to indices
+                labels = list(set(df_bin["state_name"]) | set(df_bin["going_to_state"]))
+                label_to_index = {label: idx for idx, label in enumerate(labels)}
 
-        # Normalize rows to show proportions (optional, can comment this out if counts are preferred)
-        transition_matrix_normalized = transition_matrix.div(transition_matrix.sum(axis=1), axis=0).fillna(0)
+                # Map source and target to indices
+                source_indices = transition_counts["state_name"].map(label_to_index)
+                target_indices = transition_counts["going_to_state"].map(label_to_index)
+                values = transition_counts["count"]
 
-        # Plot the state transition matrix
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(
-            transition_matrix_normalized, 
-            annot=True, 
-            fmt=".2f", 
-            cmap="Blues", 
-            xticklabels=unique_states, 
-            yticklabels=unique_states
-        )
-        plt.title("State Transition Matrix (Normalized)")
-        plt.xlabel("Next State")
-        plt.ylabel("Current State")
-        plt.show()
+                # Create Sankey plot
+                fig = go.Figure(go.Sankey(
+                    node=dict(
+                        pad=15,
+                        thickness=20,
+                        label=labels
+                    ),
+                    link=dict(
+                        source=source_indices,
+                        target=target_indices,
+                        value=values
+                    )
+                ))
+                fig.add_annotation(x = -0.05, y = -0.2, text = 'DwtPlotter.sankey_agents_even_age_ranges()', xref = 'paper',
+                            yref = 'paper', showarrow = False,
+                            font=dict(color='black',size=8))
+        
+                fig.update_layout(title_text=f"Sankey Diagram (Ages {bin_min:.1f} - {bin_max:.1f})")
+                fig.show()
 
     def sankey_agents(self, subtitle = ""):
         """
@@ -173,7 +167,7 @@ class DwtPlotter:
         The method uses Plotly to create and display the Sankey diagram.
         """
         import plotly.graph_objects as go
-        if self.data_error():
+        if self.__data_error__():
             return
         
         df = self.data
@@ -207,6 +201,7 @@ class DwtPlotter:
 
         # Create the Sankey plot
         fig = go.Figure(go.Sankey(
+            arrangement="snap",
             node=dict(
             pad=15,
             thickness=20,
@@ -224,13 +219,18 @@ class DwtPlotter:
             label=values,  # Add labels to the links
             )
         ))
-        fig.update_layout(title_text=f"Sankey Diagram of State Transitions by Agent Count \n{subtitle}", font_size=10)
-        fig.show()
-        fig.to_html(f"sankey_{subtitle}.html")
+        # fig.update_layout(title_text=f"Sankey Diagram of State Transitions by Agent Count <\br>{subtitle}", font_size=10)
 
-    #looks better- but still not perfect
-    def sankey(self):
+        fig.update_layout(
+            hovermode = 'x',
+            title=dict(text=f"State Transitions  - Agents Count<br>{subtitle} (DwtPlotter.sankey_agents())", font=dict(size=12)),
+            font=dict(size = 12, color = 'black'),
+        )
+        fig.show()
+
+    def sankey_dwelltimes(self, subtitle=''):
         """
+        NOTE: Very large data sets may cause the plot to be slow or unresponsive.
         Generates and displays a Sankey diagram of state transitions and dwell times.
 
         Parameters:
@@ -248,7 +248,7 @@ class DwtPlotter:
         """
         import plotly.graph_objects as go
 
-        if self.data_error():
+        if self.__data_error__():
             return
         
         df = self.data
@@ -266,28 +266,48 @@ class DwtPlotter:
         source_indices = source.map(label_to_index)
         target_indices = target.map(label_to_index)
 
+        # Generate colors for nodes
+        colors = plt.cm.tab20(np.linspace(0, 1, len(labels)))
+        node_colors = [f'rgba({c[0]*255}, {c[1]*255}, {c[2]*255}, 1.0)' for c in colors]
+        link_colors = [f'rgba({c[0]*255}, {c[1]*255}, {c[2]*255}, 0.5)' for c in colors]
+        link_color_map = {i: link_colors[i] for i in range(len(labels))}
+        link_colors = [link_color_map[idx] for idx in source_indices]
+
         # Create the Sankey plot
         fig = go.Figure(go.Sankey(
+            arrangement="snap",
+            
             node=dict(
                 pad=15,
                 thickness=20,
                 line=dict(color="black", width=0.2),
+                color=node_colors,
                 label=labels
             ),
             link=dict(
                 source=source_indices,
                 target=target_indices,
+                color=link_colors,
                 value=value,
                 hovertemplate='%{source.label} → %{target.label}: %{value} step_time_units<br>',
                 line=dict(color="lightgray", width=0.1),
             )
         ))
 
-        fig.update_layout(title_text="Sankey Diagram of State Transitions -  DWELL TIME", font_size=10)
+        # fig.update_layout(title_text="Sankey Diagram of State Transitions -  DWELL TIME", font_size=10)
+
+        fig.update_layout(
+            hovermode='x',
+            title=dict(text=f"State Transitions - Dwell Times<br>{subtitle}  (DwtPlotter.sankey_dwelltimes())", font=dict(size=12)),
+            font=dict(size=12, color='black'),
+            margin=dict(l=20, r=20, t=40, b=20),
+            paper_bgcolor='white',
+            plot_bgcolor='white'
+        )
+
         fig.show()
 
-    # looks good /
-    def interactive_all_state_transitions(self, dwell_time_bins=None, filter_states=None):
+    def barchar_all_state_transitions_interactive(self, dwell_time_bins=None, filter_states=None):
         """
         Generates an interactive bar chart of state transitions grouped by dwell time categories.
 
@@ -304,7 +324,7 @@ class DwtPlotter:
         import plotly.express as px
         import plotly.graph_objects as go
 
-        if self.data_error():
+        if self.__data_error__():
             return
 
         # Set default bins if none are provided
@@ -364,9 +384,11 @@ class DwtPlotter:
                 textposition='auto',
                 orientation='h'
             ))
-
+        fig.add_annotation(x = -0.05, y = -0.2, text = 'DwtPlotter.interactive_all_state_transitions()', xref = 'paper',
+            yref = 'paper', showarrow = False,
+            font=dict(color='black',size=8))
         fig.update_layout(
-            title="State Transitions Grouped by Dwell Time Categories",
+            title="State Transitions Grouped by Dwell Time Categories <br>DwtPlotter.interactive_all_state_transitions()",
             yaxis_title="State Transitions",
             xaxis_title="Count",
             legend_title="Transitions",
@@ -374,7 +396,6 @@ class DwtPlotter:
         )
         fig.show()
 
-    # looks good - although crowded /
     def stacked_bars_states_per_agent_static(self):
         """
         Plots a stacked bar chart showing the cumulative dwell time in step_time_units for each state per agent.
@@ -391,7 +412,7 @@ class DwtPlotter:
         Returns:
         None
         """
-        if self.data_error():
+        if self.__data_error__():
             return
         df = self.data
         # Calculate cumulative dwell time for each agent and state
@@ -406,6 +427,7 @@ class DwtPlotter:
         # Plot the data
         pivot_df.plot(kind='bar', stacked=True, figsize=(15, 7))
         plt.title('Cumulative Time in step_time_units on Each State for All Agents')
+        plt.annotate('DwtPlotter.stacked_bars_states_per_agent_static()', xy=(0.5, -0.1), xycoords='axes fraction', ha='center', fontsize=12)
         plt.xlabel('Agent ID')
         plt.ylabel('Cumulative Time (step_time_units)')
         plt.legend(title='State Name')
@@ -413,8 +435,7 @@ class DwtPlotter:
         plt.show()
         return
 
-    # looks good
-    def interactive_stacked_bar_charts_dt_by_state(self, bin_size=1, num_bins=20):
+    def stackedbars_dwelltime_state_interactive(self, bin_size=3, num_bins=20):
         """
         Generates an interactive stacked bar chart of dwell times by state using Plotly.
 
@@ -434,7 +455,7 @@ class DwtPlotter:
         import plotly.express as px
         import plotly.graph_objects as go
 
-        if self.data_error():
+        if self.__data_error__():
             return
 
         # Define bins for dwell times
@@ -464,16 +485,21 @@ class DwtPlotter:
 
         fig.update_layout(
             barmode='stack',
-            title="Stacked Bar Charts of Dwell Times by State",
+            title=f"Stacked Bar Charts of Dwell Times by State - {self.__class__.__name__} stackedbars_dwelltime_state_interactive() ",
             xaxis_title="Dwell Time Bins",
             yaxis_title="Count",
             legend_title="State Transitions",
-            height=400 + 50 * num_states
+            # height=500 + 50 * num_states,
         )
+        fig.update_layout(margin=dict(l=5,
+                                r=25,
+                                b=100,
+                                t=50,
+                                pad=20),
+                  paper_bgcolor="LightSteelBlue")
         fig.show()
 
-    # looks good
-    def plot_state_transition_lengths_custom(self, transitions_dict=None):
+    def subplot_custom_transitions(self, transitions_dict=None):
         """
         Plots the cumulative distribution of dwell times for different state transitions.
 
@@ -500,13 +526,12 @@ class DwtPlotter:
         import matplotlib.pyplot as plt
         import numpy as np
 
-        if self.data_error():
+        if self.__data_error__():
             return
 
         if transitions_dict is None:
             transitions_dict = {
-                'None': ['Latent Slow', 'Latent Fast'],
-                'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
+                '-1.0.None': ['0.0.Latent Slow', '1.0.Latent Fast']
             }
 
         # Create subplots
@@ -527,76 +552,11 @@ class DwtPlotter:
             ax.set_xlabel("Time")
             ax.set_ylabel("Cumulative Distribution")
             ax.legend()
+        plt.annotate('DwtPlotter.plot_state_transition_lengths_custom()', xy=(0.5, -0.2), xycoords='axes fraction', ha='center', fontsize=12)
         plt.tight_layout()
         plt.show()
 
-    # looks good /
-    def plot_binned_by_compartment(self,  bin_size=1, num_bins=50):
-        """
-        Plots the dwell time data binned by compartment for each state.
-
-        Parameters:
-        -----------
-        bin_size : int, optional
-            The size of each bin for dwell times in step_time_units. Default is 50.
-        num_bins : int, optional
-            The number of bins to create. Default is 8.
-
-        Returns:
-        --------
-        None
-            This function does not return any value. It generates and displays a plot.
-
-        Notes:
-        ------
-        - The function uses matplotlib to create a figure with subplots for each unique state in the data.
-        - Each subplot shows a stacked bar chart of the count of dwell times binned by the specified bin size and grouped by compartment.
-        - If the data is empty, the function prints a message and returns without plotting.
-        - The function automatically adjusts the layout to fit all subplots and removes any empty subplots.
-        """
-
-        import matplotlib.pyplot as plt
-
-        if self.data_error():
-            return
-
-        # Define bins for dwell times
-        bins = np.arange(0, bin_size*num_bins, bin_size)
-        bin_labels = [f"{int(b)}-{int(b+bin_size)}" for b in bins[:-1]]
-
-        # Create a figure with subplots for each state
-        states = self.data['state_name'].unique()
-
-        num_states = len(states)
-        num_cols = 4
-        num_rows = (num_states + num_cols - 1) // num_cols
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, 5 * num_rows), sharex=True)
-        fig.suptitle(f'State - Compartment Transitions)', fontsize=16)
-        axes = axes.flatten()
-
-        for ax, state in zip(axes, states):
-            state_data = self.data[self.data['state_name'] == state]
-            state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
-
-            # Group by dwell time bins and going to state
-            grouped = state_data.groupby(['dwell_time_bin', 'compartment']).size().unstack(fill_value=0)
-
-            # Plot stacked bar chart
-            grouped.plot(kind='bar', stacked=True, ax=ax, colormap='tab20')
-            ax.set_title(f'State: {state}')
-            ax.set_xlabel('Dwell Time Bins')
-            ax.set_ylabel('Count')
-            ax.legend(title='compartment')
-
-        # Remove any empty subplots
-        for i in range(num_states, len(axes)):
-            fig.delaxes(axes[i])
-
-        plt.tight_layout()
-        plt.show()
-
-    # looks good /
-    def plot_binned_stacked_bars_state_transitions(self, bin_size=1, num_bins=50):
+    def stackedbars_subplots_state_transitions(self, bin_size=1, num_bins=50):
         """
         Plots binned stacked bar charts for state transitions based on dwell times.
 
@@ -617,7 +577,7 @@ class DwtPlotter:
 
         import matplotlib.pyplot as plt
 
-        if self.data_error():
+        if self.__data_error__():
             return
 
         # Define bins for dwell times
@@ -650,7 +610,7 @@ class DwtPlotter:
         # Remove any empty subplots
         for i in range(num_states, len(axes)):
             fig.delaxes(axes[i])
-
+        plt.annotate('DwtPlotter.plot_binned_stacked_bars_state_transitions()', xy=(0.5, -0.2), xycoords='axes fraction', ha='center', fontsize=12)
         plt.tight_layout()
         plt.show()
 
@@ -669,7 +629,7 @@ class DwtPlotter:
         - Unused subplots are removed from the figure.
         """
 
-        if self.data_error():
+        if self.__data_error__():
             return
 
         # Create DataFrame
@@ -717,11 +677,11 @@ class DwtPlotter:
         # Remove any unused subplots
         for i in range(num_states, len(axes)):
             fig.delaxes(axes[i])
-
+        plt.annotate('DwtPlotter.histogram_with_kde()', xy=(0.5, -0.2), xycoords='axes fraction', ha='center', fontsize=12)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.show()
-
-    # looks good /
+        return
+    
     def graph_state_transitions(self, states=None, subtitle="", layout=None, curved_ratio=0.1, colormap='Paired', onlymodel=True):
         """
         Plot a state transition graph with mean and mode dwell times annotated on the edges.
@@ -761,7 +721,7 @@ class DwtPlotter:
         from scipy import stats
         
 
-        if self.data_error():  return
+        if self.__data_error__():  return
         if states is not None: self.data = self.data[self.data['state_name'].isin(states)]
         if onlymodel: self.data = self.data[~self.data['going_to_state_id'].isin([-3.0, -2.0])]
 
@@ -801,126 +761,9 @@ class DwtPlotter:
         nx.draw_networkx_labels(G, pos, font_size=11, font_color="black", font_weight="bold")
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6)
         plt.title(f"State Transition Graph with Dwell Times: {subtitle}")
+        plt.annotate('DwtPlotter.graph_state_transitions()', xy=(0.5, -0.2), xycoords='axes fraction', ha='center', fontsize=12)
         plt.show()
         return
-
-    def sankey_agents_by_age_subplots(self,bins=None, includecycles=False):
-        """
-        Generates and displays a single figure with multiple Sankey diagrams of state transitions,
-        filtering data by age bins and displaying them as subplots.
-
-        Parameters:
-        - data (pd.DataFrame): A DataFrame containing columns:
-        - 'state_name': The name of the current state.
-        - 'going_to_state': The name of the state to which the transition is made.
-        - 'age': The age of the agents.
-        
-        This function automatically determines four age bins and arranges them
-        in a 2x2 subplot layout.
-        """
-        data = self.data
-        data['age'] = data['age'].astype(float)
-        # Define age bins
-        age_min, age_max = data["age"].min(), data["age"].max()
-        if bins is None:
-            bin_width = (age_max - age_min) / 4
-            bins = [age_min + i * bin_width for i in range(num_bins + 1)]
-            # make sure the bins are integers 
-            bins = [int(b) for b in bins]
-        
-        # fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-        # axes = axes.flatten()
-        num_bins = len(bins) - 1
-        for i in range(num_bins):
-            # Filter data for the age bin
-            bin_min, bin_max = bins[i], bins[i + 1]
-            df_bin = data[(data["age"] >= bin_min) & (data["age"] < bin_max)]
-
-            if not df_bin.empty:
-                transition_counts = df_bin.groupby(["state_name", "going_to_state"]).size().reset_index(name="count")
-
-                # Create a dictionary to map unique labels to indices
-                labels = list(set(df_bin["state_name"]) | set(df_bin["going_to_state"]))
-                label_to_index = {label: idx for idx, label in enumerate(labels)}
-
-                # Map source and target to indices
-                source_indices = transition_counts["state_name"].map(label_to_index)
-                target_indices = transition_counts["going_to_state"].map(label_to_index)
-                values = transition_counts["count"]
-
-                # Create Sankey plot
-                sankey = go.Sankey(
-                    node=dict(
-                        pad=15,
-                        thickness=20,
-                        label=labels
-                    ),
-                    link=dict(
-                        source=source_indices,
-                        target=target_indices,
-                        value=values
-                    )
-                )
-
-                sankey_fig = go.Figure(sankey)
-                sankey_fig.update_layout(title_text=f"Sankey Diagram (Ages >= {bin_min} and <{bin_max})")
-                sankey_fig.show()
-
-
-    def sankey_agents_by_age(self):
-        """
-        Generates and displays multiple Sankey diagrams of state transitions,
-        filtering data by age bins.
-
-        Parameters:
-        - data (pd.DataFrame): A DataFrame containing columns:
-        - 'state_name': The name of the current state.
-        - 'going_to_state': The name of the state to which the transition is made.
-        - 'age': The age of the agents.
-
-        This function automatically determines four age bins and generates
-        separate Sankey diagrams for each bin.
-        """
-        data = self.data
-        # Define age bins
-        age_min, age_max = data["age"].min(), data["age"].max()
-        num_bins = 4
-        bin_width = (age_max - age_min) / num_bins
-        bins = [age_min + i * bin_width for i in range(num_bins + 1)]
-
-        for i in range(num_bins):
-            # Filter data for the age bin
-            bin_min, bin_max = bins[i], bins[i + 1]
-            df_bin = data[(data["age"] >= bin_min) & (data["age"] < bin_max)]
-
-            if not df_bin.empty:
-                transition_counts = df_bin.groupby(["state_name", "going_to_state"]).size().reset_index(name="count")
-
-                # Create a dictionary to map unique labels to indices
-                labels = list(set(df_bin["state_name"]) | set(df_bin["going_to_state"]))
-                label_to_index = {label: idx for idx, label in enumerate(labels)}
-
-                # Map source and target to indices
-                source_indices = transition_counts["state_name"].map(label_to_index)
-                target_indices = transition_counts["going_to_state"].map(label_to_index)
-                values = transition_counts["count"]
-
-                # Create Sankey plot
-                fig = go.Figure(go.Sankey(
-                    node=dict(
-                        pad=15,
-                        thickness=20,
-                        label=labels
-                    ),
-                    link=dict(
-                        source=source_indices,
-                        target=target_indices,
-                        value=values
-                    )
-                ))
-
-                fig.update_layout(title_text=f"Sankey Diagram (Ages {bin_min:.1f} - {bin_max:.1f})")
-                fig.show()
 
     def graph_state_transitions_curved(self, states=None, subtitle="", layout=None, curved_ratio=0.09, colormap='Paired', onlymodel=True, graphseed=42):
         """
@@ -941,7 +784,7 @@ class DwtPlotter:
         None: Displays a directed graph of state transitions.
         """
 
-        if self.data_error():  
+        if self.__data_error__():  
             return
         
         if states is not None: 
@@ -1004,11 +847,51 @@ class DwtPlotter:
 
         # Display the graph
         plt.title(f"State Transition Graph - By Agents Count: {subtitle}", color='white')
+        plt.annotate(text='DwtPlotter.graph_state_transitions_curved()', xy=(0.5, -0.2), xycoords='axes fraction', ha='center', fontsize=12)
         plt.tight_layout()
         plt.show()
-        plt.savefig(f'state_transition_graph{subtitle}.png')
+        
         return
 
+    def bars_reinfections_agebinned_interactive(self, exclude_infections=True, scenario=''):
+        """
+        Plots the maximum number of reinfections for agents and groups them interactively using Plotly.
+
+        This method calculates the maximum number of reinfections for each agent
+        and generates an interactive bar plot to visualize the distribution of reinfections by age bins.
+
+        Returns:
+            None
+        """
+        import plotly.express as px
+
+        if self.__data_error__():
+            return
+
+        # Ensure the 'infection_num' column exists
+        if 'infection_num' not in self.data.columns:
+            self.__generate_reinfection_data__()
+
+        reinfections = self.data  #[self.data['infection_num'] > 0]  # Filter out agents with no reinfections
+
+        # Calculate the maximum number of reinfections for each agent
+        max_reinfections = reinfections.groupby('agent_id')['infection_num'].max().reset_index()
+
+        # Merge with age data
+        age_data = reinfections[['agent_id', 'age']].drop_duplicates()
+        max_reinfections = max_reinfections.merge(age_data, on='agent_id')
+
+        # Define age bins
+        bins = [0, 5, 16, 80, np.inf]
+        labels = ['0-5', '6-16', '17-80', '80+']
+        max_reinfections['age_bin'] = pd.cut(max_reinfections['age'], bins=bins, labels=labels, right=False)
+
+        # Plot the distribution of reinfections by age bins
+        fig = px.histogram(max_reinfections, x='infection_num', color='age_bin', nbins=20,
+                           labels={'infection_num': 'Number of Reinfections', 'age_bin': 'Age Bin'},
+                           title='Distribution of Maximum Reinfections per Agent by Age Bin')
+        fig.update_layout(bargap=0.1)
+        fig.show()
     def plot_dwell_time_validation(self):
         """
         Plot the results of the dwell time validation.
@@ -1030,7 +913,7 @@ class DwtPlotter:
             None
         """
         # Plot the results of the dwell time validation. 
-        if self.data_error():
+        if self.__data_error__():
             return
         fig, ax = plt.subplots()
         data = self.data
@@ -1048,67 +931,6 @@ class DwtPlotter:
         plt.show()
         return
     
-    def plot_max_reinfections(self):
-        """
-        Plots the maximum number of reinfections for agents and groups them.
-
-        This method calculates the maximum number of reinfections for each agent
-        and generates a bar plot to visualize the distribution of reinfections.
-
-        Returns:
-            None
-        """
-        if self.data_error():
-            return
-
-        # Ensure the 'infection_num' column exists
-        if 'infection_num' not in self.data.columns:
-            self.generate_reinfection_data()
-
-        reinfections = self.data  #[self.data['infection_num'] > 0]  # Filter out agents with no reinfections
-
-        # Calculate the maximum number of reinfections for each agent
-        max_reinfections = reinfections.groupby('agent_id')['infection_num'].max()
-
-        # Group by the number of reinfections
-        reinfection_counts = max_reinfections.value_counts().sort_index()
-
-        reinfection_counts = reinfection_counts* 100/reinfection_counts.sum()
-        
-        # Print the percentage of agents with no reinfections
-        print(f"Percentage of agents with no reinfections: {reinfection_counts.get(0, 0):.2f}%")
-
-        # Plot the distribution of reinfections
-        plt.figure(figsize=(10, 6))
-        reinfection_counts.plot(kind='bar', color='skyblue')
-        plt.title('Distribution of Maximum Reinfections per Agent')
-        plt.xlabel('Number of Reinfections')
-        plt.ylabel('Number of Agents')
-        plt.xticks(rotation=0)
-        plt.grid(axis='y')
-        plt.show()
-
-    def generate_reinfection_data(self, file_path=None): 
-        if file_path is None:
-            df = self.data
-        else:
-            file_path = self.data_file
-            df = self.cleandata(file_path)
-
-        df_filtered = df[~((df['state'] == -1.0) & (df['going_to_state_id'] == 0.0))]
-        df_sorted = df_filtered.sort_values(by=['agent_id', 'entry_time'])
-        df_sorted['infection_num'] = df_sorted.groupby('agent_id')['entry_time'].rank(method='first').astype(int) - 1
-        if file_path != None:
-            processed_file = file_path.replace(".csv", "_WithReinfection.csv")
-            df_sorted.to_csv(processed_file, index=False)
-
-        if file_path is None:
-            self.data = df_sorted
-        else:
-            print(f"Processing complete. The output is saved as {processed_file}.")
-            return df_sorted
-        return
-
     def plot_dwell_time_validation_interactive(self):
         """
         Plots an interactive histogram for dwell time validation using Plotly.
@@ -1126,7 +948,7 @@ class DwtPlotter:
         """
 
         import plotly.express as px
-        if self.data_error():
+        if self.__data_error__():
             return
         
         data = self.data
@@ -1137,8 +959,119 @@ class DwtPlotter:
         fig.update_layout(bargap=0.1)
         fig.show()
         return
+    # TODO: Kaplan-Meier
+    def plot_kaplan_meier(self, dwell_time_col, event_observed_col=None):
+        """
+        Plots a Kaplan-Meier survival curve for the given data.
+
+        Parameters:
+            data (pd.DataFrame): Input DataFrame containing survival data.
+            dwell_time_col (str): Column name representing dwell times.
+            event_observed_col (str, optional): Column indicating if the event was observed (1) or censored (0).
+                If None, assumes all events are observed.
+
+        Returns:
+            None: Displays the Kaplan-Meier survival plot.
+        """
+        if self.__data_error__():
+            return
+        
+        data = self.data
+        # Prepare the data
+        durations = data[dwell_time_col]
+        event_observed = data[event_observed_col] if event_observed_col else [1] * len(data)
+
+        # Initialize Kaplan-Meier fitter
+        kmf = KaplanMeierFitter()
+
+        # Fit the data
+        kmf.fit(durations, event_observed=event_observed)
+
+        # Plot the survival function
+        plt.figure(figsize=(10, 6))
+        kmf.plot_survival_function()
+        plt.title("TBSim Kaplan-Meier Survival Curve", fontsize=16)
+        plt.figtext(0.5, 0.01, "DwtPlotter.plot_kaplan_meier()", ha="center", fontsize=12)
+        plt.xlabel(f"Time ({dwell_time_col})", fontsize=14)
+        plt.ylabel("Survival Probability", fontsize=14)
+        plt.grid(True)
+        plt.show()
+
+    def matrix_state_changes(self):
+        """
+        Generates and plots a state transition matrix from the provided data.
+        Parameters:
+        file_path (str, optional): Path to the CSV file containing the data. The CSV file should have columns 'agent_id' and 'state'.
+        self.data (pd.DataFrame, optional): DataFrame containing the data. Should have columns 'agent_id' and 'state'.
+        Returns:
+        None: The function plots the state transition matrix using seaborn's heatmap.
+        Notes:
+        - This is using plain 'state' columns recorded in the data - no need to 'going_to_state' column.
+        - If both file_path and self.data are provided, file_path will be used.
+        - If neither file_path nor self.data are provided, the function will print "No data provided." and return.
+        - The transition matrix is normalized to show proportions. To display raw counts, comment out the normalization step.
+        """
+
+        if self.__data_error__():
+            return
+        df = self.data
+
+        # Create a transition matrix
+        # Get the unique states
+        # unique_states = sorted(df['state'].dropna().unique())
+        unique_states = sorted(df['state'].unique())
+        # Initialize a matrix of zeros
+        transition_matrix = pd.DataFrame(
+            data=0, index=unique_states, columns=unique_states, dtype=int
+        )
+
+        # Fill the matrix with transitions
+        for agent_id, group in df.groupby('agent_id'):
+            states = group['state'].values
+            for i in range(len(states) - 1):
+                transition_matrix.loc[states[i], states[i + 1]] += 1
+
+        # Normalize rows to show proportions (optional, can comment this out if counts are preferred)
+        transition_matrix_normalized = transition_matrix.div(transition_matrix.sum(axis=1), axis=0).fillna(0)
+
+        # Plot the state transition matrix
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(
+            transition_matrix_normalized, 
+            annot=True, 
+            fmt=".2f", 
+            cmap="Blues", 
+            xticklabels=unique_states, 
+            yticklabels=unique_states
+        )
+        plt.title("State Transition Matrix (Normalized)", fontsize=16)
+        plt.figtext(0.5, 0.01, "Rows: Previous State, Columns: Next State \n DwtPlotter.state_transition_matrix()", ha="center", fontsize=12)
+        plt.xlabel("Next State")
+        plt.ylabel("Current State")
+        plt.show()
     
-    def data_error(self):
+    def __generate_reinfection_data__(self, file_path=None): 
+        if file_path is None:
+            df = self.data
+        else:
+            file_path = self.data_file
+            df = self.__cleandata__(file_path)
+
+        df_filtered = df[~((df['state'] == -1.0) & (df['going_to_state_id'] == 0.0))] # Ever been infected
+        df_sorted = df_filtered.sort_values(by=['agent_id', 'entry_time'])
+        df_sorted['infection_num'] = df_sorted.groupby('agent_id')['entry_time'].rank(method='first').astype(int) - 1
+        if file_path != None:
+            processed_file = file_path.replace(".csv", "_WithReinfection.csv")
+            df_sorted.to_csv(processed_file, index=False)
+
+        if file_path is None:
+            self.data = df_sorted
+        else:
+            print(f"Processing complete. The output is saved as {processed_file}.")
+            return df_sorted
+        return
+
+    def __data_error__(self):
         # data error handling - check if data is available
 
         if self.data is None or self.data.empty or 'dwell_time' not in self.data.columns:
@@ -1146,8 +1079,44 @@ class DwtPlotter:
             return True
         return False
 
+    def __cleandata__(self, filename):
+        import pandas as pd
+
+        # Define column types as expected
+        dtype_dict = {
+            "agent_id": float,  # Using float initially to avoid casting errors
+            "state": float,
+            "entry_time": float,
+            "exit_time": float,  # Keep as float first, will convert later
+            "dwell_time": float,
+            "state_name": str,
+            "going_to_state_id": float,
+            "going_to_state": float,
+            "age": float
+        }
+
+        # Read CSV as raw text to avoid errors during import
+        df = pd.read_csv(filename, dtype=str)  # Read everything as strings first
+        df = df.dropna(subset=["agent_id"])
+
+        # Convert numeric columns, coercing invalid values to NaN
+        numeric_columns = ["agent_id", "state", "entry_time", "exit_time", "dwell_time", "going_to_state_id", "age"]
+        for col in numeric_columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')  # Convert and replace invalid with NaN
+
+        # Drop rows with NaN in any of the expected numeric columns
+        df_cleaned = df.dropna(subset=numeric_columns)
+
+        # # Convert integer columns after filtering invalid data
+        # df_cleaned["agent_id"] = df_cleaned["agent_id"].astype(int)
+        # df_cleaned["exit_time"] = df_cleaned["exit_time"].astype(int)
+
+        # Reset index after dropping rows
+        df_cleaned.reset_index(drop=True, inplace=True)
+        return df_cleaned
+
     @staticmethod
-    def _select_graph_pos(G, layout, seed=42):
+    def __select_graph_pos__(G, layout, seed=42):
         import networkx as nx
         
         if layout == 1: 
@@ -1528,12 +1497,13 @@ if __name__ == '__main__':
         # # # Initialize the DwtPlotter
         file = '/Users/mine/git/tbsim/results/runTBDwellanalyzer-0204011702.csv'
         plotter = mtb.DwtPlotter(file_path=file)
-        plotter.cleandata(filename=file)
-        plotter.plot_max_reinfections()
+        # plotter.__cleandata__(filename=file)
+        plotter.plot_dwell_time_validation()
         # plotter.graph_state_transitions()
         # plotter.graph_state_transitions_curved(graphseed=9)
         #  plotter.histogram_with_kde()
-        # plotter
+
+
         # plotter.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
         # plotter.graph_state_transitions_curved(graphseed=10)  # 6, 7, 9, 11, 12, 23,31, 36, 37, 39, 40 
         # plotter.plot_dwell_time_validation()
