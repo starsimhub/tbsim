@@ -435,6 +435,76 @@ class DwtPlotter:
         plt.show()
         return
 
+    def reinfections_bars_age_bins_interactive(self, include_going_to_state, scenario=''):
+        """
+        Plots the maximum number of reinfections for agents and groups them interactively using Plotly.
+
+        This method calculates the maximum number of reinfections for each agent
+        and generates an interactive bar plot to visualize the distribution of reinfections by age bins.
+
+        Returns:
+            None
+        """
+        import plotly.express as px
+
+        if self.__data_error__():
+            return
+        
+
+        # Ensure the 'infection_num' column exists
+        if 'infection_num' not in self.data.columns:
+            reinfections = self.__generate_reinfection_data__(include_going_to_state=include_going_to_state, scenario=Utils.to_filename_friendly(scenario) )
+        else:
+            reinfections = self.data
+
+        # Calculate the maximum number of reinfections for each agent
+        max_reinfections = reinfections.groupby('agent_id')['infection_num'].max().reset_index()
+        # Merge with age data
+        age_data = reinfections[['agent_id', 'age']].drop_duplicates()
+        max_reinfections = max_reinfections.merge(age_data, on='agent_id')
+
+        # Define age bins
+        age_bins = [0, 5, 16, 30, 40, 50, 60, 70, 80, 90, 100, np.inf]
+        age_labels = [f'{int(b)}-{int(age_bins[i+1])}' if age_bins[i+1] != np.inf else f'{int(b)}+' for i, b in enumerate(age_bins[:-1])]
+        max_reinfections['age_group'] = pd.cut(max_reinfections['age'], bins=age_bins, labels=age_labels, right=False)
+
+        # Plot the data
+        fig = px.histogram(max_reinfections, x='infection_num', color='age_group', barmode='group',
+                           labels={'infection_num': 'Number of Reinfections', 'age_group': 'Age Group'},
+                           title=f'Distribution of Maximum Reinfections per Agent by Age Group {scenario}',
+                           category_orders={'age_group': age_labels})
+        fig.update_layout(bargap=0.2)
+        fig.show()
+
+    def reinfections_bars_interactive(self,include_going_to_state,  scenario=''):
+        """
+        Plots the maximum number of reinfections for agents and groups them interactively using Plotly.
+
+        This method calculates the maximum number of reinfections for each agent
+        and generates an interactive bar plot to visualize the distribution of reinfections by age bins.
+
+        Returns:
+            None
+        """
+        import plotly.express as px
+
+        if self.__data_error__():
+            return
+
+        # Ensure the 'infection_num' column exists
+        if 'infection_num' not in self.data.columns:
+            reinfections =self.__generate_reinfection_data__(include_going_to_state=include_going_to_state, scenario=Utils.to_filename_friendly(scenario) )
+        else:
+            reinfections = self.data#[self.data['infection_num'] > 0]  # Filter out agents with no reinfections
+
+        # Calculate the maximum number of reinfections for each agent
+        max_reinfections = reinfections.groupby('agent_id')['infection_num'].max().reset_index()
+        # plot it:
+        fig = px.histogram(max_reinfections, x='infection_num', nbins=20, 
+                           labels={'infection_num': 'Number of Reinfections'},
+                           title=f'Distribution of Maximum Reinfections per Agent {scenario}',)
+        fig.show()
+
     def stackedbars_dwelltime_state_interactive(self, bin_size=3, num_bins=20):
         """
         Generates an interactive stacked bar chart of dwell times by state using Plotly.
@@ -853,35 +923,6 @@ class DwtPlotter:
         
         return
 
-    def bars_reinfections_agebinned_interactive(self, exclude_infections=True, scenario=''):
-        """
-        Plots the maximum number of reinfections for agents and groups them interactively using Plotly.
-
-        This method calculates the maximum number of reinfections for each agent
-        and generates an interactive bar plot to visualize the distribution of reinfections by age bins.
-
-        Returns:
-            None
-        """
-        import plotly.express as px
-
-        if self.__data_error__():
-            return
-
-        # Ensure the 'infection_num' column exists
-        if 'infection_num' not in self.data.columns:
-            reinfections =self.__generate_reinfection_data__()
-        else:
-            reinfections = self.data#[self.data['infection_num'] > 0]  # Filter out agents with no reinfections
-
-        # Calculate the maximum number of reinfections for each agent
-        max_reinfections = reinfections.groupby('agent_id')['infection_num'].max().reset_index()
-        # plot it:
-        fig = px.histogram(max_reinfections, x='infection_num', nbins=20, 
-                           labels={'infection_num': 'Number of Reinfections'},
-                           title=f'Distribution of Maximum Reinfections per Agent {scenario}',)
-        fig.show()
-
     def plot_dwell_time_validation(self):
         """
         Plot the results of the dwell time validation.
@@ -1040,39 +1081,29 @@ class DwtPlotter:
         plt.ylabel("Current State")
         plt.show()
     
-    def __generate_reinfection_data__(self, file_path=None): 
+    def __generate_reinfection_data__(self, file_path=None, include_going_to_state=[], scenario=''): 
         if file_path is None:
             df = self.data
+            reinfection_file_name = Utils.to_filename_friendly(scenario) + '_WithReinfection.csv'
         else:
             file_path = self.data_file
             df = self.__cleandata__(file_path)
+            reinfection_file_name = file_path.replace(".csv", "_WithReinfection.csv")
 
-        # [-3] = 'NON-TB DEATH'  
-        # [-2] = 'NEVER INFECTED'
+        ignore_states = [-2.0, -3.0] # -2 = ever infected, -3 = non-TB death
 
-        relevant_rows = df[~df['going_to_state_id'].isin([-2.0, -3.0])]
-
+        relevant_rows = df[~df['going_to_state_id'].isin(ignore_states)]
+        relevant_rows = df[df['going_to_state_id'].isin(include_going_to_state)]
         # identify the rows where the going_to_state_id is greater than state
 
-        reinfection = relevant_rows[relevant_rows['going_to_state_id'] < relevant_rows['state']].copy()
-        reinfection.loc[:, 'infection_num'] = reinfection.groupby('agent_id').cumcount()
-
-        return reinfection
-
-        # df_filtered = df[~((df['state'] == -1.0) & (df['going_to_state_id'] == 0.0))] # Ever been infected
+        df = relevant_rows[relevant_rows['going_to_state_id'] < relevant_rows['state']].copy()
+        df.loc[:, 'infection_num'] = df.groupby('agent_id').cumcount()
+        df = df.sort_values(by=['agent_id', 'entry_time'])
+        df.to_csv(reinfection_file_name, index=False)
+ 
+        return df
         
-        # df_sorted = df_filtered.sort_values(by=['agent_id', 'entry_time'])
-        # df_sorted['infection_num'] = df_sorted.groupby('agent_id')['entry_time'].rank(method='first').astype(int) - 1
-        # if file_path != None:
-        #     processed_file = file_path.replace(".csv", "_WithReinfection.csv")
-        #     df_sorted.to_csv(processed_file, index=False)
 
-        # if file_path is None:
-        #     self.data = df_sorted
-        # else:
-        #     print(f"Processing complete. The output is saved as {processed_file}.")
-        #     return df_sorted
-        # return
 
     def __data_error__(self):
         # data error handling - check if data is available
@@ -1286,7 +1317,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         DwtPlotter.__init__(self, data=self.data)
         return
     
-    def _initialize_dataframes(self):
+    def __initialize_dataframes__(self):
         # Initialize the latest state dataframe
         # NOTE: This module assumes the default state is '-1'
         if self.unit is None:
@@ -1301,13 +1332,13 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         return
     
     def step(self):
-        if not self.sim.ti: self._initialize_dataframes()
-        self._check_for_new_borns()       
-        self._update_state_change_data()
-        self._record_natural_deaths()
+        if not self.sim.ti: self.__initialize_dataframes__()
+        self.__check_for_new_borns__()       
+        self.__update_state_change_data__()
+        self.__record_natural_deaths__()
         return
     
-    def _update_state_change_data(self):
+    def __update_state_change_data__(self):
         # Get the current state of the agents
         ti = self.ti
         tb = self.sim.diseases.tb
@@ -1336,7 +1367,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         return
 
     # TODO:  IN PROGRESS
-    def _record_natural_deaths(self):
+    def __record_natural_deaths__(self):
         # Get the current state of the agents
         ti = self.ti
         dead_uids = ss.uids(self.sim.people.dead)
@@ -1357,7 +1388,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
                 age= self.sim.people.age[ss.uids(relevant_rows['agent_id'].values)]
             )
             
-    def _check_for_new_borns(self):
+    def __check_for_new_borns__(self):
         # check if the number of agents has changed
         if len(self.sim.people.auids) != len(self._latest_sts_df):
             #identify which agent ids are new and add them to the _latest_sts_df
@@ -1423,7 +1454,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             elif isinstance(self.unit, str):
                 self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / ss.rate(self.unit))
                 # self.data['dwell_time'] = self.data['dwell_time'].apply(lambda x: eval(f"{x} {self.unit}"))
-        self.file_path = self._save_to_file()
+        self.file_path = self.__save_to_file__()
         return
 
     def _log_dwell_time(self, agent_ids, states, entry_times, exit_times, going_to_state_ids, age):
@@ -1442,10 +1473,10 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         self.data = pd.concat([self.data, new_logs], ignore_index=True)
         return
     
-    def _save_to_file(self):
+    def __save_to_file__(self):
         resdir = os.path.dirname(cfg.create_res_dir())
         t = ddtt.datetime.now()
-        prefix = f'{self.to_filename_friendly(self.scenario_name)}'
+        prefix = f'{Utils.to_filename_friendly(self.scenario_name)}'
         if prefix == '' or prefix is None: 
             prefix = 'dwt_logs'
         t = t.strftime("%m%d%H%M%S")
@@ -1458,14 +1489,6 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
 
         print(f"===> Dwell time logs saved to:\n {fn}\n")
         return fn
-
-    @staticmethod
-    def to_filename_friendly(string=''):
-        import re
-        string = "".join([c if c.isalpha() else "_" for c in string])
-
-        return re.sub(r'[^a-zA-Z0-9]', '', string)
-
 
     def validate_dwell_time_distributions(self, expected_distributions=None):
         from scipy.stats import ks_1samp, ks_2samp
@@ -1483,6 +1506,11 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
                 print(f"WARNING: Dwell times for state {state} deviate significantly from expectations.")
         return
 
+class Utils:
+    def to_filename_friendly(string=''):
+        import re
+        string = "".join([c if c.isalpha() else "_" for c in string])
+        return re.sub(r'[^a-zA-Z0-9]', '', string)
 
 
 # Example usage
