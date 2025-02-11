@@ -870,28 +870,18 @@ class DwtPlotter:
 
         # Ensure the 'infection_num' column exists
         if 'infection_num' not in self.data.columns:
-            self.__generate_reinfection_data__()
-
-        reinfections = self.data  #[self.data['infection_num'] > 0]  # Filter out agents with no reinfections
+            reinfections =self.__generate_reinfection_data__()
+        else:
+            reinfections = self.data#[self.data['infection_num'] > 0]  # Filter out agents with no reinfections
 
         # Calculate the maximum number of reinfections for each agent
         max_reinfections = reinfections.groupby('agent_id')['infection_num'].max().reset_index()
-
-        # Merge with age data
-        age_data = reinfections[['agent_id', 'age']].drop_duplicates()
-        max_reinfections = max_reinfections.merge(age_data, on='agent_id')
-
-        # Define age bins
-        bins = [0, 5, 16, 80, np.inf]
-        labels = ['0-5', '6-16', '17-80', '80+']
-        max_reinfections['age_bin'] = pd.cut(max_reinfections['age'], bins=bins, labels=labels, right=False)
-
-        # Plot the distribution of reinfections by age bins
-        fig = px.histogram(max_reinfections, x='infection_num', color='age_bin', nbins=20,
-                           labels={'infection_num': 'Number of Reinfections', 'age_bin': 'Age Bin'},
-                           title='Distribution of Maximum Reinfections per Agent by Age Bin')
-        fig.update_layout(bargap=0.1)
+        # plot it:
+        fig = px.histogram(max_reinfections, x='infection_num', nbins=20, 
+                           labels={'infection_num': 'Number of Reinfections'},
+                           title=f'Distribution of Maximum Reinfections per Agent {scenario}',)
         fig.show()
+
     def plot_dwell_time_validation(self):
         """
         Plot the results of the dwell time validation.
@@ -1057,19 +1047,32 @@ class DwtPlotter:
             file_path = self.data_file
             df = self.__cleandata__(file_path)
 
-        df_filtered = df[~((df['state'] == -1.0) & (df['going_to_state_id'] == 0.0))] # Ever been infected
-        df_sorted = df_filtered.sort_values(by=['agent_id', 'entry_time'])
-        df_sorted['infection_num'] = df_sorted.groupby('agent_id')['entry_time'].rank(method='first').astype(int) - 1
-        if file_path != None:
-            processed_file = file_path.replace(".csv", "_WithReinfection.csv")
-            df_sorted.to_csv(processed_file, index=False)
+        # [-3] = 'NON-TB DEATH'  
+        # [-2] = 'NEVER INFECTED'
 
-        if file_path is None:
-            self.data = df_sorted
-        else:
-            print(f"Processing complete. The output is saved as {processed_file}.")
-            return df_sorted
-        return
+        relevant_rows = df[~df['going_to_state_id'].isin([-2.0, -3.0])]
+
+        # identify the rows where the going_to_state_id is greater than state
+
+        reinfection = relevant_rows[relevant_rows['going_to_state_id'] < relevant_rows['state']].copy()
+        reinfection.loc[:, 'infection_num'] = reinfection.groupby('agent_id').cumcount()
+
+        return reinfection
+
+        # df_filtered = df[~((df['state'] == -1.0) & (df['going_to_state_id'] == 0.0))] # Ever been infected
+        
+        # df_sorted = df_filtered.sort_values(by=['agent_id', 'entry_time'])
+        # df_sorted['infection_num'] = df_sorted.groupby('agent_id')['entry_time'].rank(method='first').astype(int) - 1
+        # if file_path != None:
+        #     processed_file = file_path.replace(".csv", "_WithReinfection.csv")
+        #     df_sorted.to_csv(processed_file, index=False)
+
+        # if file_path is None:
+        #     self.data = df_sorted
+        # else:
+        #     print(f"Processing complete. The output is saved as {processed_file}.")
+        #     return df_sorted
+        # return
 
     def __data_error__(self):
         # data error handling - check if data is available
