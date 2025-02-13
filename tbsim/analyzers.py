@@ -1,3 +1,4 @@
+import matplotlib.colors as mcolors
 import pandas as pd
 import starsim as ss
 import numpy as np
@@ -421,11 +422,13 @@ class DwtPlotter:
         # Convert dwell time to suplied step_time_units
         df['cumulative_dwell_time_units'] = df['cumulative_dwell_time']#/24
 
+        cmap, state_colors = Utils.colors()
         # Pivot the data to get cumulative dwell time for each state
         pivot_df = df.pivot_table(index='agent_id', columns='state_name', values='cumulative_dwell_time_units', aggfunc='max', fill_value=0)
+        pivot_df.plot(kind='bar', stacked=True, figsize=(15, 40), colormap=cmap )
 
         # Plot the data
-        pivot_df.plot(kind='bar', stacked=True, figsize=(15, 7))
+        # pivot_df.plot(kind='bar', stacked=True, figsize=(15, 7))
         plt.title('Cumulative Time in step_time_units on Each State for All Agents')
         plt.annotate('DwtPlotter.stacked_bars_states_per_agent_static()', xy=(0.5, -0.1), xycoords='axes fraction', ha='center', fontsize=12)
         plt.xlabel('Agent ID')
@@ -435,7 +438,7 @@ class DwtPlotter:
         plt.show()
         return
 
-    def reinfections_bars_age_bins_interactive(self, include_going_to_state, scenario=''):
+    def reinfections_age_bins_bars_interactive(self, target_states, barmode = 'group', scenario=''):
         """
         Plots the maximum number of reinfections for agents and groups them interactively using Plotly.
 
@@ -453,7 +456,7 @@ class DwtPlotter:
 
         # Ensure the 'infection_num' column exists
         if 'infection_num' not in self.data.columns:
-            reinfections = self.__generate_reinfection_data__(include_going_to_state=include_going_to_state, scenario=Utils.to_filename_friendly(scenario) )
+            reinfections, total_count = self.__generate_reinfection_data__(target_states=target_states, scenario=Utils.to_filename_friendly(scenario) )
         else:
             reinfections = self.data
 
@@ -469,14 +472,14 @@ class DwtPlotter:
         max_reinfections['age_group'] = pd.cut(max_reinfections['age'], bins=age_bins, labels=age_labels, right=False)
 
         # Plot the data
-        fig = px.histogram(max_reinfections, x='infection_num', color='age_group', barmode='group',
+        fig = px.histogram(max_reinfections, x='infection_num', color='age_group', barmode=barmode,
                            labels={'infection_num': 'Number of Reinfections', 'age_group': 'Age Group'},
                            title=f'Distribution of Maximum Reinfections per Agent by Age Group {scenario}',
                            category_orders={'age_group': age_labels})
         fig.update_layout(bargap=0.2)
         fig.show()
 
-    def reinfections_bars_interactive(self,include_going_to_state,  scenario=''):
+    def reinfections_percents_bars_interactive(self, target_states, scenario=''):
         """
         Plots the maximum number of reinfections for agents and groups them interactively using Plotly.
 
@@ -493,16 +496,58 @@ class DwtPlotter:
 
         # Ensure the 'infection_num' column exists
         if 'infection_num' not in self.data.columns:
-            reinfections =self.__generate_reinfection_data__(include_going_to_state=include_going_to_state, scenario=Utils.to_filename_friendly(scenario) )
+            reinfections, total_count = self.__generate_reinfection_data__(target_states=target_states, scenario=Utils.to_filename_friendly(scenario))
         else:
-            reinfections = self.data#[self.data['infection_num'] > 0]  # Filter out agents with no reinfections
+            reinfections = self.data
+
+        total_infections = reinfections[reinfections['infection_num'] > 0]['infection_num'].count()
+
+        # Calculate the total sum of percent for each infection number
+        percent_reinfections = reinfections.groupby('infection_num')['percent'].sum().reset_index()
+
+        # Plot it
+        fig = px.bar(percent_reinfections, x='infection_num', y='percent', color='infection_num',
+             labels={'infection_num': 'Number of Reinfections', 'percent': f'Total Percent {total_count:,}'},
+             title=f'Distribution of Maximum Reinfections per Agent {scenario}',
+             color_continuous_scale=px.colors.sequential.Viridis)
+        fig.update_layout(yaxis_tickformat='.1%')
+        fig.show()
+
+    def reinfections_bystates_bars_interactive(self, target_states, scenario='', barmode='group'):
+        """
+        Plots the maximum number of reinfections for agents and groups them interactively using Plotly.
+
+        This method calculates the maximum number of reinfections for each agent
+        and generates an interactive bar plot to visualize the distribution of reinfections by state transitions.
+
+        Returns:
+            None
+        """
+        import plotly.express as px
+
+        if self.__data_error__():
+            return
+
+        # Ensure the 'infection_num' column exists
+        if 'infection_num' not in self.data.columns:
+            reinfections, total_count = self.__generate_reinfection_data__(target_states=target_states, scenario=Utils.to_filename_friendly(scenario))
+        else:
+            reinfections = self.data
 
         # Calculate the maximum number of reinfections for each agent
         max_reinfections = reinfections.groupby('agent_id')['infection_num'].max().reset_index()
-        # plot it:
-        fig = px.histogram(max_reinfections, x='infection_num', nbins=20, 
-                           labels={'infection_num': 'Number of Reinfections'},
-                           title=f'Distribution of Maximum Reinfections per Agent {scenario}',)
+        # Merge with state_name and going_to_state data
+        state_data = reinfections[['agent_id', 'state_name', 'going_to_state']] #.drop_duplicates() - interested on all of them
+        max_reinfections = max_reinfections.merge(state_data, on='agent_id')
+
+        # Combine state_name and going_to_state for better visualization
+        max_reinfections['state_transition'] = max_reinfections['state_name'] + ' → ' + max_reinfections['going_to_state']
+
+        # Plot the data
+        fig = px.histogram(max_reinfections, x='infection_num', color='state_transition', barmode=barmode,
+                           labels={'infection_num': 'Number of Reinfections ', 'state_transition': 'State Transition'},
+                           title=f'Distribution of Maximum Reinfections per Agent by State Transition {scenario}')
+        fig.update_layout(bargap=0.2)
         fig.show()
 
     def stackedbars_dwelltime_state_interactive(self, bin_size=3, num_bins=20):
@@ -669,9 +714,14 @@ class DwtPlotter:
 
             # Group by dwell time bins and going to state
             grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
+            state_colors, cmap = Utils.colors()
+            
+            # Ensure column order matches color mapping
+            matching_colors = [state_colors[state] for state in grouped.columns if state in state_colors]
+            cmap = mcolors.ListedColormap(matching_colors)
 
             # Plot stacked bar chart
-            grouped.plot(kind='bar', stacked=True, ax=ax, colormap='tab20')
+            grouped.plot(kind='bar', stacked=True, ax=ax, colormap=cmap) #'tab20')
             ax.set_title(f'State: {state}')
             ax.set_xlabel('Dwell Time Bins')
             ax.set_ylabel('Count')
@@ -1081,7 +1131,7 @@ class DwtPlotter:
         plt.ylabel("Current State")
         plt.show()
     
-    def __generate_reinfection_data__(self, file_path=None, include_going_to_state=[], scenario=''): 
+    def __generate_reinfection_data__(self, file_path=None, target_states=[], scenario=''): 
         if file_path is None:
             df = self.data
             reinfection_file_name = Utils.to_filename_friendly(scenario) + '_WithReinfection.csv'
@@ -1092,16 +1142,24 @@ class DwtPlotter:
 
         ignore_states = [-2.0, -3.0] # -2 = ever infected, -3 = non-TB death
 
-        relevant_rows = df[~df['going_to_state_id'].isin(ignore_states)]
-        relevant_rows = df[df['going_to_state_id'].isin(include_going_to_state)]
-        # identify the rows where the going_to_state_id is greater than state
+        df = df[~df['going_to_state_id'].isin(ignore_states)]
+        relevant_rows = df[df['going_to_state_id'].isin(target_states)]
+        
+        # identify all the cases that landed in the selected states:
+        total_count = len(self.data[self.data['going_to_state_id'].isin(target_states)])
 
+        # identify the rows where the going_to_state_id is greater than state
+        # this is to identify the reinfections
         df = relevant_rows[relevant_rows['going_to_state_id'] < relevant_rows['state']].copy()
-        df.loc[:, 'infection_num'] = df.groupby('agent_id').cumcount()
+        df.loc[:, 'infection_num'] = df.groupby('agent_id').cumcount()+1
+        df.loc[:, 'percent'] = df['infection_num'].astype(float)/total_count
+        # keep only the maximum infection_num for each agent_id
+        df = df.loc[df.groupby('agent_id')['infection_num'].idxmax()]
+
         df = df.sort_values(by=['agent_id', 'entry_time'])
         df.to_csv(reinfection_file_name, index=False)
  
-        return df
+        return df, total_count
         
 
 
@@ -1511,6 +1569,35 @@ class Utils:
         import re
         string = "".join([c if c.isalpha() else "_" for c in string])
         return re.sub(r'[^a-zA-Z0-9]', '', string)
+    
+    def colors():
+        """
+        Returns a ListedColormap and corresponding state labels for TB states.
+        
+        Returns:
+            cmap (ListedColormap): Colormap object for use in plots.
+            state_labels (list): Ordered state names.
+        """        
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+        # cm = mcolors.cm.get_cmap('tab20', 20)
+        state_colors = {
+            '-3.0.NON-TB DEATH': "#000000",  # Black
+            "-2.0.NEVER INFECTED": "#808080",    # Gray
+            "-1.0.Susceptible": "#ff7f0e",      # Orange
+            "0.0.Infection": "#1f77b4",       # Blue"
+            "1.0.Cleared": "#2ca02c",        # Green
+            "2.0.Unconfirmed": "#d62728",    # Red
+            "3.0.Recovered": "#9467bd",      # Purple
+            "4.0.Asymptomatic": "#8c564b",   # Brown
+            "5.0.Symptomatic": "#e377c2",    # Pink
+            "6.0.Treatment": "#7f7f7f",      # Gray
+            "7.0.Treated": "#bcbd22",        # Yellow-green
+            "8.0.Dead": "#17becf"         # Cyan
+        }
+        
+        cmap = mcolors.ListedColormap([state_colors[state] for state in state_colors])
+        return state_colors, cmap
 
 
 # Example usage
@@ -1526,10 +1613,15 @@ if __name__ == '__main__':
 
     if debug == 2:
         # # # Initialize the DwtPlotter
-        file = '/Users/mine/git/tbsim/results/runTBDwellanalyzer-0204011702.csv'
+        # file = '/Users/mine/git/tbsim/results/runTBDwellanalyzer-0204011702.csv'
+        file = "/Users/mine/TEMP/results/HighDecliningLSHTM-0206192459.csv"
+
         plotter = mtb.DwtPlotter(file_path=file)
         # plotter.__cleandata__(filename=file)
-        plotter.plot_dwell_time_validation()
+        # plotter.plot_dwell_time_validation()
+        # plotter.reinfections_age_bins_bars_interactive(target_states=[-1, 0])
+        # plotter.stacked_bars_states_per_agent_static()
+        plotter.stackedbars_subplots_state_transitions()
         # plotter.graph_state_transitions()
         # plotter.graph_state_transitions_curved(graphseed=9)
         #  plotter.histogram_with_kde()
