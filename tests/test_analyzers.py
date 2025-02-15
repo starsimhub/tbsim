@@ -2,41 +2,7 @@ import pytest
 import pandas as pd
 from tbsim.analyzers import DwtPlotter
 import os
-import tb_acf
 import starsim as ss
-
-def init():
-    plotter = DwtPlotter()
-
-
-    pop = ss.People(1000)
-    tb_pars = dict(
-        beta = ss.rate_prob(0.5, unit='month'),
-        acuinf = ss.days(ss.lognorm_ex(mean=60, std=34.2)),
-        alpha = 1.0,
-    )
-    tb = tb_acf.TB_LSHTM_Acute(tb_pars, name='tb')
-
-    nets = ss.MixingPool(
-        diseases = 'tb',
-        src      = ss.AgeGroup(0, None),
-        dst      = ss.AgeGroup(0, None),
-        beta     = tb.pars.beta,
-        contacts = ss.poisson(3), # ss.constant(1),
-    )
-
-    # Simulation parameters
-    sim_pars = dict(
-        unit = 'day',
-        dt = 30,
-        start = '1950-01-01',
-        stop = '2019-12-31',
-    )
-
-    sim = ss.Sim(pars=sim_pars, people=pop, diseases=tb, networks=nets)
-    sim.run()
-
-    return sim
 
 @pytest.fixture
 def sample_data():
