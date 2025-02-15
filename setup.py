@@ -52,5 +52,7 @@ setup(
         'plotly',
         'lifelines',
         'tqdm',
+        'networkx',
+        'plotly',
     ],
 )
