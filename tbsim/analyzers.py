@@ -12,9 +12,11 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from lifelines import KaplanMeierFitter
 import networkx as nx
-import plotly.graph_objects as go
+import plotly.graph_objects as go 
 import warnings
-
+import plotly.express as px
+import itertools as it
+        
 
 __all__ = ['DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor']
 
@@ -167,7 +169,7 @@ class DwtPlotter:
 
         The method uses Plotly to create and display the Sankey diagram.
         """
-        import plotly.graph_objects as go
+        
         if self.__data_error__():
             return
         
@@ -191,6 +193,7 @@ class DwtPlotter:
 
         # Generate colors for nodes
         colors = plt.cm.tab20(np.linspace(0, 1, len(labels)))
+
         node_colors = [f'rgba({c[0]*255}, {c[1]*255}, {c[2]*255}, 1.0)' for c in colors]
 
         # Generate lighter colors for links
@@ -247,7 +250,7 @@ class DwtPlotter:
 
         The method uses Plotly to create and display the Sankey diagram.
         """
-        import plotly.graph_objects as go
+        
 
         if self.__data_error__():
             return
@@ -298,12 +301,12 @@ class DwtPlotter:
         # fig.update_layout(title_text="Sankey Diagram of State Transitions -  DWELL TIME", font_size=10)
 
         fig.update_layout(
-            hovermode='x',
+            # hovermode='x',
             title=dict(text=f"State Transitions - Dwell Times<br>{subtitle}  (DwtPlotter.sankey_dwelltimes())", font=dict(size=12)),
-            font=dict(size=12, color='black'),
+            font=dict(size=10, color='black'),
             margin=dict(l=20, r=20, t=40, b=20),
-            paper_bgcolor='white',
-            plot_bgcolor='white'
+            # paper_bgcolor='white',
+            # plot_bgcolor='white'
         )
 
         fig.show()
@@ -321,9 +324,8 @@ class DwtPlotter:
         None: Displays an interactive Plotly bar chart.
         """
 
-        import numpy as np
-        import plotly.express as px
-        import plotly.graph_objects as go
+
+        
 
         if self.__data_error__():
             return
@@ -411,7 +413,6 @@ class DwtPlotter:
                                    the data stored in `self.data`.
 
         Returns:
-        None
         """
         if self.__data_error__():
             return
@@ -422,7 +423,12 @@ class DwtPlotter:
         # Convert dwell time to suplied step_time_units
         df['cumulative_dwell_time_units'] = df['cumulative_dwell_time']#/24
 
-        cmap, state_colors = Utils.colors()
+        # Ensure column order matches color mapping
+        state_colors, cmap = Utils.colors()
+        matching_colors = [state_colors[state] for state in df['state_name'].unique() if state in state_colors]
+        cmap = mcolors.ListedColormap(matching_colors)
+
+
         # Pivot the data to get cumulative dwell time for each state
         pivot_df = df.pivot_table(index='agent_id', columns='state_name', values='cumulative_dwell_time_units', aggfunc='max', fill_value=0)
         pivot_df.plot(kind='bar', stacked=True, figsize=(15, 40), colormap=cmap )
@@ -436,7 +442,7 @@ class DwtPlotter:
         plt.legend(title='State Name')
         plt.tight_layout()
         plt.show()
-        return
+
 
     def reinfections_age_bins_bars_interactive(self, target_states, barmode = 'group', scenario=''):
         """
@@ -448,7 +454,7 @@ class DwtPlotter:
         Returns:
             None
         """
-        import plotly.express as px
+
 
         if self.__data_error__():
             return
@@ -489,7 +495,6 @@ class DwtPlotter:
         Returns:
             None
         """
-        import plotly.express as px
 
         if self.__data_error__():
             return
@@ -504,12 +509,11 @@ class DwtPlotter:
 
         # Calculate the total sum of percent for each infection number
         percent_reinfections = reinfections.groupby('infection_num')['percent'].sum().reset_index()
-
+        
         # Plot it
-        fig = px.bar(percent_reinfections, x='infection_num', y='percent', color='infection_num',
+        fig = px.bar(percent_reinfections, x='infection_num', y='percent', color='infection_num', 
              labels={'infection_num': 'Number of Reinfections', 'percent': f'Total Percent {total_count:,}'},
-             title=f'Distribution of Maximum Reinfections per Agent {scenario}',
-             color_continuous_scale=px.colors.sequential.Viridis)
+             title=f'Distribution of Maximum Reinfections per Agent {scenario}')
         fig.update_layout(yaxis_tickformat='.1%')
         fig.show()
 
@@ -523,7 +527,7 @@ class DwtPlotter:
         Returns:
             None
         """
-        import plotly.express as px
+
 
         if self.__data_error__():
             return
@@ -567,8 +571,7 @@ class DwtPlotter:
         - It generates a stacked bar chart for each state, showing the count of transitions to other states within each dwell time bin.
         - The height of the figure is dynamically adjusted based on the number of states.
         """
-        import plotly.express as px
-        import plotly.graph_objects as go
+
 
         if self.__data_error__():
             return
@@ -638,9 +641,6 @@ class DwtPlotter:
         None: The function displays the plot and does not return any value.
         """
 
-        import matplotlib.pyplot as plt
-        import numpy as np
-
         if self.__data_error__():
             return
 
@@ -690,7 +690,6 @@ class DwtPlotter:
         - Any empty subplots are removed before displaying the plot.
         """
 
-        import matplotlib.pyplot as plt
 
         if self.__data_error__():
             return
@@ -714,9 +713,9 @@ class DwtPlotter:
 
             # Group by dwell time bins and going to state
             grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
-            state_colors, cmap = Utils.colors()
-            
+
             # Ensure column order matches color mapping
+            state_colors, cmap = Utils.colors()
             matching_colors = [state_colors[state] for state in grouped.columns if state in state_colors]
             cmap = mcolors.ListedColormap(matching_colors)
 
@@ -836,17 +835,17 @@ class DwtPlotter:
         - Nodes are colored using a colormap, and edges are drawn with arrows to indicate direction.
         - The graph is displayed using Matplotlib.
         """
-        import networkx as nx
-        import itertools as it
-        from scipy import stats
-        
 
         if self.__data_error__():  return
-        if states is not None: self.data = self.data[self.data['state_name'].isin(states)]
-        if onlymodel: self.data = self.data[~self.data['going_to_state_id'].isin([-3.0, -2.0])]
+        df = self.data
+        if states is not None: 
+            df = df[df['going_to_state'].isin(states)]
+            df = df[df['state_name'].isin(states)]
+
+        if onlymodel: df = df[~df['going_to_state_id'].isin([-3.0, -2.0])]
 
         # Calculate mean, mode, and count for each state transition
-        transitions = self.data.groupby(['state_name', 'going_to_state'])['dwell_time']   #Dweell time 
+        transitions = df.groupby(['state_name', 'going_to_state'])['dwell_time']   #Dweell time 
 
         stats_df = transitions.agg([
             'mean',
@@ -906,15 +905,15 @@ class DwtPlotter:
 
         if self.__data_error__():  
             return
-        
+        df = self.data
         if states is not None: 
-            self.data = self.data[self.data['state_name'].isin(states)]
+            df = df[df['state_name'].isin(states)]
         
         if onlymodel: 
-            self.data = self.data[~self.data['going_to_state_id'].isin([-3.0, -2.0])]
+            df = df[~df['going_to_state_id'].isin([-3.0, -2.0])]
 
         # Compute transition statistics: Mean, Mode, Count (Agent Count)
-        transitions = self.data.groupby(['state_name', 'going_to_state'])['dwell_time']
+        transitions = df.groupby(['state_name', 'going_to_state'])['dwell_time']
         
         stats_df = transitions.agg([
             'mean',
@@ -1027,8 +1026,6 @@ class DwtPlotter:
         Returns:
             None
         """
-
-        import plotly.express as px
         if self.__data_error__():
             return
         
@@ -1040,7 +1037,6 @@ class DwtPlotter:
         fig.update_layout(bargap=0.1)
         fig.show()
         return
-    # TODO: Kaplan-Meier
     def plot_kaplan_meier(self, dwell_time_col, event_observed_col=None):
         """
         Plots a Kaplan-Meier survival curve for the given data.
@@ -1078,59 +1074,6 @@ class DwtPlotter:
         plt.grid(True)
         plt.show()
 
-    def matrix_state_changes(self):
-        """
-        Generates and plots a state transition matrix from the provided data.
-        Parameters:
-        file_path (str, optional): Path to the CSV file containing the data. The CSV file should have columns 'agent_id' and 'state'.
-        self.data (pd.DataFrame, optional): DataFrame containing the data. Should have columns 'agent_id' and 'state'.
-        Returns:
-        None: The function plots the state transition matrix using seaborn's heatmap.
-        Notes:
-        - This is using plain 'state' columns recorded in the data - no need to 'going_to_state' column.
-        - If both file_path and self.data are provided, file_path will be used.
-        - If neither file_path nor self.data are provided, the function will print "No data provided." and return.
-        - The transition matrix is normalized to show proportions. To display raw counts, comment out the normalization step.
-        """
-
-        if self.__data_error__():
-            return
-        df = self.data
-
-        # Create a transition matrix
-        # Get the unique states
-        # unique_states = sorted(df['state'].dropna().unique())
-        unique_states = sorted(df['state'].unique())
-        # Initialize a matrix of zeros
-        transition_matrix = pd.DataFrame(
-            data=0, index=unique_states, columns=unique_states, dtype=int
-        )
-
-        # Fill the matrix with transitions
-        for agent_id, group in df.groupby('agent_id'):
-            states = group['state'].values
-            for i in range(len(states) - 1):
-                transition_matrix.loc[states[i], states[i + 1]] += 1
-
-        # Normalize rows to show proportions (optional, can comment this out if counts are preferred)
-        transition_matrix_normalized = transition_matrix.div(transition_matrix.sum(axis=1), axis=0).fillna(0)
-
-        # Plot the state transition matrix
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(
-            transition_matrix_normalized, 
-            annot=True, 
-            fmt=".2f", 
-            cmap="Blues", 
-            xticklabels=unique_states, 
-            yticklabels=unique_states
-        )
-        plt.title("State Transition Matrix (Normalized)", fontsize=16)
-        plt.figtext(0.5, 0.01, "Rows: Previous State, Columns: Next State \n DwtPlotter.state_transition_matrix()", ha="center", fontsize=12)
-        plt.xlabel("Next State")
-        plt.ylabel("Current State")
-        plt.show()
-    
     def __generate_reinfection_data__(self, file_path=None, target_states=[], scenario=''): 
         if file_path is None:
             df = self.data
@@ -1146,7 +1089,7 @@ class DwtPlotter:
         relevant_rows = df[df['going_to_state_id'].isin(target_states)]
         
         # identify all the cases that landed in the selected states:
-        total_count = len(self.data[self.data['going_to_state_id'].isin(target_states)])
+        total_count = len(df[df['going_to_state_id'].isin(target_states)])
 
         # identify the rows where the going_to_state_id is greater than state
         # this is to identify the reinfections
@@ -1161,8 +1104,6 @@ class DwtPlotter:
  
         return df, total_count
         
-
-
     def __data_error__(self):
         # data error handling - check if data is available
 
@@ -1172,7 +1113,6 @@ class DwtPlotter:
         return False
 
     def __cleandata__(self, filename):
-        import pandas as pd
 
         # Define column types as expected
         dtype_dict = {
@@ -1277,8 +1217,6 @@ class DwtPostProcessor(DwtPlotter):
         Returns:
             pd.DataFrame: A concatenated DataFrame containing all data from matching files.
         """
-        import os
-        import pandas as pd
         import glob
 
         file_pattern = os.path.join(directory, f"{prefix}*.csv")
@@ -1371,7 +1309,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         self.file_path = None
         self.scenario_name = scenario_name
         self.data = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state_id','going_to_state'])
-        self._latest_sts_df = pd.DataFrame(columns=['agent_id', 'last_state', 'last_state_time'])      
+        self.__latest_sts_df__ = pd.DataFrame(columns=['agent_id', 'last_state', 'last_state_time'])      
         DwtPlotter.__init__(self, data=self.data)
         return
     
@@ -1402,8 +1340,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         tb = self.sim.diseases.tb
         uids = self.sim.people.auids  # People Alive
 
-        # Filter rows in _latest_sts_df for the relevant agents (alive)
-        relevant_rows = self._latest_sts_df[self._latest_sts_df['agent_id'].isin(uids)]
+        # Filter rows in __latest_sts_df__ for the relevant agents (alive)
+        relevant_rows = self.__latest_sts_df__[self.__latest_sts_df__['agent_id'].isin(uids)]
 
         # Identify agents whose last recorded state is different from the current state
         different_state_mask = relevant_rows['last_state'].values != tb.state[ss.uids(relevant_rows['agent_id'].values)]
@@ -1420,8 +1358,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         )
 
         # Update the latest state dataframe with the new state
-        self._latest_sts_df.loc[self._latest_sts_df['agent_id'].isin(uids), 'last_state'] = tb.state[uids]
-        self._latest_sts_df.loc[self._latest_sts_df['agent_id'].isin(uids), 'last_state_time'] = ti
+        self.__latest_sts_df__.loc[self.__latest_sts_df__['agent_id'].isin(uids), 'last_state'] = tb.state[uids]
+        self.__latest_sts_df__.loc[self.__latest_sts_df__['agent_id'].isin(uids), 'last_state_time'] = ti
         return
 
     # TODO:  IN PROGRESS
@@ -1431,8 +1369,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         dead_uids = ss.uids(self.sim.people.dead)
         if not dead_uids.all():
             return
-        # Filter rows in _latest_sts_df for the relevant agents
-        relevant_rows = self._latest_sts_df[self._latest_sts_df['agent_id'].isin(dead_uids) & (self._latest_sts_df['last_state'] < 0)]
+        # Filter rows in __latest_sts_df__ for the relevant agents
+        relevant_rows = self.__latest_sts_df__[self.__latest_sts_df__['agent_id'].isin(dead_uids) & (self.__latest_sts_df__['last_state'] < 0)]
 
         # identify only those ones that are not already recorded
         relevant_rows = relevant_rows[~relevant_rows['agent_id'].isin(ss.uids(self.data['agent_id']))]
@@ -1448,28 +1386,28 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             
     def __check_for_new_borns__(self):
         # check if the number of agents has changed
-        if len(self.sim.people.auids) != len(self._latest_sts_df):
-            #identify which agent ids are new and add them to the _latest_sts_df
-            new_agent_ids = list(set(self.sim.people.auids) - set(self._latest_sts_df.agent_id))
+        if len(self.sim.people.auids) != len(self.__latest_sts_df__):
+            #identify which agent ids are new and add them to the __latest_sts_df__
+            new_agent_ids = list(set(self.sim.people.auids) - set(self.__latest_sts_df__.agent_id))
             new_logs = pd.DataFrame({
                 'agent_id': new_agent_ids,
                 'last_state': np.full(len(new_agent_ids), -1.0),
                 'last_state_time': np.zeros(len(new_agent_ids))
             })
-            self._latest_sts_df = pd.concat([self._latest_sts_df, new_logs], ignore_index=True) # Add new agents to the _latest_sts_df - more likely new borns
+            self.__latest_sts_df__ = pd.concat([self.__latest_sts_df__, new_logs], ignore_index=True) # Add new agents to the __latest_sts_df__ - more likely new borns
     
 
         # check if the number of agents has changed
-        if len(self.sim.people.auids) != len(self._latest_sts_df):
-            #identify which agent ids are new and add them to the _latest_sts_df
-            new_agent_ids = list(set(self.sim.people.auids) - set(self._latest_sts_df.agent_id))
+        if len(self.sim.people.auids) != len(self.__latest_sts_df__):
+            #identify which agent ids are new and add them to the __latest_sts_df__
+            new_agent_ids = list(set(self.sim.people.auids) - set(self.__latest_sts_df__.agent_id))
             new_logs = pd.DataFrame({
                 'agent_id': new_agent_ids,
                 'last_state': np.full(len(new_agent_ids), -1.0),      # Never infected
                 'last_state_time': np.zeros(len(new_agent_ids))
             })
             if not new_logs.empty:
-                self._latest_sts_df = pd.concat([self._latest_sts_df, new_logs.loc[:, ~new_logs.isna().all()]], 
+                self.__latest_sts_df__ = pd.concat([self.__latest_sts_df__, new_logs.loc[:, ~new_logs.isna().all()]], 
                                             ignore_index=True, copy=False)
         return
 
@@ -1477,7 +1415,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         super().finalize()
         # record Never Infected (-2):
         # Identify agents with last_state == -1 (Not a single change of state was recorded)
-        relevant_rows = self._latest_sts_df[(self._latest_sts_df['last_state'] == -1) & (self._latest_sts_df['last_state_time'] == 0.0)]
+        relevant_rows = self.__latest_sts_df__[(self.__latest_sts_df__['last_state'] == -1) & (self.__latest_sts_df__['last_state_time'] == 0.0)]
         if not relevant_rows.empty:
             self._log_dwell_time(
                 agent_ids=relevant_rows['agent_id'].values,
@@ -1580,20 +1518,28 @@ class Utils:
         """        
         import matplotlib.colors as mcolors
         import matplotlib.pyplot as plt
-        # cm = mcolors.cm.get_cmap('tab20', 20)
+
         state_colors = {
-            '-3.0.NON-TB DEATH': "#000000",  # Black
-            "-2.0.NEVER INFECTED": "#808080",    # Gray
-            "-1.0.Susceptible": "#ff7f0e",      # Orange
-            "0.0.Infection": "#1f77b4",       # Blue"
-            "1.0.Cleared": "#2ca02c",        # Green
-            "2.0.Unconfirmed": "#d62728",    # Red
-            "3.0.Recovered": "#9467bd",      # Purple
-            "4.0.Asymptomatic": "#8c564b",   # Brown
-            "5.0.Symptomatic": "#e377c2",    # Pink
-            "6.0.Treatment": "#7f7f7f",      # Gray
-            "7.0.Treated": "#bcbd22",        # Yellow-green
-            "8.0.Dead": "#17becf"         # Cyan
+            '-3.0.NON-TB DEATH': "cyan",  
+            "-2.0.NEVER INFECTED": "orange",   
+            "-1.0.Susceptible": "yellow",      
+            "0.0.Infection":  "blue",     
+            "1.0.Cleared": "green",        
+            "2.0.Unconfirmed": "black",   
+            "3.0.Recovered": "lightgreen",      
+            "4.0.Asymptomatic": "gray",   
+            "5.0.Symptomatic": "cyan",    
+            "6.0.Treatment": "lightblue",      
+            "7.0.Treated": "darkgreen",        
+            "-1.0.None": "purple",
+            "0.0.Latent Slow": "purple",
+            "1.0.Latent Fast": "pink",
+            "2.0.Active Presym": "brown",
+            "3.0.Active Smpos": "red",
+            "4.0.Active Smneg": "darkred",
+            "5.0.Active Exptb": "cyan",
+            "6.0.Dead": "gray",
+            "8.0.Dead": "black",
         }
         
         cmap = mcolors.ListedColormap([state_colors[state] for state in state_colors])
@@ -1613,29 +1559,16 @@ if __name__ == '__main__':
 
     if debug == 2:
         # # # Initialize the DwtPlotter
-        # file = '/Users/mine/git/tbsim/results/runTBDwellanalyzer-0204011702.csv'
-        file = "/Users/mine/TEMP/results/HighDecliningLSHTM-0206192459.csv"
-
-        plotter = mtb.DwtPlotter(file_path=file)
-        # plotter.__cleandata__(filename=file)
-        # plotter.plot_dwell_time_validation()
-        # plotter.reinfections_age_bins_bars_interactive(target_states=[-1, 0])
-        # plotter.stacked_bars_states_per_agent_static()
-        plotter.stackedbars_subplots_state_transitions()
-        # plotter.graph_state_transitions()
-        # plotter.graph_state_transitions_curved(graphseed=9)
-        #  plotter.histogram_with_kde()
+        file = "/Users/mine/TEMP/results/LowDecliningTBsim-0206191748.csv"
+        file = "/Users/mine/TEMP/results/LowDecliningLSHTM-0206192013.csv"
+        pl = mtb.DwtPlotter(file_path=file)
+        # pl.graph_state_transitions()
+       
+        #pl.stacked_bars_states_per_agent_static()
+    
+        # pl.barchar_all_state_transitions_interactive()
+        # pl.graph_state_transitions(states=["-1.0.Susceptible", "0.0.Infection", "1.0.Cleared", "2.0.Unconfirmed", "3.0.Recovered",  "5.0.Symptomatic"], layout=9)
+        # pl.graph_state_transitions_curved(graphseed=9)
 
 
-        # plotter.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
-        # plotter.graph_state_transitions_curved(graphseed=10)  # 6, 7, 9, 11, 12, 23,31, 36, 37, 39, 40 
-        # plotter.plot_dwell_time_validation()
-        # plotter.plot_dwell_time_validation_interactive()
-        # plotter.graph_compartments_transitions(layout=0)
-        # plotter.interactive_all_state_transitions()
-        # plotter.stacked_bars_states_per_agent_static()
-        # plotter.interactive_stacked_bar_charts_dt_by_state()
-        # plotter.plot_binned_stacked_bars_state_transitions(bin_size=50, num_bins=50)
-        # plotter.plot_binned_by_compartment(num_bins=50)
-        # plotter.sankey()
-
+ 
