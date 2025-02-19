@@ -32,7 +32,7 @@ class DwtPlotter:
         if self.__data_error__():
             print("No data provided, or data is corrupted")
             
-    def sankey_agents_by_age_subplots(self,bins=[0, 5, 16, 200], includecycles=False):
+    def sankey_agents_by_age_subplots(self, bins=[5, 16, 200], scenario="", includecycles=False):
         """
         Generates and displays a single figure with multiple Sankey diagrams of state transitions,
         filtering data by age bins .
@@ -92,7 +92,7 @@ class DwtPlotter:
                 )
 
                 sankey_fig = go.Figure(sankey)
-                sankey_fig.update_layout(title_text=f"Sankey Diagram (Ages >= {bin_min} and <{bin_max}), <br> DwtPlotter.sankey_agents_by_age_subplots()")
+                sankey_fig.update_layout(title_text=f"Sankey Diagram (Ages >= {bin_min} and <{bin_max}),<br> {scenario} <br> DwtPlotter.sankey_agents_by_age_subplots()")
                 sankey_fig.show()
 
     def sankey_agents_even_age_ranges(self, number_of_plots=8):
@@ -1517,7 +1517,6 @@ class Utils:
             state_labels (list): Ordered state names.
         """        
         import matplotlib.colors as mcolors
-        import matplotlib.pyplot as plt
 
         state_colors = {
             '-3.0.NON-TB DEATH': "cyan",  
@@ -1546,10 +1545,23 @@ class Utils:
         return state_colors, cmap
 
 
-# Example usage
+# Example usage and verification of the DwtAnalyzer and DwtPostProcessor classes
 if __name__ == '__main__':
 
-    debug = 2
+    debug = 1
+
+    if debug == 0:
+        # # # Initialize the DwtAnalyzer
+        import starsim as ss
+        sim = ss.Sim()
+        
+        sim.add_analyzer(DwtAnalyzer())
+        sim.run()
+
+        # # # Initialize the DwtPostProcessor
+        londonpp = DwtPostProcessor(directory='results', prefix='BaselineLSHTM')
+        londonpp.save_combined_dataframe('london_combined.csv')
+        londonpp.sankey_agents()
 
     if debug == 1:
             results_path = '/Users/mine/git/tb_acf/results/'
