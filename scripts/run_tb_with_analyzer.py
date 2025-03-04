@@ -7,7 +7,7 @@ import scipy.stats as stats
 
 TBS = mtb.TBS
 
-def make_tb(sim_pars=None):
+def build_tbsim(sim_pars=None):
     sim_params = dict(
         start=sc.date('1940-01-01'),
         stop=sc.date('2025-12-31'),
@@ -73,7 +73,7 @@ def calculate_expected_distributions(start, stop):
     }
 
 if __name__ == '__main__':
-    sim_tb = make_tb()
+    sim_tb = build_tbsim()
     sim_tb.run()
     start = sim_tb.pars.start
     stop = sim_tb.pars.stop
@@ -85,14 +85,9 @@ if __name__ == '__main__':
     ana : mtb.DwtAnalyzer = sim_tb.analyzers[0] #shortcut to the dwell time analyzer
     ana.graph_state_transitions()
 
-
-    # file = '/Users/mine/git/tbsim/results/dwell_time_logger_20250127151951.csv'   # Option #1:  MANUALLY PASS THE FILE PATH
-    # file = ana_dwt.file_path                                                        # Option #2:  Get the file path from the analyzer   
-
-    # # # # Initialize the DwtPlotter
-    # plotter = mtb.DwtPlotter(file_path=file)
-    # #  plotter.histogram_with_kde()
-    # # plotter.plot_state_transition_lengths_custom(transitions_dict=transitions_dict)
-    # plotter.graph_state_transitions()
-    # # plotter.plot_dwell_time_validation()
-
+    # Sample using directly from the generated file(s)
+    file = '/Users/mine/git/tbsim/scripts/data/runTBDwellanalyzer-0228113200.csv'
+    file = ana.file_path                                                        # Option #2:  Get the file path from the analyzer   
+    plotter = mtb.DwtPlotter(file_path=file)
+    plotter.graph_state_transitions()
+    plotter.sankey_agents_by_age_subplots()
