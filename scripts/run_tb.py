@@ -3,11 +3,11 @@ import starsim as ss
 import sciris as sc
 import matplotlib.pyplot as plt
 
-def make_tb(sim_pars=None):
+def build_tbsim(sim_pars=None):
     spars = dict(
         unit = 'day',
         dt = 7, 
-        start = sc.date('2013-01-01'), 
+        start = sc.date('2013-01-01'),      
         stop = sc.date('2016-12-31'), 
         rand_seed = 123,
     )
@@ -37,8 +37,8 @@ def make_tb(sim_pars=None):
     return sim
 
 if __name__ == '__main__':
-    sim_tb = make_tb()
+    sim_tb = build_tbsim()
     sim_tb.run()
-    sim_tb.diseases['tb'].plot()
-    # mtb.plot_sim(sim_tb)
+    tb : mtb.TB = sim_tb.diseases['tb']
+    tb.plot()
     plt.show()

@@ -46,15 +46,15 @@ The steps described below will allow you to use the latest unreleased features o
 
 ### Running a sample simulation
 
-1. Navigate to the project directory **_tests_**
+1. Navigate to the directory **_scripts_**
 2. Run the script:
    ```bash
-   python run_single.py
+   python run_tb.py
    ```
 3. running this script should result in basic charts being displayed.
 
 ## Usage 
-- Usage examples are available in the **[scripts\general](https://github.com/starsimhub/tbsim/tree/main/scripts/general)** folder.
+- Usage examples are available in the **[scripts](https://github.com/starsimhub/tbsim/tree/main/scripts)** folder.
 
 ## Documentation: 
 _TBSim_ is based on Starsim, please refer to [Starsim documentation](https://docs.idmod.org/projects/starsim/en/latest/) for additional information.
