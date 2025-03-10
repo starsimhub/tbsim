@@ -9,28 +9,26 @@ TBS = mtb.TBS
 
 def build_tbsim(sim_pars=None):
     sim_params = dict(
-        start=sc.date('1940-01-01'),
-        stop=sc.date('2025-12-31'),
+        start = sc.date('2013-01-01'),      
+        stop = sc.date('2016-12-31'), 
         rand_seed=123,
-        unit='days',
-        dt=30,
+        unit='day',
+        dt=7,
     )
     if sim_pars is not None:
         sim_params.update(sim_pars)
 
-    np.random.seed()
     pop = ss.People(n_agents=1000)
 
     tb_params = dict(
         beta=ss.beta(0.1),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
+        unit='day'
     )
     tb = mtb.TB(tb_params)
     
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
-    births = ss.Births(pars=dict(birth_rate=5))
-    deaths = ss.Deaths(pars=dict(death_rate=5))
 
     dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=1.0, scenario_name='run_TB_Dwell_analyzer') # ANALYZER
 
@@ -38,11 +36,11 @@ def build_tbsim(sim_pars=None):
         people=pop,
         networks=net,
         diseases=tb,
-        demographics=[deaths, births],
+        # demographics=[deaths, births],
         pars=sim_params,
         analyzers=dwell_analyzer,
     )
-    sim.pars.verbose = sim.pars.dt / 365
+    sim.pars.verbose = 30/365
 
     return sim
 
@@ -81,13 +79,13 @@ if __name__ == '__main__':
     # Calculate expected distributions
     expected_distributions = calculate_expected_distributions(start, stop)
 
-    # Extract the analyzer
+    # # Extract the analyzer
     ana : mtb.DwtAnalyzer = sim_tb.analyzers[0] #shortcut to the dwell time analyzer
     ana.graph_state_transitions()
+    ana.sankey_agents_by_age_subplots(bins = [0,5,200])
+
 
     # Sample using directly from the generated file(s)
-    file = '/Users/mine/git/tbsim/scripts/data/runTBDwellanalyzer-0228113200.csv'
-    file = ana.file_path                                                        # Option #2:  Get the file path from the analyzer   
+    file = ana.file_path        # (uses the file from the analyzer)
     plotter = mtb.DwtPlotter(file_path=file)
-    plotter.graph_state_transitions()
-    plotter.sankey_agents_by_age_subplots()
+    plotter.histogram_with_kde()

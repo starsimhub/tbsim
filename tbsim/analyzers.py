@@ -32,19 +32,15 @@ class DwtPlotter:
         if self.__data_error__():
             print("No data provided, or data is corrupted")
             
-    def sankey_agents_by_age_subplots(self, bins=[5, 16, 200], scenario="", includecycles=False):
+    def sankey_agents_by_age_subplots(self, bins=[0, 5, 200], scenario="", includecycles=False):
         """
         Generates and displays a single figure with multiple Sankey diagrams of state transitions,
         filtering data by age bins .
 
         Parameters:
-        - data (pd.DataFrame): A DataFrame containing columns:
-        - 'state_name': The name of the current state.
-        - 'going_to_state': The name of the state to which the transition is made.
-        - 'age': The age of the agents.
+        - bins: List of age bins to filter the data by. Default is [5, 16, 200].
+        - scenario: Scenario name to be displayed in the plot title.
         
-        This function automatically determines four age bins and arranges them
-        in a 2x2 subplot layout.
         """
         data = self.data
         data['age'] = data['age'].astype(float)
@@ -58,7 +54,6 @@ class DwtPlotter:
             bins = [int(b) for b in bins]
         
         # fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-        # axes = axes.flatten()
         num_bins = len(bins) - 1
         for i in range(num_bins):
             # Filter data for the age bin
@@ -90,24 +85,22 @@ class DwtPlotter:
                         value=values
                     )
                 )
-
                 sankey_fig = go.Figure(sankey)
                 sankey_fig.update_layout(title_text=f"Sankey Diagram (Ages >= {bin_min} and <{bin_max}),<br> {scenario} <br> DwtPlotter.sankey_agents_by_age_subplots()")
                 sankey_fig.show()
 
-    def sankey_agents_even_age_ranges(self, number_of_plots=8):
+    def sankey_agents_even_age_ranges(self, number_of_plots=2, scenario=""):
         """
         Generates and displays multiple Sankey diagrams of state transitions,
         filtering data by age bins.
 
         Parameters:
-        - data (pd.DataFrame): A DataFrame containing columns:
-        - 'state_name': The name of the current state.
-        - 'going_to_state': The name of the state to which the transition is made.
-        - 'age': The age of the agents.
+        - number_of_plots: Number of age bins to create. Default is 2.
+        - scenario: Scenario name to be displayed in the plot title.
 
-        This function automatically determines four age bins and generates
-        separate Sankey diagrams for each bin.
+        This function automatically determines num_of_plots age bins and generates
+        separate Sankey diagrams for each bin based on the Min and Max age values in the data.
+        The age bins are evenly distributed across the range of ages in the data
         """
         data = self.data
         # Define age bins
@@ -150,7 +143,7 @@ class DwtPlotter:
                             yref = 'paper', showarrow = False,
                             font=dict(color='black',size=8))
         
-                fig.update_layout(title_text=f"Sankey Diagram (Ages {bin_min:.1f} - {bin_max:.1f})")
+                fig.update_layout(title_text=f"Sankey Diagram (Ages {bin_min:.1f} - {bin_max:.1f})<br> {scenario} <br> DwtPlotter.sankey_agents_even_age_ranges()")
                 fig.show()
 
     def sankey_agents(self, subtitle = ""):
@@ -491,7 +484,9 @@ class DwtPlotter:
 
         This method calculates the maximum number of reinfections for each agent
         and generates an interactive bar plot to visualize the distribution of reinfections by age bins.
-
+        Parameters:
+            target_states (list): List of target states to filter the data. i.e. [-1.0, 0.0, 1.0]
+            scenario (str): Scenario name for the plot title.
         Returns:
             None
         """
@@ -857,7 +852,9 @@ class DwtPlotter:
 
         # Create a directed graph
         G = nx.DiGraph()
-
+        # increase the size of the figure
+        plt.figure(figsize=(15, 10), facecolor='black')
+        
         # Add edges with mean and mode annotations
         for _, row in stats_df.iterrows():
             from_state = row['state_name']
@@ -922,7 +919,7 @@ class DwtPlotter:
         ]).reset_index()
         
         stats_df.columns = ['state_name', 'going_to_state', 'mean', 'mode', 'count']
-
+        plt.figure(figsize=(15, 10), facecolor='black')
         # Create directed graph
         G = nx.DiGraph()
 
@@ -998,6 +995,7 @@ class DwtPlotter:
         fig, ax = plt.subplots()
         data = self.data
         model_states = data['state_name'].unique()
+        plt.figure(figsize=(15, 10), facecolor='black')
         for state in model_states:
             dwell_times = data[data['state_name'] == state]['dwell_time']
             if dwell_times.empty:
@@ -1037,6 +1035,7 @@ class DwtPlotter:
         fig.update_layout(bargap=0.1)
         fig.show()
         return
+    
     def plot_kaplan_meier(self, dwell_time_col, event_observed_col=None):
         """
         Plots a Kaplan-Meier survival curve for the given data.
@@ -1318,7 +1317,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         # NOTE: This module assumes the default state is '-1'
         if self.unit is None:
             self.unit = self.sim.pars.unit
-        agent_ids = self.sim.people.auids
+        agent_ids = self.sim.people.auids.copy()
         population = len(agent_ids)
         new_logs = pd.DataFrame({
             'agent_id': agent_ids,
@@ -1338,7 +1337,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         # Get the current state of the agents
         ti = self.ti
         tb = self.sim.diseases.tb
-        uids = self.sim.people.auids  # People Alive
+        uids = self.sim.people.auids.copy()  # People Alive
 
         # Filter rows in __latest_sts_df__ for the relevant agents (alive)
         relevant_rows = self.__latest_sts_df__[self.__latest_sts_df__['agent_id'].isin(uids)]
@@ -1353,8 +1352,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             states=relevant_rows['last_state'].values[different_state_mask],
             entry_times=relevant_rows['last_state_time'].values[different_state_mask],
             exit_times=np.full(len(uids), ti),
-            going_to_state_ids=tb.state[uids],
-            age=self.sim.people.age[uids]
+            going_to_state_ids=tb.state[uids].copy(),
+            age=self.sim.people.age[uids].copy()
         )
 
         # Update the latest state dataframe with the new state
@@ -1423,7 +1422,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
                 entry_times=relevant_rows['last_state_time'].values,
                 exit_times=np.full(len(relevant_rows), self.sim.ti),
                 going_to_state_ids=np.full(len(relevant_rows), -2.0) , # never infected
-                age= self.sim.people.age[ss.uids(relevant_rows['agent_id'].values)]
+                age= self.sim.people.age[ss.uids(relevant_rows['agent_id'].values)].copy()
             )
         # TODO: this is a temporary solution to get the enum name, ideally this information 
         # should be available in the disease class
@@ -1548,7 +1547,7 @@ class Utils:
 # Example usage and verification of the DwtAnalyzer and DwtPostProcessor classes
 if __name__ == '__main__':
 
-    debug = 1
+    debug = 0
 
     if debug == 0:
         # # # Initialize the DwtAnalyzer
