@@ -221,38 +221,3 @@ class HIV(ss.Disease):
     def set_ART(self, uids, on_art=True):
         """Switch the ART status for specified agents."""
         self.on_ART[uids] = on_art
-
-###############################################################################
-# EXAMPLE USAGE: DUMMY SIMULATION ENVIRONMENT
-###############################################################################
-if __name__ == "__main__":
-    # Create a minimal dummy simulation environment for demonstration.
-    class DummySim:
-        def __init__(self, n_agents=1000):
-            self.pars = {'n_agents': n_agents}
-            self.ti = 0  # time index
-            # Create a dummy people object with agent unique ids.
-            self.people = type("People", (), {})()
-            self.people.auids = np.arange(n_agents)
-    
-    # Instantiate the dummy simulation.
-    sim = DummySim(n_agents=1000)
-    
-    # Create an instance of the HIV model.
-    model = HIV()
-    model.sim = sim  # attach the simulation reference to the model
-    
-    # Initialize the disease states.
-    model.set_initial_states(sim)
-    
-    # Run a single time step.
-    model.step()
-    
-    # Initialize and update results.
-    model.init_results()
-    model.update_results()
-    
-    # Print results.
-    print("HIV Prevalence:", model.results.hiv_prevalence[sim.ti])
-    print("Mean CD4:", model.results.mean_cd4[sim.ti])
-    print("Mean Viral Load:", model.results.mean_vl[sim.ti])
