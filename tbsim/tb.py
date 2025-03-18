@@ -9,45 +9,20 @@ __all__ = ['TB', 'TBS']
 # -----------------------------------------------------------------
 # TBS: Defines TB States and Provides State-Related Utilities
 # -----------------------------------------------------------------
-class TBS:
-    """Module for defining TB states and utility functions."""
-    class States(IntEnum):
-        NONE            = -1  # No TB
-        LATENT_SLOW     = 0   # Latent TB, slow progression
-        LATENT_FAST     = 1   # Latent TB, fast progression
-        ACTIVE_PRESYMP  = 2   # Active TB, pre-symptomatic
-        ACTIVE_SMPOS    = 3   # Active TB, smear positive
-        ACTIVE_SMNEG    = 4   # Active TB, smear negative
-        ACTIVE_EXPTB    = 5   # Active TB, extra-pulmonary
-        DEAD            = 8   # TB-related death
+class TBS(IntEnum):
+    NONE            = -1  # No TB
+    LATENT_SLOW     = 0   # Latent TB, slow progression
+    LATENT_FAST     = 1   # Latent TB, fast progression
+    ACTIVE_PRESYMP  = 2   # Active TB, pre-symptomatic
+    ACTIVE_SMPOS    = 3   # Active TB, smear positive
+    ACTIVE_SMNEG    = 4   # Active TB, smear negative
+    ACTIVE_EXPTB    = 5   # Active TB, extra-pulmonary
+    DEAD            = 8   # TB-related death
 
-    class LMHTS(IntEnum):
-        SUSCEPTIBLE  = -1    # No TB
-        INFECTION    = 0     # Has latent infection
-        CLEARED      = 1     # Cleared infection
-        UNCONFIRMED  = 2     # Unconfirmed TB
-        RECOVERED    = 3     # Recovered from TB
-        ASYMPTOMATIC = 4     # Asymptomatic TB
-        SYMPTOMATIC  = 5     # Symptomatic TB
-        TREATMENT    = 6     # On treatment
-        TREATED      = 7     # Treated
-        DEAD         = 8     # TB death
-        ACUTE        = 9     # Acute infection ~ (only in TB_LSHTM_ACUTE)
-        
-    @staticmethod
-    def get_tbs_states():
-        """Return a list of TB states."""
-        return list(TBS.States)
-    
-    @staticmethod
-    def get_tbs_lmhts():
-        """Return a list of TB states."""
-        return list(TBS.LMHTS)
-    
 # ---------------------------------------------------------------------------
 # Parameter and State Definition Module
 # ---------------------------------------------------------------------------
-class TBParameterModule(TBS):
+class TBParameterModule():
     def define_tb_parameters(self):
         self.define_pars(
             init_prev = ss.bernoulli(0.01),                            # Initial seed infections
@@ -62,7 +37,7 @@ class TBParameterModule(TBS):
             rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative TB to Dead            
             rate_treatment_to_clear = ss.peryear(12/2),                # Treatment clearance rate
 
-            active_state = ss.choice(a=[self.States.ACTIVE_EXPTB, self.States.ACTIVE_SMPOS, self.States.ACTIVE_SMNEG],
+            active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG],
                                      p=[0.1, 0.65, 0.25]),           # Distribution for active TB types
 
             # Relative transmissibility of each state
@@ -88,9 +63,9 @@ class TBParameterModule(TBS):
 
     def define_tb_states(self):
         self.define_states(
-            ss.FloatArr('state', default=self.States.NONE),
-            ss.FloatArr('latent_tb_state', default=self.States.NONE),
-            ss.FloatArr('active_tb_state', default=self.States.NONE),
+            ss.FloatArr('state', default=TBS.NONE),
+            ss.FloatArr('latent_tb_state', default=TBS.NONE),
+            ss.FloatArr('active_tb_state', default=TBS.NONE),
             ss.FloatArr('rr_activation', default=1.0),
             ss.FloatArr('rr_clearance', default=1.0),
             ss.FloatArr('rr_death', default=1.0),
@@ -105,7 +80,7 @@ class TBParameterModule(TBS):
 # ---------------------------------------------------------------------------
 # Transition and Probability Handling Module
 # ---------------------------------------------------------------------------
-class TBTransitionModule(TBS):
+class TBTransitionModule():
     def _apply_transition(self, transition_func, sim, uids):
         """Helper: Given a transition function returning per-agent probabilities,
            sample which agents transition.
@@ -118,26 +93,26 @@ class TBTransitionModule(TBS):
 
     # Transition probability functions as instance methods
     def p_latent_to_presym(self, sim, uids):
-        assert np.all(np.isin(self.state[uids], [self.States.LATENT_FAST, self.States.LATENT_SLOW]))
+        assert np.all(np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]))
         rate = np.full(len(uids), self.pars.rate_LS_to_presym)
-        rate[self.state[uids] == self.States.LATENT_FAST] = self.pars.rate_LF_to_presym
+        rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         rate *= self.rr_activation[uids]
         return 1 - np.exp(-rate)
 
     def p_presym_to_clear(self, sim, uids):
-        assert np.all(self.state[uids] == self.States.ACTIVE_PRESYMP)
+        assert np.all(self.state[uids] == TBS.ACTIVE_PRESYMP)
         rate = np.zeros(len(uids))
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
         return 1 - np.exp(-rate)
 
     def p_presym_to_active(self, sim, uids):
-        assert np.all(self.state[uids] == self.States.ACTIVE_PRESYMP)
+        assert np.all(self.state[uids] == TBS.ACTIVE_PRESYMP)
         rate = np.full(len(uids), self.pars.rate_presym_to_active)
         return 1 - np.exp(-rate)
 
     def p_active_to_clear(self, sim, uids):
         assert np.all(np.isin(self.state[uids],
-                                [self.States.ACTIVE_SMPOS, self.States.ACTIVE_SMNEG, self.States.ACTIVE_EXPTB]))
+                                [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
         rate = np.full(len(uids), self.pars.rate_active_to_clear)
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
         rate *= self.rr_clearance[uids]
@@ -145,10 +120,10 @@ class TBTransitionModule(TBS):
 
     def p_active_to_death(self, sim, uids):
         assert np.all(np.isin(self.state[uids],
-                                [self.States.ACTIVE_SMPOS, self.States.ACTIVE_SMNEG, self.States.ACTIVE_EXPTB]))
+                                [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
         rate = np.full(len(uids), self.pars.rate_exptb_to_dead)
-        rate[self.state[uids] == self.States.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead
-        rate[self.state[uids] == self.States.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
+        rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead
+        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
         rate *= self.rr_death[uids]
         return 1 - np.exp(-rate)
 
@@ -157,10 +132,10 @@ class TBTransitionModule(TBS):
         ti = self.ti
 
         # Latent -> Pre-symptomatic
-        latent_uids = ((self.state == self.States.LATENT_SLOW) | (self.state == self.States.LATENT_FAST)).uids
+        latent_uids = ((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST)).uids
         new_presymp_uids = self._apply_transition(self.p_latent_to_presym, self.sim, latent_uids)
         if len(new_presymp_uids):
-            self.state[new_presymp_uids] = self.States.ACTIVE_PRESYMP
+            self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_cur[new_presymp_uids] = ti
             self.ti_presymp[new_presymp_uids] = ti
             self.susceptible[new_presymp_uids] = False
@@ -170,7 +145,7 @@ class TBTransitionModule(TBS):
         )
 
         # Pre-symptomatic transitions: clearance and progression to active
-        presym_uids = (self.state == self.States.ACTIVE_PRESYMP).uids
+        presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
         new_clear_presymp_uids = self._apply_transition(self.p_presym_to_clear, self.sim, presym_uids)
         new_active_uids = self._apply_transition(self.p_presym_to_active, self.sim, presym_uids)
         if len(new_active_uids):
@@ -180,30 +155,30 @@ class TBTransitionModule(TBS):
             self.ti_active[new_active_uids] = ti
 
         # Active -> Clear (via recovery or treatment)
-        active_uids = ((self.state == self.States.ACTIVE_SMPOS) |
-                       (self.state == self.States.ACTIVE_SMNEG) |
-                       (self.state == self.States.ACTIVE_EXPTB)).uids
+        active_uids = ((self.state == TBS.ACTIVE_SMPOS) |
+                       (self.state == TBS.ACTIVE_SMNEG) |
+                       (self.state == TBS.ACTIVE_EXPTB)).uids
         new_clear_active_uids = self._apply_transition(self.p_active_to_clear, self.sim, active_uids)
         new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
             self.susceptible[new_clear_uids] = True
             self.infected[new_clear_uids] = False
-            self.state[new_clear_uids] = self.States.NONE
+            self.state[new_clear_uids] = TBS.NONE
             self.ti_cur[new_clear_uids] = ti
-            self.active_tb_state[new_clear_uids] = self.States.NONE
+            self.active_tb_state[new_clear_uids] = TBS.NONE
             self.ti_presymp[new_clear_uids] = np.nan
             self.ti_active[new_clear_uids] = np.nan
             self.on_treatment[new_clear_uids] = False
 
         # Active -> Death
         # Recompute active_uids after clearances
-        active_uids = ((self.state == self.States.ACTIVE_SMPOS) |
-                       (self.state == self.States.ACTIVE_SMNEG) |
-                       (self.state == self.States.ACTIVE_EXPTB)).uids
+        active_uids = ((self.state == TBS.ACTIVE_SMPOS) |
+                       (self.state == TBS.ACTIVE_SMNEG) |
+                       (self.state == TBS.ACTIVE_EXPTB)).uids
         new_death_uids = self._apply_transition(self.p_active_to_death, self.sim, active_uids)
         if len(new_death_uids):
             self.sim.people.request_death(new_death_uids)
-            self.state[new_death_uids] = self.States.DEAD
+            self.state[new_death_uids] = TBS.DEAD
             self.ti_cur[new_death_uids] = ti
         self.results['new_deaths'][ti] = len(new_death_uids)
         self.results['new_deaths_15+'][ti] = np.count_nonzero(
@@ -218,10 +193,10 @@ class TBTransitionModule(TBS):
         # Reset to baseline transmissibility
         self.rel_trans[:] = 1
         state_reltrans = [
-            (self.States.ACTIVE_PRESYMP, self.pars.rel_trans_presymp),
-            (self.States.ACTIVE_EXPTB, self.pars.rel_trans_exptb),
-            (self.States.ACTIVE_SMPOS, self.pars.rel_trans_smpos),
-            (self.States.ACTIVE_SMNEG, self.pars.rel_trans_smneg),
+            (TBS.ACTIVE_PRESYMP, self.pars.rel_trans_presymp),
+            (TBS.ACTIVE_EXPTB, self.pars.rel_trans_exptb),
+            (TBS.ACTIVE_SMPOS, self.pars.rel_trans_smpos),
+            (TBS.ACTIVE_SMNEG, self.pars.rel_trans_smneg),
         ]
         for state, multiplier in state_reltrans:
             uids = (self.state == state)
@@ -244,16 +219,16 @@ class TBTransitionModule(TBS):
 # ---------------------------------------------------------------------------
 # Treatment Handling Module
 # ---------------------------------------------------------------------------
-class TBTreatmentModule(TBS):
+class TBTreatmentModule():
     def start_treatment(self, uids):
         """Start treatment for active TB cases."""
         if len(uids) == 0:
             return 0
         rst = self.state[uids]
-        is_active = np.isin(rst, [self.States.ACTIVE_PRESYMP,
-                                   self.States.ACTIVE_SMPOS,
-                                   self.States.ACTIVE_SMNEG,
-                                   self.States.ACTIVE_EXPTB])
+        is_active = np.isin(rst, [TBS.ACTIVE_PRESYMP,
+                                   TBS.ACTIVE_SMPOS,
+                                   TBS.ACTIVE_SMNEG,
+                                   TBS.ACTIVE_EXPTB])
         tx_uids = uids[is_active]
         self.results['new_notifications_15+'][self.ti] = np.count_nonzero(
             self.sim.people.age[tx_uids] >= 15
@@ -276,7 +251,7 @@ class TBTreatmentModule(TBS):
 # ---------------------------------------------------------------------------
 # Results Handling Module
 # ---------------------------------------------------------------------------
-class TBResultsModule(TBS):
+class TBResultsModule():
     def init_tb_results(self):
         super().init_results()
         self.define_results(
@@ -323,12 +298,12 @@ class TBResultsModule(TBS):
         is_15_plus = age >= 15
 
         # Boolean masks for each state
-        is_latent_slow = (state == self.States.LATENT_SLOW)
-        is_latent_fast = (state == self.States.LATENT_FAST)
-        is_presymp = (state == self.States.ACTIVE_PRESYMP)
-        is_smpos = (state == self.States.ACTIVE_SMPOS)
-        is_smneg = (state == self.States.ACTIVE_SMNEG)
-        is_exptb = (state == self.States.ACTIVE_EXPTB)
+        is_latent_slow = (state == TBS.LATENT_SLOW)
+        is_latent_fast = (state == TBS.LATENT_FAST)
+        is_presymp = (state == TBS.ACTIVE_PRESYMP)
+        is_smpos = (state == TBS.ACTIVE_SMPOS)
+        is_smneg = (state == TBS.ACTIVE_SMNEG)
+        is_exptb = (state == TBS.ACTIVE_EXPTB)
         is_active = is_presymp | is_smpos | is_smneg | is_exptb
         is_infectious = self.infectious
 
@@ -407,10 +382,10 @@ class TB(TBParameterModule,
         Infectious if in any of the active states or on treatment.
         """
         return (self.on_treatment) | \
-               (self.state == self.States.ACTIVE_PRESYMP) | \
-               (self.state == self.States.ACTIVE_SMPOS) | \
-               (self.state == self.States.ACTIVE_SMNEG) | \
-               (self.state == self.States.ACTIVE_EXPTB)
+               (self.state == TBS.ACTIVE_PRESYMP) | \
+               (self.state == TBS.ACTIVE_SMPOS) | \
+               (self.state == TBS.ACTIVE_SMNEG) | \
+               (self.state == TBS.ACTIVE_EXPTB)
 
     def set_prognoses(self, uids, from_uids=None):
         super().set_prognoses(uids, from_uids)
@@ -418,14 +393,14 @@ class TB(TBParameterModule,
 
         # Determine latent fast vs slow for new infections
         fast_uids, slow_uids = p.p_latent_fast.filter(uids, both=True)
-        self.latent_tb_state[fast_uids] = self.States.LATENT_FAST
-        self.latent_tb_state[slow_uids] = self.States.LATENT_SLOW
-        self.state[slow_uids] = self.States.LATENT_SLOW
-        self.state[fast_uids] = self.States.LATENT_FAST
+        self.latent_tb_state[fast_uids] = TBS.LATENT_FAST
+        self.latent_tb_state[slow_uids] = TBS.LATENT_SLOW
+        self.state[slow_uids] = TBS.LATENT_SLOW
+        self.state[fast_uids] = TBS.LATENT_FAST
         self.ti_cur[uids] = self.ti
 
         new_uids = uids[~self.infected[uids]]
-        reinfected_uids = uids[(self.infected[uids]) & (self.state[uids] == self.States.LATENT_FAST)]
+        reinfected_uids = uids[(self.infected[uids]) & (self.state[uids] == TBS.LATENT_FAST)]
         self.results['n_reinfected'][self.ti] = len(reinfected_uids)
 
         # Update infection flags and parameters
