@@ -1271,7 +1271,7 @@ class DwtPostProcessor(DwtPlotter):
             print(f"Error saving DataFrame to {output_file}: {e}")
             
 class DwtAnalyzer(ss.Analyzer, DwtPlotter):
-    def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=mtb.TBS.States, scenario_name=''):
+    def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=mtb.TBS, scenario_name=''):
         """
         Initializes the analyzer with optional adjustments to step_time_units.
 
@@ -1280,7 +1280,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             Default is True.
             
             unit (float | ss.t ):  TODO: Implement its use.
-            states_ennumerator (IntEnum): An IntEnum class that enumerates the states in the simulation. Default is mtb.TBS.States but it will accept any equivalent IntEnum class.
+            states_ennumerator (IntEnum): An IntEnum class that enumerates the states in the simulation. Default is mtb.TBS but it will accept any equivalent IntEnum class.
 
 
         Notes:
