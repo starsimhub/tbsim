@@ -59,8 +59,7 @@ jobs:
       - name: Annotate test results
         if: always()
         uses: dorny/test-reporter@v1
-        working-directory: ./tests
         with:
           name: Pytest results
-          path: pytest-results.xml
+          path: ./tests/test-results.xml
           reporter: junit
