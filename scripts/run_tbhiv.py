@@ -1,0 +1,53 @@
+import tbsim as mtb
+import starsim as ss
+import matplotlib.pyplot as plt
+
+def build_tb_hiv_sim():
+    # --------- People ----------
+    n_agents = 1000
+    extra_states = [
+        ss.FloatArr('SES', default= ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (TODO)
+    ]
+    pop = ss.People(n_agents=n_agents, extra_states=extra_states)
+
+    # ------- TB disease --------
+    # Disease parameters
+    tb_pars = dict(
+        beta = 0.01, 
+        init_prev = 0.25,
+        )
+    # Initialize
+    tb = mtb.TB(tb_pars)
+
+    # ---------- hiv --------
+    hiv_pars = dict()
+    hiv = mtb.HIV(hiv_pars)
+    
+    # Add demographics
+    dems = [
+        ss.Pregnancy(pars=dict(fertility_rate=15)), # Per 1,000 people
+        ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people
+    ]
+
+    # Connector
+    cn_pars = dict()
+    cn = mtb.TB_HIV_Connector(cn_pars)
+
+    # -------- simulation -------
+    # define simulation parameters
+    sim_pars = dict(
+        dt = 7/365,
+        start = 1990,
+        stop = 2010,
+        )
+    # initialize the simulation
+    sim = ss.Sim(people=pop,  diseases=[tb, hiv], pars=sim_pars, demographics=dems, connectors=cn)
+    sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
+
+    return sim
+
+if __name__ == '__main__':  
+    sim = build_tb_hiv_sim( )
+    sim.run()
+    sim.plot()
+    plt.show()
