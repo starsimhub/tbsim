@@ -63,3 +63,5 @@ jobs:
           name: Pytest results
           path: ./tests/test-results.xml
           reporter: java-junit
+          fail-on-error: false
+          max-test-history: 10
