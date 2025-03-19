@@ -55,9 +55,10 @@ jobs:
         working-directory: ./tests
         run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml
       
-      - name: Upload test results as artifact
-        uses: actions/upload-artifact@v4
-        if: always() # Ensure this step runs whether tests pass or fail
+      - name: Annotate test results
+        if: always()
+        uses: dorny/test-reporter@v1
         with:
-          name: test-results-${{ matrix.python-version }}
-          path: tests/test-results.xml
+          name: Pytest results
+          path: pytest-results.xml
+          reporter: junit
