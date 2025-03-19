@@ -52,12 +52,14 @@ jobs:
           pip freeze
 
       - name: Run Tests
+        id: pytest
         working-directory: ./tests
         run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml
       
       - name: Annotate test results
         if: always()
         uses: dorny/test-reporter@v1
+        working-directory: ./tests
         with:
           name: Pytest results
           path: pytest-results.xml
