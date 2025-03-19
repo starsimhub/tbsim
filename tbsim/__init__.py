@@ -2,7 +2,7 @@ from os.path import dirname, join as joinpath
 DATADIR = joinpath(dirname(__file__), 'data')
 
 from .tb import TB, TBS
-from .comorbidities.malnutrition import Malnutrition
+from .malnutrition import Malnutrition
 from .comorbidities.hiv import HIV, HIVStage
 from .config import *
 from .interventions import *

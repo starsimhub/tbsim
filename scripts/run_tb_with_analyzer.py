@@ -60,14 +60,14 @@ def calculate_expected_distributions(start, stop):
     max_value = duration_days  # Maximum dwell time
 
     scales = {
-        TBS.States.NONE: 126,
-        TBS.States.LATENT_SLOW: 365,
-        TBS.States.LATENT_FAST: 200,
-        TBS.States.ACTIVE_PRESYMP: 100,
-        TBS.States.ACTIVE_SMPOS: 150,
-        TBS.States.ACTIVE_SMNEG: 300,
-        TBS.States.ACTIVE_EXPTB: 250,
-        TBS.States.DEAD: 400,
+        TBS.NONE: 126,
+        TBS.LATENT_SLOW: 365,
+        TBS.LATENT_FAST: 200,
+        TBS.ACTIVE_PRESYMP: 100,
+        TBS.ACTIVE_SMPOS: 150,
+        TBS.ACTIVE_SMNEG: 300,
+        TBS.ACTIVE_EXPTB: 250,
+        TBS.DEAD: 400,
     }
 
     # Precompute the truncated exponential distributions

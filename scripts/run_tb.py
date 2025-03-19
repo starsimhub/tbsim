@@ -39,6 +39,6 @@ def build_tbsim(sim_pars=None):
 if __name__ == '__main__':
     sim_tb = build_tbsim()
     sim_tb.run()
-    tb : mtb.TB = sim_tb.diseases['tb']
-    tb.plot()
+    tb: mtb.TB = sim_tb.diseases['tb']
+    tb.plot_channels()
     plt.show()

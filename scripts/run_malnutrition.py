@@ -33,6 +33,6 @@ if __name__ == '__main__':
     # Make Malnutrition simulation
     sim_n = make_malnutrition()
     sim_n.run()
-    sim_n.diseases['malnutrition'].plot()
+    sim_n.plot()
     plt.show()
     
