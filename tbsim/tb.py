@@ -251,7 +251,9 @@ class TBTreatmentModule():
 # ---------------------------------------------------------------------------
 # Results Handling Module
 # ---------------------------------------------------------------------------
-class TBResultsModule():
+class TBChannelsModule():
+    channels_data = None
+    channels = []
     def init_tb_results(self):
         super().init_results()
         self.define_results(
@@ -344,27 +346,85 @@ class TBResultsModule():
         res['cum_deaths_15+'] = np.cumsum(res['new_deaths_15+'])
         res['cum_active']     = np.cumsum(res['new_active'])
         res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
+        self.channels = self.get_channels()
+        self.channels_data = self.get_channel_data_all()
+        
+    def get_channels(self):
+        """  Retrieve the names of the channels (tb only defined results).
+        Returns:
+            dict_keys: A view object that displays a list of all the keys (channel names) in the results dictionary.
+        """
+        return self.results.keys()
+    
+    def get_channels_data(self, channel_names=[]):
+        """  Retrieve the data of the channels (tb only defined results).
+        Args:
+            channel_names (list): A list of channel names.
+        Returns:
+            pd.DataFrame: A pandas dataframe containing the data of the requested channels.
+        """
+        d = self.results[channel_names]
+        return d.to_df()    
+    
+    def get_channel_data_all(self):      
+        """  Retrieve the data of all channels (tb only defined results).
+        Returns:
+            pd.DataFrame: A pandas dataframe containing the data of all channels.
+        """
+        return self.results.to_df()
+    
 
 # ---------------------------------------------------------------------------
 # Plotting Module
 # ---------------------------------------------------------------------------
 class TBPlotModule:
-    def plot_tb_results(self):
-        fig = plt.figure()
-        for rkey in self.results.keys():
-            if rkey == 'timevec':
-                continue
-            plt.plot(self.results['timevec'], self.results[rkey], label=rkey.title())
-        plt.legend()
-        return fig
+    
+    def plot_channels(self):
+        """Dynamically plots channels in a properly arranged subplot grid."""
+        
+        if not hasattr(self, 'channels_data') or not hasattr(self, 'channels'):
+            print("Error: Missing 'channels_data' or 'channels' attributes.")
+            return
+        
+        df = pd.DataFrame(self.channels_data)
+        num_ch = len(self.channels)
 
+        if num_ch == 0:
+            print("No channels to plot.")
+            return
+
+        # Dynamically determine grid layout
+        cols = min(5, num_ch)  # Use up to 3 columns, adjust if fewer channels
+        rows = math.ceil(num_ch / cols)
+
+        fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 4 * rows), squeeze=False)  
+        
+        # Flatten axes array for easier iteration
+        axes = axes.flatten()
+
+        for i, ch in enumerate(self.channels):
+            try:
+                df[ch].plot(ax=axes[i], title=ch)
+                axes[i].legend([ch])
+            except Exception as e:
+                print(f"\n Error in plotting {ch}: {e}")
+                print(ch)
+                axes[i].axis("on")  # Hide subplot if error occurs
+
+        # Hide unused subplots (if any)
+        for j in range(i + 1, len(axes)):
+            axes[j].axis("off")
+
+        plt.tight_layout(pad=1.0)
+        plt.show()
+        
 # ---------------------------------------------------------------------------
 # Main TB Class (Combining Modules)
 # ---------------------------------------------------------------------------
 class TB(TBParameterModule,
          TBTransitionModule,
          TBTreatmentModule,
-         TBResultsModule,
+         TBChannelsModule,
          TBPlotModule,
          ss.Infection):
     
