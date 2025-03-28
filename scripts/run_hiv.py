@@ -13,7 +13,16 @@ def build_hivsim():
         rand_seed=123,)
     
     # --------- Disease ----------
-    nut = mtb.HIV()
+    pars = dict(
+        init_prev=0.01,  # Initial prevalence of HIV
+        p_HIV_to_LATENT=1 - np.exp(-1/8),  # Probability of transitioning from HIV to LATENT
+        p_LATENT_to_AIDS=1 - np.exp(-1/416),  # Probability of transitioning from LATENT to AIDS
+        p_AIDS_to_DEAD=1 - np.exp(-1/104),  # Probability of transitioning from AIDS to DEAD
+        art_progression_factor=0.25,  # Progression factor when on ART
+        on_art = True # Whether individuals are on ART (True or False)
+    )
+    # Create the HIV disease model with the specified parameters
+    nut = mtb.HIV(pars=pars)
     
     # --------- People ----------
     n_agents = 1000

@@ -78,23 +78,28 @@ class TB_HIV_Connector(ss.Connector):
     """
     Connector between TB and HIV.
     
-    This connector uses the HIV state from the simplified HIV model to adjust TB parameters.
+    This connector uses the HIV state (ATRISK, HIV, LATENT, AIDS, DEAD) and the on_ART flag
+    from the HIV disease model to modify TB parameters.
     
-    For TB‐infected individuals, the TB activation relative risk is multiplied by:
+    For TB‐infected individuals, the TB activation relative risk (rr_activation) is multiplied by:
       - ATRISK: 1.0 (baseline)
-      - HIV:    1.5
-      - LATENT: 2.0
-      - AIDS:   3.0
-      - DEAD:   0.0 (if dead from HIV)
+      - HIV:    1.5 (or 1.5 * art_tb_multiplier if on ART)
+      - LATENT: 2.0 (or 2.0 * art_tb_multiplier if on ART)
+      - AIDS:   3.0 (or 3.0 * art_tb_multiplier if on ART)
+      - DEAD:   0.0
+      
+    Similarly, for TB‐noninfected individuals, their TB relative susceptibility is set accordingly.
     
-    For TB‐noninfected individuals, the relative susceptibility is set accordingly.
+    The art_tb_multiplier parameter (default 0.8) reduces the TB risk for individuals on ART.
     """
+    
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='TB-HIV')
         self.define_pars(
             tb_activation_rr_func = self.compute_tb_activation_rr,
-            tb_clearance_rr_func  = self.ones_rr,
+            tb_clearance_rr_func  = self.ones_rr,  # No clearance modification.
             tb_rel_sus_func       = self.compute_tb_rel_sus,
+            art_tb_multiplier     = 0.8,
         )
         self.update_pars(pars, **kwargs)
     
@@ -105,45 +110,56 @@ class TB_HIV_Connector(ss.Connector):
     @staticmethod
     def compute_tb_activation_rr(tb, hiv, uids, base_factor=1.0):
         rr = np.ones_like(uids, dtype=float)
+        art_multiplier = tb.pars.get('art_tb_multiplier', 0.8)
         states = hiv.state[uids]
         for i, s in enumerate(states):
-            if s == HIVState.ACUTE:
-                rr[i] = 1.5
+            if s == HIVState.HIV:
+                multiplier = 1.5
             elif s == HIVState.LATENT:
-                rr[i] = 2.0
+                multiplier = 2.0
             elif s == HIVState.AIDS:
-                rr[i] = 3.0
+                multiplier = 3.0
             elif s == HIVState.DEAD:
-                rr[i] = 0.0
+                multiplier = 0.0
             else:  # ATRISK
-                rr[i] = 1.0
+                multiplier = 1.0
+            # If the individual is on ART, reduce the multiplier.
+            if hiv.on_ART[uids[i]]:
+                multiplier *= art_multiplier
+            rr[i] = multiplier
         return rr * base_factor
     
     @staticmethod
     def compute_tb_rel_sus(tb, hiv, uids, baseline=1.0):
         rel_sus = np.ones_like(uids, dtype=float) * baseline
+        art_multiplier = tb.pars.get('art_tb_multiplier', 0.8)
         states = hiv.state[uids]
         for i, s in enumerate(states):
-            if s == HIVState.ACUTE:
-                rel_sus[i] = baseline * 1.5
+            if s == HIVState.HIV:
+                multiplier = 1.5
             elif s == HIVState.LATENT:
-                rel_sus[i] = baseline * 2.0
+                multiplier = 2.0
             elif s == HIVState.AIDS:
-                rel_sus[i] = baseline * 3.0
+                multiplier = 3.0
             elif s == HIVState.DEAD:
-                rel_sus[i] = 0.0
+                multiplier = 0.0
             else:
-                rel_sus[i] = baseline
+                multiplier = 1.0
+            if hiv.on_ART[uids[i]]:
+                multiplier *= art_multiplier
+            rel_sus[i] = baseline * multiplier
         return rel_sus
     
     def step(self):
         tb = self.sim.diseases['tb']
         hiv = self.sim.diseases['hiv']
         
+        # Adjust parameters for TB-infected individuals.
         uids_tb = tb.infected.uids
         tb.rr_activation[uids_tb] *= self.pars.tb_activation_rr_func(tb, hiv, uids_tb)
         tb.rr_clearance[uids_tb] *= self.pars.tb_clearance_rr_func(tb, hiv, uids_tb)
         
+        # Adjust susceptibility for TB-noninfected individuals.
         uids_no_tb = (~tb.infected).uids
         tb.rel_sus[uids_no_tb] = self.pars.tb_rel_sus_func(tb, hiv, uids_no_tb)
         return
