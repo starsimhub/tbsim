@@ -10,16 +10,17 @@ def build_hivsim():
         dt=7,
         start=sc.date('2013-01-01'),
         stop=sc.date('2020-12-31'),
-        rand_seed=123,)
+        )
     
     # --------- Disease ----------
     hiv_pars = dict(
-        init_prev=0.01,  # Initial prevalence of HIV
+        init_prev=0.30,  # Initial prevalence of HIV
+        p_ATRISK_to_ACUTE=0.0001,  # Probability of transitioning from ATRISK to ACUTE
         p_ACUTE_to_LATENT=1-np.exp(-1/8),  # Probability of transitioning from HIV to LATENT
         p_LATENT_to_AIDS=1-np.exp(-1/416),  # Probability of transitioning from LATENT to AIDS
         p_AIDS_to_DEAD=1-np.exp(-1/104),  # Probability of transitioning from AIDS to DEAD
-        art_progression_factor=0.25,  # Progression factor when on ART
-        on_ART = 0.90 # Percxentage of people on ART (infected)
+        art_progression_factor=0.5,  # Progression factor when on ART
+        on_ART = 0.50) # Percxentage of people on ART (infected)
     # Create the HIV disease model with the specified parameters
     hiv = mtb.HIV(pars=hiv_pars)
 
@@ -27,8 +28,8 @@ def build_hivsim():
     n_agents = 1000
     extra_states = [   # People additional attributes - Cross simulation and diseases
         ss.FloatArr('SES', default= ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (TODO)
-        ss.Arr(name="MaritalStatus", dtype=str, default="Smith"),
-        ss.Arr("FavoriteColor", dtype=str, default="Blue"),
+        ss.Arr(name="CustomField", dtype=str, default="Any Value"),  # Custom field for each agent
+        ss.Arr(name="FavoriteColor", dtype=str, default="Blue"),
     ]
     pop = ss.People(n_agents=n_agents, extra_states=extra_states)
     
@@ -42,7 +43,7 @@ def build_hivsim():
     # --------- Simulation -------
     sim = ss.Sim(people=pop, 
                  diseases=[hiv], 
-                 demographics=[deaths, births],
+                 demographics=[deaths,births],
                  networks=net,
                  pars=sim_pars)
     

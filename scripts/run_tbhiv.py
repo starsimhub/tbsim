@@ -37,8 +37,8 @@ def build_tbhiv_sim(simpars=None, tbpars=None):
     
     # --------- Demographics ---------
     dems = [
-        ss.Pregnancy(pars=dict(fertility_rate=15)), # Per 1,000 people
-        ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people
+        ss.Pregnancy(pars=dict(fertility_rate=20)), # Per 1,000 people
+        ss.Deaths(pars=dict(death_rate=20)), # Per 1,000 people
     ]
 
     # ----- Networks -----
