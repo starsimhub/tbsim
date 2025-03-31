@@ -83,7 +83,7 @@ class TB_HIV_Connector(ss.Connector):
     
     For TB‐infected individuals, the TB activation relative risk (rr_activation) is multiplied by:
       - ATRISK: 1.0 (baseline)
-      - HIV:    1.5 (or 1.5 * art_tb_multiplier if on ART)
+      - ACUTE:    1.5 (or 1.5 * art_tb_multiplier if on ART)
       - LATENT: 2.0 (or 2.0 * art_tb_multiplier if on ART)
       - AIDS:   3.0 (or 3.0 * art_tb_multiplier if on ART)
       - DEAD:   0.0
@@ -113,7 +113,7 @@ class TB_HIV_Connector(ss.Connector):
         art_multiplier = tb.pars.get('art_tb_multiplier', 0.8)
         states = hiv.state[uids]
         for i, s in enumerate(states):
-            if s == HIVState.HIV:
+            if s == HIVState.ACUTE:
                 multiplier = 1.5
             elif s == HIVState.LATENT:
                 multiplier = 2.0
@@ -135,7 +135,7 @@ class TB_HIV_Connector(ss.Connector):
         art_multiplier = tb.pars.get('art_tb_multiplier', 0.8)
         states = hiv.state[uids]
         for i, s in enumerate(states):
-            if s == HIVState.HIV:
+            if s == HIVState.ACUTE:
                 multiplier = 1.5
             elif s == HIVState.LATENT:
                 multiplier = 2.0

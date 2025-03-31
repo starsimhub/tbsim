@@ -24,7 +24,7 @@ def build_tbhiv_sim(simpars=None, tbpars=None):
     _tbpars = dict(
         beta=ss.beta(0.1),
         init_prev=ss.bernoulli(p=0.25),
-        rel_sus_latentslow=0.1,
+        # rel_sus_latentslow=0.1,
         unit="day"
     )
     if tbpars is not None:  # Update parameters if provided

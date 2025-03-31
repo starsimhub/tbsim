@@ -3,12 +3,12 @@ import numpy as np
 import starsim as ss
 from enum import IntEnum
 
-__all__ = ['HIVState', 'HIV']
+__all__ = ['HIVState', 'ACUTE']
 
 # Define HIV states as an enumeration.
 class HIVState(IntEnum):
     ATRISK = -1   # Uninfected
-    HIV    = 0    # Newly infected (early state)
+    ACUTE    = 0    # Newly infected (early state)
     LATENT = 1    # Chronic infection
     AIDS   = 2    # Advanced disease
     DEAD   = 3    # Dead from HIV
@@ -28,7 +28,7 @@ class HIV(ss.Disease):
       
     Parameters:
       - init_prev: Initial prevalence of infection.
-      - p_HIV_to_LATENT: Baseline probability per step for HIV → LATENT (1 - exp(-dt/8)).
+      - p_ACUTE_to_LATENT: Baseline probability per step for HIV → LATENT (1 - exp(-dt/8)).
       - p_LATENT_to_AIDS: Baseline probability per step for LATENT → AIDS (1 - exp(-dt/416)).
       - p_AIDS_to_DEAD: Baseline probability per step for AIDS → DEAD (1 - exp(-dt/104)).
       - art_progression_factor: Multiplier to reduce progression rates if on ART.
@@ -44,19 +44,20 @@ class HIV(ss.Disease):
             init_prev           = 0.01,
             # Baseline transition probabilities computed using an exponential waiting time:
             # p = 1 - exp(-dt/mean_duration), with dt assumed to be 1 week.
-            p_HIV_to_LATENT     = 1 - np.exp(-1/8),    # ~0.117
-            p_LATENT_to_AIDS    = 1 - np.exp(-1/416),  # ~0.0024
-            p_AIDS_to_DEAD      = 1 - np.exp(-1/104),  # ~0.0096
+            p_ACUTE_to_LATENT     = 1-np.exp(-1/8),    # ~0.117
+            p_LATENT_to_AIDS    = 1-np.exp(-1/416),  # ~0.0024
+            p_AIDS_to_DEAD      = 1-np.exp(-1/104),  # ~0.0096
             art_progression_factor  = 0.25,            # Halve the progression probability if on ART.
-            on_art                  = False,           # Default ART status for agents (True = on ART)
+            on_ART                  = 0.25,           # Default ART status for agents (True = on ART)
         )
         self.update_pars(pars, **kwargs)
         
-        # Define states: state and on_ART.
+        # Define extra attributes for Agents of this disease.
         self.define_states(
             ss.FloatArr('state', default=HIVState.ATRISK),  # State: ATRISK, HIV, LATENT, AIDS, DEAD.
-            ss.BoolArr('on_ART', default=self.pars.on_art),             # Whether agent is on ART.
+            ss.BoolArr('on_ART', default=False),#self.pars.on_ART),             # Whether agent is on ART.
         )
+        return
     
     def set_initial_states(self, sim):
         """
@@ -66,10 +67,14 @@ class HIV(ss.Disease):
         """
         uids = sim.people.auids
         n = len(uids)
-        infected = np.random.rand(n) < self.pars['init_prev']
-        self.state[uids[infected]] = HIVState.HIV
+        infected = np.random.rand(n) < self.pars.init_prev
+        
+        # Set Infected individuals to ACUTE, others to ATRISK.
+        self.state[uids[infected]] = HIVState.ACUTE
         self.state[uids[~infected]] = HIVState.ATRISK
-    
+        # Set ART status for a % of agents.
+        self.on_ART[uids] = np.random.rand(n) < self.pars.on_ART  # Randomly assign ART status.
+        
     def step(self):
         """
         Update state transitions based solely on state and ART.
@@ -92,14 +97,14 @@ class HIV(ss.Disease):
         if atrisk_ids.size > 0:
             rand_vals = np.random.rand(atrisk_ids.size)
             to_HIV = rand_vals < p_atrisk_to_HIV
-            self.state[atrisk_ids[to_HIV]] = HIVState.HIV
+            self.state[atrisk_ids[to_HIV]] = HIVState.ACUTE
         
         # HIV → LATENT:
-        p_HIV_to_LATENT = 1 - np.exp(-dt/8)
-        hiv_ids = uids[current == HIVState.HIV]
+        p_ACUTE_to_LATENT = 1 - np.exp(-dt/8)
+        hiv_ids = uids[current == HIVState.ACUTE]
         if hiv_ids.size > 0:
             # Apply ART factor if on ART.
-            effective_p = np.array([p_HIV_to_LATENT * (art_factor if self.on_ART[uid] else 1.0)
+            effective_p = np.array([p_ACUTE_to_LATENT * (art_factor if self.on_ART[uid] else 1.0)
                                       for uid in hiv_ids])
             rand_vals = np.random.rand(hiv_ids.size)
             to_latent = rand_vals < effective_p
@@ -130,11 +135,11 @@ class HIV(ss.Disease):
         self.define_results(
             ss.Result(name='hiv_prevalence', dtype=float, label='Prevalence (Infected)'),
             ss.Result(name='atrisk', dtype=float, label='ATRISK'),
-            ss.Result(name='HIV', dtype=float, label='HIV'),
+            ss.Result(name='acute', dtype=float, label='ACUTE'),
             ss.Result(name='latent', dtype=float, label='LATENT'),
-            ss.Result(name='AIDS', dtype=float, label='AIDS'),
+            ss.Result(name='aids', dtype=float, label='AIDS'),
             ss.Result(name='dead', dtype=float, label='DEAD'),
-            ss.Result(name='on_ART', dtype=float, label='On ART'),
+            ss.Result(name='on_art', dtype=float, label='On ART'),
         )
     
     def update_results(self):
@@ -144,15 +149,15 @@ class HIV(ss.Disease):
         n = len(uids)
         states = self.state[uids]
         infected = (states != HIVState.ATRISK) & (states != HIVState.DEAD)
-        self.results.hiv_prevalence[ti] = infected.sum() / n
-        self.results.atrisk[ti] = np.sum(states == HIVState.ATRISK) / n
-        self.results.HIV[ti] = np.sum(states == HIVState.HIV) / n
-        self.results.latent[ti] = np.sum(states == HIVState.LATENT) / n
-        self.results.AIDS[ti] = np.sum(states == HIVState.AIDS) / n
-        self.results.dead[ti] = np.sum(states == HIVState.DEAD) / n
+        self.results.hiv_prevalence[ti] = infected.sum()/n
+        self.results.atrisk[ti] = np.sum(states == HIVState.ATRISK)/n
+        self.results.acute[ti] = np.sum(states == HIVState.ACUTE)/n
+        self.results.latent[ti] = np.sum(states == HIVState.LATENT)/n
+        self.results.aids[ti] = np.sum(states == HIVState.AIDS)/n
+        self.results.dead[ti] = np.sum(states == HIVState.DEAD)/n
         # Calculate proportion of agents on ART.
-        self.results.on_ART[ti] = self.on_ART[uids].mean()
+        self.results.on_art[ti] = self.on_ART[uids].mean()
     
-    def set_ART(self, uids, on_art=True):
+    def set_ART(self, uids, on_ART=True):
         """Set the ART status for specified agents."""
-        self.on_ART[uids] = on_art
+        self.on_ARTs[uids] = on_ART

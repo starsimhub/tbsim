@@ -13,30 +13,35 @@ def build_hivsim():
         rand_seed=123,)
     
     # --------- Disease ----------
-    pars = dict(
+    hiv_pars = dict(
         init_prev=0.01,  # Initial prevalence of HIV
-        p_HIV_to_LATENT=1 - np.exp(-1/8),  # Probability of transitioning from HIV to LATENT
-        p_LATENT_to_AIDS=1 - np.exp(-1/416),  # Probability of transitioning from LATENT to AIDS
-        p_AIDS_to_DEAD=1 - np.exp(-1/104),  # Probability of transitioning from AIDS to DEAD
+        p_ACUTE_to_LATENT=1-np.exp(-1/8),  # Probability of transitioning from HIV to LATENT
+        p_LATENT_to_AIDS=1-np.exp(-1/416),  # Probability of transitioning from LATENT to AIDS
+        p_AIDS_to_DEAD=1-np.exp(-1/104),  # Probability of transitioning from AIDS to DEAD
         art_progression_factor=0.25,  # Progression factor when on ART
-        on_art = True # Whether individuals are on ART (True or False)
-    )
+        on_ART = 0.90 # Percxentage of people on ART (infected)
     # Create the HIV disease model with the specified parameters
-    nut = mtb.HIV(pars=pars)
-    
+    hiv = mtb.HIV(pars=hiv_pars)
+
     # --------- People ----------
     n_agents = 1000
-    extra_states = [
+    extra_states = [   # People additional attributes - Cross simulation and diseases
         ss.FloatArr('SES', default= ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (TODO)
+        ss.Arr(name="MaritalStatus", dtype=str, default="Smith"),
+        ss.Arr("FavoriteColor", dtype=str, default="Blue"),
     ]
     pop = ss.People(n_agents=n_agents, extra_states=extra_states)
     
+    # --------- Network ---------
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    
+    # --------- Demographics -----
     births = ss.Births(pars=dict(birth_rate=5))
     deaths = ss.Deaths(pars=dict(death_rate=5))
     
+    # --------- Simulation -------
     sim = ss.Sim(people=pop, 
-                 diseases=nut, 
+                 diseases=[hiv], 
                  demographics=[deaths, births],
                  networks=net,
                  pars=sim_pars)
