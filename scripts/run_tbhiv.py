@@ -1,6 +1,7 @@
 import tbsim as mtb
 import starsim as ss
 import sciris as sc
+import numpy as np
 import matplotlib.pyplot as plt
 
 def build_tbhiv_sim(simpars=None, tbpars=None):
@@ -14,7 +15,7 @@ def build_tbhiv_sim(simpars=None, tbpars=None):
     )
     
     # --------- People ----------
-    n_agents = 1000
+    n_agents = 5_000
     extra_states = [
         ss.FloatArr('SES', default= ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (TODO)
     ]
@@ -32,8 +33,18 @@ def build_tbhiv_sim(simpars=None, tbpars=None):
     
     tb = mtb.TB(_tbpars)
 
-    # ---------- hiv --------
-    hiv = mtb.HIV() #mtb.HIV(hiv_pars)
+     # --------- Disease ----------
+    hiv_pars = dict(
+        init_prev=0.40,  # Initial prevalence of HIV
+        p_ATRISK_to_ACUTE=0.0000,  # Importation (Seeding factor) - Probability of transitioning from ATRISK to ACUTE
+        p_ACUTE_to_LATENT=1-np.exp(-1/8),  # Probability of transitioning from HIV to LATENT
+        p_LATENT_to_AIDS=1-np.exp(-1/416),  # Probability of transitioning from LATENT to AIDS
+        p_AIDS_to_DEAD=1-np.exp(-1/104),  # Probability of transitioning from AIDS to DEAD
+        art_progression_factor=0.0,  # Progression factor when on ART
+        on_ART = 0.00) # Percentage of infected people on ART 
+    
+    # Create the HIV disease model with the specified parameters
+    hiv = mtb.HIV(pars=hiv_pars)
     
     # --------- Demographics ---------
     dems = [

@@ -75,4 +75,5 @@ if __name__ == '__main__':
 
     sim_tbn = make_tb_nut_02(agents=1500)
     sim_tbn.run()
+    sim_tbn.plot()
     plt.show()
