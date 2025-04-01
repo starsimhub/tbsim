@@ -56,8 +56,11 @@ def build_tbhiv_sim(simpars=None, tbpars=None):
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
 
     # --------- Connectors ---------
-    cn_pars = dict()
-    cn = mtb.TB_HIV_Connector(cn_pars)
+    
+    cn_pars = dict(
+        art_tb_multiplier=0.30,  # ART reduces TB risk by this factor
+    )
+    cn = mtb.TB_HIV_Connector(pars=cn_pars)
 
     # initialize the simulation
     sim = ss.Sim(
@@ -65,7 +68,7 @@ def build_tbhiv_sim(simpars=None, tbpars=None):
                 diseases=[tb, hiv], 
                 pars=_simpars, 
                 demographics=dems, 
-                connectors=cn
+                connectors=[cn]
                 )
     
     sim.pars.verbose = 7/365 # Print status every 5 years instead of every 10 steps
