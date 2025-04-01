@@ -8,8 +8,8 @@ def build_tbhiv_sim(simpars=None, tbpars=None):
     _simpars = dict(
         unit = 'day',
         dt = 7, 
-        start = sc.date('2013-01-01'),      
-        stop = sc.date('2016-12-31'), 
+        start = sc.date('2000-01-01'),      
+        stop = sc.date('2035-12-31'), 
         rand_seed = 123,
     )
     

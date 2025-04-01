@@ -45,8 +45,8 @@ class HIV(ss.Disease):
             init_prev               = ss.bernoulli(p=0.25 ), # Initial prevalence of HIV
             # Baseline transition probabilities computed using an exponential waiting time:
             # p = 1 - exp(-dt/mean_duration), with dt assumed to be 1 week.
-            p_ATRISK_to_ACUTE       = 0,  # Whether to allow new infections in the simulation.
-            p_ACUTE_to_HIV          = 1 - np.exp(-1/4),    # ~0.25
+            p_ATRISK_to_ACUTE       = 0,  # If more than 0, then it will generate new infections
+            p_ACUTE_to_HIV          = 1-np.exp(-1/4),    # ~0.25
             p_ACUTE_to_LATENT       = 1-np.exp(-1/8),    # ~0.117
             p_LATENT_to_AIDS        = 1-np.exp(-1/416),  # ~0.0024
             p_AIDS_to_DEAD          = 1-np.exp(-1/104),  # ~0.0096
@@ -116,7 +116,6 @@ class HIV(ss.Disease):
         self.state[latent_ids[rand_vals<effective_p]] = HIVState.AIDS
         
         # AIDS → DEAD:
-        
         p_AIDS_to_DEAD  =self.pars.p_AIDS_to_DEAD
         aids_ids = uids[current == HIVState.AIDS]
         art_multiplier = np.where(self.on_ART[aids_ids], art_factor, 1.0)   # Apply ART factor

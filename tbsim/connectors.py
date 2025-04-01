@@ -83,7 +83,7 @@ class TB_HIV_Connector(ss.Connector):
     
     For TB‐infected individuals, the TB activation relative risk (rr_activation) is multiplied by:
       - ATRISK: 1.0 (baseline)
-      - ACUTE:    1.5 (or 1.5 * art_tb_multiplier if on ART)
+      - ACUTE:  1.5 (or 1.5 * art_tb_multiplier if on ART)
       - LATENT: 2.0 (or 2.0 * art_tb_multiplier if on ART)
       - AIDS:   3.0 (or 3.0 * art_tb_multiplier if on ART)
       - DEAD:   0.0
@@ -128,26 +128,30 @@ class TB_HIV_Connector(ss.Connector):
                 multiplier *= art_multiplier
             rr[i] = multiplier
         return rr * base_factor
-    
+
     @staticmethod
     def compute_tb_rel_sus(tb, hiv, uids, baseline=1.0):
-        rel_sus = np.ones_like(uids, dtype=float) * baseline
+        rel_sus = np.full_like(uids, fill_value=baseline, dtype=float)
         art_multiplier = tb.pars.get('art_tb_multiplier', 0.8)
         states = hiv.state[uids]
-        for i, s in enumerate(states):
-            if s == HIVState.ACUTE:
-                multiplier = 1.5
-            elif s == HIVState.LATENT:
-                multiplier = 2.0
-            elif s == HIVState.AIDS:
-                multiplier = 3.0
-            elif s == HIVState.DEAD:
-                multiplier = 0.0
-            else:
-                multiplier = 1.0
-            if hiv.on_ART[uids[i]]:
-                multiplier *= art_multiplier
-            rel_sus[i] = baseline * multiplier
+        on_art = hiv.on_ART[uids]
+
+        # Define multipliers for each state
+        state_multipliers = {
+            HIVState.ACUTE: 1.5,
+            HIVState.LATENT: 2.0,
+            HIVState.AIDS: 3.0,
+            HIVState.DEAD: 0.0,
+        }
+
+        # Get multiplier for each state, default to 1.0
+        vectorized_multipliers = np.vectorize(lambda s: state_multipliers.get(s, 1.0))(states).astype(float)
+
+        # Apply ART multiplier
+        vectorized_multipliers *= np.where(on_art, art_multiplier, 1.0)
+
+        # Compute final susceptibility
+        rel_sus = baseline * vectorized_multipliers
         return rel_sus
     
     def step(self):

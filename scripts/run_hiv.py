@@ -8,8 +8,8 @@ def build_hivsim():
     sim_pars = dict(
         unit = 'day',
         dt=7,
-        start=sc.date('2013-01-01'),
-        stop=sc.date('2020-12-31'),
+        start=sc.date('2000-01-01'),
+        stop=sc.date('2035-12-31'),
         )
     
     # --------- Disease ----------
