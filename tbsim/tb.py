@@ -1,9 +1,9 @@
-import numpy as np
-import starsim as ss
-import matplotlib.pyplot as plt
-import pandas as pd
-
 from enum import IntEnum
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import starsim as ss
 
 __all__ = ['TB', 'TBS']
 
@@ -66,6 +66,7 @@ class TB(ss.Infection):
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
             ss.State('on_treatment', default=False),
+            ss.State('hiv_positive', default=False),            # falg for HIV positive
             ss.State('ever_infected', default=False),           # Flag for ever infected
 
             ss.FloatArr('ti_presymp'),
