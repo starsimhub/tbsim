@@ -26,7 +26,7 @@ class TB(ss.Infection):
             init_prev = ss.bernoulli(0.01),                            # Initial seed infections
             beta = ss.beta(0.25),                                      # Infection probability
             p_latent_fast = ss.bernoulli(0.1),                         # Probability of latent fast as opposed to latent slow
-            rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)            
+            rate_LS_to_presym       = ss.perday(3e-5),    # Latent Slow to Active Pre-Symptomatic (per day)            
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
             rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
             rate_active_to_clear    = ss.perday(2.4e-4),               # Active infection to natural clearance (per day)
@@ -66,9 +66,7 @@ class TB(ss.Infection):
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
             ss.State('on_treatment', default=False),
-            ss.State('hiv_positive', default=False),            # falg for HIV positive
             ss.State('ever_infected', default=False),           # Flag for ever infected
-
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
             ss.FloatArr('ti_cur', default=0),                   # Time index of transition into the current state
