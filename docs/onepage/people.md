@@ -5,7 +5,28 @@
 The **People** module is a core component of a simulation framework that models agents (or people) over time. It manages the creation, state updates, and lifecycle events (such as births and deaths) for a population. The design emphasizes scalability, state coherence, dynamic extensibility, and tight integration with the overall simulation environment.
 
 ---
+## Table of Contents
 
+- [1. Introduction and Purpose](#1-introduction-and-purpose)
+- [2. Architectural Overview](#2-architectural-overview)
+  - [Modular & Extensible Design](#modular--extensible-design)
+  - [Core Dependencies](#core-dependencies)
+- [3. Key Components and Concepts](#3-key-components-and-concepts)
+  - [Unique Identifiers and State Arrays](#unique-identifiers-and-state-arrays)
+  - [Managing Agent Attributes via States](#managing-agent-attributes-via-states)
+  - [Age Distribution and Data Processing](#age-distribution-and-data-processing)
+- [4. Detailed Method Analysis](#4-detailed-method-analysis)
+  - [Initialization and Construction](#initialization-and-construction)
+  - [Linking with the Simulation Environment](#linking-with-the-simulation-environment)
+  - [Agent Lifecycle Operations](#agent-lifecycle-operations)
+  - [Iteration, Indexing, and Serialization](#iteration-indexing-and-serialization)
+  - [Result Aggregation and Post-Step Operations](#result-aggregation-and-post-step-operations)
+- [5. The Person Class: A Lightweight Data Wrapper](#5-the-person-class-a-lightweight-data-wrapper)
+- [6. Error Handling, Debugging, and Best Practices](#6-error-handling-debugging-and-best-practices)
+- [7. Usage Example](#7-usage-example)
+- [8. Conclusion](#8-conclusion)
+
+--- 
 ## 1. Introduction and Purpose
 
 In many simulation environments, particularly in epidemiology, social dynamics, or agent-based modeling, managing a population efficiently is key. The **People** class serves as a container and orchestrator for all agent-related operations. Its responsibilities include:
