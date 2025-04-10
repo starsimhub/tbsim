@@ -14,23 +14,22 @@ class HIVState(IntEnum):
     DEAD   = 3    # Dead from HIV
     
 class HivFunctions():
-    @staticmethod
-    def seeding(sim, uids, minimum_age=15, max_age=49, p_value=0.10):
-        p = np.zeros(len(uids))
-        is_atrisk = sim.people.hiv.states[uids] == HIVState.ATRISK
-        is_within_age_range = (sim.people.age[uids] >= minimum_age) & (sim.people.age[uids] <= (max_age if max_age is not None else np.inf))
-        eligible_uids = uids[is_atrisk & is_within_age_range]
-        if len(eligible_uids) == 0:  return p
-        p[eligible_uids] = p_value
-        return p
     
-    def equilibrate_infections(self):
-
+    def equilibrate_infections(self, minimum_age=0, max_age=200 ):
+        # minimum_age = self.pars.minimum_age
+        # max_age = self.pars.max_age
+        
         alive = len(self.sim.people.alive)
-        expected_infectious = int(np.round(alive * self.pars.prevalence))
+        
+        # check if self.pars.prevalence is callable
+        if callable(self.pars.prevalence):
+            target_prevalence = self.pars.prevalence(self.sim)
+        else:
+            target_prevalence = self.pars.prevalence
+        expected_infectious = int(np.round(alive * target_prevalence))
 
         # Current infectious agents
-        infectious_uids = ((self.state == HIVState.ACUTE) | (self.state == HIVState.LATENT)).uids
+        infectious_uids = ((self.state == HIVState.ACUTE) | (self.state == HIVState.LATENT)| (self.state == HIVState.AIDS)).uids
         n_current = len(infectious_uids)
 
         # Calculate delta
@@ -39,6 +38,9 @@ class HivFunctions():
         if delta > 0:
             # Not enough infections → add more
             at_risk_uids = (self.state == HIVState.ATRISK).uids
+            is_within_age_range = (self.sim.people.age[at_risk_uids] >= minimum_age) & (self.sim.people.age[at_risk_uids] <= (max_age if max_age is not None else np.inf))
+            at_risk_uids = at_risk_uids[is_within_age_range]
+            
             n_to_add = min(delta, len(at_risk_uids))
 
             if n_to_add > 0:
@@ -122,19 +124,13 @@ class HIV(ss.Disease):
         # Define progression parameters (using a time step in weeks).
         # Define progression parameters (using a time step in weeks).
         self.define_pars(
-            # init_prev               = ss.bernoulli(p=0.25 ), # Initial prevalence of HIV
-            # init_prev              = ss.bernoulli(p=0.20), # Initial prevalence of HIV (can be a float for fixed probability)
             prevalence              = 0.20, # Prevalence to maintain along the simulation
-            # Baseline transition probabilities computed using an exponential waiting time:
-            # p = 1 - exp(-dt/mean_duration), with dt assumed to be 1 week.
-            
-            ATRISK_to_ACUTE       = ss.perday(0.25),  # 1-np.exp(-1/4),  # 4 weeks
-            ACUTE_to_LATENT       = ss.perday(0.117), # 1-np.exp(-1/8),  # 8 weeks
-            LATENT_to_AIDS        = ss.perday(0.0024), # 1-np.exp(-1/416), # 416 weeks
-            AIDS_to_DEAD          = ss.perday(0.0096), # 1-np.exp(-1/104), # 104 weeks
+            ACUTE_to_LATENT       = ss.perday(1/(7*12)), # 1-np.exp(-1/8),  # 8 weeks
+            LATENT_to_AIDS        = ss.perday(1/(365*8)), # 1-np.exp(-1/416), # 416 weeks
+            AIDS_to_DEAD          = ss.perday(1/(365*2)), # 1-np.exp(-1/104), # 104 weeks
             
             art_progression_factor  = 0.1, # Multiplier to reduce progression rates if on ART.
-            percent_on_ART                  = 0.5, # Probability of being on ART (if infected).
+            percent_on_ART          = 0.5, # Probability of being on ART (if infected).
         )
         self.update_pars(pars, **kwargs)
         
@@ -161,13 +157,7 @@ class HIV(ss.Disease):
         # ART factor for progression:
         art_factor = self.pars['art_progression_factor']
 
-        if self.pars.ATRISK_to_ACUTE>0:
-            # ATRISK → HIV: (applied only to ATRISK; ART does not apply here)
-            p_atrisk_to_HIV = self.pars.ATRISK_to_ACUTE
-            atrisk_ids = uids[current == HIVState.ATRISK]
-            rand_vals = np.random.rand(atrisk_ids.size)
-            self.state[atrisk_ids[rand_vals<p_atrisk_to_HIV]] = HIVState.ACUTE
-        
+       
         # HIV → LATENT:
         ACUTE_to_LATENT = self.pars.ACUTE_to_LATENT
         hiv_ids = uids[current == HIVState.ACUTE]

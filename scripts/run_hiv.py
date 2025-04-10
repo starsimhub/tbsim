@@ -21,7 +21,7 @@ def build_hivsim():
     hiv = mtb.HIV(pars=hiv_pars)
 
     # --------- People ----------
-    n_agents = 1000
+    n_agents = 10_000
     # For demonstration purposes only:
     extra_states = [   # People additional attributes - Cross simulation and diseases
         ss.FloatArr('SES', default= ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (e.g. low SES)
@@ -40,7 +40,7 @@ def build_hivsim():
     # --------- Simulation -------
     sim = ss.Sim(people=pop, 
                  diseases=hiv, 
-                 demographics=[deaths,births],
+                #  demographics=[births],
                 #  interventions=[inv], 
                  networks=net,
                  pars=sim_pars)
