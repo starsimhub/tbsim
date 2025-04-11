@@ -14,7 +14,7 @@ def build_hivsim() -> ss.Sim:
     )
 
     # --- Population Setup ---
-    n_agents = 10_000
+    n_agents = 1000
     extra_states = [
         ss.FloatArr('SES', default=ss.bernoulli(p=0.3)),  # ~30% get 0 (low SES), ~70% get 1
         ss.Arr(name="CustomField", dtype=str, default="Any Value"),  # Custom string field
@@ -23,8 +23,8 @@ def build_hivsim() -> ss.Sim:
 
     # --- HIV Disease Model ---
     hiv_pars = dict(
-        init_prev=ss.bernoulli(p=0.20),
-        init_onart=ss.bernoulli(p=0.20),
+        init_prev=ss.bernoulli(p=0.30),
+        init_onart=ss.bernoulli(p=0.50),
     )
     hiv = mtb.HIV(pars=hiv_pars)
 
@@ -32,12 +32,14 @@ def build_hivsim() -> ss.Sim:
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
 
     # --- Demographics (Optional) ---
-    births = ss.Births(pars=dict(birth_rate=1.5))
+    births = ss.Births(pars=dict(birth_rate=2))
     deaths = ss.Deaths(pars=dict(death_rate=0.08))
 
     # --- HIV Intervention ---
     intervention_pars = dict(
         mode='both',
+        prevalence=0.2,     # 20% of the population infected
+        percent_on_ART=0.5, # 50% of the infected population on ART
         minimum_age=15,
         max_age=49,
     )
@@ -47,7 +49,7 @@ def build_hivsim() -> ss.Sim:
     sim = ss.Sim(
         people=people,
         diseases=hiv,
-        interventions=interventions,
+        # interventions=interventions,
         networks=net,
         # demographics=[births, deaths],  # Uncomment if demographics are needed
         pars=sim_pars,

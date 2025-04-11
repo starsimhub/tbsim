@@ -69,8 +69,11 @@ class HIV(ss.Disease):
             initial_infected= self.pars.init_prev.filter(uids)
             self.state[initial_infected] = HIVState.ACUTE
             
-        if len(self.on_ART[self.on_ART == True])==0:        
-            initial_onart = self.pars.init_onart.filter(uids)
+        current = self.state[uids].copy()
+        if len(self.on_ART[self.on_ART == True])==0:  
+            # apply ART only to those who are in the ACUTE state      
+            infected =uids[current == HIVState.ACUTE]
+            initial_onart = self.pars.init_onart.filter(infected)
             self.on_ART[initial_onart] = True
         return
 
@@ -82,7 +85,7 @@ class HIV(ss.Disease):
         if self.sim.ti == 0:
             # Set initial prognoses for all agents
             self.set_prognoses()
-            
+            return
         
         dt = self.sim.t.dt if hasattr(self.sim.t, 'dt') else 1.0  # dt in weeks (default=1)
         uids = self.sim.people.auids
