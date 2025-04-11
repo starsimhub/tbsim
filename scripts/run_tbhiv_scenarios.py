@@ -4,76 +4,116 @@ import sciris as sc
 import tbsim as mtb
 import starsim as ss
 
-def build_tbhiv_sim(hiv_pars=None, tb_pars=None):
-    # Simulation parameters
-    simpars = dict(
+
+def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
+    """Build a TB-HIV simulation with current disease and intervention models."""
+
+    # --- Simulation Parameters ---
+    default_simpars = dict(
         unit='day',
         dt=7,
-        start=sc.date('2000-01-01'),
-        stop=sc.date('2025-12-31'),
+        start=ss.date('1980-01-01'),
+        stop=ss.date('2035-12-31'),
         rand_seed=123,
     )
+    if simpars:
+        default_simpars.update(simpars)
 
-    # People and states
-    n_agents = 10_000
+    # --- Population ---
+    n_agents = 1000
     extra_states = [ss.FloatArr('SES', default=ss.bernoulli(p=0.3))]
-    pop = ss.People(n_agents=n_agents, extra_states=extra_states)
+    people = ss.People(n_agents=n_agents, extra_states=extra_states)
 
-    # TB
-    default_tbpars = dict(
+    # --- TB Model ---
+    pars = dict(
         beta=ss.beta(0.1),
         init_prev=ss.bernoulli(p=0.25),
-        unit="day"
+        rel_sus_latentslow=0.1,
     )
-    if tb_pars:
-        default_tbpars.update(tb_pars)
-    tb = mtb.TB(default_tbpars)
+    if tbpars:
+        pars.update(tbpars)
+    tb = mtb.TB(pars=pars)
 
-    # HIV
-    default_hivpars = dict(
-        init_prev=ss.bernoulli(p=0.3),  # Initial prevalence of HIV
+    # --- HIV Disease Model ---
+    hiv_pars = dict(
+        init_prev=ss.bernoulli(p=0.10),
+        init_onart=ss.bernoulli(p=0.50),
     )
-    if hiv_pars:
-        default_hivpars.update(hiv_pars)
-    hiv = mtb.HIV(pars=default_hivpars)
+    hiv = mtb.HIV(pars=hiv_pars)
 
-    # Demographics and connectors
-    dems = [
-        ss.Pregnancy(pars=dict(fertility_rate=10)),
-        ss.Deaths(pars=dict(death_rate=10)),
-    ]
-    
-    # Connectors
-    cn = mtb.TB_HIV_Connector(pars=dict(art_effectiveness=0.30))
+    # --- HIV Intervention ---
+    hivinv_pars = hivinv_pars or dict(
+        mode='both',
+        prevalence=0.20,
+        percent_on_ART=0.20,
+        minimum_age=15,
+        max_age=49,
+        start=ss.date('2000-01-01'),
+        stop=ss.date('2010-12-31'),
+    )
+    hiv_intervention = mtb.HivInterventions(pars=hivinv_pars)
 
-    # Build sim
+    # --- Network ---
+    network = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
+
+    # --- Connector ---
+    connector = mtb.TB_HIV_Connector()
+
+    # --- Assemble Simulation ---
     sim = ss.Sim(
-        people=pop,
+        people=people,
         diseases=[tb, hiv],
-        pars=simpars,
-        demographics=dems,
-        connectors=cn,
+        interventions=[hiv_intervention],
+        networks=network,
+        connectors=[connector],
+        pars=default_simpars,
     )
-    sim.pars.verbose = 0
+
     return sim
 
+
 def run_scenarios():
-    # Define scenarios
     scenarios = {
-        'base': {},
-        '50_perc_ART': dict(art_coverage=0.50),
-        '75_perc_ART': dict(art_coverage=0.75),
-        'art effectiveness 0.2': dict(art_effectiveness=0.2),
-        'art effectiveness 0.1': dict(art_effectiveness=0.1),  # This is the default in the base case
-        'art effectiveness 0.001': dict(art_effectiveness=0.001),
+        # 'base': {},
+        'early_low_coverage': dict(
+            prevalence=0.10,
+            percent_on_ART=0.10,
+            minimum_age=15,
+            max_age=49,
+            start=ss.date('1990-01-01'),
+            stop=ss.date('2000-12-31'),
+        ),
+        'mid_coverage_mid_years': dict(
+            prevalence=0.20,
+            percent_on_ART=0.40,
+            minimum_age=20,
+            max_age=60,
+            start=ss.date('2000-01-01'),
+            stop=ss.date('2010-12-31'),
+        ),
+        'high_coverage_recent': dict(
+            prevalence=0.25,
+            percent_on_ART=0.75,
+            minimum_age=10,
+            max_age=60,
+            start=ss.date('2010-01-01'),
+            stop=ss.date('2025-12-31'),
+        ),
+        'youth_targeted': dict(
+            prevalence=0.15,
+            percent_on_ART=0.60,
+            minimum_age=10,
+            max_age=24,
+            start=ss.date('2005-01-01'),
+            stop=ss.date('2020-12-31'),
+        ),
     }
 
-    # Store flattened results for each scenario
     flat_results = {}
 
-    for name, hiv_pars in scenarios.items():
+    for name, hivinv_pars in scenarios.items():
         print(f'Running scenario: {name}')
-        sim = build_tbhiv_sim(hiv_pars=hiv_pars)
+        sim = build_tbhiv_sim(hivinv_pars=hivinv_pars)
         sim.run()
         flat_results[name] = sim.results.flatten()
 
@@ -112,8 +152,9 @@ def plot_results(flat_results, keywords=None, exclude=['15']):
                 ax.plot(result.timevec, result.values, label=scenario, color=cmap(j))
         ax.set_title(metric)
         if max(result.values) < 1:
-            # ax.set_yscale('log')   
-            ax.set_ylim(0, max(result.values) * 1.1) 
+            # identify the max value of result.values
+            v = max(result.values)
+            ax.set_ylim(0, max(0.5, v)) 
             ax.set_ylabel('%')
         else:
             ax.set_ylabel('Value')
@@ -125,7 +166,8 @@ def plot_results(flat_results, keywords=None, exclude=['15']):
         if len(flat_results) > 5:
             leg = ax.legend(loc='upper right', fontsize=5)
         else:
-            leg = ax.legend(loc='upper right')
+            leg = ax.legend(loc='upper right', fontsize=6)
+            
         # Handle legend positioning for crowded plots
         if leg:
             leg.get_frame().set_alpha(0.5)
@@ -171,9 +213,13 @@ def plot_results(flat_results, keywords=None, exclude=['15']):
         ax.set_facecolor('#f0f0f0')  # Light gray background for better contrast
         
     plt.tight_layout()
+    
+    # save the plot in the current directory
+    dirname = sc.thisdir()
+    plt.savefig(f'{dirname}/tbhiv_scenarios.png', dpi=300)
+    # Show the plot
     plt.show()
 
 if __name__ == '__main__':
     flat_results = run_scenarios()
     plot_results(flat_results)
-    
