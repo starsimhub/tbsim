@@ -9,8 +9,8 @@ def build_tbhiv_sim(simpars=None, tbpars=None):
     _simpars = dict(
         unit = 'day',
         dt = 7, 
-        start = sc.date('2000-01-01'),      
-        stop = sc.date('2035-12-31'), 
+        start = ss.date('2000-01-01'),      
+        stop = ss.date('2035-12-31'), 
         rand_seed = 123,
     )
     
@@ -34,14 +34,7 @@ def build_tbhiv_sim(simpars=None, tbpars=None):
     tb = mtb.TB(_tbpars)
 
      # --------- Disease ----------
-    hiv_pars = dict(
-        init_prev=0.40,  # Initial prevalence of HIV
-        p_ATRISK_to_ACUTE=0.0000,  # Importation (Seeding factor) - Probability of transitioning from ATRISK to ACUTE
-        p_ACUTE_to_LATENT=1-np.exp(-1/8),  # Probability of transitioning from HIV to LATENT
-        p_LATENT_to_AIDS=1-np.exp(-1/416),  # Probability of transitioning from LATENT to AIDS
-        p_AIDS_to_DEAD=1-np.exp(-1/104),  # Probability of transitioning from AIDS to DEAD
-        art_progression_factor=0.0,  # Progression factor when on ART
-        on_ART = 0.00) # Percentage of infected people on ART 
+    hiv_pars = dict()
     
     # Create the HIV disease model with the specified parameters
     hiv = mtb.HIV(pars=hiv_pars)
@@ -79,4 +72,5 @@ if __name__ == '__main__':
     sim = build_tbhiv_sim( )
     sim.run()
     sim.plot()
+    all=sim.results.all_results_dict # To see all results in a dictionary format
     plt.show()

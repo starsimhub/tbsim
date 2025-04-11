@@ -4,7 +4,7 @@ Define a connector between TB and Malnutrition
 
 import numpy as np
 import starsim as ss
-from tbsim import TB, Malnutrition, HIV, HIVState
+from tbsim import TB, Malnutrition
 
 __all__ = ['TB_Nutrition_Connector']
 

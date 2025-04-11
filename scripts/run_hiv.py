@@ -4,53 +4,62 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def build_hivsim():
-    # -------- simulation -------
+def build_hivsim() -> ss.Sim:
+    # --- Simulation Parameters ---
     sim_pars = dict(
-        unit = 'day',
+        unit='day',
         dt=7,
         start=ss.date('2000-01-01'),
         stop=ss.date('2035-12-31'),
-        )
-    
-    # --------- Disease ----------
+    )
+
+    # --- Population Setup ---
+    n_agents = 10_000
+    extra_states = [
+        ss.FloatArr('SES', default=ss.bernoulli(p=0.3)),  # ~30% get 0 (low SES), ~70% get 1
+        ss.Arr(name="CustomField", dtype=str, default="Any Value"),  # Custom string field
+    ]
+    people = ss.People(n_agents=n_agents, extra_states=extra_states)
+
+    # --- HIV Disease Model ---
     hiv_pars = dict(
-        # init_prev=ss.bernoulli(p=0.20),  # Initial prevalence of HIV
-        )
-    # Create the HIV disease model with the specified parameters
+        init_prev=ss.bernoulli(p=0.20),
+        init_onart=ss.bernoulli(p=0.20),
+    )
     hiv = mtb.HIV(pars=hiv_pars)
 
-    # --------- People ----------
-    n_agents = 10_000
-    # For demonstration purposes only:
-    extra_states = [   # People additional attributes - Cross simulation and diseases
-        ss.FloatArr('SES', default= ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (e.g. low SES)
-        ss.Arr(name="CustomField", dtype=str, default="Any Value"),  # Custom field for each agent
-    ]
-    pop = ss.People(n_agents=n_agents, extra_states=extra_states)
-    
-    # --------- Network ---------
-    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
-    
-    # --------- Demographics -----
+    # --- Network Setup ---
+    net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
+
+    # --- Demographics (Optional) ---
     births = ss.Births(pars=dict(birth_rate=1.5))
     deaths = ss.Deaths(pars=dict(death_rate=0.08))
-    
 
-    # --------- Simulation -------
-    sim = ss.Sim(people=pop, 
-                 diseases=hiv, 
-                #  demographics=[births],
-                #  interventions=[inv], 
-                 networks=net,
-                 pars=sim_pars)
-    
-    sim.pars.verbose = 7/365
+    # --- HIV Intervention ---
+    intervention_pars = dict(
+        mode='both',
+        minimum_age=15,
+        max_age=49,
+    )
+    interventions = [mtb.HivInterventions(pars=intervention_pars)]
+
+    # --- Build Simulation ---
+    sim = ss.Sim(
+        people=people,
+        diseases=hiv,
+        interventions=interventions,
+        networks=net,
+        # demographics=[births, deaths],  # Uncomment if demographics are needed
+        pars=sim_pars,
+    )
+
+    # --- Logging Frequency ---
+    sim.pars.verbose = 7/365  # Log once per week
+
     return sim
 
 
 if __name__ == '__main__':
-    # Make Malnutrition simulation
     sim = build_hivsim()
     sim.run()
     sim.plot()
