@@ -25,6 +25,7 @@ def build_hivsim() -> ss.Sim:
     hiv_pars = dict(
         init_prev=ss.bernoulli(p=0.30),
         init_onart=ss.bernoulli(p=0.50),
+        dt=7,
     )
     hiv = mtb.HIV(pars=hiv_pars)
 
@@ -49,7 +50,7 @@ def build_hivsim() -> ss.Sim:
     sim = ss.Sim(
         people=people,
         diseases=hiv,
-        # interventions=interventions,
+        interventions=interventions,
         networks=net,
         # demographics=[births, deaths],  # Uncomment if demographics are needed
         pars=sim_pars,

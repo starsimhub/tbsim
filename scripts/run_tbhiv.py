@@ -4,73 +4,84 @@ import sciris as sc
 import numpy as np
 import matplotlib.pyplot as plt
 
-def build_tbhiv_sim(simpars=None, tbpars=None):
-    # --------- Simulation ---------
-    _simpars = dict(
-        unit = 'day',
-        dt = 7, 
-        start = ss.date('2000-01-01'),      
-        stop = ss.date('2035-12-31'), 
-        rand_seed = 123,
-    )
-    
-    # --------- People ----------
-    n_agents = 5_000
-    extra_states = [
-        ss.FloatArr('SES', default= ss.bernoulli(p=0.3)), # SES example: ~30% get 0, ~70% get 1 (TODO)
-    ]
-    pop = ss.People(n_agents=n_agents, extra_states=extra_states)
+def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
+    """Build a TB-HIV simulation with current disease and intervention models."""
 
-    # ------- TB  --------
-    _tbpars = dict(
+    # --- Simulation Parameters ---
+    default_simpars = dict(
+        unit='day',
+        dt=7,
+        start=ss.date('1980-01-01'),
+        stop=ss.date('2035-12-31'),
+        rand_seed=123,
+    )
+    if simpars:
+        default_simpars.update(simpars)
+
+    # --- Population ---
+    n_agents = 1000
+    # Optional: add extra states (e.g., SES)
+    extra_states = [
+        ss.FloatArr('SES', default=ss.bernoulli(p=0.3)),    # ~30% get 0 (low SES), ~70% get 1
+    ]
+    people = ss.People(n_agents=n_agents, extra_states=extra_states)
+
+    # --- TB Model ---
+    pars = dict(
         beta=ss.beta(0.1),
         init_prev=ss.bernoulli(p=0.25),
-        # rel_sus_latentslow=0.1,
-        unit="day"
+        rel_sus_latentslow=0.1,
     )
-    if tbpars is not None:  # Update parameters if provided
-        _tbpars.update(tbpars)
-    
-    tb = mtb.TB(_tbpars)
+    tb = mtb.TB(pars=pars)
 
-     # --------- Disease ----------
-    hiv_pars = dict()
-    
-    # Create the HIV disease model with the specified parameters
+    # --- HIV Disease Model ---
+    hiv_pars = dict(
+        init_prev=ss.bernoulli(p=0.10),     # 10% of the population is infected (in case not using intervention)
+        init_onart=ss.bernoulli(p=0.50),    # 50% of the infected population is on ART (in case not using intervention)
+    )
     hiv = mtb.HIV(pars=hiv_pars)
-    
-    # --------- Demographics ---------
-    dems = [
-        ss.Pregnancy(pars=dict(fertility_rate=20)), # Per 1,000 people
-        ss.Deaths(pars=dict(death_rate=20)), # Per 1,000 people
-    ]
 
-    # ----- Networks -----
-    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
-
-    # --------- Connectors ---------
-    
-    cn_pars = dict(
-        art_tb_multiplier=0.30,  # ART reduces TB risk by this factor
+    # --- HIV Intervention ---
+    hivinv_pars = hivinv_pars or dict(
+        mode='both',
+        prevalence=0.20,
+        percent_on_ART=0.20,
+        minimum_age=15,
+        max_age=49,
+        start=ss.date('2000-01-01'),
+        stop=ss.date('2010-12-31'),
     )
-    cn = mtb.TB_HIV_Connector(pars=cn_pars)
-
-    # initialize the simulation
-    sim = ss.Sim(
-                people=pop,  
-                diseases=[tb, hiv], 
-                pars=_simpars, 
-                demographics=dems, 
-                connectors=[cn]
-                )
+    hiv_intervention = mtb.HivInterventions(pars=hivinv_pars)
     
-    sim.pars.verbose = 7/365 # Print status every 5 years instead of every 10 steps
+    # # --- Demographics ---
+    # demographics = [
+    #     ss.Pregnancy(pars=dict(fertility_rate=20)),
+    #     ss.Deaths(pars=dict(death_rate=20)),
+    # ]
 
+    # --- Network ---
+    network = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
+
+    # --- Connector ---
+    connector = mtb.TB_HIV_Connector()
+
+    # --- Assemble Simulation ---
+    sim = ss.Sim(
+        people=people,
+        diseases=[tb, hiv],
+        interventions=[hiv_intervention],
+        # demographics=demographics,
+        networks=network,
+        connectors=[connector],
+        pars=default_simpars,
+    )
+
+    sim.pars.verbose = 7 / 365  # One update per year
     return sim
 
-if __name__ == '__main__':  
-    sim = build_tbhiv_sim( )
+
+if __name__ == '__main__':
+    sim = build_tbhiv_sim()
     sim.run()
     sim.plot()
-    all=sim.results.all_results_dict # To see all results in a dictionary format
     plt.show()

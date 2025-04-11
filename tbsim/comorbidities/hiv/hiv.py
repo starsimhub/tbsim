@@ -64,7 +64,17 @@ class HIV(ss.Disease):
         # is initialized. It also captures the case where the intervention only requests
         # not both (infections and art) are selected
         
+        # # check if the sim has a HIV intervention, if so, it will
+        
+        if hasattr(self.sim, 'interventions'):    # TODO: Dan, do you know if there is an easy way to identify if the intervention is HIV?
+            import tbsim as mtb  
+            for i in self.sim.interventions:
+                if i=='hivinterventions':
+                    print('HIV intervention found')
+                    return
+        
         uids = self.sim.people.auids
+        
         if len(self.state[self.state == HIVState.ACUTE])==0:
             initial_infected= self.pars.init_prev.filter(uids)
             self.state[initial_infected] = HIVState.ACUTE
@@ -86,7 +96,7 @@ class HIV(ss.Disease):
             # Set initial prognoses for all agents
             self.set_prognoses()
             return
-        
+
         dt = self.sim.t.dt if hasattr(self.sim.t, 'dt') else 1.0  # dt in weeks (default=1)
         uids = self.sim.people.auids
         current = self.state[uids].copy()
@@ -115,12 +125,13 @@ class HIV(ss.Disease):
     def init_results(self):
         super().init_results()
         self.define_results(
-            ss.Result(name='hiv_prevalence', dtype=float, label='Prevalence (Infected)'),
-            ss.Result(name='atrisk', dtype=float, label='ATRISK'),
-            ss.Result(name='acute', dtype=float, label='ACUTE'),
-            ss.Result(name='latent', dtype=float, label='LATENT'),
-            ss.Result(name='aids', dtype=float, label='AIDS'),
+            ss.Result(name='hiv_prevalence', dtype=float, label='Prevalence (% Infected)'),
+            ss.Result(name='infected', dtype=int, label='Infected'),
             ss.Result(name='on_art', dtype=float, label='On ART'),
+            ss.Result(name='atrisk', dtype=float, label='% ATRISK (Alive)'),
+            ss.Result(name='acute', dtype=float, label='% ACUTE'),
+            ss.Result(name='latent', dtype=float, label='% LATENT'),
+            ss.Result(name='aids', dtype=float, label='% AIDS'),
             ss.Result(name='n_active', dtype=int, label='Active (Combined)'),
         )
     
@@ -131,116 +142,18 @@ class HIV(ss.Disease):
         n_alive = np.count_nonzero(self.sim.people.alive)
         res = self.results
         n = len(uids)
+        
         states = self.state[uids]
-        infected = (states != HIVState.ATRISK) & (states != HIVState.DEAD)
-        # res.hiv_prevalence[ti] = infected.sum()/n
-        res.atrisk[ti]     = np.count_nonzero(self.state == HIVState.ATRISK) #np.sum(states == HIVState.ATRISK)/n
-        res.acute[ti]      = np.count_nonzero(self.state == HIVState.ACUTE) 
-        res.latent[ti]     = np.count_nonzero(self.state == HIVState.LATENT) 
-        res.aids[ti]       = np.count_nonzero(self.state == HIVState.AIDS) 
+        res.hiv_prevalence[ti] = np.count_nonzero(np.isin(self.state, [HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS]))/n
+        res.infected[ti] = np.count_nonzero(np.isin(self.state, [HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS]))
+        res.atrisk[ti]     = np.count_nonzero(self.state == HIVState.ATRISK)/n_alive
+        res.acute[ti]      = np.count_nonzero(self.state == HIVState.ACUTE)/n_alive
+        res.latent[ti]     = np.count_nonzero(self.state == HIVState.LATENT)/n_alive 
+        res.aids[ti]       = np.count_nonzero(self.state == HIVState.AIDS)/n_alive
         res.n_active[ti]   = np.count_nonzero(np.isin(self.state, [HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS]))
-        # Calculate proportion of agents on ART.
         res.on_art[ti]     = np.count_nonzero(self.on_ART == True)
         
-        if n_alive > 0:
-            res.hiv_prevalence[ti] = res.n_active[ti] / n_alive 
+        # if n_alive > 0:
+        #     res.hiv_prevalence[ti] = res.n_active[ti] / n_alive 
  
  
-class HivInterventions(ss.Intervention):
-    def __init__(self, pars, **kwargs):
-        super().__init__(**kwargs)
-        self.define_pars(
-            mode='both',  # 'infection', 'art', or 'both'
-            prevalence=0.20,
-            percent_on_ART=0.80,
-            minimum_age=0,
-            max_age=200,
-        )
-        self.update_pars(pars, **kwargs)
-
-        # Dispatch table to route logic by mode
-        self.handlers = {
-            'infection': self._apply_infection,
-            'art': self._apply_art,
-            'both': self._apply_both,
-        }
-        
-    def step(self):
-        # logic for infections
-        minimum_age = self.pars.minimum_age
-        max_age = self.pars.max_age
-        
-        alive = len(self.sim.people.alive)
-        
-        # check if self.pars.prevalence is callable
-        if callable(self.pars.prevalence):
-            target_prevalence = self.pars.prevalence(self.sim)
-        else:
-            target_prevalence = self.pars.prevalence
-        expected_infectious = int(np.round(alive * target_prevalence))
-
-        
-        handler = self.handlers.get(self.pars.mode)
-        if handler is None:
-            raise ValueError(f"Unsupported mode: {self.pars.mode}, please specify 'infection', 'art', or 'both' ")
-        handler()
-
-    def _apply_infection(self):
-        self.hiv = self.sim.diseases.hiv
-        alive = len(self.sim.people.alive)
-        target_prev = self.pars.prevalence(self.sim) if callable(self.pars.prevalence) else self.pars.prevalence
-        expected_infectious = int(np.round(alive * target_prev))
-
-        infectious_uids = ((self.hiv.state == HIVState.ACUTE) | (self.hiv.state == HIVState.LATENT) | (self.hiv.state == HIVState.AIDS)).uids
-        n_current = len(infectious_uids)
-        delta = expected_infectious - n_current
-
-        if delta > 0:
-            at_risk_uids = (self.hiv.state == HIVState.ATRISK).uids
-            ages = self.sim.people.age[at_risk_uids]
-            in_age_range = (ages >= self.pars.minimum_age) & (ages <= (self.pars.max_age or np.inf))
-            eligible = at_risk_uids[in_age_range]
-
-            n_to_add = min(delta, len(eligible))
-            if n_to_add:
-                dist = ss.randint(0, len(eligible), strict=False).init()
-                chosen = eligible[dist(n_to_add)]
-                self.hiv.state[chosen] = HIVState.ACUTE
-
-        elif delta < 0:
-            acute_uids = (self.hiv.state == HIVState.ACUTE).uids
-            n_to_remove = min(-delta, len(acute_uids))
-            if n_to_remove:
-                dist = ss.randint(0, len(acute_uids), strict=False).init()
-                chosen = acute_uids[dist(n_to_remove)]
-                self.hiv.state[chosen] = HIVState.ATRISK
-
-    def _apply_art(self):
-        self.hiv = self.sim.diseases.hiv
-        
-        alive = len(self.sim.people.alive)
-        target_prev = self.pars.prevalence(self.sim) if callable(self.pars.prevalence) else self.pars.prevalence
-        expected_on_art = int(np.round(alive * self.pars.percent_on_ART * target_prev))
-
-        current_on_art = (self.hiv.on_ART == True).uids
-        n_current = len(current_on_art)
-        delta = expected_on_art - n_current
-
-        if delta > 0:
-            candidates = ((~self.hiv.on_ART) & (self.hiv.state != HIVState.DEAD) & (self.hiv.state != HIVState.ATRISK)).uids
-            n_to_add = min(delta, len(candidates))
-            if n_to_add:
-                dist = ss.randint(0, len(candidates), strict=False).init()
-                chosen = candidates[dist(n_to_add)]
-                self.hiv.on_ART[chosen] = True
-
-        elif delta < 0:
-            n_to_remove = min(-delta, len(current_on_art))
-            if n_to_remove:
-                dist = ss.randint(0, len(current_on_art), strict=False).init()
-                chosen = current_on_art[dist(n_to_remove)]
-                self.hiv.on_ART[chosen] = False
-
-    def _apply_both(self):
-        self._apply_infection()
-        self._apply_art()
