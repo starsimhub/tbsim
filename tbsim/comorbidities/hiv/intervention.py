@@ -2,8 +2,19 @@ import starsim as ss
 import numpy as np
 from tbsim import HIVState
 
-__all__ = ['HivInterventions']
-
+__all__ = ['HivInterventions', 'HivInterventionMode']
+class HivInterventionMode():
+    """
+    HivInterventionMode is an enumeration class that defines the modes of HIV interventions in a simulation.
+    The modes include:
+        - INFECTION: Adjusts the number of individuals infected with HIV to match a target prevalence.
+        - ART: Adjusts the number of individuals on antiretroviral therapy (ART) to match a target proportion.
+        - BOTH: Applies both infection and ART adjustments sequentially.
+    """
+    INFECTION = 'infection'
+    ART = 'art'
+    BOTH = 'both'
+    
 class HivInterventions(ss.Intervention):
     """
     HivInterventions is a class that models HIV-related interventions in a simulation. 
