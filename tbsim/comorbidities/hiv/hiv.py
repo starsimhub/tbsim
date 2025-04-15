@@ -47,9 +47,9 @@ class HIV(ss.Disease):
     Parameters:
         - init_prev: Initial probability of infection (ACUTE).
         - init_onart: Probability of being on ART at initialization (if infected).
-        - ACUTE_to_LATENT: Daily transition probability from ACUTE to LATENT.
-        - LATENT_to_AIDS: Daily transition probability from LATENT to AIDS.
-        - AIDS_to_DEAD: Daily transition probability from AIDS to DEAD (unused).
+        - acute_to_latent: Daily transition probability from ACUTE to LATENT.
+        - latent_to_aids: Daily transition probability from LATENT to AIDS.
+        - aids_to_dead: Daily transition probability from AIDS to DEAD (unused).
         - art_progression_factor: Multiplier applied to progression probabilities for agents on ART.
 
     States:
@@ -69,10 +69,10 @@ class HIV(ss.Disease):
         self.define_pars(
             init_prev = ss.bernoulli(p=0.20),  # Initial prevalence of HIV
             init_onart = ss.bernoulli(p=0.50),  # Initial probability of being on ART (if infected).
-            ACUTE_to_LATENT       = ss.perday(1/(7*12)), # 1-np.exp(-1/8),  # 8 weeks
-            LATENT_to_AIDS        = ss.perday(1/(365*8)), # 1-np.exp(-1/416), # 416 weeks
-            AIDS_to_DEAD          = ss.perday(1/(365*2)), # 1-np.exp(-1/104), # 104 weeks
             art_progression_factor  = 0.1, # Multiplier to reduce progression rates if on ART.
+            acute_to_latent       = ss.perday(1/(7*12)), # 1-np.exp(-1/8),  # 8 weeks
+            latent_to_aids        = ss.perday(1/(365*8)), # 1-np.exp(-1/416), # 416 weeks
+            aids_to_dead          = ss.perday(1/(365*2)), # 1-np.exp(-1/104), # 104 weeks
         )
         self.update_pars(pars, **kwargs)
         
@@ -146,18 +146,18 @@ class HIV(ss.Disease):
 
        
         # HIV → LATENT:
-        ACUTE_to_LATENT = self.pars.ACUTE_to_LATENT
+        acute_to_latent = self.pars.acute_to_latent
         hiv_ids = uids[current == HIVState.ACUTE]
         art_multiplier = np.where(self.on_ART[hiv_ids], art_factor, 1.0) # Apply ART factor
-        effective_p = ACUTE_to_LATENT*art_multiplier
+        effective_p = acute_to_latent*art_multiplier
         rand_vals = np.random.rand(hiv_ids.size)
         self.state[hiv_ids[rand_vals < effective_p]] = HIVState.LATENT
         
         # LATENT → AIDS:
-        LATENT_to_AIDS = self.pars.LATENT_to_AIDS
+        latent_to_aids = self.pars.latent_to_aids
         latent_ids = uids[current == HIVState.LATENT]
         art_multiplier = np.where(self.on_ART[latent_ids], art_factor, 1.0)  # Apply ART factor
-        effective_p = LATENT_to_AIDS*art_multiplier
+        effective_p = latent_to_aids*art_multiplier
         rand_vals = np.random.rand(latent_ids.size)
         self.state[latent_ids[rand_vals<effective_p]] = HIVState.AIDS
 
