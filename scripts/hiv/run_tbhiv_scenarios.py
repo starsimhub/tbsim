@@ -47,18 +47,9 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
     # --- Connector ---
     connector = mtb.TB_HIV_Connector()
     
+    # --- HIV Intervention ---
+    hiv_intervention = None
     if hiv_pars is not None:
-        hiv.update_pars(hiv_pars)
-        # --- HIV Intervention ---
-        hivinv_pars = hivinv_pars or dict(
-            mode='both',
-            prevalence=0.20,
-            percent_on_ART=0.20,
-            minimum_age=15,
-            max_age=49,
-            start=ss.date('2000-01-01'),
-            stop=ss.date('2010-12-31'),
-        )
         hiv_intervention = mtb.HivInterventions(pars=hivinv_pars)
 
 

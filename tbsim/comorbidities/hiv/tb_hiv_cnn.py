@@ -25,12 +25,15 @@ class TB_HIV_Connector(ss.Connector):
         super().__init__(label='TB-HIV')
         self.define_pars(
             tb_hiv_rr_func      = self.compute_tb_hiv_risk_rr,
+            acute_multiplier     = 1.5,
+            latent_multiplier    = 2.0,
+            aids_multiplier      = 3.0,
         )
         self.update_pars(pars, **kwargs)
         self.state_multipliers = {
-            HIVState.ACUTE: 1.5,
-            HIVState.LATENT: 2.0,
-            HIVState.AIDS: 3.0,
+            HIVState.ACUTE: self.pars.acute_multiplier,
+            HIVState.LATENT: self.pars.latent_multiplier,
+            HIVState.AIDS:   self.pars.aids_multiplier,
 
         }
 
@@ -68,6 +71,9 @@ class TB_HIV_Connector(ss.Connector):
         return rr * base_factor
 
     def step(self):
+        """
+        This is where the actual modification of TB parameters occurs.
+        """
         tb = self.sim.diseases['tb']
         hiv = self.sim.diseases['hiv']
 
