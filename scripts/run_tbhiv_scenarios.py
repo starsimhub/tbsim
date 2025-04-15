@@ -40,24 +40,28 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
         init_onart=ss.bernoulli(p=0.50),
     )
     hiv = mtb.HIV(pars=hiv_pars)
-
-    # --- HIV Intervention ---
-    hivinv_pars = hivinv_pars or dict(
-        mode='both',
-        prevalence=0.20,
-        percent_on_ART=0.20,
-        minimum_age=15,
-        max_age=49,
-        start=ss.date('2000-01-01'),
-        stop=ss.date('2010-12-31'),
-    )
-    hiv_intervention = mtb.HivInterventions(pars=hivinv_pars)
-
+    
     # --- Network ---
     network = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
 
     # --- Connector ---
     connector = mtb.TB_HIV_Connector()
+    
+    if hiv_pars is not None:
+        hiv.update_pars(hiv_pars)
+        # --- HIV Intervention ---
+        hivinv_pars = hivinv_pars or dict(
+            mode='both',
+            prevalence=0.20,
+            percent_on_ART=0.20,
+            minimum_age=15,
+            max_age=49,
+            start=ss.date('2000-01-01'),
+            stop=ss.date('2010-12-31'),
+        )
+        hiv_intervention = mtb.HivInterventions(pars=hivinv_pars)
+
+
 
     # --- Assemble Simulation ---
     sim = ss.Sim(
@@ -74,8 +78,10 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
 
 def run_scenarios():
     scenarios = {
-        # 'base': {},
+        'baseline': None,
+            
         'early_low_coverage': dict(
+            mode='both',
             prevalence=0.10,
             percent_on_ART=0.10,
             minimum_age=15,
@@ -84,6 +90,7 @@ def run_scenarios():
             stop=ss.date('2000-12-31'),
         ),
         'mid_coverage_mid_years': dict(
+            mode='both',
             prevalence=0.20,
             percent_on_ART=0.40,
             minimum_age=20,
@@ -92,6 +99,7 @@ def run_scenarios():
             stop=ss.date('2010-12-31'),
         ),
         'high_coverage_recent': dict(
+            mode='both',
             prevalence=0.25,
             percent_on_ART=0.75,
             minimum_age=10,
@@ -100,6 +108,7 @@ def run_scenarios():
             stop=ss.date('2025-12-31'),
         ),
         'youth_targeted': dict(
+            mode='both',
             prevalence=0.15,
             percent_on_ART=0.60,
             minimum_age=10,
@@ -171,49 +180,16 @@ def plot_results(flat_results, keywords=None, exclude=['15']):
         # Handle legend positioning for crowded plots
         if leg:
             leg.get_frame().set_alpha(0.5)
-    # Handle x-axis label for the last subplot
-    if n_metrics > 0:
-        # Only set xlabel for the last subplot in the grid
-        if isinstance(axs, np.ndarray):
-            axs[-1].set_xlabel('Time')
-        else:
-            # for single ax
-            axs.set_xlabel('Time')
-    else:
-        # In case there are no metrics to plot, set xlabel on axs
-        if isinstance(axs, np.ndarray):
-            axs.set_xlabel('Time')
-        else:
-            axs.set_xlabel('Time')
-    # Ensure the layout is tight to avoid overlap
-    if n_metrics > 0:
-        if isinstance(axs, np.ndarray):
-            axs[-1].set_xlabel('Time')  # Ensure the last subplot has the x-label
-        else:
-            axs.set_xlabel('Time')
-    else:
-        # In case there are no metrics to plot, set xlabel on axs
-        axs.set_xlabel('Time')
-    if n_metrics > 0:
-        plt.tight_layout()
-    else:
-        # In case no metrics were plotted, ensure layout is tight
-        plt.tight_layout()
-    # Final layout adjustments
-    if n_metrics > 0:
-        plt.tight_layout()
-    else:
-        plt.tight_layout()  # Ensure layout is tight even with no metrics
+            
 
-    axs[-1].set_xlabel('Time')
+    # Ensure the layout is tight
+    plt.tight_layout()
     
     # add an option to change the background color of the plot for better visibility
     for ax in axs:
         # Change the background color of each axis for better visibility
         ax.set_facecolor('#f0f0f0')  # Light gray background for better contrast
-        
-    plt.tight_layout()
-    
+
     # save the plot in the current directory
     dirname = sc.thisdir()
     plt.savefig(f'{dirname}/tbhiv_scenarios.png', dpi=300)

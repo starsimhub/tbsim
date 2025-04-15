@@ -7,39 +7,64 @@ __all__ = ['HIVState', 'HIV']
 
 # Define HIV states as an enumeration.
 class HIVState(IntEnum):
+    """
+    Enum representing the possible HIV states an agent can be in.
+
+    States:
+        - ATRISK: Agent is HIV-negative but at risk.
+        - ACUTE: Recently infected with HIV.
+        - LATENT: Chronic HIV infection.
+        - AIDS: Advanced stage of HIV infection.
+        - DEAD: Died from HIV-related causes.
+    """    
     ATRISK = -1   # Uninfected
     ACUTE  = 0    # Newly infected (early state)
     LATENT = 1    # Chronic infection
     AIDS   = 2    # Advanced disease
     DEAD   = 3    # Dead from HIV
+    def __str__(self):
+        return {0: 'ATRISK', 1: 'ACUTE', 2: 'LATENT', 3: 'AIDS', 4: 'DEAD'}[self.value]
+    def __repr__(self):
+        return {0: 'ATRISK', 1: 'ACUTE', 2: 'LATENT', 3: 'AIDS', 4: 'DEAD'}[self.value]
+
+    
+
         
 class HIV(ss.Disease):
     """
-    A simplified HIV disease model that tracks only the agent's state and ART status.
-    
-    Transitions are stochastic with expected durations:
-      - ATRISK → ACUTE HIVS: 4 weeks
-      - ACUTE → LATENT: 8 weeks
-      - LATENT → AIDS: 416 weeks (≈8 years)
-      
-    If an agent is on ART, progression probabilities are reduced by a factor
-      art_progression_factor (default 0.5), thus prolonging the duration in that state.
-      
+    A simplified agent-based HIV disease model for use with the Starsim framework.
+
+    This model tracks HIV state progression through ACUTE, LATENT, and AIDS phases,
+    influenced by whether the agent is receiving ART (antiretroviral therapy).
+
+    Key Features:
+        - Initial infection and ART status are assigned during the first timestep, 
+          unless a high-level intervention labeled 'hivinterventions' is present.
+        - Disease progression is stochastic and modified by ART presence.
+        - ART reduces the probability of progression from ACUTE → LATENT and LATENT → AIDS.
+        - AIDS → DEAD transition is defined but not applied in this model.
+
     Parameters:
-      - init_prev: Initial prevalence of infection.
-      - ACUTE_to_LATENT: Baseline probability per step for HIV → LATENT (1 - exp(-dt/8)).
-      - LATENT_to_AIDS: Baseline probability per step for LATENT → AIDS (1 - exp(-dt/416)).
-      - AIDS_to_DEAD: Baseline probability per step for AIDS → DEAD (1 - exp(-dt/104)).
-      - art_progression_factor: Multiplier to reduce progression rates if on ART.
-      
-    References:
-      - Expert Report to the Infected Blood Inquiry: HIV (Jan 2020) and related guidelines.
-      - https://www.infectedbloodinquiry.org.uk/sites/default/files/documents/HIV%20Report%20with%20Addendum.pdf 
+        - init_prev: Initial probability of infection (ACUTE).
+        - init_onart: Probability of being on ART at initialization (if infected).
+        - ACUTE_to_LATENT: Daily transition probability from ACUTE to LATENT.
+        - LATENT_to_AIDS: Daily transition probability from LATENT to AIDS.
+        - AIDS_to_DEAD: Daily transition probability from AIDS to DEAD (unused).
+        - art_progression_factor: Multiplier applied to progression probabilities for agents on ART.
+
+    States:
+        - state: HIV progression state (ATRISK, ACUTE, LATENT, AIDS, DEAD).
+        - on_ART: Boolean indicating whether agent is on ART.
+
+    Results Tracked:
+        - hiv_prevalence: Proportion of total agents with HIV.
+        - infected: Total number of HIV-positive agents.
+        - on_art: Number of agents on ART.
+        - atrisk, acute, latent, aids: Percent of population in each state.
+        - n_active: Total number of agents in ACUTE, LATENT, or AIDS states.
     """
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
-        
-        # Define progression parameters (using a time step in weeks).
         # Define progression parameters (using a time step in weeks).
         self.define_pars(
             init_prev = ss.bernoulli(p=0.20),  # Initial prevalence of HIV
@@ -53,28 +78,43 @@ class HIV(ss.Disease):
         
         # Define extra attributes for Agents of this disease.
         self.define_states(
-            ss.FloatArr('state', default=HIVState.ATRISK),          
-            ss.BoolArr('on_ART', default=False),          # Whether agent is on ART.
+            ss.FloatArr('state', default=HIVState.ATRISK),  # Column name to store HIV state.   
+            ss.BoolArr('on_ART', default=False),            # Column name to store Whether agent is on ART.
         )
         return
         
-    def set_prognoses(self ):
-        # This protects against re-initialization or in case there is an 
-        # intervention handling HIV infections and ART before this disease
-        # is initialized. It also captures the case where the intervention only requests
-        # not both (infections and art) are selected
-        
-        # # check if the sim has a HIV intervention, if so, it will
-        
-        if hasattr(self.sim, 'interventions'):    # TODO: Dan, do you know if there is an easy way to identify if the intervention is HIV?
+    def set_prognoses(self ):   
+        """
+        Initialize HIV infection and ART status for agents in the simulation.
+
+        This method is called at the beginning of the simulation (time index 0)
+        to assign initial disease states and treatment (ART) status.
+
+        Behavior:
+            - If a high-level intervention labeled 'hivinterventions' is present in the simulation,
+            initialization is skipped entirely, assuming that the intervention will handle infection
+            and ART assignments dynamically at the appropriate time.
+            - If no HIV states are currently set to ACUTE, a subset of agents is randomly assigned to
+            ACUTE based on the `init_prev` parameter.
+            - If no agents are currently on ART, a subset of those in the ACUTE state is randomly
+            assigned to be on ART based on the `init_onart` parameter.
+
+        Notes:
+            - This check ensures the model does not reinitialize infected or ART states
+            if they've already been set or will be handled externally.
+            - It also avoids reapplying ART if ART status was assigned previously.
+
+        Returns:
+            None
+        """ 
+        if hasattr(self.sim, 'interventions'):      
             import tbsim as mtb  
             for i in self.sim.interventions:
-                if i=='hivinterventions':
-                    print('HIV intervention found')
+                if i=='hivinterventions':           # Check if the intervention label is present among the interventions
+                    print('HIV intervention present, skipping initialization.')
                     return
         
         uids = self.sim.people.auids
-        
         if len(self.state[self.state == HIVState.ACUTE])==0:
             initial_infected= self.pars.init_prev.filter(uids)
             self.state[initial_infected] = HIVState.ACUTE
@@ -155,5 +195,5 @@ class HIV(ss.Disease):
         
         # if n_alive > 0:
         #     res.hiv_prevalence[ti] = res.n_active[ti] / n_alive 
- 
- 
+
+        
