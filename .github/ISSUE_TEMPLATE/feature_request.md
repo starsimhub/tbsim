@@ -1,10 +1,9 @@
 ---
-name: Feature request
+name: "\U0001F4A1 Feature Request"
 about: Suggest a new idea or enhancement for TBSim
-title: ''
-labels: ''
+title: "[Feature Request] <brief summary>"
+labels: enhancement
 assignees: ''
-
 ---
 
 ### TITLE: "[Feature Request] <brief summary>"
@@ -32,3 +31,13 @@ assignees: ''
 ## Additional Context
 
 - Add any other context, sketches, references, or screenshots here.
+
+## Requestor Information (Optional)
+
+- Name:
+- Institution:
+- Project:
+- Email:
+- GitHub username:
+- Any other relevant information:
+

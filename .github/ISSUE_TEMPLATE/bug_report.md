@@ -1,13 +1,4 @@
 ---
-name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
-assignees: ''
-
----
-
----
 name: "\U0001F41B Bug Report"
 about: Report an issue with TBSim
 title: "[Bug] <brief summary>"
@@ -17,7 +8,7 @@ assignees: ''
 
 ### Description
 
-Describe the bug or unexpected behavior.
+- Describe the bug or unexpected behavior.
 
 ### Steps to Reproduce
 
@@ -28,15 +19,15 @@ List the steps to reproduce the issue:
 
 ### Expected Behavior
 
-What did you expect to happen?
+- What did you expect to happen?
 
 ### Actual Behavior
 
-What actually happened?
+- What actually happened?
 
 ### Screenshots / Logs
 
-If applicable, include relevant screenshots or error messages.
+- If applicable, include relevant screenshots or error messages.
 
 ### Environment
 
@@ -47,4 +38,4 @@ If applicable, include relevant screenshots or error messages.
 
 ### Additional Context
 
-Add any other context about the problem here.
+- Add any other context about the problem here.
