@@ -7,14 +7,30 @@ assignees: ''
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+---
+name: "ABC Feature Request"
+about: Suggest a new idea or enhancement for TBSim
+title: "[Feature Request] <brief summary>"
+labels: enhancement
+assignees: ''
+---
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+### Summary
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+A clear and concise description of the feature or improvement you'd like to see.
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+### Problem or Limitation
+
+What problem does this solve or what limitation does it address?
+
+### Proposed Solution
+
+Describe how you envision the feature working or being implemented. Include examples if applicable.
+
+### Alternatives Considered
+
+Did you consider any other approaches or workarounds?
+
+### Additional Context
+
+Add any other context, sketches, references, or screenshots here.
