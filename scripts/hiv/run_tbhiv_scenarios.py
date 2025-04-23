@@ -49,7 +49,7 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
     
     # --- HIV Intervention ---
     hiv_intervention = None
-    if hiv_pars is not None:
+    if hivinv_pars is not None:
         hiv_intervention = mtb.HivInterventions(pars=hivinv_pars)
 
 
