@@ -15,14 +15,14 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
         start=ss.date('1980-01-01'),
         stop=ss.date('2035-12-31'),
         rand_seed=123,
+        verbose=0,
     )
     if simpars:
         default_simpars.update(simpars)
 
     # --- Population ---
-    n_agents = 1000
-    extra_states = [ss.FloatArr('SES', default=ss.bernoulli(p=0.3))]
-    people = ss.People(n_agents=n_agents, extra_states=extra_states)
+    n_agents = 500
+    people = ss.People(n_agents=n_agents)
 
     # --- TB Model ---
     pars = dict(
@@ -30,8 +30,6 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
     )
-    if tbpars:
-        pars.update(tbpars)
     tb = mtb.TB(pars=pars)
 
     # --- HIV Disease Model ---
@@ -52,13 +50,11 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
     if hivinv_pars is not None:
         hiv_intervention = mtb.HivInterventions(pars=hivinv_pars)
 
-
-
     # --- Assemble Simulation ---
     sim = ss.Sim(
         people=people,
         diseases=[tb, hiv],
-        interventions=[hiv_intervention],
+        interventions=None if hiv_intervention is None else [hiv_intervention],
         networks=network,
         connectors=[connector],
         pars=default_simpars,
@@ -89,26 +85,7 @@ def run_scenarios():
             start=ss.date('2000-01-01'),
             stop=ss.date('2010-12-31'),
         ),
-        'high_coverage_recent': dict(
-            mode='both',
-            prevalence=0.25,
-            percent_on_ART=0.75,
-            minimum_age=10,
-            max_age=60,
-            start=ss.date('2010-01-01'),
-            stop=ss.date('2025-12-31'),
-        ),
-        'youth_targeted': dict(
-            mode='both',
-            prevalence=0.15,
-            percent_on_ART=0.60,
-            minimum_age=10,
-            max_age=24,
-            start=ss.date('2005-01-01'),
-            stop=ss.date('2020-12-31'),
-        ),
     }
-
     flat_results = {}
 
     for name, hivinv_pars in scenarios.items():
@@ -171,17 +148,12 @@ def plot_results(flat_results, keywords=None, exclude=['15']):
         # Handle legend positioning for crowded plots
         if leg:
             leg.get_frame().set_alpha(0.5)
-            
-
-    # Ensure the layout is tight
     plt.tight_layout()
     
     # add an option to change the background color of the plot for better visibility
     for ax in axs:
-        # Change the background color of each axis for better visibility
         ax.set_facecolor('#f0f0f0')  # Light gray background for better contrast
 
-    # save the plot in the current directory
     dirname = sc.thisdir()
     plt.savefig(f'{dirname}/tbhiv_scenarios.png', dpi=300)
     # Show the plot
