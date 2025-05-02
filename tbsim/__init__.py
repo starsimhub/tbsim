@@ -5,7 +5,7 @@ from .tb import TB, TBS
 from .comorbidities.malnutrition.malnutrition import Malnutrition
 from .comorbidities.hiv.hiv import HIV
 from .comorbidities.hiv.hiv import HIVState
-from .comorbidities.hiv.intervention import HivInterventions, HivInterventionMode
+from .comorbidities.hiv.intervention import HivInterventions
 from .config import *
 from .interventions import *
 from .networks import HouseholdNet

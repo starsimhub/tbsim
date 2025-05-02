@@ -67,8 +67,8 @@ class HIV(ss.Disease):
         super().__init__(**kwargs)
         # Define progression parameters (using a time step in weeks).
         self.define_pars(
-            init_prev = ss.bernoulli(p=0.20),  # Initial prevalence of HIV
-            init_onart = ss.bernoulli(p=0.50),  # Initial probability of being on ART (if infected).
+            init_prev = ss.bernoulli(p=0.00),  # Initial prevalence of HIV
+            init_onart = ss.bernoulli(p=0.00),  # Initial probability of being on ART (if infected).
             art_progression_factor  = 0.1, # Multiplier to reduce progression rates if on ART.
             acute_to_latent       = ss.perday(1/(7*12)), # 1-np.exp(-1/8),  # 8 weeks
             latent_to_aids        = ss.perday(1/(365*8)), # 1-np.exp(-1/416), # 416 weeks
@@ -136,7 +136,7 @@ class HIV(ss.Disease):
             # Set initial prognoses for all agents
             self.set_prognoses()
             return
-
+        
         dt = self.sim.t.dt if hasattr(self.sim.t, 'dt') else 1.0  # dt in weeks (default=1)
         uids = self.sim.people.auids
         current = self.state[uids].copy()
