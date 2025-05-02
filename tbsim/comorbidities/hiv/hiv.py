@@ -15,17 +15,15 @@ class HIVState(IntEnum):
         - ACUTE: Recently infected with HIV.
         - LATENT: Chronic HIV infection.
         - AIDS: Advanced stage of HIV infection.
-        - DEAD: Died from HIV-related causes.
     """    
     ATRISK = -1   # Uninfected
     ACUTE  = 0    # Newly infected (early state)
     LATENT = 1    # Chronic infection
     AIDS   = 2    # Advanced disease
-    DEAD   = 3    # Dead from HIV
     def __str__(self):
-        return {0: 'ATRISK', 1: 'ACUTE', 2: 'LATENT', 3: 'AIDS', 4: 'DEAD'}[self.value]
+        return {0: 'ATRISK', 1: 'ACUTE', 2: 'LATENT', 3: 'AIDS'}[self.value]
     def __repr__(self):
-        return {0: 'ATRISK', 1: 'ACUTE', 2: 'LATENT', 3: 'AIDS', 4: 'DEAD'}[self.value]
+        return {0: 'ATRISK', 1: 'ACUTE', 2: 'LATENT', 3: 'AIDS'}[self.value]
 
     
 

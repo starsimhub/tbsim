@@ -12,7 +12,7 @@ def build_tbhiv_sim(include_intv=False, hiv_pars=None, intv_pars=None, Demgs=Fal
     sim_pars = dict(
         unit='day',
         dt=7,
-        start=ss.date('1940-01-01'),
+        start=ss.date('1980-01-01'),
         stop=ss.date('2030-12-31'),
         rand_seed=123,
         verbose=0,
@@ -23,9 +23,14 @@ def build_tbhiv_sim(include_intv=False, hiv_pars=None, intv_pars=None, Demgs=Fal
 
     tb = sf.make_tb()
     hiv = sf.make_hiv(hiv_pars=hiv_pars)
-    connector = sf.make_tb_hiv_connector(include=tb)
+    pars = dict(
+                acute_multiplier     = 1.2222111,
+                latent_multiplier    = 1.9999999999,
+                aids_multiplier      = 2.7777,
+        )
+    connector = sf.make_tb_hiv_connector(include=tb, pars=pars)
     interventions = sf.make_interventions(include=include_intv, pars=intv_pars) if include_intv else None
-
+    
     return ss.Sim(
         people=people,
         diseases=[tb, hiv],
@@ -43,19 +48,19 @@ def get_scenarios():
             init_prev=ss.bernoulli(p=0.00),
             init_onart=ss.bernoulli(p=0.00)
         )),
-        "HIV prevalence = 30%": dict(
+        "HIV prevalence = 20%": dict(
             include_intv=False, 
             hiv_pars=dict(
-                init_prev=ss.bernoulli(p=0.30),
+                init_prev=ss.bernoulli(p=0.20),
                 init_onart=ss.bernoulli(p=0.00)
         )),
-        "Controlled by intv. 20% prev.": dict(
+        "Controlled by intv. 30% prev.": dict(
             include_intv=True,
             intv_pars=dict(
-                prevalence=0.20,
+                prevalence=0.30,
                 percent_on_ART=0.00,
-                start=ss.date('1980-01-01'),
-                stop=ss.date('2020-12-31'),
+                start=ss.date('1980-05-01'),
+                stop=ss.date('2000-12-31'),
             )
         ),
     }

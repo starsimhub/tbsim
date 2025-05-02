@@ -1,6 +1,7 @@
 import numpy as np
 import starsim as ss
 from tbsim import TB, HIV, HIVState
+from enum import IntEnum
 
 __all__ = ['TB_HIV_Connector']
 
@@ -25,9 +26,9 @@ class TB_HIV_Connector(ss.Connector):
         super().__init__(label='TB-HIV')
         self.define_pars(
             tb_hiv_rr_func      = self.compute_tb_hiv_risk_rr,
-            acute_multiplier     = 1.5,
-            latent_multiplier    = 2.0,
-            aids_multiplier      = 3.0,
+            acute_multiplier     = 1.2202,
+            latent_multiplier    = 1.9001,
+            aids_multiplier      = 2.5955,
         )
         self.update_pars(pars, **kwargs)
         self.state_multipliers = {
@@ -80,7 +81,8 @@ class TB_HIV_Connector(ss.Connector):
         # Adjust TB progression and death risks for infected individuals
         uids_tb = tb.infected.uids
         rr = self.pars.tb_hiv_rr_func(self, tb, hiv, uids_tb)
-
+        # print(f"TB-HIV Connector: Adjusting TB progression risk for {len(uids_tb)} individuals. {rr}")
+        
         tb.rr_activation[uids_tb] *= rr
-
+        # print(tb.rr_activation[uids_tb])
         return

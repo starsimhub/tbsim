@@ -38,9 +38,9 @@ def make_tb(include:bool=True, tb_pars=None):
     return mtb.TB(pars=pars)
 
 # - - - - - - - MAKE TB-HIV CONNECTOR - - - - - -
-def make_tb_hiv_connector(include:bool=True):
+def make_tb_hiv_connector(include:bool=True, pars=None):
     if not include: return None
-    return mtb.TB_HIV_Connector()  
+    return mtb.TB_HIV_Connector(pars=pars)  
 
 # - - - - - -  MAKE DEMOGRAPHICS - - - - - -
 def make_demographics(include:bool=False):
@@ -160,3 +160,4 @@ def uncertanty_plot():
 
     plt.tight_layout()
     plt.show()
+
