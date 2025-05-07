@@ -2,33 +2,32 @@ import tbsim as mtb
 import starsim as ss
 import sciris as sc
 import numpy as np
-import matplotlib.pyplot as plt
 import shared_functions as sf
 
 
-def build_tbhiv_sim(include_intv=False, hiv_pars=None, intv_pars=None, Demgs=False) -> ss.Sim:
+def build_tbhiv_sim(include_intv=False, include_cnn=False, hiv_pars=None, intv_pars=None, Demgs=False) -> ss.Sim:
     """Construct a TB-HIV simulation with optional interventions."""
     
     sim_pars = dict(
-        unit='day',
-        dt=7,
-        start=ss.date('1980-01-01'),
-        stop=ss.date('2030-12-31'),
-        rand_seed=123,
-        verbose=0,
+        unit='day', dt=7,   # Simulation's Time unit and time-step size.
+        start=ss.date('1980-01-01'),  stop=ss.date('2030-12-31'), # Simulation's start and stop dates
+        verbose=0,          # Verbosity level   
     )
 
-    people = ss.People(n_agents=500)
+    people = ss.People(n_agents=100)
     network = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
 
     tb = sf.make_tb()
     hiv = sf.make_hiv(hiv_pars=hiv_pars)
-    pars = dict(
-                acute_multiplier     = 1.2222111,
-                latent_multiplier    = 1.9999999999,
-                aids_multiplier      = 2.7777,
-        )
-    connector = sf.make_tb_hiv_connector(include=tb, pars=pars)
+    
+    # Please note, this multiplier is used to adjust the rate of progression 
+    # from latent to presynptomatic TB (TB state 'rr_activation'):
+    cnn_pars = dict(
+                acute_multiplier     = 1.7,
+                latent_multiplier    = 2.5,
+                aids_multiplier      = 2.9,
+                )
+    connector = sf.make_tb_hiv_connector(pars=cnn_pars) if include_cnn else None
     interventions = sf.make_interventions(include=include_intv, pars=intv_pars) if include_intv else None
     
     return ss.Sim(
@@ -44,23 +43,30 @@ def build_tbhiv_sim(include_intv=False, hiv_pars=None, intv_pars=None, Demgs=Fal
 def get_scenarios():
     """Define simulation scenarios."""
     return {
-        "No HIV": dict(hiv_pars=dict(
-            init_prev=ss.bernoulli(p=0.00),
-            init_onart=ss.bernoulli(p=0.00)
-        )),
-        "HIV prevalence = 20%": dict(
-            include_intv=False, 
+        "No HIV": dict(
+            include_intv=False,
+            include_cnn=False,
             hiv_pars=dict(
-                init_prev=ss.bernoulli(p=0.20),
+                init_prev=ss.bernoulli(p=0.00),
                 init_onart=ss.bernoulli(p=0.00)
         )),
-        "Controlled by intv. 30% prev.": dict(
+        "Initial HIV prevalence = 15%": dict(
+            include_intv=False, 
+            include_cnn=True,
+            hiv_pars=dict(
+                init_prev=ss.bernoulli(p=0.15),
+                init_onart=ss.bernoulli(p=0.77)
+        )),
+        "Controlled HIV Prevalence 30%": dict(
             include_intv=True,
+            include_cnn=True,
             intv_pars=dict(
                 prevalence=0.30,
-                percent_on_ART=0.00,
-                start=ss.date('1980-05-01'),
-                stop=ss.date('2000-12-31'),
+                percent_on_ART=0.30,
+                start=ss.date('1981-05-01'),
+                stop=ss.date('2030-12-31'),
+                dt=7,
+                unit='day',
             )
         ),
     }
@@ -76,8 +82,9 @@ def main():
         sim.run()
         results[name] = sim.results.flatten()
 
-    sf.plot_results(results)
-
+    # sf.plot_results(results)
+    # sf.plot_results_1(results)
+    sf.plot_results(results, dark=True, cmap='viridis' )
 
 if __name__ == '__main__':
     main()

@@ -1,9 +1,10 @@
+import datetime
 import starsim as ss 
 import tbsim as mtb 
 import numpy as np
 import matplotlib.pyplot as plt
 import sciris as sc
-
+import os
 
 #- - - - - - MAKE INTERVENTIONS - - - - - -
 def make_interventions(include:bool=True, pars=None):
@@ -11,10 +12,11 @@ def make_interventions(include:bool=True, pars=None):
     if pars is None:
         pars=dict(
                 mode='both',
-                prevalence=0.30,
-                percent_on_ART=0.5,
-                minimum_age=15,
-                max_age=49,)
+                prevalence=0.30,            # Maintain 30 percent of the alive population infected
+                percent_on_ART=0.50,        # Maintain 50 percent of the % infected population on ART
+                min_age=15, max_age=49,     # Min and Max age of agents that can be hit with the intervention
+                start=ss.date('2000-01-01'), stop=ss.date('2035-12-31'),   # Intervention's start and stop dates
+        )
         
     return [mtb.HivInterventions(pars=pars),]
     
@@ -39,7 +41,8 @@ def make_tb(include:bool=True, tb_pars=None):
 
 # - - - - - - - MAKE TB-HIV CONNECTOR - - - - - -
 def make_tb_hiv_connector(include:bool=True, pars=None):
-    if not include: return None
+    if not include: 
+        return None
     return mtb.TB_HIV_Connector(pars=pars)  
 
 # - - - - - -  MAKE DEMOGRAPHICS - - - - - -
@@ -49,67 +52,84 @@ def make_demographics(include:bool=False):
             ss.Deaths(pars=dict(death_rate=8.4)),]
 
 
-# - - - - - -  PLOT RESULTS - - - - - -
-def plot_results(flat_results, keywords=None, exclude=['15']):
-    # Automatically identify all unique metrics across all scenarios
-    metrics = []
-    if keywords is None:
-        metrics = sorted({key for flat in flat_results.values() for key in flat.keys()}, reverse=True)
-        
-    else:
-        metrics = sorted({
-            k for flat in flat_results.values() for k in flat
-            if any(kw in k for kw in keywords) 
-        })
-        # Exclude specified metrics
-    
-    metrics = [m for m in metrics if not any(excl in m for excl in exclude)]
-        
-    n_metrics = len(metrics)
-    if n_metrics > 0:
-        # If there are more than 5 metrics, use a grid of 5 columns
-        n_cols = 5
-        n_rows = int(np.ceil(n_metrics / n_cols))
-        fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, n_rows*2))
-        axs = axs.flatten()
-        
-    cmap = plt.cm.get_cmap('tab10', len(flat_results))
+def plot_results( flat_results, keywords=None, exclude=('15',), n_cols=5,
+    dark=True, cmap='tab20', heightfold=3, style='default'):
+    """
+    Parameters
+    ----------
+    flat_results : dict[str, dict[str, Result]]  -  Mapping scenario→{metric→Result(timevec, values)}.
+    keywords :  list[str], optional - Only plot metrics containing any of these substrings.
+    exclude :   tuple[str], optional - Skip metrics whose name contains any of these substrings.
+    n_cols :    int, optional -  Number of columns in the subplot grid.
+    dark :      If True use greyish dark mode; otherwise default style.
+    cmap :      str, optional -  Name of the Matplotlib colormap to use.
+    """
+    try:
+        plt.style.use(style)
+    except Exception:
+        print(f"Warning: {style} style not found. Using default style.")
+        plt.style.use('default')
 
+    # collect & filter metric names
+    all_metrics = {m for flat in flat_results.values() for m in flat}
+    if keywords is not None:
+        all_metrics = {m for m in all_metrics if any(kw in m for kw in keywords)}
+    metrics = sorted(m for m in all_metrics if not any(ex in m for ex in exclude))
+    if not metrics:
+        print("No metrics to plot.")
+        return
+
+    # plot layout and colors
+    n_rows = int(np.ceil(len(metrics) / n_cols))
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, heightfold*n_rows))
+    axs = np.array(axs).flatten()
+
+    if dark:
+        fig.patch.set_facecolor('lightgray')  # figure background
+        for ax in axs:
+            ax.set_facecolor('darkgray')
+    palette = plt.cm.get_cmap(cmap, len(flat_results))
+
+    # plot each metric
     for i, metric in enumerate(metrics):
-        ax = axs[i] if n_metrics > 1 else axs
-        for j, (scenario, flat) in enumerate(flat_results.items()):
+        ax = axs[i]
+        for j, (scen, flat) in enumerate(flat_results.items()):
             if metric in flat:
-                result = flat[metric]
-                ax.plot(result.timevec, result.values, label=scenario, color=cmap(j))
-        ax.set_title(metric)
-        if max(result.values) < 1:
-            # identify the max value of result.values
-            v = max(result.values)
-            ax.set_ylim(0, max(0.5, v)) 
+                r = flat[metric]
+                ax.plot(r.timevec, r.values, lw=0.8, label=scen, color=palette(j))
+        ax.set_title(metric, fontsize=10)
+        vmax = max(flat.get(metric, r).values)
+        if vmax < 1.001:
+            ax.set_ylim(0, max(0.5, vmax))
             ax.set_ylabel('%')
         else:
             ax.set_ylabel('Value')
         ax.set_xlabel('Time')
-        
-        ax.grid(True)
-        ax.legend()
-        
-        leg = ax.legend(loc='upper right', fontsize=(6 if len(flat_results) <= 5 else 5))
-        
-        if leg:
-            leg.get_frame().set_alpha(0.5)
-            
+
+        # grid lines
+        ax.grid(True, color='white' if dark else 'gray', alpha=0.3)
+        leg = ax.legend(fontsize=6 if len(flat_results)>5 else 7)
+        if leg: leg.get_frame().set_alpha(0.3)
+
+    # remove unused axes
+    for ax in axs[len(metrics):]:
+        fig.delaxes(ax)
+
     plt.tight_layout()
-    for ax in axs:
-        ax.set_facecolor('#f0f0f0')  # Light gray background for better contrast
-    dirname = sc.thisdir()
-    plt.savefig(f'{dirname}/scenarios.png', dpi=300)
+    # save figure
+    timestamp = sc.now(tostring=True)
+    try:
+        out = os.path.join(sc.thisdir(), f'scenarios_{timestamp}.png')
+    except Exception:
+        out = f'scenarios_{timestamp}.png'
+    fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
     plt.show()
 
 
 def uncertanty_plot():
     import matplotlib.pyplot as plt
     import numpy as np
+    from datetime import datetime
 
     # Example data generation
     np.random.seed(0)

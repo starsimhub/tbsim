@@ -16,10 +16,10 @@ class HIVState(IntEnum):
         - LATENT: Chronic HIV infection.
         - AIDS: Advanced stage of HIV infection.
     """    
-    ATRISK = -1   # Uninfected
-    ACUTE  = 0    # Newly infected (early state)
-    LATENT = 1    # Chronic infection
-    AIDS   = 2    # Advanced disease
+    ATRISK = 0   # Uninfected
+    ACUTE  = 1    # Newly infected (early state)
+    LATENT = 2    # Chronic infection
+    AIDS   = 3    # Advanced disease
     def __str__(self):
         return {0: 'ATRISK', 1: 'ACUTE', 2: 'LATENT', 3: 'AIDS'}[self.value]
     def __repr__(self):
@@ -70,7 +70,6 @@ class HIV(ss.Disease):
             art_progression_factor  = 0.1, # Multiplier to reduce progression rates if on ART.
             acute_to_latent       = ss.perday(1/(7*12)), # 1-np.exp(-1/8),  # 8 weeks
             latent_to_aids        = ss.perday(1/(365*8)), # 1-np.exp(-1/416), # 416 weeks
-            aids_to_dead          = ss.perday(1/(365*2)), # 1-np.exp(-1/104), # 104 weeks
         )
         self.update_pars(pars, **kwargs)
         

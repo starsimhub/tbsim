@@ -15,7 +15,7 @@ def sim_setup( n_agents=10_000,
     sim_pars = dict(
         unit='day',
         dt=7,
-        start=ss.date('2000-01-01'),
+        start=ss.date('1980-01-01'),
         stop=ss.date('2035-12-31'),
         verbose=verbose_log
     )
@@ -55,4 +55,4 @@ if __name__ == '__main__':
         sim = sim_setup(**arg).run()  
         results[str(arg)] = sim.results.flatten()
         
-    plot_results(results)
+    plot_results(results, dark=False)

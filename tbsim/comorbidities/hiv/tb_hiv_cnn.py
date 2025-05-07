@@ -30,7 +30,7 @@ class TB_HIV_Connector(ss.Connector):
             latent_multiplier    = 1.9001,
             aids_multiplier      = 2.5955,
         )
-        self.update_pars(pars, **kwargs)
+        self.update_pars(pars=pars, **kwargs)
         self.state_multipliers = {
             HIVState.ACUTE: self.pars.acute_multiplier,
             HIVState.LATENT: self.pars.latent_multiplier,
