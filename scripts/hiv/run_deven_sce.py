@@ -50,11 +50,11 @@ def get_scenarios():
                 init_prev=ss.bernoulli(p=0.00),
                 init_onart=ss.bernoulli(p=0.00)
         )),
-        "Initial HIV prevalence = 15%": dict(
+        "Initial HIV prevalence = 30%": dict( 
             include_intv=False, 
             include_cnn=True,
             hiv_pars=dict(
-                init_prev=ss.bernoulli(p=0.15),
+                init_prev=ss.bernoulli(p=0.30),
                 init_onart=ss.bernoulli(p=0.77)
         )),
         "Controlled HIV Prevalence 30%": dict(
