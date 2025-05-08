@@ -14,7 +14,7 @@ def make_interventions(include:bool=True, pars=None):
                 mode='both',
                 prevalence=0.30,            # Maintain 30 percent of the alive population infected
                 percent_on_ART=0.50,        # Maintain 50 percent of the % infected population on ART
-                min_age=15, max_age=49,     # Min and Max age of agents that can be hit with the intervention
+                min_age=15, max_age=60,     # Min and Max age of agents that can be hit with the intervention
                 start=ss.date('2000-01-01'), stop=ss.date('2035-12-31'),   # Intervention's start and stop dates
         )
         
