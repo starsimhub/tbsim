@@ -5,7 +5,7 @@ import numpy as np
 import shared_functions as sf
 
 
-def build_tbhiv_sim(include_intv=False, include_cnn=False, hiv_pars=None, intv_pars=None, Demgs=False) -> ss.Sim:
+def build_tbhiv_sim(include_intv=False, include_cnn=False, hiv_pars=None, hiv_intv_pars=None, Demgs=False) -> ss.Sim:
     """Construct a TB-HIV simulation with optional interventions."""
     
     sim_pars = dict(
@@ -28,7 +28,7 @@ def build_tbhiv_sim(include_intv=False, include_cnn=False, hiv_pars=None, intv_p
                 aids_multiplier      = 2.9,
                 )
     connector = sf.make_tb_hiv_connector(pars=cnn_pars) if include_cnn else None
-    interventions = sf.make_interventions(include=include_intv, pars=intv_pars) if include_intv else None
+    interventions = sf.make_hiv_interventions(include=include_intv, pars=hiv_intv_pars) if include_intv else None
     
     return ss.Sim(
         people=people,
@@ -60,7 +60,7 @@ def get_scenarios():
         "Controlled HIV Prevalence 30%": dict(
             include_intv=True,
             include_cnn=True,
-            intv_pars=dict(
+            hiv_intv_pars=dict(
                 prevalence=0.30,
                 percent_on_ART=0.30,
                 start=ss.date('1981-05-01'),

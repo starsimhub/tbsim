@@ -7,7 +7,7 @@ import sciris as sc
 import os
 
 #- - - - - - MAKE INTERVENTIONS - - - - - -
-def make_interventions(include:bool=True, pars=None):
+def make_hiv_interventions(include:bool=True, pars=None):
     if not include: return None
     if pars is None:
         pars=dict(
