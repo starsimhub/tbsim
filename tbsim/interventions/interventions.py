@@ -6,7 +6,7 @@ import datetime as dt
 import tbsim as mtb
 import pandas as pd
 
-__all__ = ['TPTInitiation', 'BCGProtection', 'Product', 'TBVaccinationCampaign', 'get_extrastates']
+__all__ = ['BCGProtection', 'Product', 'TBVaccinationCampaign', 'get_extrastates']
 
 
 def get_extrastates():
@@ -26,55 +26,9 @@ def get_extrastates():
         ss.State('non_symptomatic', default=True),
         ss.State('screen_negative', default=True),
         ss.State('household_contact', default=False),
+        ss.State('hhid', default=False),
         ss.FloatArr('vaccination_year', default=np.nan),]
     return exs
-
-
-class TPTInitiation(ss.Intervention):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__(**kwargs)
-        self.define_pars(
-            p_tpt=ss.bernoulli(1.0),
-            tpt_duration=2.0,
-            max_age=5,
-            hiv_status_threshold=False,
-            p_3HP=0.3,
-            start=ss.date('2000-01-01'),
-        )
-        self.update_pars(pars, **kwargs)
-
-    def step(self):
-        sim = self.sim
-        ppl = sim.people
-        tb = sim.diseases.tb
-        eligible = (~tb.on_treatment) & ppl['household_contact'] & (ppl['screen_negative'] | ppl['non_symptomatic'])
-        #eligible &= (ppl.age < self.pars.max_age) | (ppl.hiv_positive == self.pars.hiv_status_threshold)
-
-        tpt_candidates = self.pars.p_tpt.filter(eligible.uids)
-
-        if len(tpt_candidates):
-            use_3HP = sim.year >= self.pars.start.year
-            assigned_3HP = np.random.rand(len(tpt_candidates)) < self.pars.p_3HP if use_3HP else np.zeros(len(tpt_candidates), dtype=bool)
-
-            if not hasattr(tb, 'on_treatment_duration'):
-                tb.define_states(ss.FloatArr('on_treatment_duration', default=0.0))
-
-            tb.start_treatment(tpt_candidates)
-            tb.on_treatment_duration[tpt_candidates] = self.pars.tpt_duration
-            ppl['on_tpt'][tpt_candidates] = True
-
-    def init_results(self):
-        self.define_results(
-            ss.Result('n_eligible', dtype=int),
-            ss.Result('n_tpt_initiated', dtype=int),
-            ss.Result('n_3HP_assigned', dtype=int),
-        )
-        
-    def update_results(self):
-        self.results['n_eligible'][self.ti] = np.count_nonzero(self.sim.people['household_contact'])
-        self.results['n_tpt_initiated'][self.ti] = np.count_nonzero(self.sim.people['on_tpt'])
-        self.results['n_3HP_assigned'][self.ti] = np.count_nonzero(self.sim.people['on_tpt'] & (self.sim.people.age < self.pars.max_age))
-
 
 class BCGProtection(ss.Intervention):
     def __init__(self, pars=None, **kwargs):

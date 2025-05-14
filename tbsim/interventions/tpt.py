@@ -1,6 +1,8 @@
 import numpy as np
 import starsim as ss
 
+__all__ = ['TPTInitiation']
+
 
 class TPTInitiation(ss.Intervention):
     """
@@ -34,7 +36,7 @@ class TPTInitiation(ss.Intervention):
         n_3HP_assigned (int): Subset of TPT individuals presumed to receive 3HP
 
     Notes:
-        - Requires people to have a 'HHID' attribute (household ID).
+        - Requires people to have a 'hhid' attribute (household ID).
         - Assumes states like 'on_tpt', 'received_tpt', 'screen_negative' are initialized.
     """
 
@@ -57,10 +59,10 @@ class TPTInitiation(ss.Intervention):
 
         # Identify households with at least one member currently on TB treatment
         treated = tb.on_treatment & ppl.alive
-        eligible_hhids = np.unique(ppl['HHID'][treated])
+        eligible_hhids = np.unique(ppl['hhid'][treated])
 
         # Identify all members of those households
-        in_eligible_households = np.isin(ppl['HHID'], eligible_hhids)
+        in_eligible_households = np.isin(ppl['hhid'], eligible_hhids)
         eligible = in_eligible_households & (~tb.on_treatment) & (ppl['screen_negative'] | ppl['non_symptomatic'])
 
         tpt_candidates = self.pars.p_tpt.filter(eligible.uids)

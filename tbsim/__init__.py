@@ -5,7 +5,7 @@ from .tb import TB, TBS
 from .malnutrition import Malnutrition
 from .config import *
 from .interventions.interventions import *
-from .interventions.tpt import TPT
+from .interventions.tpt import *
 from .networks import HouseholdNet
 from .connectors import TB_Nutrition_Connector
 from .analyzers import DwtAnalyzer, DwtPlotter, DwtPostProcessor

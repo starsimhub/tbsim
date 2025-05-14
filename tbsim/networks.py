@@ -43,10 +43,8 @@ class HouseholdNet(ss.Network):
         self.edges.p2 = ss.uids(self.edges.p2)
 
         return
-
-    def step(self):
+    def step(self): 
         """ Adds newborns to the trial population, including hhid, arm, and household contacts """
-        super().step()
 
         if not self.pars.add_newborns:
             return
