@@ -6,7 +6,28 @@ import datetime as dt
 import tbsim as mtb
 import pandas as pd
 
-__all__ = ['TPTInitiation', 'BCGProtection', 'Product', 'TBVaccinationCampaign']
+__all__ = ['TPTInitiation', 'BCGProtection', 'Product', 'TBVaccinationCampaign', 'get_extrastates']
+
+
+def get_extrastates():
+    exs = [ss.State('sought_care', default=False),
+        ss.State('returned_to_community', default=False),
+        ss.State('received_tpt', default=False),
+        ss.State('tb_treatment_success', default=False),
+        ss.State('tested', default=False),
+        ss.State('test_result', default=np.nan),
+        ss.State('diagnosed', default=False),
+        ss.State('on_tpt', default=True),
+        ss.State('tb_smear', default=False),
+        ss.State('hiv_positive', default=False),
+        ss.State('eptb', default=False),
+        ss.State('symptomatic', default=False),
+        ss.State('presymptomatic', default=False),
+        ss.State('non_symptomatic', default=True),
+        ss.State('screen_negative', default=True),
+        ss.State('household_contact', default=False),
+        ss.FloatArr('vaccination_year', default=np.nan),]
+    return exs
 
 
 class TPTInitiation(ss.Intervention):
@@ -15,10 +36,10 @@ class TPTInitiation(ss.Intervention):
         self.define_pars(
             p_tpt=ss.bernoulli(1.0),
             tpt_duration=2.0,
-            age_threshold=5,
+            max_age=5,
             hiv_status_threshold=False,
             p_3HP=0.3,
-            rollout_date=ss.date('2000-01-01'),
+            start=ss.date('2000-01-01'),
         )
         self.update_pars(pars, **kwargs)
 
@@ -26,14 +47,13 @@ class TPTInitiation(ss.Intervention):
         sim = self.sim
         ppl = sim.people
         tb = sim.diseases.tb
-
         eligible = (~tb.on_treatment) & ppl['household_contact'] & (ppl['screen_negative'] | ppl['non_symptomatic'])
-        # eligible &= (ppl.age < self.pars.age_threshold) | (ppl.hiv_positive == self.pars.hiv_status_threshold)
+        #eligible &= (ppl.age < self.pars.max_age) | (ppl.hiv_positive == self.pars.hiv_status_threshold)
 
         tpt_candidates = self.pars.p_tpt.filter(eligible.uids)
 
         if len(tpt_candidates):
-            use_3HP = sim.year >= self.pars.rollout_date.year
+            use_3HP = sim.year >= self.pars.start.year
             assigned_3HP = np.random.rand(len(tpt_candidates)) < self.pars.p_3HP if use_3HP else np.zeros(len(tpt_candidates), dtype=bool)
 
             if not hasattr(tb, 'on_treatment_duration'):
@@ -53,7 +73,7 @@ class TPTInitiation(ss.Intervention):
     def update_results(self):
         self.results['n_eligible'][self.ti] = np.count_nonzero(self.sim.people['household_contact'])
         self.results['n_tpt_initiated'][self.ti] = np.count_nonzero(self.sim.people['on_tpt'])
-        self.results['n_3HP_assigned'][self.ti] = np.count_nonzero(self.sim.people['on_tpt'] & (self.sim.people.age < self.pars.age_threshold))
+        self.results['n_3HP_assigned'][self.ti] = np.count_nonzero(self.sim.people['on_tpt'] & (self.sim.people.age < self.pars.max_age))
 
 
 class BCGProtection(ss.Intervention):
@@ -114,6 +134,8 @@ class BCGProtection(ss.Intervention):
     def update_results(self):
         self.results['n_vaccinated'][self.ti] = len(self.vaccinated) if self.vaccinated is not None else 0
         self.results['n_eligible'][self.ti] = np.count_nonzero(self.sim.people.age < self.pars.target_age)
+        
+        
 # class TBTestScenario:
 #     BASE = 'base'
 #     SCENARIO = 'scenario'

@@ -14,9 +14,17 @@ def build_sim(spars=None, scenario=None, **kwargs):
         rand_seed = 123,
     )
     inv = []
-    pop = ss.People(n_agents=500, extra_states=get_extrastates())
+    pop = ss.People(n_agents=500, extra_states=mtb.get_extrastates())
     tb = mtb.TB(pars=scenario['tbpars'])
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    hhnet = mtb.HouseholdNet(
+        n_contacts=ss.poisson(lam=5),
+        n_households=ss.poisson(lam=5),
+        household_size=ss.poisson(lam=5),
+        household_size_min=1,
+        household_size_max=5,
+    )
+    net.add_network(hhnet)
     births = ss.Births(pars=dict(birth_rate=15))
     deaths = ss.Deaths(pars=dict(death_rate=15))
     
@@ -25,7 +33,7 @@ def build_sim(spars=None, scenario=None, **kwargs):
     
     sim = ss.Sim(
         people=pop,
-        networks=net,
+        networks=hhnet,
         interventions=inv,
         diseases=tb,
         demographics=[deaths, births],
@@ -41,70 +49,56 @@ def get_scenarios():
             'pars': {
                 'tbpars' : {
                     'start' : sc.date('1990-01-01'),
-                    'stop' : sc.date('2035-12-31'),  
+                    'stop' : sc.date('2030-12-31'),  
                 },
                 'tptintervention': {
                     'p_tpt':ss.bernoulli(1.0),
                     'tpt_duration':2.0,
-                    'age_threshold':25,
+                    'max_age':25,
                     'hiv_status_threshold':True,
                     'p_3HP':0.8,
-                    'rollout_date': ss.date('1970-01-01'),
+                    'start': ss.date('1970-01-01'),
                 },
                 'bcgintervention': None
             },
         },
-        'BCG': {
-            'name': 'BCG PROTECTIOB',
-            'pars': {
-                'tbpars' : {
-                    'start' : sc.date('1980-01-01'),
-                    'stop' : sc.date('2030-12-31'),  
-                },
-                'tptintervention': None,
-                'bcgintervention': {
-                    'coverage':0.60,
-                    'target_age':18,
-                }
-            },
-        },
+        # 'BCG': {
+        #     'name': 'BCG PROTECTIOB',
+        #     'pars': {
+        #         'tbpars' : {
+        #             'start' : sc.date('1990-01-01'),
+        #             'stop' : sc.date('2030-12-31'),  
+        #         },
+        #         'tptintervention': None,
+        #         'bcgintervention': {
+        #             'coverage':0.60,
+        #             'target_age':18,
+        #         }
+        #     },
+        # },
                 
-        # 'high_beta': {
-        #     'name': 'High Beta',
-        #     'pars': {
-        #         'beta': ss.beta(0.2),
-        #         'init_prev': ss.bernoulli(p=0.25),
-        #     },
-        # },
-        # 'low_beta': {
-        #     'name': 'Low Beta',
-        #     'pars': {
-        #         'beta': ss.beta(0.05),
-        #         'init_prev': ss.bernoulli(p=0.25),
-        #     },
-        # },
     }
     return scenarios
 
-def get_extrastates():
-    exs = [ss.State('sought_care', default=False),
-        ss.State('returned_to_community', default=False),
-        ss.State('received_tpt', default=False),
-        ss.State('tb_treatment_success', default=False),
-        ss.State('tested', default=False),
-        ss.State('test_result', default=np.nan),
-        ss.State('diagnosed', default=False),
-        ss.State('on_tpt', default=True),
-        ss.State('tb_smear', default=False),
-        ss.State('hiv_positive', default=False),
-        ss.State('eptb', default=False),
-        ss.State('symptomatic', default=False),
-        ss.State('presymptomatic', default=False),
-        ss.State('non_symptomatic', default=True),
-        ss.State('screen_negative', default=True),
-        ss.State('household_contact', default=False),
-        ss.FloatArr('vaccination_year', default=np.nan),]
-    return exs
+# def get_extrastates():
+#     exs = [ss.State('sought_care', default=False),
+#         ss.State('returned_to_community', default=False),
+#         ss.State('received_tpt', default=False),
+#         ss.State('tb_treatment_success', default=False),
+#         ss.State('tested', default=False),
+#         ss.State('test_result', default=np.nan),
+#         ss.State('diagnosed', default=False),
+#         ss.State('on_tpt', default=True),
+#         ss.State('tb_smear', default=False),
+#         ss.State('hiv_positive', default=False),
+#         ss.State('eptb', default=False),
+#         ss.State('symptomatic', default=False),
+#         ss.State('presymptomatic', default=False),
+#         ss.State('non_symptomatic', default=True),
+#         ss.State('screen_negative', default=True),
+#         ss.State('household_contact', default=False),
+#         ss.FloatArr('vaccination_year', default=np.nan),]
+#     return exs
 
 if __name__ == '__main__':
     import plots as pl
