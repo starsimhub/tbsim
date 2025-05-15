@@ -9,15 +9,16 @@ def build_sim(spars=None, scenario=None, **kwargs):
     spars = dict(
         unit = 'day',
         dt = 7, 
-        start = sc.date('1940-01-01'),      
+        start = sc.date('1965-01-01'),      
         stop = sc.date('2035-12-31'), 
         rand_seed = 123,
     )
     inv = []
-    pop = ss.People(n_agents=500, extra_states=mtb.get_extrastates())
+    pop = ss.People(n_agents=100, extra_states=mtb.get_extrastates())
     tb = mtb.TB(pars=scenario['tbpars'])
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     hhnet = mtb.HouseholdNet()
+    mat = ss.MaternalNet()
  
     births = ss.Births(pars=dict(birth_rate=15))
     deaths = ss.Deaths(pars=dict(death_rate=15))
@@ -27,7 +28,7 @@ def build_sim(spars=None, scenario=None, **kwargs):
     
     sim = ss.Sim(
         people=pop,
-        networks=hhnet,
+        networks=[net, hhnet, mat],
         interventions=inv,
         diseases=tb,
         demographics=[deaths, births],
@@ -42,7 +43,7 @@ def get_scenarios():
             'name': 'TPT INITIATION',
             'pars': {
                 'tbpars' : {
-                    'start' : sc.date('1990-01-01'),
+                    'start' : sc.date('1975-01-01'),
                     'stop' : sc.date('2030-12-31'),  
                 },
                 'tptintervention': {
@@ -51,7 +52,7 @@ def get_scenarios():
                     'max_age':25,
                     'hiv_status_threshold':True,
                     'p_3HP':0.8,
-                    'start': ss.date('1970-01-01'),
+                    'start': ss.date('1975-01-01'),
                 },
                 'bcgintervention': None
             },
@@ -60,13 +61,14 @@ def get_scenarios():
             'name': 'BCG PROTECTIOB',
             'pars': {
                 'tbpars' : {
-                    'start' : sc.date('1990-01-01'),
+                    'start' : sc.date('1970-01-01'),
                     'stop' : sc.date('2030-12-31'),  
                 },
                 'tptintervention': None,
                 'bcgintervention': {
                     'coverage':0.60,
                     'target_age':18,
+                    'start': ss.date('1970-01-01'),
                 }
             },
         },
@@ -86,7 +88,7 @@ if __name__ == '__main__':
         results[name] = sim.results.flatten()
     
     pl.plot_results(results, n_cols=5,
-        dark=True, cmap='tab20', heightfold=3, style='default')
+        dark=True, cmap='viridis', heightfold=2)
     
     
     plt.show()

@@ -6,6 +6,8 @@ from .malnutrition import Malnutrition
 from .config import *
 from .interventions.interventions import *
 from .interventions.tpt import *
+from .interventions.bcg import *
+from .interventions.cascadecare import *
 from .networks import HouseholdNet
 from .connectors import TB_Nutrition_Connector
 from .analyzers import DwtAnalyzer, DwtPlotter, DwtPostProcessor
