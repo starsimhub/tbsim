@@ -38,6 +38,7 @@ class TPTInitiation(ss.Intervention):
     Notes:
         - Requires people to have a 'hhid' attribute (household ID).
         - Assumes states like 'on_tpt', 'received_tpt', 'screen_negative' are initialized.
+        - Requires HouseHoldNet or similar to define household structure.   
     """
 
     def __init__(self, pars=None, **kwargs):
@@ -50,7 +51,7 @@ class TPTInitiation(ss.Intervention):
             p_3HP=0.3,
             start=ss.date('2000-01-01'),
         )
-        self.update_pars(pars, **kwargs)
+        self.update_pars(pars=pars, **kwargs)
 
     def step(self):
         sim = self.sim
