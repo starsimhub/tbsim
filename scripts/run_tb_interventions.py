@@ -16,8 +16,7 @@ DEFAULT_TBPARS = dict(
         beta = ss.beta(0.1),
         init_prev = ss.bernoulli(p=0.25),
         unit = 'day',
-        dt=7,
-        start = sc.date('2004-05-05')
+        dt=7,      
     )
 
 def build_sim(scenario=None, spars=None):
@@ -26,6 +25,8 @@ def build_sim(scenario=None, spars=None):
 
     spars = {**DEFAULT_SPARS, **(spars or {})}  # Merge user spars with default
     tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})} 
+    print(f"\nSimulation parameters: {spars}")
+    print(f"\nTB parameters: {tbpars}")
     
     # Set up interventions safely
     inv = []
@@ -62,11 +63,10 @@ def get_scenarios():
             'name': 'BCG PROTECTION',
             'tbpars': dict(start=sc.date('1975-02-15'), 
                            stop=sc.date('2030-12-31')),
-            'tptintervention': None,
             'bcgintervention': dict(
                 coverage=0.60,
                 target_age=18,
-                year= [1987]  #sc.date('1970-01-01'),
+                year= [1987]  
             ),
         },
         'TPT': {
@@ -81,7 +81,6 @@ def get_scenarios():
                 p_3HP=0.8,
                 start=sc.date('1970-01-01'),
             ),
-            'bcgintervention': None,
         },
     }
 
