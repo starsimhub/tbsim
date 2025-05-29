@@ -21,14 +21,14 @@ class BCGProtection(ss.Intervention):
         )
     @staticmethod
     def prob_activation(self):
-        min = .80
-        max = .95
+        min = .50
+        max = .65
         return np.random.uniform(min, max)
             
     @staticmethod
     def prob_clearance():
-        min = .10
-        max = .30                   
+        min = .80
+        max = .90                   
         return np.random.uniform(min, max)
         
     @staticmethod
@@ -45,21 +45,23 @@ class BCGProtection(ss.Intervention):
         uids = self.sim.people.auids
 
         # Identify eligible individuals: alive and age <= 5
-        el = uids[self.sim.people.age[uids] <= 5]
-
+        five_or_younger = uids[(self.sim.people.age[uids] <= 5) & (self.vaccinated == False)]
+        older_than_five = uids[self.sim.people.age[uids] > 5]
+        
         # Mark eligible individuals
-        self.eligible[el] = True
-
+        self.eligible[five_or_younger] = True
+        self.eligible[older_than_five] = False
+        
+        
         # Determine how many individuals are eligible
-        eligible_uids = el
-        self.n_eligible = len(eligible_uids)
+        self.n_eligible = len(five_or_younger)
 
         # Sample who gets vaccinated based on coverage
         vaccinated_mask = np.random.binomial(1, self.pars.coverage, self.n_eligible).astype(bool)
         
         # Apply vaccination to selected eligible individuals
-        self.vaccinated = eligible_uids[vaccinated_mask]
-        self.sim.people.vaccination_year[self.vaccinated] = self.pars.year[0]
+        self.vaccinated = five_or_younger[vaccinated_mask]
+        # self.sim.people.vaccination_year[self.vaccinated] = ?   #TODO: Set the vaccination year
 
 
     def step(self):

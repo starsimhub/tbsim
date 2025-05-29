@@ -64,6 +64,11 @@ def build_sim(scenario=None, spars=None):
 
 def get_scenarios():
     return {
+        'BAseline': {
+            'name': 'BASELINE',
+            'tbpars': dict(start=sc.date('1975-02-07'), 
+                stop=sc.date('2030-12-31')),
+        },
         'BCG': {
             'name': 'BCG PROTECTION',
             'tbpars': dict(start=sc.date('1975-02-15'), 
