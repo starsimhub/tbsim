@@ -3,6 +3,7 @@ import starsim as ss
 import sciris as sc
 import matplotlib.pyplot as plt
 import numpy as np
+import pprint as pp
 
 # Default simulation parameters
 DEFAULT_SPARS = dict(
@@ -11,22 +12,26 @@ DEFAULT_SPARS = dict(
     start=sc.date('1965-01-01'),
     stop=sc.date('2035-12-31'),
     rand_seed=123,
+    verbose =0,
 )
 DEFAULT_TBPARS = dict(
         beta = ss.beta(0.1),
         init_prev = ss.bernoulli(p=0.25),
         unit = 'day',
         dt=7,      
+        start=sc.date('1975-02-01'),
+        stop=sc.date('2030-12-31'),
     )
 
 def build_sim(scenario=None, spars=None):
     scenario = scenario or {}
-    tbpars = {}
+    # merge and override default parameters
 
+    
     spars = {**DEFAULT_SPARS, **(spars or {})}  # Merge user spars with default
     tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})} 
-    print(f"\nSimulation parameters: {spars}")
-    print(f"\nTB parameters: {tbpars}")
+    pp.pp(spars)
+    pp.pp(tbpars)
     
     # Set up interventions safely
     inv = []
@@ -71,8 +76,6 @@ def get_scenarios():
         },
         'TPT': {
             'name': 'TPT INITIATION',
-            'tbpars': dict(start=sc.date('1975-02-01'), 
-                           stop=sc.date('2030-12-31')),
             'tptintervention': dict(
                 p_tpt=ss.bernoulli(1.0),
                 tpt_duration=2.0,
