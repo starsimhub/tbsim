@@ -1,34 +1,68 @@
 import numpy as np
 import starsim as ss
+from tbsim.utils import Agents
 
+
+ 
 __all__ = ['BCGProtection']
 
 class BCGProtection(ss.Intervention):
+    """
+    Simulates the effect of BCG vaccination on tuberculosis outcomes in children under a target age.
+
+    This intervention applies BCG vaccine protection to a subset of children under a specified age 
+    threshold (default 5 years) based on a coverage probability. The vaccine modifies individual-level
+    tuberculosis risk by reducing activation, clearance, and death rates for those vaccinated.
+
+    Attributes:
+        coverage (float): Proportion of eligible individuals to vaccinate (default 0.9).
+        year (int): Reference year for intervention (default 1900).
+        target_age (int): Maximum age for eligibility in years (default 5). (NOT USED FOR NOW).
+        vaccinated (UIDs): Set of vaccinated individuals.
+        n_eligible (int): Number of individuals eligible in the current time step.
+        eligible (np.ndarray): Boolean array marking eligible individuals at each step.
+
+    States:
+        vaccinated (bool): Whether an individual has been vaccinated.
+
+    Methods:
+        prob_activation(): Draws a random factor to reduce TB activation risk post-vaccination.
+        prob_clearance(): Draws a random factor to modify TB clearance probability post-vaccination.
+        prob_death(): Draws a random factor to reduce TB death probability post-vaccination.
+        check_eligibility(): Identifies eligible individuals under age threshold who are not yet vaccinated,
+                            samples them based on coverage, and returns selected UIDs.
+        step(): Executes the intervention for the current timestep: applies vaccination and modifies
+                TB risk factors for newly vaccinated individuals.
+        init_results(): Defines result metrics for number vaccinated and number eligible.
+        update_results(): Updates the time series results for number vaccinated and number eligible.
+    """
+    
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
-        self.define_pars(
-            year=[1900],         # Placeholder; can be used for scheduling logic
-            coverage=0.95,
-            target_age=5,        # Age cutoff in years
-        )
-        self.update_pars(pars=pars, **kwargs)
+        self.coverage = pars.get('coverage', 0.9)   # Default coverage if not specified
+        self.year = pars.get('year', 1900)          # Default year if not specified
+        # self.target_age = pars.get('target_age', 5) # Default target age if not specified
+        
+        
+        print(self.pars)
         self.vaccinated = ss.uids()
         self.n_eligible = 0
+        self.eligible = []
         # Define states for individuals who 
         self.define_states(
-            ss.State('vaccinated', default=False),
-            ss.State('eligible', default=False)
+            ss.State('vaccinated', default=False)
         )
+        
     @staticmethod
-    def prob_activation(self):
+    def prob_activation():
         min = .50
         max = .65
         return np.random.uniform(min, max)
             
     @staticmethod
     def prob_clearance():
-        min = .80
-        max = .90                   
+        min = 1.3
+        max = 1.5                   
         return np.random.uniform(min, max)
         
     @staticmethod
@@ -38,50 +72,31 @@ class BCGProtection(ss.Intervention):
         return np.random.uniform(min, max)
         
     def check_eligibility(self):
-        # Call the superclass method
-        super().check_eligibility()
-
-        # Get the uids of alive individuals
-        uids = self.sim.people.auids
-
-        # Identify eligible individuals: alive and age <= 5
-        five_or_younger = uids[(self.sim.people.age[uids] <= 5) & (self.vaccinated == False)]
-        older_than_five = uids[self.sim.people.age[uids] > 5]
+        self.eligible = np.zeros(self.sim.people.n_uids, dtype=bool) #Resets eligibility for all individuals
         
-        # Mark eligible individuals
-        self.eligible[five_or_younger] = True
-        self.eligible[older_than_five] = False
+        under5 = Agents.under_5(self.sim.people)    # Get UIDs of individuals under 5 years old
+        eligible = under5 & ~self.vaccinated        # Filter out those who are already vaccinated
+        eligible_coverage = int(len(eligible) * self.coverage)  # Calculate number of individuals to vaccinate based on coverage
+        eligible_subset = np.random.choice(eligible, size=eligible_coverage, replace=False) # Randomly select individuals to vaccinate based on coverage
         
+        if len(eligible_subset)>0: 
+            self.eligible[eligible_subset] = True  # Mark these individuals as eligible for vaccination
         
-        # Determine how many individuals are eligible
-        self.n_eligible = len(five_or_younger)
+        self.n_eligible = np.count_nonzero(self.eligible)  # Count the number of eligible individuals
 
-        # Sample who gets vaccinated based on coverage
-        vaccinated_mask = np.random.binomial(1, self.pars.coverage, self.n_eligible).astype(bool)
-        
-        # Apply vaccination to selected eligible individuals
-        self.vaccinated = five_or_younger[vaccinated_mask]
-        # self.sim.people.vaccination_year[self.vaccinated] = ?   #TODO: Set the vaccination year
-
-
+        return ss.uids(eligible_subset)
+    
+    
     def step(self):
-        self.check_eligibility()
-        if self.vaccinated is None or len(self.vaccinated) == 0:
-            return
+        eligible = self.check_eligibility()
 
-        tb = self.sim.diseases.tb
-        ppl = self.sim.people
-
-        # Only apply effects to still-alive vaccinated individuals
-        alive_mask = ppl.alive[self.vaccinated]
-        uids = self.vaccinated[alive_mask]
-
-        # Apply protection - these are SAMPLE values and effects
-        # TODO: Please provide the actual values and effects of the BCG vaccine
+        if len(eligible) == 0: return  # If no eligible individuals, exit early
         
-        tb.rr_activation[uids] *= self.prob_activation(self)
-        tb.rr_clearance[uids] *= self.prob_clearance()
-        tb.rr_death[uids] *= self.prob_death()
+        self.vaccinated[eligible] = True  # Mark eligible individuals as vaccinated
+        tb = self.sim.diseases.tb   # Access the TB disease model   
+        tb.rr_activation[eligible] *= self.prob_activation()   # Apply random activation rate to eligible individuals
+        tb.rr_clearance[eligible] *= self.prob_clearance()     # Apply random clearance rate to eligible individuals
+        tb.rr_death[eligible] *= self.prob_death()             # Apply random death rate to eligible individuals  
 
 
     def init_results(self):
@@ -91,5 +106,5 @@ class BCGProtection(ss.Intervention):
         )
 
     def update_results(self):
-        self.results['n_vaccinated'][self.ti] = len(self.vaccinated)
-        self.results['n_eligible'][self.ti] = self.n_eligible
+        self.results['n_vaccinated'][self.ti] =  np.count_nonzero(self.vaccinated)
+        self.results['n_eligible'][self.ti] =  self.n_eligible    # this count gets reset every step, so it only counts the current step's eligible individuals

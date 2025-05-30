@@ -74,9 +74,7 @@ def get_scenarios():
             'tbpars': dict(start=sc.date('1975-02-15'), 
                            stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
-                coverage=0.60,
-                target_age=18,
-                year= [1987]  
+                coverage=0.90,
             ),
         },
         'TPT': {
