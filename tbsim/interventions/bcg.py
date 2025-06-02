@@ -8,33 +8,29 @@ __all__ = ['BCGProtection']
 
 class BCGProtection(ss.Intervention):
     """
-    Simulates the effect of BCG vaccination on tuberculosis outcomes in children under a target age.
+    Applies BCG-like protection against tuberculosis in children under age 5.
 
-    This intervention applies BCG vaccine protection to a subset of children under a specified age 
-    threshold (default 5 years) based on a coverage probability. The vaccine modifies individual-level
-    tuberculosis risk by reducing activation, clearance, and death rates for those vaccinated.
+    This intervention identifies children under 5 years old who are not yet vaccinated and
+    randomly selects a proportion of them (based on the `coverage` parameter) to receive simulated
+    protection against TB. Once vaccinated, individuals experience a probabilistic reduction in
+    their activation, death, and clearance risk modifiers within the TB disease model.
 
     Attributes:
-        coverage (float): Proportion of eligible individuals to vaccinate (default 0.9).
-        year (int): Reference year for intervention (default 1900).
-        target_age (int): Maximum age for eligibility in years (default 5). (NOT USED FOR NOW).
-        vaccinated (UIDs): Set of vaccinated individuals.
-        n_eligible (int): Number of individuals eligible in the current time step.
-        eligible (np.ndarray): Boolean array marking eligible individuals at each step.
+        coverage (float): Proportion of under-5 children to vaccinate each timestep (default 0.9).
+        year (int): Reference year for the intervention (default 1900).
+        vaccinated (UIDs): Set of UIDs representing individuals who have been vaccinated.
+        n_eligible (int): Number of individuals eligible for vaccination at the current timestep.
+        eligible (np.ndarray): Boolean array indicating eligibility status in the current timestep.
 
-    States:
-        vaccinated (bool): Whether an individual has been vaccinated.
+    Defined States:
+        vaccinated (bool): State flag indicating whether an individual has received the BCG vaccine.
 
     Methods:
-        prob_activation(): Draws a random factor to reduce TB activation risk post-vaccination.
-        prob_clearance(): Draws a random factor to modify TB clearance probability post-vaccination.
-        prob_death(): Draws a random factor to reduce TB death probability post-vaccination.
-        check_eligibility(): Identifies eligible individuals under age threshold who are not yet vaccinated,
-                            samples them based on coverage, and returns selected UIDs.
-        step(): Executes the intervention for the current timestep: applies vaccination and modifies
-                TB risk factors for newly vaccinated individuals.
-        init_results(): Defines result metrics for number vaccinated and number eligible.
-        update_results(): Updates the time series results for number vaccinated and number eligible.
+        check_eligibility(): Identifies unvaccinated children under age 5, samples based on
+            coverage, and returns their UIDs.
+        step(): Applies vaccination and updates the TB disease risk modifiers for newly vaccinated individuals.
+        init_results(): Initializes the results tracking for number vaccinated and number eligible.
+        update_results(): Records the current timestep's vaccination and eligibility counts.
     """
     
     def __init__(self, pars=None, **kwargs):
@@ -53,24 +49,7 @@ class BCGProtection(ss.Intervention):
             ss.State('vaccinated', default=False)
         )
         
-    @staticmethod
-    def prob_activation():
-        min = .50
-        max = .65
-        return np.random.uniform(min, max)
-            
-    @staticmethod
-    def prob_clearance():
-        min = 1.3
-        max = 1.5                   
-        return np.random.uniform(min, max)
-        
-    @staticmethod
-    def prob_death():
-        min = .05
-        max = .15
-        return np.random.uniform(min, max)
-        
+
     def check_eligibility(self):
         self.eligible = np.zeros(self.sim.people.n_uids, dtype=bool) #Resets eligibility for all individuals
         
@@ -94,9 +73,9 @@ class BCGProtection(ss.Intervention):
         
         self.vaccinated[eligible] = True  # Mark eligible individuals as vaccinated
         tb = self.sim.diseases.tb   # Access the TB disease model   
-        tb.rr_activation[eligible] *= self.prob_activation()   # Apply random activation rate to eligible individuals
-        tb.rr_clearance[eligible] *= self.prob_clearance()     # Apply random clearance rate to eligible individuals
-        tb.rr_death[eligible] *= self.prob_death()             # Apply random death rate to eligible individuals  
+        tb.rr_activation[eligible] *= Probability.activation()   # Apply random activation rate to eligible individuals
+        tb.rr_clearance[eligible] *= Probability.clearance()     # Apply random clearance rate to eligible individuals
+        tb.rr_death[eligible] *= Probability.death()             # Apply random death rate to eligible individuals  
 
 
     def init_results(self):
@@ -108,3 +87,40 @@ class BCGProtection(ss.Intervention):
     def update_results(self):
         self.results['n_vaccinated'][self.ti] =  np.count_nonzero(self.vaccinated)
         self.results['n_eligible'][self.ti] =  self.n_eligible    # this count gets reset every step, so it only counts the current step's eligible individuals
+
+
+class Probability:
+    """
+    Static class providing random scaling factors for modifying TB risks post-vaccination.
+
+    These factors simulate the biological variability in how BCG vaccination impacts:
+    - Activation risk (from latent to active TB)
+    - Clearance probability (spontaneous recovery)
+    - Mortality risk (death from TB)
+
+    The sampled values are multiplicative factors applied to individual risk modifiers.
+
+    Methods:
+        activation(): Returns a sampled multiplier (0.50–0.65) reducing TB activation risk.
+        clearance(): Returns a sampled multiplier (1.3–1.5) increasing TB clearance probability.
+        death(): Returns a sampled multiplier (0.05–0.15) reducing TB-related mortality.
+    """
+    @staticmethod
+    def _sample_uniform(low: float, high: float) -> float:
+        """ Sample a value from a uniform distribution in the given range. """
+        return np.random.uniform(low, high)
+
+    @staticmethod
+    def activation() -> float:
+        """ Probability of activation (e.g. latent to active disease). """
+        return Probability._sample_uniform(0.50, 0.65)
+
+    @staticmethod
+    def clearance() -> float:
+        """ Probability of clearing an infection (natural recovery)."""
+        return Probability._sample_uniform(1.3, 1.5)
+
+    @staticmethod
+    def death() -> float:
+        """ Probability of death due to the disease."""
+        return Probability._sample_uniform(0.05, 0.15)
