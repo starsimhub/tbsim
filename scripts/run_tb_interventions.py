@@ -24,9 +24,42 @@ DEFAULT_TBPARS = dict(
     )
 
 def build_sim(scenario=None, spars=None):
+    """
+    Build and return a complete Starsim-based simulation instance for TB modeling,
+    incorporating optional interventions and user-defined parameters.
+
+    Args:
+        scenario (dict, optional): A dictionary defining scenario-specific components,
+            such as intervention parameters and TB simulation settings. Expected keys:
+                - 'tbpars' (dict): TB-specific simulation parameters.
+                - 'tptintervention' (dict, optional): Parameters for TPT intervention.
+                - 'bcgintervention' (dict, optional): Parameters for BCG intervention.
+        spars (dict, optional): General simulation parameters (e.g., timestep, duration).
+            These override values in the DEFAULT_SPARS global dictionary.
+
+    Returns:
+        ss.Sim: A fully initialized simulation object containing:
+            - A population (`People`) with TB-related extra states.
+            - A TB disease module initialized with merged parameters.
+            - A list of social and household network layers.
+            - Optional interventions (TPT or BCG) as defined by the scenario.
+            - Demographic processes like births and deaths.
+            - Core simulation parameters merged from defaults and user inputs.
+
+    Notes:
+        - If no scenario is provided, defaults are used.
+        - Intervention objects (`TPTInitiation`, `BCGProtection`) are conditionally added
+          based on the scenario dictionary contents.
+        - The population size is fixed at 100 agents for simplicity.
+        - This function is typically used to instantiate simulations for batch execution,
+          comparison, or visualization.
+    
+    Example:
+        sim = build_sim(scenario=my_scenario, spars={'n_steps': 200})
+        sim.run()
+    """
     scenario = scenario or {}
     # merge and override default parameters
-
     
     spars = {**DEFAULT_SPARS, **(spars or {})}  # Merge user spars with default
     tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})} 
@@ -63,8 +96,25 @@ def build_sim(scenario=None, spars=None):
 
 
 def get_scenarios():
+    """
+    Define a set of simulation scenarios for evaluating TB interventions.
+
+    Returns:
+        dict: A dictionary where each key is the name of a scenario and the value is 
+        a dictionary of simulation parameters. Each scenario may include:
+            - 'name' (str): A human-readable scenario name.
+            - 'tbpars' (dict, optional): Parameters controlling the simulation timeframe.
+            - 'bcgintervention' (dict, optional): BCG vaccine intervention settings.
+            - 'tptintervention' (dict, optional): Tuberculosis Preventive Therapy settings.
+    
+    Scenarios included:
+        - 'Baseline': No intervention, default simulation window.
+        - 'BCG': BCG vaccination with 90% coverage.
+        - 'TPT': TPT with full eligibility, conditional on HIV status.
+    """
+    
     return {
-        'BAseline': {
+        'Baseline': {
             'name': 'BASELINE',
             'tbpars': dict(start=sc.date('1975-02-07'), 
                 stop=sc.date('2030-12-31')),
@@ -92,6 +142,41 @@ def get_scenarios():
 
 
 def run_scenarios(plot=True):
+    """
+    Execute all defined TB simulation scenarios and optionally visualize results.
+
+    Args:
+        plot (bool, optional): If True (default), generates comparative plots of 
+        scenario outcomes using a built-in plotting module.
+
+    Returns:
+        None: Results are stored locally within the function and plotted if requested.
+
+    Workflow:
+        1. Retrieves all predefined scenarios using get_scenarios().
+        2. Runs a simulation for each scenario using build_sim().
+        3. Collects and flattens the results for each simulation.
+        4. Optionally plots results in a grid layout with custom styling.
+    
+    Example:
+        >>> run_scenarios(True)
+        
+    
+    NOTE:  
+    -----
+    This line:
+        >>> results[name] = sim.results.flatten()
+         
+    Converts the simulation's time series outputs into a flat dictionary or DataFrame.
+    Makes results easier to compare across scenarios (e.g., plotting incidence over time).
+    The results dictionary now maps scenario names to their flattened outputs:
+    {
+        'BCG': <results>,
+        'TPT': <results>,
+        ...
+    }
+    """
+
     import plots as pl
 
     results = {}
@@ -99,7 +184,9 @@ def run_scenarios(plot=True):
         print(f"\nRunning scenario: {name}")
         sim = build_sim(scenario=scenario)
         sim.run()
-        results[name] = sim.results.flatten()
+        
+        # 
+        results[name] = sim.results.flatten()     
 
     if plot:
         pl.plot_results(results, n_cols=5, dark=True, cmap='viridis', heightfold=2)
