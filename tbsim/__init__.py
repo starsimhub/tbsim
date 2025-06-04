@@ -8,6 +8,7 @@ from .comorbidities.hiv.hiv import HIVState
 from .comorbidities.hiv.intervention import HivInterventions
 from .config import *
 from .interventions.interventions import *
+from .interventions.healthseeking import HealthSeeking
 from .interventions.tpt import *
 from .interventions.bcg import *
 from .interventions.cascadecare import *
