@@ -15,4 +15,5 @@ from .networks import HouseholdNet
 from .comorbidities.hiv.tb_hiv_cnn import *
 from .comorbidities.malnutrition.tb_malnut_cnn import TB_Nutrition_Connector
 from .analyzers import DwtAnalyzer, DwtPlotter, DwtPostProcessor
-from .utils import Agents
+from .utils import *
+from .wrappers import Agents
