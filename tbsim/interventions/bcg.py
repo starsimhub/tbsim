@@ -1,6 +1,7 @@
 import numpy as np
 import starsim as ss
-from tbsim.utils import Agents
+from tbsim.utils import *
+from tbsim.wrappers import *
 
 
  
