@@ -8,7 +8,8 @@ from .comorbidities.hiv.hiv import HIVState
 from .comorbidities.hiv.intervention import HivInterventions
 from .config import *
 from .interventions.interventions import *
-from .interventions.healthseeking import HealthSeeking
+from .interventions.tb_health_seeking import *
+from .interventions.tb_diagnostic import *
 from .interventions.tpt import *
 from .interventions.bcg import *
 from .interventions.cascadecare import *
@@ -16,5 +17,3 @@ from .networks import HouseholdNet
 from .comorbidities.hiv.tb_hiv_cnn import *
 from .comorbidities.malnutrition.tb_malnut_cnn import TB_Nutrition_Connector
 from .analyzers import DwtAnalyzer, DwtPlotter, DwtPostProcessor
-from .utils import *
-from .wrappers import Agents

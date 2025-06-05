@@ -11,6 +11,9 @@ __all__ = ['Product', 'TBVaccinationCampaign', 'get_extrastates']
 
 def get_extrastates():
     exs = [ss.State('sought_care', default=False),
+        ss.FloatArr('care_seeking_multiplier', default=1.0),
+        ss.State('multiplier_applied', default=False),
+        ss.FloatArr('n_times_tested', default=0.0),
         ss.State('returned_to_community', default=False),
         ss.State('received_tpt', default=False),
         ss.State('tb_treatment_success', default=False),
@@ -101,3 +104,9 @@ class TBVaccinationCampaign(ss.Intervention):
         tb.rel_LF_prog[change_uids] = tb.rel_LF_prog[change_uids]*0.9  # *self.product.efficacy   
         
         return len(change_uids)
+
+# Sample calling function below
+if __name__ == '__main__':
+
+    print('care_seeking_multiplier' in [s.name for s in mtb.get_extrastates()])
+    print('n_times_tested' in [s.name for s in mtb.get_extrastates()])
