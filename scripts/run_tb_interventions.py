@@ -4,7 +4,7 @@ import sciris as sc
 import matplotlib.pyplot as plt
 import numpy as np
 import pprint as pp
-
+import pandas as pd
 # Default simulation parameters
 DEFAULT_SPARS = dict(
     unit='day',
@@ -22,6 +22,10 @@ DEFAULT_TBPARS = dict(
         start=sc.date('1975-02-01'),
         stop=sc.date('2030-12-31'),
     )
+age_data = pd.DataFrame({
+    'age':   [0, 2, 4, 10, 15, 20, 30, 40, 50, 60, 70, 80],
+    'value': [20, 10, 25, 15, 10, 5, 4, 3, 2, 1, 1, 1]  # Skewed toward younger ages
+})
 
 def build_sim(scenario=None, spars=None):
     """
@@ -75,7 +79,7 @@ def build_sim(scenario=None, spars=None):
             inv.append(cls(pars=params))
 
     # Core sim components
-    pop = ss.People(n_agents=100, extra_states=mtb.get_extrastates())
+    pop = ss.People(n_agents=500, age_data=age_data, extra_states=mtb.get_extrastates())
     tb = mtb.TB(pars=tbpars)
     networks = [ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
                 mtb.HouseholdNet(),
