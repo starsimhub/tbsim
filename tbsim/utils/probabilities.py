@@ -41,6 +41,8 @@ class Range:
         Returns:
             float or np.ndarray: Sampled value(s).
         """
+        
+        # TODO: change this to use Starsim distributions
         self.validate()
         if self.dist == "uniform":
             return np.random.uniform(self.min, self.max, size=size)
@@ -245,7 +247,7 @@ class Probability:
         except csv.Error as ce:
             raise csv.Error(f"Malformed CSV file: {ce}") from ce
         
-
+    # this is where the value is actually sampled
     def sample(self, name: str, size: Optional[Union[int, tuple]] = None) -> Union[float, np.ndarray]:
         """
         Sample from the distribution for a specific parameter.
@@ -253,10 +255,8 @@ class Probability:
         Parameters:
             name (str): Parameter name to sample.
             size (int or tuple, optional): Shape of the sampled output.
-
         Returns:
             float or np.ndarray: Sampled value(s).
-
         Raises:
             KeyError: If the parameter is not found.
         """
@@ -267,9 +267,6 @@ class Probability:
     def to_json(self, filename: str):
         """
         Export current parameter ranges to a JSON file.
-
-        Parameters:
-            filename (str): Output JSON file path.
         """
         with open(filename, 'w') as f:
             json.dump(self.values.to_dict(), f, indent=2)
@@ -277,9 +274,6 @@ class Probability:
     def to_csv(self, filename: str):
         """
         Export current parameter ranges to a CSV file.
-
-        Parameters:
-            filename (str): Output CSV file path.
         """
         fieldnames = ['name', 'min', 'max', 'dist']
         with open(filename, 'w', newline='') as f:

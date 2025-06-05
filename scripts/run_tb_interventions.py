@@ -181,7 +181,7 @@ def run_scenarios(plot=True):
     }
     """
 
-    import plots as pl
+    import tbsim.utils.plots as pl
 
     results = {}
     for name, scenario in get_scenarios().items():

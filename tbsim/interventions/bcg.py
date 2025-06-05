@@ -1,6 +1,6 @@
 import numpy as np
 import starsim as ss
-from tbsim.utils import Probability
+from tbsim.utils.probabilities import Probability
 from tbsim.wrappers import Agents
 
 
