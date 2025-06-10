@@ -193,7 +193,7 @@ def run_scenarios(plot=True):
         results[name] = sim.results.flatten()     
 
     if plot:
-        pl.plot_results(results, n_cols=5, dark=True, cmap='viridis', heightfold=2)
+        pl.plot_results(results, n_cols=5, dark=True, cmap='viridis', heightfold=2, outdir='results/interventions',)
         plt.show()
 
 

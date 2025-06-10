@@ -57,7 +57,7 @@ def get_scenarios():
 
 
 if __name__ == '__main__':
-    import plots as pl
+    import tbsim.utils.plots as pl
     results = {}
     scenarios = get_scenarios()
     for name, scen in scenarios.items():
