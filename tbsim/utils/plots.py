@@ -137,7 +137,12 @@ def plot_results(flat_results, keywords=None, exclude=('15',), n_cols=5,
     if savefig:
         # save figure
         timestamp = sc.now(dateformat='%Y%m%d_%H%M%S') 
-        script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
+        # Determine script directory in a cross-platform way
+        if hasattr(sys.modules['__main__'], '__file__'):
+            script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
+        else:
+            script_dir = os.getcwd()
+
         outdir = 'results' if outdir is None else outdir
         outdir = os.path.join(script_dir, outdir)
         os.makedirs(outdir, exist_ok=True)
