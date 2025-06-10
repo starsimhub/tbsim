@@ -18,5 +18,4 @@ from .analyzers import DwtAnalyzer, DwtPlotter, DwtPostProcessor
 from .utils.probabilities import *
 from .utils.plots import *
 from .wrappers import Agents
-from .misc.tbterms import TBTerms
-from .misc.docs_scripts import *
+from .misc.tbterms import TBTerms, TermsExport
