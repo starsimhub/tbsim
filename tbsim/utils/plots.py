@@ -4,10 +4,13 @@ import matplotlib.pyplot as plt
 import sciris as sc
 from typing import Dict, List, Tuple
 import starsim as ss
+import datetime
+import sys
 
 
 def plot_results(flat_results, keywords=None, exclude=('15',), n_cols=5,
-                 dark=True, cmap='tab20', heightfold=3, style='default'):
+                 dark=True, cmap='tab20', heightfold=3, 
+                 style='default', savefig=True, outdir=None):
     """
     Visualize simulation outputs from multiple scenarios in a structured grid layout.
 
@@ -28,7 +31,9 @@ def plot_results(flat_results, keywords=None, exclude=('15',), n_cols=5,
         cmap (str, optional): Name of a matplotlib colormap (e.g., 'viridis', 'tab10'). Default is 'tab20'.
         heightfold (int, optional): Height multiplier per row of subplots. Default is 3.
         style (str, optional): Matplotlib style to apply. Defaults to 'default'. Falls back to 'default' if not found.
-
+        savefig (bool, optional): If True (default), saves the figure as a PNG file with a timestamped filename.
+        outdir (str, optional): Directory to save the figure. If None, saves in the current script's directory under 'results'.
+    
     Returns:
         None: The figure is displayed and also saved as a PNG with a timestamped filename.
 
@@ -129,11 +134,15 @@ def plot_results(flat_results, keywords=None, exclude=('15',), n_cols=5,
         fig.delaxes(ax)
 
     plt.tight_layout()
-    # save figure
-    timestamp = sc.now(tostring=True)
-    try:
-        out = os.path.join(sc.thisdir(), f'scenarios_{timestamp}.png')
-    except Exception:
-        out = f'scenarios_{timestamp}.png'
-    fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
+    if savefig:
+        # save figure
+        timestamp = sc.now(dateformat='%Y%m%d_%H%M%S') 
+        script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
+        outdir = 'results' if outdir is None else outdir
+        outdir = os.path.join(script_dir, outdir)
+        os.makedirs(outdir, exist_ok=True)
+
+        out = os.path.join(outdir, f'scenarios_{timestamp}.png')
+        fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
+        print(f"Saved figure to {out}")
     plt.show()
