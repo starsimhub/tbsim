@@ -36,7 +36,81 @@ def flat_results():
             'mortality': DummyResult([0, 1, 2], [0.03, 0.05, 0.08]),
         }
     }
- 
+    
+@mock.patch('tbsim.utils.plots.sc')
+@mock.patch('tbsim.utils.plots.plt.show')
+def test_plot_results_creates_valid_png(mock_show, mock_sc, tmp_path, flat_results):
+    # This test checks that the saved file is a valid PNG image
+    import PIL.Image
+    import io
+
+    # Patch sciris.now to return a fixed timestamp
+    mock_sc.now.return_value = '20240101_120000'
+    # Use a custom output directory
+    outdir = tmp_path / "png_check"
+    plots.plot_results(flat_results, outdir=str(outdir), savefig=True)
+    # Check that the PNG file exists
+    png_file = outdir / "scenarios_20240101_120000.png"
+    assert png_file.exists()
+    # Try to open the file as an image
+    with open(png_file, "rb") as f:
+        img_bytes = f.read()
+        img = PIL.Image.open(io.BytesIO(img_bytes))
+        assert img.format == "PNG"
+    assert mock_show.called
+            
+@mock.patch('tbsim.utils.plots.sc')
+@mock.patch('tbsim.utils.plots.plt.show')
+def test_plot_results_custom_outdir(mock_show, mock_sc, flat_results, tmp_path):
+    mock_sc.now.return_value = '20240101_120000'
+    mock_sc.thisdir.return_value = str(tmp_path)
+    outdir = tmp_path / "custom_results"
+    # Ensure directory does not exist before
+    if outdir.exists():
+        shutil.rmtree(outdir)
+    plots.plot_results(flat_results, outdir=str(outdir))
+    # Check that the file was created in the custom outdir
+    files = list(outdir.glob("scenarios_20240101_120000.png"))
+    assert len(files) == 1
+    assert files[0].is_file()
+    assert mock_show.called
+
+@mock.patch('tbsim.utils.plots.sc')
+@mock.patch('tbsim.utils.plots.plt.show')
+def test_plot_results_savefig_false(mock_show, mock_sc, flat_results, tmp_path):
+    mock_sc.now.return_value = '20240101_120000'
+    mock_sc.thisdir.return_value = str(tmp_path)
+    outdir = tmp_path / "nosave_results"
+    plots.plot_results(flat_results, outdir=str(outdir), savefig=False)
+    # Directory should not be created since savefig is False
+    assert not outdir.exists()
+    assert mock_show.called
+
+@mock.patch('tbsim.utils.plots.sc')
+@mock.patch('tbsim.utils.plots.plt.show')
+def test_plot_results_dark_theme(mock_show, mock_sc, flat_results, tmp_path):
+    mock_sc.now.return_value = '20240101_120000'
+    mock_sc.thisdir.return_value = str(tmp_path)
+    plots.plot_results(flat_results, dark=True, savefig=False)
+    assert mock_show.called
+
+@mock.patch('tbsim.utils.plots.sc')
+@mock.patch('tbsim.utils.plots.plt.show')
+def test_plot_results_light_theme(mock_show, mock_sc, flat_results, tmp_path):
+    mock_sc.now.return_value = '20240101_120000'
+    mock_sc.thisdir.return_value = str(tmp_path)
+    plots.plot_results(flat_results, dark=False, savefig=False)
+    assert mock_show.called
+
+@mock.patch('tbsim.utils.plots.sc')
+@mock.patch('tbsim.utils.plots.plt.show')
+def test_plot_results_multiple_metrics_and_scenarios(mock_show, mock_sc, flat_results, tmp_path):
+    mock_sc.now.return_value = '20240101_120000'
+    mock_sc.thisdir.return_value = str(tmp_path)
+    # Should plot both 'incidence' and 'mortality' for both scenarios
+    plots.plot_results(flat_results, n_cols=2, savefig=False)
+    assert mock_show.called
+    
 @mock.patch('tbsim.utils.plots.sc')
 @mock.patch('tbsim.utils.plots.plt.show')
 def test_plot_results_keywords_and_exclude(mock_show, mock_sc, flat_results):
