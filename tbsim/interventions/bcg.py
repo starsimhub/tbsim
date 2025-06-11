@@ -22,7 +22,8 @@ class BCGProtection(ss.Intervention):
     Parameters:
         pars (dict, optional): Dictionary of parameters. Supported keys:
             - 'coverage' (float): Fraction of eligible individuals vaccinated per timestep (default: 0.9).
-            - 'year' (int): Reference year for the intervention (default: 1900).
+            - 'start' (int): Year when the intervention starts (default: 1900).
+            - 'stop' (int): Year when the intervention stops (default: 2100).
             - 'efficacy' (float): Scaling factor applied to sampled risk modifiers (default: 0.8).
             - 'duration' (int): Duration (in years) for which BCG protection remains effective (default: 10).
             - 'age_limit' (int): Maximum age (in years) to be considered eligible for vaccination (default: 5).
@@ -51,10 +52,11 @@ class BCGProtection(ss.Intervention):
         and modifies its rr_activation, rr_clearance, and rr_death arrays.
     """
 
-    def __init__(self, pars=None, **kwargs):
+    def __init__(self, pars={}, **kwargs):
         super().__init__(**kwargs)
         self.coverage = pars.get('coverage', 0.6)
-        self.year = pars.get('year', 1900)
+        self.start = pars.get('start', 1900)            
+        self.stop = pars.get('stop', 2100)
         self.efficacy = pars.get('efficacy', 0.8)      # BCGProb of protection
         self.duration = pars.get('duration', 10)       # Duration of protection in years
         self.age_limit = pars.get('age_limit', 5)      # Max age for eligibility
@@ -67,14 +69,11 @@ class BCGProtection(ss.Intervention):
             ss.FloatArr('ti_bcgvaccinated'), 
         )
         print(self.pars)
-
         
     def check_eligibility(self):
         ages = self.sim.people.age
         under_age = ages <= self.age_limit
-        
-        # not_vaccinated = ~self.vaccinated
-        # 
+
         eligible = under_age & ~self.vaccinated
         eligible_uids = np.where(eligible)[0]
         n_to_vaccinate = int(len(eligible_uids) * self.coverage)
@@ -93,6 +92,10 @@ class BCGProtection(ss.Intervention):
         return (self.vaccinated[uids]) & ((current_time - self.ti_bcgvaccinated[uids]) <= self.duration)
 
     def step(self):
+        # Check if now is the right time to vaccinate
+        if self.sim.now < self.start or self.sim.now > self.stop:
+            return
+        
         current_time = self.ti  # Assuming sim.t is in years
         eligible = self.check_eligibility()
         if len(eligible) == 0:
