@@ -114,7 +114,8 @@ def test_bcg_intervention_default_values():
     bcg = sim.interventions['bcgprotection']
     assert bcg.coverage== 0.6, "Default coverage should be 0.6"
     assert bcg.efficacy == 0.8, "Default efficacy should be 0.8"
-    assert bcg.year == 1900, "Default year should be 1900"
+    assert bcg.start == 1900, "Default start year should be 2000"
+    assert bcg.stop == 2100, "Default stop year should be 2020"
     assert bcg.duration == 10, "Default duration should be 10 years"
     assert bcg.age_limit == 5, "Default age limit should be 5 years"
     assert len(bcg.vaccinated) == nagents, "Vaccinated array should match population size"
@@ -130,7 +131,8 @@ def test_bcg_intervention_custom_values():
     itv = mtb.BCGProtection(pars={
         'coverage': 0.75,
         'efficacy': 0.9,
-        'year': 2000,
+        'start': 2000,
+        'stop' : 2015,
         'duration': 15,
         'age_limit': 10
     })
@@ -140,7 +142,8 @@ def test_bcg_intervention_custom_values():
     bcg = sim.interventions['bcgprotection']
     assert bcg.coverage == 0.75, "Custom coverage should be 0.75"
     assert bcg.efficacy == 0.9, "Custom efficacy should be 0.9"
-    assert bcg.year == 2000, "Custom year should be 2000"
+    assert bcg.start == 2000, "Custom start year should be 2000"
+    assert bcg.stop == 2015, "Custom stop year should be 2015"
     assert bcg.duration == 15, "Custom duration should be 15 years"
     assert bcg.age_limit == 10, "Custom age limit should be 10 years"
     assert len(bcg.vaccinated) == nagents, "Vaccinated array should match population size"
