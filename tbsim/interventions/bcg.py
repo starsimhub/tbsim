@@ -68,7 +68,7 @@ class BCGProtection(ss.Intervention):
             ss.BoolArr('vaccinated', default=False),
             ss.FloatArr('ti_bcgvaccinated'), 
         )
-        print(self.pars)
+        logger.debug(self.pars)
         
     def check_eligibility(self):
         ages = self.sim.people.age
