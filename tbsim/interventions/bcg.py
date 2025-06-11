@@ -2,7 +2,7 @@ import numpy as np
 import starsim as ss
 from tbsim.utils.probabilities import Probability
 from tbsim.wrappers import Agents
-
+import sciris as sc
 
 __all__ = ['BCGProtection']
 
@@ -55,8 +55,8 @@ class BCGProtection(ss.Intervention):
     def __init__(self, pars={}, **kwargs):
         super().__init__(**kwargs)
         self.coverage = pars.get('coverage', 0.6)
-        self.start = pars.get('start', 1900)            
-        self.stop = pars.get('stop', 2100)
+        self.start = pars.get('start', sc.date('1900-01-01'))            
+        self.stop = pars.get('stop', sc.date('2100-12-31'))
         self.efficacy = pars.get('efficacy', 0.8)      # BCGProb of protection
         self.duration = pars.get('duration', 10)       # Duration of protection in years
         self.age_limit = pars.get('age_limit', 5)      # Max age for eligibility
@@ -93,7 +93,8 @@ class BCGProtection(ss.Intervention):
 
     def step(self):
         # Check if now is the right time to vaccinate
-        if self.sim.now < self.start or self.sim.now > self.stop:
+        now = sc.date(self.sim.now)
+        if now < self.start or now > self.stop:
             return
         
         current_time = self.ti  # Assuming sim.t is in years

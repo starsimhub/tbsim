@@ -7,6 +7,7 @@ import tbsim as mtb
 import json
 import csv
 import pandas as pd
+import sciris as sc
 
 class DummyTB:
     def __init__(self, n):
@@ -43,7 +44,7 @@ def dummy_uids(arr):
     # Patch for ss.uids
     return np.array(arr, dtype=int)
 
-def make_sim(agents=20, start=2000, stop=2020, dt=7/365):
+def make_sim(agents=20, start=sc.date('2000-01-01'), stop=sc.date('2020-12-31'), dt=7/365):
     pop = ss.People(n_agents=agents)
     tb = mtb.TB(pars={'beta': ss.beta(0.01), 'init_prev': 0.25})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
@@ -104,7 +105,7 @@ def test_bcgprob_file_csv(tmp_path):
     assert np.all((a >= 0.6) & (a <= 0.7))
 
 def test_bcg_intervention_default_values():
-    # Test BCGProtection intervention
+    # Test BCGProtection intervention with default parameters
     nagents = 100
     pop, tb, net, pars = make_sim(agents=nagents)
     itv = mtb.BCGProtection()
@@ -114,16 +115,14 @@ def test_bcg_intervention_default_values():
     bcg = sim.interventions['bcgprotection']
     assert bcg.coverage== 0.6, "Default coverage should be 0.6"
     assert bcg.efficacy == 0.8, "Default efficacy should be 0.8"
-    assert bcg.start == 1900, "Default start year should be 2000"
-    assert bcg.stop == 2100, "Default stop year should be 2020"
+    assert bcg.start == sc.date('1900-01-01'), "Default start year should be 1900-01-01 with type sc.date"
+    assert bcg.stop == sc.date('2100-12-31'), "Default stop year should be 2100-12-31 with type sc.date"
     assert bcg.duration == 10, "Default duration should be 10 years"
     assert bcg.age_limit == 5, "Default age limit should be 5 years"
     assert len(bcg.vaccinated) == nagents, "Vaccinated array should match population size"
     assert len(bcg.ti_bcgvaccinated) == nagents, "ti_bcgvaccinated array should match population size"
 
     
-# now make a similar test to the one above, but with pased arguments to the BCGProtection constructor
-
 def test_bcg_intervention_custom_values():
     # Test BCGProtection intervention with custom parameters
     nagents = 100
@@ -131,8 +130,8 @@ def test_bcg_intervention_custom_values():
     itv = mtb.BCGProtection(pars={
         'coverage': 0.75,
         'efficacy': 0.9,
-        'start': 2000,
-        'stop' : 2015,
+        'start': sc.date('2000-01-01'),
+        'stop' : sc.date('2015-01-01'),
         'duration': 15,
         'age_limit': 10
     })
@@ -142,8 +141,8 @@ def test_bcg_intervention_custom_values():
     bcg = sim.interventions['bcgprotection']
     assert bcg.coverage == 0.75, "Custom coverage should be 0.75"
     assert bcg.efficacy == 0.9, "Custom efficacy should be 0.9"
-    assert bcg.start == 2000, "Custom start year should be 2000"
-    assert bcg.stop == 2015, "Custom stop year should be 2015"
+    assert bcg.start == sc.date('2000-01-01'), "Custom start year should be 2000-01-01 with type sc.date"
+    assert bcg.stop == sc.date('2015-01-01'), "Custom stop year should be 2015-01-01 with type sc.date"
     assert bcg.duration == 15, "Custom duration should be 15 years"
     assert bcg.age_limit == 10, "Custom age limit should be 10 years"
     assert len(bcg.vaccinated) == nagents, "Vaccinated array should match population size"
@@ -154,12 +153,18 @@ age_data = pd.DataFrame({
     'value': [20, 10, 25, 15, 10, 5, 4, 3, 2, 1, 1, 1]  # Skewed toward younger ages
 })
 
-# now make a test to check eligibility and vaccination process
 def test_bcg_eligibility_and_vaccination():
+    # this tests checks the eligibility and vaccination of individuals for BCG
     nagents = 100
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = mtb.BCGProtection()
+    # pars['start'] = sc.date('2000-01-01')
+    # pars['stop'] = sc.date('2015-01-01')
+    inv_pars={
+        # 'start': sc.date('2000-01-01'),         
+        # 'stop' : sc.date('2014-01-01'),
+    }
+    itv = mtb.BCGProtection(inv_pars)
     assert isinstance(itv, mtb.BCGProtection)
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()  
@@ -174,5 +179,28 @@ def test_bcg_eligibility_and_vaccination():
     bcg.step()
     # After step, eligible individuals should be vaccinated
     assert np.any(bcg.vaccinated[eligible]), "Some eligible individuals should be vaccinated after step"
+    
+def test_bcg_improves_tb_outcomes():
+    # this tests checks the improvement in TB outcomes due to BCG vaccination
+    nagents = 100
+    pop, tb, net, pars = make_sim(agents=nagents)
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+    itv = mtb.BCGProtection()
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.init()  
+    bcg = sim.interventions['bcgprotection']
+    
+    tb = sim.diseases.tb
+    # Store initial TB outcomes
+    initial_rr_activation = tb.rr_activation.copy()
+    initial_rr_clearance = tb.rr_clearance.copy()
+    initial_rr_death = tb.rr_death.copy()
+    
+    # Simulate a step to apply BCG intervention
+    bcg.step()
+    # Check if TB outcomes have improved
+    assert np.any(tb.rr_activation < initial_rr_activation), "BCG should reduce activation risk"
+    assert np.any(tb.rr_clearance > initial_rr_clearance), "BCG should improve clearance rate"
+    assert np.any(tb.rr_death < initial_rr_death), "BCG should reduce death risk"
     
         

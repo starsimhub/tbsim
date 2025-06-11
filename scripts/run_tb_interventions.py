@@ -129,6 +129,9 @@ def get_scenarios():
                            stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
                 coverage=0.90,
+                start=sc.date('1970-01-01'),
+                stop=sc.date('2030-12-31'),
+                max_age=15,
             ),
         },
         'TPT': {
