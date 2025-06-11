@@ -3,8 +3,11 @@ import starsim as ss
 from tbsim.utils.probabilities import Probability
 from tbsim.wrappers import Agents
 import sciris as sc
+import logging
 
 __all__ = ['BCGProtection']
+
+logger = logging.getLogger(__name__)
 
 class BCGProtection(ss.Intervention):
     """
@@ -171,11 +174,6 @@ class BCGProb(Probability):
     sample(name, size=None)
         Sample from any named distribution using the specified distribution type.
 
-    to_json(filename)
-        Export all current distributions to a JSON file.
-
-    to_csv(filename)
-        Export all current distributions to a CSV file.
     """
 
     def __init__(self, from_file=None):
