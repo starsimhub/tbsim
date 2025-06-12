@@ -10,6 +10,7 @@ from .config import *
 from .interventions.interventions import *
 from .interventions.tb_health_seeking import *
 from .interventions.tb_diagnostic import *
+from .interventions.tb_treatment import *
 from .interventions.tpt import *
 from .interventions.bcg import *
 from .interventions.cascadecare import *

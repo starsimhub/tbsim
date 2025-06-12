@@ -14,6 +14,7 @@ def get_extrastates():
         ss.FloatArr('care_seeking_multiplier', default=1.0),
         ss.State('multiplier_applied', default=False),
         ss.FloatArr('n_times_tested', default=0.0),
+        ss.FloatArr('n_times_treated', default=0.0),
         ss.State('returned_to_community', default=False),
         ss.State('received_tpt', default=False),
         ss.State('tb_treatment_success', default=False),
