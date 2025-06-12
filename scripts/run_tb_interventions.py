@@ -134,17 +134,18 @@ def get_scenarios():
                 max_age=15,
             ),
         },
-        'TPT': {
-            'name': 'TPT INITIATION',
-            'tptintervention': dict(
-                p_tpt=ss.bernoulli(1.0),
-                tpt_duration=2.0,
-                max_age=25,
-                hiv_status_threshold=True,
-                p_3HP=0.8,
-                start=sc.date('1970-01-01'),
-            ),
-        },
+        # Under construction, not yet finished 
+        # 'TPT': {
+        #     'name': 'TPT INITIATION',
+        #     'tptintervention': dict(
+        #         p_tpt=ss.bernoulli(1.0),
+        #         tpt_duration=2.0,
+        #         max_age=25,
+        #         hiv_status_threshold=True,
+        #         p_3HP=0.8,
+        #         start=sc.date('1970-01-01'),
+        #     ),
+        # },
     }
 
 

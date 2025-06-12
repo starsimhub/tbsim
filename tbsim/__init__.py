@@ -10,7 +10,6 @@ from .config import *
 from .interventions.interventions import *
 from .interventions.tpt import *
 from .interventions.bcg import *
-from .interventions.cascadecare import *
 from .networks import HouseholdNet
 from .comorbidities.hiv.tb_hiv_cnn import *
 from .comorbidities.malnutrition.tb_malnut_cnn import TB_Nutrition_Connector
