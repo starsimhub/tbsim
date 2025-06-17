@@ -2,9 +2,9 @@ import tbsim as mtb
 import starsim as ss
 import sciris as sc
 import matplotlib.pyplot as plt
-import numpy as np
-import pprint as pp
+import pprint as pprint
 import pandas as pd
+
 # Default simulation parameters
 DEFAULT_SPARS = dict(
     unit='day',
@@ -67,9 +67,9 @@ def build_sim(scenario=None, spars=None):
     
     spars = {**DEFAULT_SPARS, **(spars or {})}  # Merge user spars with default
     tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})} 
-    pp.pp(spars)
-    pp.pp(tbpars)
-    
+    pprint.pp(spars)
+    pprint.pp(tbpars)
+    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=1.0, scenario_name='run_TB_Dwell_analyzer') # ANALYZER
     # Set up interventions safely
     inv = []
     for key, cls in [('tptintervention', mtb.TPTInitiation), 
@@ -79,11 +79,10 @@ def build_sim(scenario=None, spars=None):
             inv.append(cls(pars=params))
 
     # Core sim components
-    pop = ss.People(n_agents=500, age_data=age_data, extra_states=mtb.get_extrastates())
+    pop = ss.People(n_agents=100, age_data=age_data, extra_states=mtb.get_extrastates())
     tb = mtb.TB(pars=tbpars)
     networks = [ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
-                mtb.HouseholdNet(),
-                ss.MaternalNet()]
+                mtb.HouseholdNet()]
     
     demographics = [ss.Births(pars={'birth_rate': 15}),
                     ss.Deaths(pars={'death_rate': 15})]
@@ -94,6 +93,7 @@ def build_sim(scenario=None, spars=None):
         networks=networks,
         interventions=inv,
         diseases=tb,
+        analyzers=dwell_analyzer,
         demographics=demographics,
         pars=spars,
     )
@@ -120,18 +120,18 @@ def get_scenarios():
     return {
         'Baseline': {
             'name': 'BASELINE',
-            'tbpars': dict(start=sc.date('1975-02-07'), 
+            'tbpars': dict(start=sc.date('1970-02-07'), 
                 stop=sc.date('2030-12-31')),
         },
         'BCG': {
             'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1975-02-15'), 
+            'tbpars': dict(start=sc.date('1970-02-17'), 
                            stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
                 coverage=0.90,
-                start=sc.date('1970-01-01'),
+                start=sc.date('1972-01-01'),
                 stop=sc.date('2030-12-31'),
-                max_age=15,
+                age_limit=6,
             ),
         },
         # Under construction, not yet finished 
@@ -188,18 +188,31 @@ def run_scenarios(plot=True):
     import tbsim.utils.plots as pl
 
     results = {}
+    sims = []
     for name, scenario in get_scenarios().items():
         print(f"\nRunning scenario: {name}")
         sim = build_sim(scenario=scenario)
         sim.run()
-        
+        sims.append(sim)
         # 
         results[name] = sim.results.flatten()     
-
-    if plot:
-        pl.plot_results(results, n_cols=5, dark=True, cmap='viridis', heightfold=2, outdir='results/interventions',)
-        plt.show()
+        
+    return sims
+    # if plot:
+    #     pl.plot_results(results, n_cols=5, dark=True, cmap='viridis', heightfold=2, outdir='results/interventions',)
+    #     plt.show()
 
 
 if __name__ == '__main__':
-    run_scenarios()
+    sims = run_scenarios()
+    
+    
+    # Extract the analyzer
+    ana : mtb.DwtAnalyzer = sims[0].analyzers[0] #shortcut to the dwell time analyzer
+    file = ana.file_path        # (uses the file from the analyzer)
+    plotter = mtb.DwtPlotter(file_path=file)
+    plotter.stacked_bars_states_per_agent_static()
+    
+    # plotter.histogram_with_kde()
+    # plotter.sankey_agents()
+    # plotter.sankey_agents_even_age_ranges()
