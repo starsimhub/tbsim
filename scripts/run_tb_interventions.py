@@ -197,22 +197,11 @@ def run_scenarios(plot=True):
         # 
         results[name] = sim.results.flatten()     
         
-    return sims
-    # if plot:
-    #     pl.plot_results(results, n_cols=5, dark=True, cmap='viridis', heightfold=2, outdir='results/interventions',)
-    #     plt.show()
+    if plot:
+        pl.plot_results(results, n_cols=5, dark=True, cmap='viridis', heightfold=2, outdir='results/interventions',)
+        plt.show()
+
 
 
 if __name__ == '__main__':
-    sims = run_scenarios()
-    
-    
-    # Extract the analyzer
-    ana : mtb.DwtAnalyzer = sims[0].analyzers[0] #shortcut to the dwell time analyzer
-    file = ana.file_path        # (uses the file from the analyzer)
-    plotter = mtb.DwtPlotter(file_path=file)
-    plotter.stacked_bars_states_per_agent_static()
-    
-    # plotter.histogram_with_kde()
-    # plotter.sankey_agents()
-    # plotter.sankey_agents_even_age_ranges()
+    run_scenarios()
