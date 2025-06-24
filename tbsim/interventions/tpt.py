@@ -13,6 +13,9 @@ class TPTInitiation(ss.Intervention):
     This intervention identifies households with at least one TB-treated individual, and offers TPT to all
     other members of those households who meet the following eligibility criteria:
     
+    Requirements:
+        - Must have been in a previous intervention which updates screen_negative and non_symptomatic attributes
+    
     Eligibility criteria:
         - Must reside in a household where at least one member is on TB treatment
         - Must not already be on TB treatment themselves
@@ -56,7 +59,7 @@ class TPTInitiation(ss.Intervention):
             stop=ss.date('2100-12-31'),
         )
         self.update_pars(pars=pars, **kwargs)
-
+    
     def step(self):
         sim = self.sim
         ppl = sim.people
