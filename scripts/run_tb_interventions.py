@@ -69,7 +69,7 @@ def build_sim(scenario=None, spars=None):
     tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})} 
     pprint.pp(spars)
     pprint.pp(tbpars)
-    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=1.0, scenario_name='run_TB_Dwell_analyzer') # ANALYZER
+
     # Set up interventions safely
     inv = []
     for key, cls in [('tptintervention', mtb.TPTInitiation), 
@@ -93,7 +93,6 @@ def build_sim(scenario=None, spars=None):
         networks=networks,
         interventions=inv,
         diseases=tb,
-        analyzers=dwell_analyzer,
         demographics=demographics,
         pars=spars,
     )
@@ -123,29 +122,29 @@ def get_scenarios():
             'tbpars': dict(start=sc.date('1970-02-07'), 
                 stop=sc.date('2030-12-31')),
         },
-        'BCG': {
-            'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1970-02-17'), 
-                           stop=sc.date('2030-12-31')),
-            'bcgintervention': dict(
-                coverage=0.90,
-                start=sc.date('1972-01-01'),
-                stop=sc.date('2030-12-31'),
-                age_limit=6,
-            ),
-        },
-        # Under construction, not yet finished 
-        # 'TPT': {
-        #     'name': 'TPT INITIATION',
-        #     'tptintervention': dict(
-        #         p_tpt=ss.bernoulli(1.0),
-        #         tpt_duration=2.0,
-        #         max_age=25,
-        #         hiv_status_threshold=True,
-        #         p_3HP=0.8,
-        #         start=sc.date('1970-01-01'),
+        # 'BCG': {
+        #     'name': 'BCG PROTECTION',
+        #     'tbpars': dict(start=sc.date('1970-02-17'), 
+        #                    stop=sc.date('2030-12-31')),
+        #     'bcgintervention': dict(
+        #         coverage=0.90,
+        #         start=sc.date('1972-01-01'),
+        #         stop=sc.date('2030-12-31'),
+        #         age_limit=6,
         #     ),
         # },
+        # Under construction, not yet finished 
+        'TPT': {
+            'name': 'TPT INITIATION',
+            'tptintervention': dict(
+                p_tpt=ss.bernoulli(1.0),
+                tpt_duration=2.0,
+                max_age=25,
+                hiv_status_threshold=True,
+                p_3HP=0.8,
+                start=sc.date('1970-01-01'),
+            ),
+        },
     }
 
 

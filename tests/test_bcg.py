@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from unittest import mock
-from tbsim.interventions.bcg import BCGProtection, BCGProb
+from tbsim.interventions.bcg import BCGProb
 import starsim as ss
 import tbsim as mtb
 import json

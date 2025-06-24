@@ -1,10 +1,6 @@
 import starsim as ss
 import sciris as sc
 import numpy as np
-from tbsim import TBS
-import datetime as dt
-import tbsim as mtb
-import pandas as pd
 
 __all__ = ['Product', 'TBVaccinationCampaign', 'get_extrastates']
 

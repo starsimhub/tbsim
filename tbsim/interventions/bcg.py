@@ -1,7 +1,6 @@
 import numpy as np
 import starsim as ss
 from tbsim.utils.probabilities import Probability
-from tbsim.wrappers import Agents
 import sciris as sc
 import logging
 
@@ -57,15 +56,27 @@ class BCGProtection(ss.Intervention):
 
     def __init__(self, pars={}, **kwargs):
         super().__init__(**kwargs)
-        self.coverage = pars.get('coverage', 0.6)
-        self.start = pars.get('start', sc.date('1900-01-01'))            
-        self.stop = pars.get('stop', sc.date('2100-12-31'))
-        self.efficacy = pars.get('efficacy', 0.8)      # BCGProb of protection
-        self.duration = pars.get('duration', 10)       # Duration of protection in years
-        self.age_limit = pars.get('age_limit', 5)      # Max age for eligibility
+        self.define_pars(
+            coverage=0.6,  # Fraction of eligible individuals vaccinated per timestep
+            start=sc.date('1900-01-01'),  # Year when the intervention starts
+            stop=sc.date('2100-12-31'),  # Year when the intervention stops
+            efficacy=0.8,  # BCGProb of protection
+            duration=10,  # Duration (in years) for which BCG protection remains effective
+            age_limit=5,  # Maximum age (in years) to be considered eligible for vaccination
+            probs=BCGProb(),  # Probability distributions for TB risk modifiers
+            prob_file=None,  # Optional path to a JSON or CSV file defining probability distributions
+        )
+        self.update_pars(pars)
+        self.coverage = self.pars.coverage
+        self.coverage_dist = ss.bernoulli(p=self.pars.coverage)
+        self.start = self.pars.start
+        self.stop = self.pars.stop
+        self.efficacy = self.pars.efficacy
+        self.duration = self.pars.duration
+        self.age_limit = self.pars.age_limit
         self.n_eligible = 0
         self.eligible = []
-        self.probs = BCGProb()
+        self.probs = self.pars.probs
 
         self.define_states(
             ss.BoolArr('vaccinated', default=False),
@@ -79,9 +90,9 @@ class BCGProtection(ss.Intervention):
 
         eligible = under_age & ~self.vaccinated
         eligible_uids = np.where(eligible)[0]
-        n_to_vaccinate = int(len(eligible_uids) * self.coverage)
+        n_to_vaccinate = int(len(eligible_uids) * self.coverage)   #int(len(eligible_uids) * self.coverage_dist)
         if n_to_vaccinate > 0:
-            chosen = np.random.choice(eligible_uids, size=n_to_vaccinate, replace=False)
+            chosen = self.coverage_dist.filter(eligible_uids)            #np.random.choice(eligible_uids, size=n_to_vaccinate, replace=False)
             self.eligible = np.zeros_like(eligible)
             self.eligible[chosen] = True
         else:
@@ -89,7 +100,13 @@ class BCGProtection(ss.Intervention):
             self.eligible = np.zeros_like(eligible)
         self.n_eligible = len(chosen)
         return ss.uids(chosen)
-
+    
+    
+    def check_eligibility_short(self):
+        eli = ((self.sim.people.age <= self.age_limit) & ~self.vaccinated).uids
+        chos = self.coverage_dist.filter(eli)
+        return chos
+        
     def is_protected(self, uids, current_time):
         """Return boolean array: True if still protected (within duration), else False."""
         return (self.vaccinated[uids]) & ((current_time - self.ti_bcgvaccinated[uids]) <= self.duration)
@@ -102,6 +119,12 @@ class BCGProtection(ss.Intervention):
         
         current_time = self.ti  # Assuming sim.t is in years
         eligible = self.check_eligibility()
+        eligible_short = self.check_eligibility_short()
+        
+        ############# DEBUGGING ##################
+        
+        
+        
         if len(eligible) == 0:
             return
         # Vaccinate
@@ -112,7 +135,7 @@ class BCGProtection(ss.Intervention):
         protected = self.is_protected(eligible, current_time)
         protected_uids = eligible[protected]
         if len(protected_uids) > 0:
-            tb.rr_activation[protected_uids] *= self.efficacy * self.probs.activation()
+            tb.rr_activation[protected_uids] *= (1-self.efficacy) * self.probs.activation()
             tb.rr_clearance[protected_uids] *= self.probs.clearance()
             tb.rr_death[protected_uids] *= self.probs.death()
 
@@ -142,13 +165,13 @@ class BCGProb(Probability):
 
     Parameters
     ----------
-    from_file : str, optional
-        Path to a `.json` or `.csv` file containing custom probability definitions.
+    from_file: str, optional, 
+        Path to a `.json` or `.csv` file containing custom probability definitions. 
         If provided, the file is used to override or supplement the default values.
 
     Attributes
     ----------
-    values : RangeDict
+    values: RangeDict
         Container for all named `Range` objects, supporting both dict- and dot-access.
 
     Methods
@@ -161,19 +184,6 @@ class BCGProb(Probability):
 
     death(size=None)
         Sample from the TB mortality modifier distribution.
-
-    from_json(filename)
-        Load distributions from a JSON file with structure: {name: {min, max, dist}}.
-
-    from_csv(filename)
-        Load distributions from a CSV file with columns: name, min, max [,dist].
-
-    from_dict(data)
-        Load distributions from a dictionary (same structure as JSON).
-
-    sample(name, size=None)
-        Sample from any named distribution using the specified distribution type.
-
     """
 
     def __init__(self, from_file=None):
@@ -183,6 +193,7 @@ class BCGProb(Probability):
             "clearance": {"min": 1.3, "max": 1.5},
             "death": {"min": 0.05, "max": 0.15}
         })
+        
         if from_file:
             if from_file.endswith('.json'):
                 self.from_json(from_file)
@@ -190,7 +201,7 @@ class BCGProb(Probability):
                 self.from_csv(from_file)
             else:
                 raise ValueError("Unsupported file format. Use .json or .csv.")
-
+  
     def activation(self, size=None):
         """Sample from the activation risk modifier distribution."""
         return self.sample("activation", size)
