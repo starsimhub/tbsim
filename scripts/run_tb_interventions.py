@@ -138,10 +138,8 @@ def get_scenarios():
             'name': 'TPT INITIATION',
             'tptintervention': dict(
                 p_tpt=ss.bernoulli(1.0),
-                max_age=25,
+                max_age=55,
                 hiv_status_threshold=True,
-                tpt_regime_duration=0.5,  # 6 months for isoniazid monotherapy
-                p_on_tpt_regime=0.8,
                 start=sc.date('1970-01-01'),
             ),
         },

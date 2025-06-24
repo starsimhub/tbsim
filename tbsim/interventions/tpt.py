@@ -6,7 +6,6 @@ from enum import Enum
 
 __all__ = ['TPTInitiation', 'TPTRegimes']
 
-
 class TPTInitiation(ss.Intervention):
     """
     Tuberculosis Preventive Therapy (TPT) intervention for entire eligible households.
@@ -21,43 +20,40 @@ class TPTInitiation(ss.Intervention):
         - Optionally filtered by age and/or HIV status (logic can be extended)
     
     Treatment logic:
-        - A Bernoulli trial (`p_tpt`) is used to determine which eligible individuals receive TPT
-        - If initiated, individuals are marked as `on_tpt` and receive a fixed protection duration (`tpt_regime_duration`)
-        - After the specified `start` date, a proportion (`p_on_tpt`) receive the 3HP regimen
+        - A Bernoulli trial (`p_tpt`) is used to determine which eligible individuals initiate TPT
+        - If initiated, individuals are flagged as `on_tpt` for the treatment duration (`tpt_treatment_duration`)
+        - After completing treatment, individuals become `protected_from_tb` for a fixed duration (`tpt_protection_duration`)
+        - Protection starts at `tpt_treatment_until` and ends at `tpt_protection_until`
     
     Parameters:
         p_tpt (float or ss.Bernoulli): Probability of initiating TPT for an eligible individual
-        p_on_tpt (float): Proportion of individuals initiated on 3HP after the `start` date
         max_age (int): Optional filter for outcome reporting (default: 5)
         hiv_status_threshold (bool): Reserved for HIV-based filtering (default: False)
-        tpt_regime_duration (float): Duration of protection in years
-        start (date): Intervention start date, this is when TPT can begin being offered
-        stop (date): Intervention end date, after which no new TPT is initiated
-ß
+        tpt_treatment_duration (float): Duration of TPT administration (e.g., 3 months)
+        tpt_protection_duration (float): Duration of post-treatment protection (e.g., 2 years)
+        start (date): Start date for offering TPT
+        stop (date): Stop date for offering TPT
+
     Results tracked:
-        n_eligible (int): Number of individuals in eligible households meeting criteria
-        n_tpt_initiated (int): Number of individuals actually started on TPT
-        n_3HP_assigned (int): Subset of TPT individuals presumed to receive 3HP
+        n_eligible (int): Number of individuals meeting criteria
+        n_tpt_initiated (int): Number of individuals who started TPT
 
     Notes:
-        - Requires people to have a 'hhid' attribute (household ID).
-        - Assumes states like 'on_tpt', 'received_tpt', 'screen_negative' are initialized.
-        - Requires HouseHoldNet or similar to define household structure.   
-        
-        - tpt_regime_duration is set to 0.5 years by default (6 months for isoniazid monotherapy), 
-          however is expected to be provided during the simulation definition. i.e.
+        - Requires 'hhid', 'on_tpt', 'received_tpt', 'screen_negative' attributes on people
+        - Assumes household structure is available (e.g., via HouseHoldNet)
+        - TB disease model must support 'protected_from_tb', 'tpt_treatment_until', and 'tpt_protection_until' states
     """
 
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         self.define_pars(
             p_tpt=ss.bernoulli(p=1.0),
-            p_on_tpt=ss.bernoulli(p=0.3),      # Proportion of individuals on TPT who receive the selected regimen
             max_age=5,
             hiv_status_threshold=False,
-            tpt_regime_duration=TPTRegimes.cdc_3HP,      # duration of the TPT regimen in years, defaulting to 3HP (3 months)
-            start=ss.date('2000-01-01'),              # Date when the intervention starts
-            stop=ss.date('2100-12-31'),               # Date when the intervention stops   
+            tpt_treatment_duration=ss.peryear(0.25),   # 3 months of treatment
+            tpt_protection_duration=ss.peryear(2.0),   # 2 years of protection
+            start=ss.date('2000-01-01'),
+            stop=ss.date('2100-12-31'),
         )
         self.update_pars(pars=pars, **kwargs)
 
@@ -66,44 +62,52 @@ class TPTInitiation(ss.Intervention):
         ppl = sim.people
         tb = sim.diseases.tb
 
-        # Identify households with at least one member currently on TB treatment
-        treated = tb.on_treatment 
+        # Initialize states if not already present
+        if not hasattr(tb, 'protected_from_tb'):
+            tb.define_states(
+                ss.BoolArr('protected_from_tb', default=False),
+                ss.Arr('tpt_treatment_until', default=None),
+                ss.Arr('tpt_protection_until', default=None),
+            )
+
+        # Households with TB cases
+        treated = tb.on_treatment
         eligible_hhids = np.unique(ppl['hhid'][treated])
 
-        # Identify all members of those households
+        # Eligibility screening
         in_eligible_households = np.isin(ppl['hhid'], eligible_hhids)
         eligible = in_eligible_households & (~tb.on_treatment) & (ppl['screen_negative'] | ppl['non_symptomatic'])
 
+        # Bernoulli selection
         tpt_candidates = self.pars.p_tpt.filter(eligible)
 
         if len(tpt_candidates):
-            use_3HP = sim.year >= self.pars.start.year
-            assigned_3HP = np.random.rand(len(tpt_candidates)) < self.pars.p_on_tpt if use_3HP else np.zeros(len(tpt_candidates), dtype=bool)
-
-            if not hasattr(tb, 'on_treatment_duration'):
-                tb.define_states(ss.FloatArr('on_treatment_duration', default=0.0))
-
-            tb.start_treatment(tpt_candidates)
-            tb.on_treatment_duration[tpt_candidates] = self.pars.tpt_regime_duration
+            # Treatment phase
             ppl['on_tpt'][tpt_candidates] = True
             ppl['received_tpt'][tpt_candidates] = True
 
+            # Track treatment and future protection schedule
+            treatment_end = sim.date + self.pars.tpt_treatment_duration
+            protection_end = treatment_end + self.pars.tpt_protection_duration
+
+            tb.tpt_treatment_until[tpt_candidates] = treatment_end
+            tb.tpt_protection_until[tpt_candidates] = protection_end
+
+            # Result tracking
             self.results['n_eligible'][self.ti] = np.count_nonzero(eligible)
             self.results['n_tpt_initiated'][self.ti] = len(tpt_candidates)
-            self.results['n_3HP_assigned'][self.ti] = np.count_nonzero(assigned_3HP)
 
     def init_results(self):
         self.define_results(
             ss.Result('n_eligible', dtype=int),
             ss.Result('n_tpt_initiated', dtype=int),
-            ss.Result('n_3HP_assigned', dtype=int),
         )
 
     def update_results(self):
         ppl = self.sim.people
         self.results['n_eligible'][self.ti] = np.count_nonzero(ppl['on_tpt'] | ppl['received_tpt'])
         self.results['n_tpt_initiated'][self.ti] = np.count_nonzero(ppl['on_tpt'])
-        self.results['n_3HP_assigned'][self.ti] = np.count_nonzero(ppl['on_tpt'] & (ppl.age < self.pars.max_age))
+
         
 
 class TPTRegimes():
