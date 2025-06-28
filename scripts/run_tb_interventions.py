@@ -122,27 +122,27 @@ def get_scenarios():
             'tbpars': dict(start=sc.date('1970-02-07'), 
                 stop=sc.date('2030-12-31')),
         },
-        # 'BCG': {
-        #     'name': 'BCG PROTECTION',
-        #     'tbpars': dict(start=sc.date('1970-02-17'), 
-        #                    stop=sc.date('2030-12-31')),
-        #     'bcgintervention': dict(
-        #         coverage=0.90,
-        #         start=sc.date('1972-01-01'),
-        #         stop=sc.date('2030-12-31'),
-        #         age_limit=6,
-        #     ),
-        # },
-        # Under construction, not yet finished 
-        'TPT': {
-            'name': 'TPT INITIATION',
-            'tptintervention': dict(
-                p_tpt=ss.bernoulli(1.0),
-                max_age=55,
-                hiv_status_threshold=True,
-                start=sc.date('1970-01-01'),
+        'BCG': {
+            'name': 'BCG PROTECTION',
+            'tbpars': dict(start=sc.date('1970-02-07'), 
+                           stop=sc.date('2030-12-31')),
+            'bcgintervention': dict(
+                coverage=0.90,
+                start=sc.date('1972-01-01'),
+                stop=sc.date('2030-12-31'),
+                age_limit=6,
             ),
         },
+        # Under construction, not yet finished 
+        # 'TPT': {
+        #     'name': 'TPT INITIATION',
+        #     'tptintervention': dict(
+        #         p_tpt=ss.bernoulli(1.0),
+        #         max_age=55,
+        #         hiv_status_threshold=True,
+        #         start=sc.date('1970-01-01'),
+        #     ),
+        # },
     }
 
 
