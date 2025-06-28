@@ -79,7 +79,7 @@ def build_sim(scenario=None, spars=None):
             inv.append(cls(pars=params))
 
     # Core sim components
-    pop = ss.People(n_agents=100, age_data=age_data, extra_states=mtb.get_extrastates())
+    pop = ss.People(n_agents=500, age_data=age_data, extra_states=mtb.get_extrastates())
     tb = mtb.TB(pars=tbpars)
     networks = [ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
                 mtb.HouseholdNet()]

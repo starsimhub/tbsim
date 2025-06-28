@@ -10,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 class BCGProtection(ss.Intervention):
     """
-    Simulates BCG-like vaccination for tuberculosis prevention in children under a specified age.
+    Simulates BCG-like vaccination for tuberculosis prevention in individuals under a specified age.
 
-    This intervention identifies children below a configurable age limit who have not yet 
-    been vaccinated. At each timestep, a proportion of these eligible individuals are 
+    This intervention identifies individuals below a configurable age limit who have not yet 
+    been vaccinated. At each timestep, a proportion of these eligible individuals is 
     selected based on the `coverage` parameter to receive simulated BCG protection.
 
     Once vaccinated, individuals are considered protected for a fixed number of years 
@@ -34,29 +34,20 @@ class BCGProtection(ss.Intervention):
             - 'death_modifier'      (ss.uniform): Distribution for TB mortality modifier (default: uniform(0.05, 0.15)).
 
     Usage Examples:
-        # Basic usage with default parameters
+        # Basic usage with default parameters (targets individuals ≤5 years)
         bcg = BCGProtection()
         
-        # Custom parameters using dictionary
+        # Custom parameters using dictionary (targets individuals ≤7 years)
         bcg = BCGProtection(pars={
             'coverage': 0.8,
             'start': '2020-01-01',
             'stop': '2030-12-31',
             'efficacy': 0.9,
             'duration': 15,
-            'age_limit': 3
+            'age_limit': 7
         })
         
-        # Custom parameters using keyword arguments
-        bcg = BCGProtection(
-            coverage=0.7,
-            start='2020-01-01',
-            stop='2030-12-31',
-            efficacy=0.85,
-            duration=12,
-            age_limit=4
-        )
-        
+
         # Custom probability distributions
         bcg = BCGProtection(pars={
             'activation_modifier': ss.uniform(0.4, 0.6),
@@ -92,7 +83,8 @@ class BCGProtection(ss.Intervention):
         This intervention assumes the presence of a TB disease model attached to the simulation 
         and modifies its rr_activation, rr_clearance, and rr_death arrays. The intervention
         uses starsim probability distributions for stochastic modeling and proper date handling
-        for temporal eligibility checks.
+        for temporal eligibility checks. The age_limit parameter allows targeting of any age group,
+        making this intervention suitable for both pediatric and adult vaccination strategies.
     """
 
     def __init__(self, pars={}, **kwargs):
@@ -173,45 +165,46 @@ class BCGProtection(ss.Intervention):
 
     def step(self):
         """
-        Executes pediatric BCG vaccination during the current simulation timestep.
+        Executes BCG vaccination during the current simulation timestep.
 
-        This method implements a targeted Bacille Calmette–Guérin (BCG) immunization strategy
-        restricted to pediatric populations, typically neonates or children below a specified
-        age threshold. It models age-filtered eligibility, stochastic coverage, and vaccine-induced
-        protection with time-limited efficacy.
-
-        Parameters
-        ----------
-        sim : starsim.Simulation
-            The simulation object representing current time and population state.
+        This method implements a targeted Bacille Calmette-Guérin (BCG) immunization strategy
+        for individuals below a specified age threshold. It models age-filtered eligibility, 
+        stochastic coverage, and vaccine-induced protection with time-limited efficacy.
 
         Notes
         -----
         This intervention performs the following operations:
 
-        1. **Temporal and pediatric eligibility**:
-        Ensures the current timestep falls within the vaccination window and filters individuals
-        by age (e.g., <1 year or <5 years) and vaccination history.
+        1. **Temporal eligibility check**:
+           Verifies the current simulation time falls within the intervention window (start/stop dates).
 
-        2. **Stochastic assignment**:
-        Vaccinates eligible children based on a predefined coverage probability.
+        2. **Protection expiration management**:
+           Checks for previously vaccinated individuals whose protection has expired and removes
+           their protection effects from TB risk modifiers.
 
-        3. **Status update**:
-        Marks individuals as vaccinated and logs the immunization time.
+        3. **Eligibility determination**:
+           Identifies individuals meeting age criteria (≤ age_limit) who have not been vaccinated.
 
-        4. **Vaccine response modeling**:
-        Simulates the probability of an effective immune response. Non-responders receive no benefit.
+        4. **Vaccination assignment**:
+           Randomly selects eligible individuals based on coverage probability and marks them
+           as vaccinated, recording the vaccination timestep.
 
-        5. **Duration and waning**:
-        Assigns a protection period and checks for expiration at each step.
+        5. **Vaccine response modeling**:
+           Simulates individual vaccine response using efficacy probability. Only responders
+           receive protection benefits.
 
-        6. **TB risk modification**:
-        Applies BCG-specific reductions in TB activation and mortality rates for protected children.
+        6. **Protection duration assignment**:
+           Sets expiration timestep for vaccine responders based on protection duration.
 
-        7. **Heterogeneity adjustment**:
-        Models differential vaccine impact based on child-level factors (e.g., birth weight, HIV status).
+        7. **TB risk modification**:
+           Applies BCG-specific modifiers to TB activation, clearance, and death rates
+           using starsim probability distributions for individual heterogeneity.
 
-        Pediatric strategies support early-life immunity modeling, especially in neonatal and infant TB prevention studies.
+        8. **Ongoing protection maintenance**:
+           Ensures protection effects persist for all currently protected individuals.
+
+        The method uses starsim indexing and probability distributions for efficient
+        population-level operations and stochastic modeling.
         """
         
         # 1. Assess temporal eligibility: verify if the current simulation time falls within the intervention window
@@ -237,7 +230,7 @@ class BCGProtection(ss.Intervention):
             if len(expired_uids) > 0:
                 self._remove_protection(expired_uids)
         
-        # 3. Determine immunization eligibility: identify individuals meeting age and vaccination status criteria
+        # 3. Determine immunization eligibility: identify individuals meeting age criteria who have not been vaccinated
         eligible = self.check_eligibility()
         
         if len(eligible) == 0:
@@ -261,7 +254,7 @@ class BCGProtection(ss.Intervention):
         protection_expires = current_time + self.duration
         self.ti_bcg_protection_expires[vaccine_responders] = protection_expires
         
-        # 8. Adjust TB risk modifiers: apply BCG-specific probabilities to TB activation, clearance, and death rates
+        # 8. Adjust TB risk modifiers: apply BCG-specific modifiers to TB activation, clearance, and death rates
         self._apply_protection_effects(vaccine_responders)
         
         # 9. Maintain ongoing protection effects for all currently protected individuals
