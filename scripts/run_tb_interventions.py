@@ -80,11 +80,12 @@ def build_sim(scenario=None, spars=None):
 
     # Core sim components
     pop = ss.People(n_agents=500, age_data=age_data, extra_states=mtb.get_extrastates())
+    # pop = ss.People(n_agents=500, extra_states=mtb.get_extrastates())
     tb = mtb.TB(pars=tbpars)
     networks = [ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
                 mtb.HouseholdNet()]
     
-    demographics = [ss.Births(pars={'birth_rate': 15}),
+    demographics = [ss.Births(pars={'birth_rate': 20}),
                     ss.Deaths(pars={'death_rate': 15})]
 
     # Create and return simulation
@@ -122,15 +123,26 @@ def get_scenarios():
             'tbpars': dict(start=sc.date('1970-02-07'), 
                 stop=sc.date('2030-12-31')),
         },
-        'BCG': {
+        'BCG 2 - 10': {
             'name': 'BCG PROTECTION',
             'tbpars': dict(start=sc.date('1970-02-07'), 
                            stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
-                coverage=0.90,
-                start=sc.date('1972-01-01'),
-                stop=sc.date('2030-12-31'),
-                age_limit=6,
+                coverage=0.60,
+                start=sc.date('1975-01-01'),
+                stop=sc.date('2020-12-31'),
+                age_range=(2, 10),
+            ),
+        },
+        'BCG Adult': {
+            'name': 'BCG PROTECTION',
+            'tbpars': dict(start=sc.date('1970-02-07'), 
+                           stop=sc.date('2030-12-31')),
+            'bcgintervention': dict(
+                coverage=0.30,
+                start=sc.date('1975-01-01'),
+                stop=sc.date('2020-12-31'),
+                age_range=(30, 50),
             ),
         },
         # Under construction, not yet finished 

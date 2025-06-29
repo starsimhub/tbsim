@@ -8,7 +8,7 @@ import datetime
 import sys
 
 
-def plot_results(flat_results, keywords=None, exclude=('15',), n_cols=5,
+def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
                  dark=True, cmap='tab20', heightfold=3, 
                  style='default', savefig=True, outdir=None):
     """

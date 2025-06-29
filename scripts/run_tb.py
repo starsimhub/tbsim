@@ -21,7 +21,7 @@ def build_tbsim(sim_pars=None):
         unit = 'day'
     ))
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
-    births = ss.Births(pars=dict(birth_rate=15))
+    births = ss.Births(pars=dict(birth_rate=20))
     deaths = ss.Deaths(pars=dict(death_rate=15))
 
     sim = ss.Sim(
