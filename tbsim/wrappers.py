@@ -9,6 +9,20 @@ class Agents:
     Static utility methods for filtering agents by age, alive status, etc.
     """
     @staticmethod
+    def of_age(people, age):
+        """
+        Return UIDs of alive individuals of a given age.
+
+        Parameters:
+            people (People): The sim.people object
+            age (float): The exact age to filter by
+
+        Returns:
+            UIDs: The selected individuals
+        """
+        return ss.uids(people.age == age)
+    
+    @staticmethod
     def under_5(people):
         """
         Return UIDs of alive individuals <= 5 years old.
@@ -47,17 +61,59 @@ class Agents:
         Returns:
             UIDs: The selected individuals
         """
-        if max_age is None | min_age is None:
+        if max_age is None and min_age is None:
             raise ValueError("At least one of max_age or min_age must be specified.")
-        if max_age < min_age:
+        
+        condition = np.ones(len(people.age), dtype=bool)
+        
+        if min_age is not None:
+            condition &= (people.age > min_age)
+        if max_age is not None:
+            condition &= (people.age <= max_age)
+            
+        if max_age is not None and min_age is not None and max_age <= min_age:
             raise ValueError("max_age must be greater than min_age.")
-        return ss.uids((people.age >= min_age) & (people.age < max_age))
+            
+        return ss.uids(condition)
 
     @staticmethod
     def get_alive(people):
         """Return UIDs of currently alive individuals."""
         return ss.uids(people.auids)
 
+    @staticmethod
+    def get_alive_by_age(people, max_age=None, min_age=None):
+        """
+        Return UIDs of ALIVE individuals filtered by age.
+
+        Parameters:
+            people (People): The sim.people object
+            max_age (float, optional): Upper age bound (inclusive)
+            min_age (float, optional): Lower age bound (exclusive)
+
+        Returns:
+            UIDs: The selected individuals
+        """
+        # First get alive individuals
+        alive_uids = ss.uids(people.auids)
+        
+        if max_age is None and min_age is None:
+            return alive_uids
+        
+        # Create condition for alive individuals
+        condition = np.zeros(len(people.age), dtype=bool)
+        condition[people.auids] = True
+        
+        # Apply age filters
+        if min_age is not None:
+            condition &= (people.age > min_age)
+        if max_age is not None:
+            condition &= (people.age <= max_age)
+            
+        if max_age is not None and min_age is not None and max_age <= min_age:
+            raise ValueError("max_age must be greater than min_age.")
+            
+        return ss.uids(condition)
    
     @staticmethod
     def where(condition):
