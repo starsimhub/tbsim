@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sciris as sc
 import os
+import re
 
 #- - - - - - MAKE INTERVENTIONS - - - - - -
 def make_hiv_interventions(include:bool=True, pars=None):
@@ -117,7 +118,7 @@ def plot_results( flat_results, keywords=None, exclude=('15',), n_cols=5,
 
     plt.tight_layout()
     # save figure
-    timestamp = sc.now(tostring=True)
+    timestamp = datetime.datetime.now().strftime('%Y_%m_%d_%H%M')
     try:
         out = os.path.join(sc.thisdir(), f'scenarios_{timestamp}.png')
     except Exception:

@@ -2,7 +2,7 @@ import tbsim as mtb
 import starsim as ss
 import matplotlib.pyplot as plt
 import numpy as np
-from shared_functions import make_interventions, make_demographics, plot_results
+from shared_functions import make_hiv_interventions, make_demographics, plot_results
 
 
 # Main Simulation Setup
@@ -36,7 +36,7 @@ def sim_setup( n_agents=10_000,
         diseases=hiv,
         pars=sim_pars,
         networks=network,
-        interventions=make_interventions(Intvs),    
+        interventions=make_hiv_interventions(Intvs),    
         demographics=make_demographics(Demgs),      
     )
 
