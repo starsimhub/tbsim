@@ -38,7 +38,7 @@ def build_tbhiv_sim(Intvs=True, tb=True, includehiv = True, Demgs= True, simpars
     sim = ss.Sim(
         people=people,
         diseases=[sf.make_tb(include=tb), hiv],
-        interventions=sf.make_interventions(include=Intvs),
+        interventions=sf.make_hiv_interventions(Intvs),
         # demographics=demographics,
         networks=network,
         connectors=sf.make_tb_hiv_connector(include=tb),
