@@ -87,7 +87,8 @@ class TBDiagnostic(ss.Intervention):
         false_negative_uids = selected[~test_positive & has_tb]
 
         if len(false_negative_uids):
-            print(f"[t={self.sim.ti}] {len(false_negative_uids)} false negatives → retry scheduled")
+            # print(f"[t={self.sim.ti}] {len(false_negative_uids)} false negatives → retry scheduled")
+            pass
 
         # # Enable retry: reset care flag and allow re-test
         # ppl.sought_care[false_negative_uids] = False
@@ -104,7 +105,8 @@ class TBDiagnostic(ss.Intervention):
             ppl.multiplier_applied[unboosted] = True  # ✅ mark as boosted
 
         if len(unboosted):
-            print(f"[t={self.sim.ti}] Multiplier applied to {len(unboosted)} people")
+            # print(f"[t={self.sim.ti}] Multiplier applied to {len(unboosted)} people")
+            pass
 
         # Reset flags to allow re-care-seeking
         ppl.sought_care[false_negative_uids] = False
