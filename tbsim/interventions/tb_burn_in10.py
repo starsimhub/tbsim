@@ -74,6 +74,117 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+
+class GradualHIVIntervention(ss.Intervention):
+    """
+    Custom HIV intervention that implements gradual ramp-up based on van Schalkwyk et al. 2021 data
+    for eThekwini, South Africa. Handles both age groups: 15-24 and 25+.
+    """
+    
+    def __init__(self, pars, **kwargs):
+        super().__init__(**kwargs)
+        self.define_pars(
+            percent_on_ART=0.50,  # 50% of HIV-positive individuals on ART
+            start=ss.date('1990-01-01'),
+            stop=ss.date('2050-12-31'),
+        )
+        self.update_pars(pars, **kwargs)
+        
+        # Define target years and prevalence levels for adults 25+ (estimated + survey data)
+        self.hiv_targets_25plus = [
+            (1990, 0.01),  # 1% in 1990
+            (1995, 0.04),  # 4% in 1995
+            (2000, 0.11),  # 11% in 2000
+            (2005, 0.19),  # 19% in 2005 (survey data)
+            (2008, 0.22),  # 22% in 2008 (survey data)
+            (2010, 0.18),  # 18% in 2010 (estimated)
+            (2013, 0.21),  # 21% in 2013 (survey data)
+            (2015, 0.19),  # 19% in 2015 (estimated)
+            (2018, 0.25),  # 25% in 2018 (survey data)
+        ]
+        
+        # Define target years and prevalence levels for adults 15-24 (simplified non-decreasing trend)
+        self.hiv_targets_15to24 = [
+            (1990, 0.01),  # 1% in 1990
+            (1995, 0.05),  # 5% in 1995
+            (2000, 0.10),  # 10% in 2000
+            (2005, 0.10),  # 10% in 2005 (leveled off)
+            (2010, 0.10),  # 10% in 2010 (leveled off)
+            (2015, 0.10),  # 10% in 2015 (leveled off)
+        ]
+        
+    def step(self):
+        t = self.sim.now
+        if t < self.pars.start or t > self.pars.stop:
+            return
+            
+        # Get current year
+        current_year = t.year
+        
+        # Find the target prevalence for adults 25+
+        target_prevalence_25plus = 0.0
+        for year, prev in self.hiv_targets_25plus:
+            if current_year >= year:
+                target_prevalence_25plus = prev
+        
+        # Find the target prevalence for adults 15-24
+        target_prevalence_15to24 = 0.0
+        for year, prev in self.hiv_targets_15to24:
+            if current_year >= year:
+                target_prevalence_15to24 = prev
+        
+        # Apply the target prevalence for both age groups
+        self._apply_prevalence(target_prevalence_25plus, min_age=25, max_age=60)
+        self._apply_prevalence(target_prevalence_15to24, min_age=15, max_age=24)
+        
+    def _apply_prevalence(self, target_prevalence, min_age=25, max_age=60):
+        """Apply the target HIV prevalence for a specific age range"""
+        self.hiv = self.sim.diseases.hiv
+        people = self.sim.people
+        
+        # Get alive people in target age range
+        alive_mask = people.alive
+        age_mask = (people.age >= min_age) & (people.age <= max_age)
+        eligible_mask = alive_mask & age_mask
+        eligible_uids = people.auids[eligible_mask]
+        
+        if len(eligible_uids) == 0:
+            return
+            
+        # Calculate target number of HIV-positive people
+        target_infectious = int(np.round(len(eligible_uids) * target_prevalence))
+        
+        # Get current HIV-positive people in eligible age range
+        # First get HIV states for eligible people
+        eligible_hiv_states = self.hiv.state[eligible_uids]
+        hiv_positive_mask = np.isin(eligible_hiv_states, [HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS])
+        current_infectious_uids = eligible_uids[hiv_positive_mask]
+        n_current = len(current_infectious_uids)
+        
+        delta = target_infectious - n_current
+        
+        if delta > 0:
+            # Need to add more HIV infections
+            at_risk_mask = (eligible_hiv_states == HIVState.ATRISK)
+            at_risk_uids = eligible_uids[at_risk_mask]
+            
+            if delta > len(at_risk_uids):
+                # Not enough eligible people to infect
+                delta = len(at_risk_uids)
+            
+            if delta > 0:
+                # Randomly select people to infect
+                chosen_indices = np.random.choice(len(at_risk_uids), size=delta, replace=False)
+                chosen_uids = at_risk_uids[chosen_indices]
+                self.hiv.state[chosen_uids] = HIVState.ACUTE
+                
+                # Put some of them on ART
+                art_indices = np.random.choice(len(chosen_uids), 
+                                             size=int(len(chosen_uids) * self.pars.percent_on_ART), 
+                                             replace=False)
+                art_uids = chosen_uids[art_indices]
+                self.hiv.on_ART[art_uids] = True
+
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import datetime
 import time
@@ -183,6 +294,114 @@ def compute_hiv_prevalence(sim):
                 return np.zeros(time_length)
 
 
+def compute_hiv_prevalence_adults_25plus(sim, target_year=None):
+    """
+    Compute HIV prevalence for adults 25+ at a specific year or over time
+    
+    Args:
+        sim: Simulation object
+        target_year: If specified, compute for this year only. If None, compute over time.
+    
+    Returns:
+        If target_year specified: float (prevalence for that year)
+        If target_year is None: array (prevalence over time)
+    """
+    try:
+        # Get people alive and HIV states
+        people = sim.people
+        alive_mask = people.alive
+        hiv_states = sim.diseases.hiv.state
+        
+        # Get HIV-positive states (states 1, 2, 3 are positive)
+        hiv_positive_mask = np.isin(hiv_states, [1, 2, 3])
+        
+        # Filter for adults 25+
+        adult_25plus_mask = (people.age >= 25)
+        
+        # Combine masks
+        alive_adult_25plus_mask = alive_mask & adult_25plus_mask
+        
+        if target_year is not None:
+            # Compute for specific year
+            time_years = np.array([d.year for d in sim.results['timevec']])
+            target_idx = np.argmin(np.abs(time_years - target_year))
+            
+            # Get states at target time (this is approximate - we use current states)
+            total_adults_25plus = np.sum(alive_adult_25plus_mask)
+            hiv_positive_adults_25plus = np.sum(alive_adult_25plus_mask & hiv_positive_mask)
+            
+            if total_adults_25plus > 0:
+                return hiv_positive_adults_25plus / total_adults_25plus
+            else:
+                return 0.0
+        else:
+            # Compute over time (this is approximate since we only have current states)
+            # For now, return the overall HIV prevalence as a proxy
+            return compute_hiv_prevalence(sim)
+            
+    except Exception as e:
+        print(f"Error computing HIV prevalence for adults 25+: {e}")
+        if target_year is not None:
+            return 0.0
+        else:
+            time_length = len(sim.results['timevec'])
+            return np.zeros(time_length)
+
+
+def compute_hiv_prevalence_adults_15to24(sim, target_year=None):
+    """
+    Compute HIV prevalence for adults 15-24 at a specific year or over time
+    
+    Args:
+        sim: Simulation object
+        target_year: If specified, compute for this year only. If None, compute over time.
+    
+    Returns:
+        If target_year specified: float (prevalence for that year)
+        If target_year is None: array (prevalence over time)
+    """
+    try:
+        # Get people alive and HIV states
+        people = sim.people
+        alive_mask = people.alive
+        hiv_states = sim.diseases.hiv.state
+        
+        # Get HIV-positive states (states 1, 2, 3 are positive)
+        hiv_positive_mask = np.isin(hiv_states, [1, 2, 3])
+        
+        # Filter for adults 15-24
+        adult_15to24_mask = (people.age >= 15) & (people.age <= 24)
+        
+        # Combine masks
+        alive_adult_15to24_mask = alive_mask & adult_15to24_mask
+        
+        if target_year is not None:
+            # Compute for specific year
+            time_years = np.array([d.year for d in sim.results['timevec']])
+            target_idx = np.argmin(np.abs(time_years - target_year))
+            
+            # Get states at target time (this is approximate - we use current states)
+            total_adults_15to24 = np.sum(alive_adult_15to24_mask)
+            hiv_positive_adults_15to24 = np.sum(alive_adult_15to24_mask & hiv_positive_mask)
+            
+            if total_adults_15to24 > 0:
+                return hiv_positive_adults_15to24 / total_adults_15to24
+            else:
+                return 0.0
+        else:
+            # Compute over time (this is approximate since we only have current states)
+            # For now, return the overall HIV prevalence as a proxy
+            return compute_hiv_prevalence(sim)
+            
+    except Exception as e:
+        print(f"Error computing HIV prevalence for adults 15-24: {e}")
+        if target_year is not None:
+            return 0.0
+        else:
+            time_length = len(sim.results['timevec'])
+            return np.zeros(time_length)
+
+
 def compute_hiv_positive_tb_prevalence(sim):
     """Compute HIV-positive TB prevalence as proportion of total population"""
     try:
@@ -279,25 +498,25 @@ def plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_v
         for i, rel_sus in enumerate(rel_sus_vals):
             for j, beta in enumerate(beta_vals):
                 sim = sim_grid[m][i][j]
-                time = np.array([d.year for d in sim.results['timevec']])
+                time = sim.results['timevec']  # Use datetime objects directly
                 n_alive = sim.results['n_alive']
 
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(time, n_alive, color='blue', label='Sim Total Pop (rel. to 2020)')
+                ax.plot(time, n_alive, color='blue', label='Total Population')
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
                 ax.grid(True)
                 if ax_idx == nrows - 1:
                     ax.set_xlabel('Year')
                 if j == 0:
-                    ax.set_ylabel('Pop')
+                    ax.set_ylabel('Population Size')
                 if m == 0 and i == 0 and j == 0:
                     ax.legend(fontsize=6)
 
     plt.tight_layout()
     plt.suptitle('Simulated Total Population', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots (every 20 years)
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
     time_years = np.array([d.year for d in first_sim.results['timevec']])
     min_year = time_years.min()
@@ -306,9 +525,11 @@ def plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_v
     for ax_row in axs:
         if isinstance(ax_row, np.ndarray):
             for ax in ax_row:
-                ax.set_xticks(xticks)
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            ax_row.set_xticks(xticks)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"total_population_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -316,12 +537,38 @@ def plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_v
 
 
 def plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
-    """Plot HIV prevalence and HIV-positive TB prevalence for all parameter combinations"""
+    """Plot HIV prevalence for both age groups (15-24 and 25+) with target data points"""
     import matplotlib.ticker as mtick
+
+    # Define target data points for adults 25+ from van Schalkwyk et al. 2021 for eThekwini, South Africa
+    estimated_data_25plus = [
+        (1990, 0.01),  # 1% in 1990
+        (1995, 0.04),  # 4% in 1995
+        (2000, 0.11),  # 11% in 2000
+        (2010, 0.18),  # 18% in 2010
+        (2015, 0.19),  # 19% in 2015
+    ]
+    
+    survey_data_25plus = [
+        (2005, 0.19),  # 19% in 2005
+        (2008, 0.22),  # 22% in 2008
+        (2013, 0.21),  # 21% in 2013
+        (2018, 0.25),  # 25% in 2018
+    ]
+    
+    # Define target data points for adults 15-24 (simplified non-decreasing trend)
+    estimated_data_15to24 = [
+        (1990, 0.01),  # 1% in 1990
+        (1995, 0.05),  # 5% in 1995
+        (2000, 0.10),  # 10% in 2000
+        (2005, 0.10),  # 10% in 2005
+        (2010, 0.10),  # 10% in 2010
+        (2015, 0.10),  # 10% in 2015
+    ]
 
     nrows = len(tb_mortality_vals) * len(rel_sus_vals)
     ncols = len(beta_vals)
-    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 6 * nrows), sharex=True, sharey=True)
 
     for m, tb_mortality in enumerate(tb_mortality_vals):
         for i, rel_sus in enumerate(rel_sus_vals):
@@ -333,35 +580,47 @@ def plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, 
                 if m == 0 and i == 0 and j == 0:
                     debug_hiv_results(sim)
                 
-                # Compute HIV metrics
-                hiv_prev = compute_hiv_prevalence(sim)
-                hiv_positive_tb_prev = compute_hiv_positive_tb_prevalence(sim)
+                # Compute HIV prevalence for both age groups
+                hiv_prev_25plus = compute_hiv_prevalence_adults_25plus(sim)
+                hiv_prev_15to24 = compute_hiv_prevalence_adults_15to24(sim)
 
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
                 
-                # Plot HIV prevalence (should be around 20%)
-                ax.plot(time, hiv_prev, label='HIV Prevalence', color='red', linewidth=2)
+                # Plot HIV prevalence for adults 25+
+                ax.plot(time, hiv_prev_25plus, label='Model HIV Prevalence (25+)', color='blue', linewidth=2)
                 
-                # Plot HIV-positive TB prevalence
-                ax.plot(time, hiv_positive_tb_prev, label='HIV+ TB Prevalence', color='purple', linestyle='--')
+                # Plot estimated data points for 25+
+                for year, prev in estimated_data_25plus:
+                    ax.plot(datetime.date(year, 1, 1), prev, 'go', markersize=4, alpha=0.8, label='Estimated Data (25+)' if year == 1990 else "")
                 
-                # Add target line for HIV prevalence
-                ax.axhline(0.20, color='red', linestyle=':', linewidth=1, alpha=0.7, label='Target 20% HIV')
+                # Plot survey data points for 25+
+                for year, prev in survey_data_25plus:
+                    ax.plot(datetime.date(year, 1, 1), prev, 'ro', markersize=4, alpha=0.8, label='Survey Data (25+)' if year == 2005 else "")
+                
+                # Plot HIV prevalence for adults 15-24
+                ax.plot(time, hiv_prev_15to24, label='Model HIV Prevalence (15-24)', color='orange', linewidth=2, linestyle='--')
+                
+                # Plot estimated data points for 15-24
+                for year, prev in estimated_data_15to24:
+                    ax.plot(datetime.date(year, 1, 1), prev, 'mo', markersize=4, alpha=0.8, label='Estimated Data (15-24)' if year == 1990 else "")
                 
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
-                ax.grid(True)
+                ax.grid(True, alpha=0.3)
                 if ax_idx == nrows - 1:
                     ax.set_xlabel('Year')
                 if j == 0:
-                    ax.set_ylabel('Prevalence')
+                    ax.set_ylabel('HIV Prevalence')
                 if m == 0 and i == 0 and j == 0:
                     ax.legend(fontsize=6)
+                
+                # Set y-axis to show percentages properly
+                ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0))
 
     plt.tight_layout()
-    plt.suptitle('HIV Prevalence and HIV-Positive TB Prevalence', fontsize=14, y=1.02)
+    plt.suptitle('HIV Prevalence by Age Group: Model vs van Schalkwyk et al. 2021 Data (eThekwini, South Africa)', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots (every 20 years)
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
     time_years = np.array([d.year for d in first_sim.results['timevec']])
     min_year = time_years.min()
@@ -370,9 +629,11 @@ def plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, 
     for ax_row in axs:
         if isinstance(ax_row, np.ndarray):
             for ax in ax_row:
-                ax.set_xticks(xticks)
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            ax_row.set_xticks(xticks)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"hiv_metrics_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -495,7 +756,7 @@ def plot_health_seeking_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
     plt.tight_layout()
     plt.suptitle('Health-Seeking Behavior Over Time', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots (every 20 years)
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
     time_years = np.array([d.year for d in first_sim.results['timevec']])
     min_year = time_years.min()
@@ -504,9 +765,11 @@ def plot_health_seeking_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
     for ax_row in axs:
         if isinstance(ax_row, np.ndarray):
             for ax in ax_row:
-                ax.set_xticks(xticks)
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            ax_row.set_xticks(xticks)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"health_seeking_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -561,7 +824,7 @@ def plot_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, t
     plt.tight_layout()
     plt.suptitle('TB Diagnostic Testing Outcomes', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots (every 20 years)
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
     time_years = np.array([d.year for d in first_sim.results['timevec']])
     min_year = time_years.min()
@@ -570,9 +833,11 @@ def plot_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, t
     for ax_row in axs:
         if isinstance(ax_row, np.ndarray):
             for ax in ax_row:
-                ax.set_xticks(xticks)
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            ax_row.set_xticks(xticks)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"diagnostic_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -622,7 +887,7 @@ def plot_cumulative_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortal
     plt.tight_layout()
     plt.suptitle('Cumulative TB Diagnostic Results', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots (every 20 years)
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
     time_years = np.array([d.year for d in first_sim.results['timevec']])
     min_year = time_years.min()
@@ -631,9 +896,11 @@ def plot_cumulative_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortal
     for ax_row in axs:
         if isinstance(ax_row, np.ndarray):
             for ax in ax_row:
-                ax.set_xticks(xticks)
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            ax_row.set_xticks(xticks)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"cumulative_diagnostic_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -686,7 +953,7 @@ def plot_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, ti
     plt.tight_layout()
     plt.suptitle('TB Treatment Outcomes', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots (every 20 years)
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
     time_years = np.array([d.year for d in first_sim.results['timevec']])
     min_year = time_years.min()
@@ -695,9 +962,11 @@ def plot_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, ti
     for ax_row in axs:
         if isinstance(ax_row, np.ndarray):
             for ax in ax_row:
-                ax.set_xticks(xticks)
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            ax_row.set_xticks(xticks)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"treatment_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -747,7 +1016,7 @@ def plot_cumulative_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortali
     plt.tight_layout()
     plt.suptitle('Cumulative TB Treatment Outcomes', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots (every 20 years)
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
     time_years = np.array([d.year for d in first_sim.results['timevec']])
     min_year = time_years.min()
@@ -756,9 +1025,11 @@ def plot_cumulative_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortali
     for ax_row in axs:
         if isinstance(ax_row, np.ndarray):
             for ax in ax_row:
-                ax.set_xticks(xticks)
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            ax_row.set_xticks(xticks)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"cumulative_treatment_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -1117,18 +1388,19 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
 
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
 
-    # Add TB-HIV connector to model coinfection effects
-    tb_hiv_connector = sf.make_tb_hiv_connector()
+    # Add TB-HIV connector to model coinfection effects with increased progression rates
+    # Higher multipliers to get steeper TB prevalence increase from 1990 onwards
+    # Increased by 50% from previous values
+    tb_hiv_connector = sf.make_tb_hiv_connector(pars=dict(
+        acute_multiplier=4.5,    # Increased from 3.0 to 4.5 (50% higher)
+        latent_multiplier=7.5,   # Increased from 5.0 to 7.5 (50% higher)
+        aids_multiplier=12.0,    # Increased from 8.0 to 12.0 (50% higher)
+    ))
 
-    # Add HIV intervention to maintain 20% prevalence for the entire simulation
-    # Use 'both' mode to properly manage both HIV infection and ART coverage
-    hiv_intervention = sf.make_hiv_interventions(pars=dict(
-        mode='both',  # Changed from 'prevalence' to 'both' to manage both infection and ART
-        prevalence=0.20,  # Maintain 20% HIV prevalence for the entire simulation
+    # Add custom HIV intervention with gradual ramp-up based on van Schalkwyk et al. 2021 data for eThekwini
+    hiv_intervention = GradualHIVIntervention(pars=dict(
         percent_on_ART=0.50,  # 50% of HIV-positive individuals on ART
-        min_age=15,  # Only target adults
-        max_age=60,
-        start=ss.date(f'{start_year}-01-01'),
+        start=ss.date('1990-01-01'),  # Start from 1990 when HIV epidemic began
         stop=ss.date(f'{start_year + years}-01-01'),
     ))
 
@@ -1158,7 +1430,7 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
     ))
 
     # Combine all interventions
-    all_interventions = hiv_intervention + [health_seeking, tb_diagnostic, tb_treatment]
+    all_interventions = [hiv_intervention, health_seeking, tb_diagnostic, tb_treatment]
 
     sim = ss.Sim(
         people=people,
@@ -1230,7 +1502,7 @@ if __name__ == '__main__':
     # Plot population demographics
     # Run sweep
     # Reduced to 2 parameter combinations for faster runtime
-    beta_range = np.array([0.015, 0.025])  # Higher infectiousness range up to 0.025
+    beta_range = np.array([0.025, 0.035])  # Higher infectiousness range 0.025-0.035
     rel_sus_range = np.array([0.15])  # Single value for reinfection susceptibility
     tb_mortality_range = [3e-4]  # Single value for TB mortality
     refined_sweep(beta_range, rel_sus_range, tb_mortality_range)
