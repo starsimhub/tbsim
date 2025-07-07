@@ -69,6 +69,7 @@ diagnostic testing, and treatment outcomes.
 
 import starsim as ss
 import tbsim as mtb
+from tbsim.comorbidities.hiv.hiv import HIVState
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -855,6 +856,191 @@ def plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
     plt.show()
 
 
+def compute_hiv_tb_coinfection_rates(sim, target_year=2018):
+    """
+    Compute HIV coinfection rates among TB cases by symptom status
+    
+    Args:
+        sim: Simulation object
+        target_year: Year to compute rates for
+    
+    Returns:
+        dict: HIV coinfection rates by TB symptom status
+    """
+    
+    # Find the time index closest to target year
+    time_years = np.array([d.year for d in sim.results['timevec']])
+    target_idx = np.argmin(np.abs(time_years - target_year))
+    
+    # Get people alive at target time
+    people = sim.people
+    alive_mask = people.alive
+    
+    # Get TB states
+    tb_states = sim.diseases.tb.state
+    hiv_states = sim.diseases.hiv.state
+    
+    # Define TB states by symptom status
+    # Presymptomatic (0 symptoms) - ACTIVE_PRESYMP
+    presymptomatic_mask = (tb_states == mtb.TBS.ACTIVE_PRESYMP)
+    
+    # Symptomatic (≥1 symptoms) - ACTIVE_SMPOS, ACTIVE_SMNEG, ACTIVE_EXPTB
+    symptomatic_mask = np.isin(tb_states, [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB])
+    
+    # All active TB (any symptoms)
+    all_active_mask = np.isin(tb_states, [mtb.TBS.ACTIVE_PRESYMP, mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB])
+    
+    # Get HIV-positive states (assuming HIV states 1, 2, 3 are positive - adjust as needed)
+    # HIV states: 0=uninfected, 1=acute, 2=latent, 3=AIDS
+    hiv_positive_mask = np.isin(hiv_states, [1, 2, 3])
+    
+    # Filter for adults (age 15+)
+    adult_mask = (people.age >= 15)
+    
+    # Combine masks
+    alive_adult_mask = alive_mask & adult_mask
+    
+    # Calculate coinfection rates for each category
+    coinfection_rates = {}
+    
+    # 1. Presymptomatic TB cases (0 symptoms)
+    presymp_adult_mask = alive_adult_mask & presymptomatic_mask
+    presymp_total = np.sum(presymp_adult_mask)
+    presymp_hiv_positive = np.sum(presymp_adult_mask & hiv_positive_mask)
+    presymp_hiv_rate = (presymp_hiv_positive / presymp_total * 100) if presymp_total > 0 else 0
+    
+    coinfection_rates['presymptomatic'] = {
+        'total_cases': presymp_total,
+        'hiv_positive': presymp_hiv_positive,
+        'hiv_rate_percent': presymp_hiv_rate
+    }
+    
+    # 2. Symptomatic TB cases (≥1 symptoms)
+    sympt_adult_mask = alive_adult_mask & symptomatic_mask
+    sympt_total = np.sum(sympt_adult_mask)
+    sympt_hiv_positive = np.sum(sympt_adult_mask & hiv_positive_mask)
+    sympt_hiv_rate = (sympt_hiv_positive / sympt_total * 100) if sympt_total > 0 else 0
+    
+    coinfection_rates['symptomatic'] = {
+        'total_cases': sympt_total,
+        'hiv_positive': sympt_hiv_positive,
+        'hiv_rate_percent': sympt_hiv_rate
+    }
+    
+    # 3. All active TB cases (any symptoms)
+    all_active_adult_mask = alive_adult_mask & all_active_mask
+    all_active_total = np.sum(all_active_adult_mask)
+    all_active_hiv_positive = np.sum(all_active_adult_mask & hiv_positive_mask)
+    all_active_hiv_rate = (all_active_hiv_positive / all_active_total * 100) if all_active_total > 0 else 0
+    
+    coinfection_rates['all_active'] = {
+        'total_cases': all_active_total,
+        'hiv_positive': all_active_hiv_positive,
+        'hiv_rate_percent': all_active_hiv_rate
+    }
+    
+    return coinfection_rates
+
+
+def plot_hiv_tb_coinfection_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
+    """Plot HIV coinfection rates among TB cases by symptom status for all parameter combinations
+    
+    This function creates a grid of plots showing HIV coinfection rates among TB cases
+    stratified by symptom status, comparing model results to 2018 South Africa survey data.
+    """
+    import matplotlib.ticker as mtick
+
+    # 2018 South Africa survey data (HIV coinfection rates by symptom status)
+    sa_2018_data = {
+        'presymptomatic': 22.4,  # 0 symptoms (presymptomatic)
+        'symptomatic': 36.9,     # ≥1 symptoms (symptomatic) - calculated from weighted average
+        'all_active': 28.8       # All active TB cases
+    }
+    
+    categories = ['presymptomatic', 'symptomatic', 'all_active']
+    category_labels = ['0 Symptoms\n(Presymptomatic)', '≥1 Symptoms\n(Symptomatic)', 'All Active TB']
+    sa_2018_values = [sa_2018_data[cat] for cat in categories]
+
+    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
+    ncols = len(beta_vals)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
+
+    for m, tb_mortality in enumerate(tb_mortality_vals):
+        for i, rel_sus in enumerate(rel_sus_vals):
+            for j, beta in enumerate(beta_vals):
+                sim = sim_grid[m][i][j]
+                
+                # Compute HIV-TB coinfection rates for 2018
+                coinfection_rates = compute_hiv_tb_coinfection_rates(sim, target_year=2018)
+                model_rates = [coinfection_rates[cat]['hiv_rate_percent'] for cat in categories]
+
+                ax_idx = m * len(rel_sus_vals) + i
+                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
+                
+                # Create bar plot
+                x_pos = np.arange(len(categories))
+                width = 0.35
+                
+                # Plot model results
+                bars1 = ax.bar(x_pos - width/2, model_rates, width, 
+                              label='Model (2018)', alpha=0.8, color='blue')
+                
+                # Plot South Africa 2018 data
+                bars2 = ax.bar(x_pos + width/2, sa_2018_values, width, 
+                              label='SA Data (2018)', alpha=0.8, color='red')
+                
+                # Add value labels on bars
+                for bar in bars1:
+                    height = bar.get_height()
+                    if height > 0:
+                        ax.text(bar.get_x() + bar.get_width()/2., height + 1,
+                               f'{height:.1f}%', ha='center', va='bottom', fontsize=8)
+                
+                for bar in bars2:
+                    height = bar.get_height()
+                    if height > 0:
+                        ax.text(bar.get_x() + bar.get_width()/2., height + 1,
+                               f'{height:.1f}%', ha='center', va='bottom', fontsize=8)
+                
+                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
+                ax.set_xlabel('TB Symptom Status')
+                ax.set_ylabel('HIV Coinfection Rate (%)')
+                ax.set_xticks(x_pos)
+                ax.set_xticklabels(category_labels, rotation=0, ha='center')
+                ax.grid(True, alpha=0.3)
+                
+                # Set y-axis to show percentages properly
+                ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+                
+                if m == 0 and i == 0 and j == 0:
+                    ax.legend(fontsize=6)
+                
+                # Add percentage differences
+                for k, (model_val, data_val) in enumerate(zip(model_rates, sa_2018_values)):
+                    if data_val > 0:
+                        pct_diff = ((model_val - data_val) / data_val) * 100
+                        ax.annotate(f'{pct_diff:.1f}%', 
+                                    xy=(k, max(model_val, data_val) + 2), 
+                                    xytext=(0, 5), 
+                                    textcoords='offset points',
+                                    ha='center', fontsize=7, color='darkgreen')
+                
+                # Add case counts as text annotations
+                for k, cat in enumerate(categories):
+                    total_cases = coinfection_rates[cat]['total_cases']
+                    hiv_positive = coinfection_rates[cat]['hiv_positive']
+                    ax.text(k, -5, f'n={total_cases}\nHIV+={hiv_positive}', 
+                           ha='center', va='top', fontsize=6, color='gray')
+
+    plt.tight_layout()
+    plt.suptitle('HIV Coinfection Rates Among TB Cases by Symptom Status: Model vs South Africa 2018 Survey Data', 
+                 fontsize=14, y=1.02)
+
+    filename = f"hiv_tb_coinfection_grid_{timestamp}.pdf"
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.show()
+
+
 def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=1000):  # 8000
     start_year = 1850  # 1750
     sim_pars = dict(
@@ -1035,6 +1221,7 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
     plot_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_cumulative_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
+    plot_hiv_tb_coinfection_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
 
 if __name__ == '__main__':
     # Setup for TB prevalence sweeps
@@ -1042,10 +1229,10 @@ if __name__ == '__main__':
     
     # Plot population demographics
     # Run sweep
-    # 2x2x2 parameter grid for 8 total scenarios with higher beta range
+    # Reduced to 2 parameter combinations for faster runtime
     beta_range = np.array([0.015, 0.025])  # Higher infectiousness range up to 0.025
-    rel_sus_range = np.array([0.10, 0.20])  # Reinfection susceptibility range
-    tb_mortality_range = [2e-4, 4e-4]  # TB mortality range
+    rel_sus_range = np.array([0.15])  # Single value for reinfection susceptibility
+    tb_mortality_range = [3e-4]  # Single value for TB mortality
     refined_sweep(beta_range, rel_sus_range, tb_mortality_range)
 
     end_wallclock = time.time()
