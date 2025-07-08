@@ -10,7 +10,7 @@ import sys
 
 def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
                  dark=True, cmap='tab20', heightfold=2, 
-                 style='default', savefig=True, outdir=None):
+                 style='default', savefig=True, outdir=None, metric_filter=None):
     """
     Visualize simulation outputs from multiple scenarios in a structured grid layout.
 
@@ -33,6 +33,7 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
         style (str, optional): Matplotlib style to apply. Defaults to 'default'. Falls back to 'default' if not found.
         savefig (bool, optional): If True (default), saves the figure as a PNG file with a timestamped filename.
         outdir (str, optional): Directory to save the figure. If None, saves in the current script's directory under 'results'.
+        metric_filter (list[str], optional): List of metric names to plot. If provided, only these metrics will be plotted.
     
     Returns:
         None: The figure is displayed and also saved as a PNG with a timestamped filename.
@@ -92,13 +93,14 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
     all_metrics = {m for flat in flat_results.values() for m in flat}
     if keywords is not None:
         all_metrics = {m for m in all_metrics if any(kw in m for kw in keywords)}
-    metrics = sorted(m for m in all_metrics if not any(ex in m for ex in exclude))
+    if metric_filter is not None:
+        metrics = metric_filter
+    else:
+        metrics = sorted(m for m in all_metrics if not any(ex in m for ex in exclude))
     if not metrics:
         print("No metrics to plot.")
         return
-    if filter is not None:
-        metrics = filter
-        
+
     # plot layout and colors
     n_rows = int(np.ceil(len(metrics) / n_cols))
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, heightfold*n_rows))
