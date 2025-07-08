@@ -19,9 +19,8 @@ class TBS(IntEnum):
 
 
 class TB(ss.Infection):
-    def __init__(self, pars=None, debug=False, **kwargs):
+    def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.debug = debug
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),                            # Initial seed infections
@@ -52,6 +51,7 @@ class TB(ss.Infection):
             reltrans_het = ss.constant(v=1.0),
         )
         self.update_pars(pars, **kwargs) 
+
         # Validate rates
         for k, v in self.pars.items():
             if k[:5] == 'rate_':
@@ -179,7 +179,7 @@ class TB(ss.Infection):
         return
 
     def step(self):
-        prev_state = self.state.copy()
+        # Make all the updates from the SIR model 
         super().step()
         p = self.pars
         ti = self.ti
@@ -263,7 +263,6 @@ class TB(ss.Infection):
         self.rr_death[uids] = 1
 
         return
-
 
     def start_treatment(self, uids):
         """ Start treatment for active TB """
