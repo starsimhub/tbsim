@@ -19,7 +19,7 @@ def build_tbsim(sim_pars=None):
         unit = 'day',
         dt = 7,
         beta = ss.rate_prob(0.0025, unit='year')
-    ), debug=True)
+    ))
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     births = ss.Births(pars=dict(birth_rate=20))
     deaths = ss.Deaths(pars=dict(death_rate=15))
