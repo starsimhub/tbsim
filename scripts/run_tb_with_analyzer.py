@@ -21,7 +21,7 @@ def build_tbsim(sim_pars=None):
     pop = ss.People(n_agents=1000)
 
     tb_params = dict(
-        beta=ss.beta(0.1),
+        beta=ss.rate_prob(0.0025),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
         unit='day'

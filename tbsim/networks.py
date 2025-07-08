@@ -5,6 +5,45 @@ import networkx as nx
 __all__ = ['HouseholdNet']
 
 class HouseholdNet(ss.Network):
+    """
+    A household-level contact network for agent-based simulations using Starsim.
+
+    This network constructs complete graphs among household members and supports 
+    dynamically adding newborns to the simulation and linking them to their household 
+    based on the parent-child relationship. It is especially useful in intervention 
+    trials where household structure and arm assignment are important (e.g., RATIONS trial).
+
+    Parameters
+    ----------
+    hhs : list of lists or arrays of int, optional
+        A list of households, where each household is represented by a list or array of agent UIDs.
+    pars : dict, optional
+        Dictionary of network parameters. Supports:
+            - `add_newborns` (bool): Whether to dynamically add newborns to households.
+    **kwargs : dict
+        Additional keyword arguments passed to the `Network` base class.
+
+    Attributes
+    ----------
+    hhs : list
+        List of household UID groups.
+    pars : sc.objdict
+        Dictionary-like container of network parameters.
+    edges : Starsim EdgeStruct
+        Container for the network's edges (p1, p2, and beta arrays).
+
+    Methods
+    -------
+    add_hh(uids):
+        Add a complete graph among the given UIDs to the network.
+    
+    init_pre(sim):
+        Initialize the network prior to simulation start. Adds initial household connections.
+
+    step():
+        During simulation, adds newborns to the network by linking them to their household contacts 
+        and assigning household-level attributes (e.g., hhid, trial arm).
+    """
     def __init__(self, hhs=None, pars=None, **kwargs):
         super().__init__(**kwargs)
 
@@ -43,10 +82,8 @@ class HouseholdNet(ss.Network):
         self.edges.p2 = ss.uids(self.edges.p2)
 
         return
-
-    def step(self):
+    def step(self): 
         """ Adds newborns to the trial population, including hhid, arm, and household contacts """
-        super().step()
 
         if not self.pars.add_newborns:
             return

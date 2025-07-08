@@ -7,21 +7,21 @@ def build_tbsim(sim_pars=None):
     spars = dict(
         unit = 'day',
         dt = 7, 
-        start = sc.date('2013-01-01'),      
-        stop = sc.date('2016-12-31'), 
-        rand_seed = 123,
+        start = sc.date('1940-01-01'),      
+        stop = sc.date('2010-12-31'), 
+        rand_seed = 1,
     )
     if sim_pars is not None:
         spars.update(sim_pars)
 
     pop = ss.People(n_agents=1000)
     tb = mtb.TB(dict(
-        beta = ss.beta(0.1),
-        init_prev = ss.bernoulli(p=0.25),
-        unit = 'day'
+        unit = 'day',
+        dt = 7,
+        beta = ss.rate_prob(0.0025, unit='year')
     ))
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
-    births = ss.Births(pars=dict(birth_rate=15))
+    births = ss.Births(pars=dict(birth_rate=20))
     deaths = ss.Deaths(pars=dict(death_rate=15))
 
     sim = ss.Sim(
@@ -32,13 +32,20 @@ def build_tbsim(sim_pars=None):
         pars=spars,
     )
 
-    sim.pars.verbose = sim.pars.dt / 365
+    sim.pars.verbose = 0
 
     return sim
 
 if __name__ == '__main__':
-    sim_tb = build_tbsim()
-    sim_tb.run()
-    tb : mtb.TB = sim_tb.diseases['tb']
-    tb.plot()
+    sim = ss.Sim()
+    
+    sim = build_tbsim()
+    sim.run()
+    print(sim.pars)
+    results = sim.results.flatten()
+    results = {'basic': results}
+    mtb.plot_combined(results, dark=True, n_cols=3, filter=mtb.FILTERS.important_metrics)
+
+    
+    
     plt.show()

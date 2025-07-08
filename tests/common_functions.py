@@ -1,8 +1,6 @@
 import starsim as ss 
-import sciris as sc
 import tbsim as mtb 
 import numpy as np 
-import matplotlib.pyplot as plt
 import pandas as pd
 import os
 
@@ -13,7 +11,7 @@ def make_tb(pars = None):
     # Define simulation parameters
     if pars is None: 
         pars = dict(
-            beta = ss.beta(0.1),
+            beta = ss.rate_prob(0.1),
             init_prev = ss.bernoulli(p=0.25),
             unit = 'day'
         )
@@ -58,7 +56,7 @@ def make_births(pars = None):
     # Define births parameters
     if pars is None: 
         pars = dict(
-            birth_rate=20,  # Birth rate
+            birth_rate=15,  # Birth rate
             # Add any other default parameters here
         )
     return ss.Births(pars=pars)
@@ -102,9 +100,7 @@ def make_cnn(pars = None):
     """
     # Define CNN parameters
     if pars is None: 
-        pars = dict(
-            # Add any default parameters here
-        )
+        return dict() #TODO: This may need to be updated with more specific cases of CNN, for instance, TB - Malnutrition, TB - HIV, etc.
     return ss.CNN(pars=pars)  # Placeholder for the actual CNN class
 
 def load_age_data(source='default', file_path=''):

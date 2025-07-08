@@ -1,0 +1,2023 @@
+diff --git a/scripts/run_tb.py b/scripts/run_tb.py
+index 66216d0..b944906 100644
+--- a/scripts/run_tb.py
++++ b/scripts/run_tb.py
+@@ -39,6 +39,5 @@ def build_tbsim(sim_pars=None):
+ if __name__ == '__main__':
+     sim_tb = build_tbsim()
+     sim_tb.run()
+-    tb : mtb.TB = sim_tb.diseases['tb']
+-    tb.plot()
++    sim_tb.plot()
+     plt.show()
+diff --git a/scripts/run_tb_interventions.py b/scripts/run_tb_interventions.py
+new file mode 100644
+index 0000000..f841863
+--- /dev/null
++++ b/scripts/run_tb_interventions.py
+@@ -0,0 +1,205 @@
++import tbsim as mtb
++import starsim as ss
++import sciris as sc
++import matplotlib.pyplot as plt
++import numpy as np
++import pprint as pp
++import pandas as pd
++# Default simulation parameters
++DEFAULT_SPARS = dict(
++    unit='day',
++    dt=7,
++    start=sc.date('1965-01-01'),
++    stop=sc.date('2035-12-31'),
++    rand_seed=123,
++    verbose =0,
++)
++DEFAULT_TBPARS = dict(
++        beta = ss.beta(0.1),
++        init_prev = ss.bernoulli(p=0.25),
++        unit = 'day',
++        dt=7,      
++        start=sc.date('1975-02-01'),
++        stop=sc.date('2030-12-31'),
++    )
++age_data = pd.DataFrame({
++    'age':   [0, 2, 4, 10, 15, 20, 30, 40, 50, 60, 70, 80],
++    'value': [20, 10, 25, 15, 10, 5, 4, 3, 2, 1, 1, 1]  # Skewed toward younger ages
++})
++
++def build_sim(scenario=None, spars=None):
++    """
++    Build and return a complete Starsim-based simulation instance for TB modeling,
++    incorporating optional interventions and user-defined parameters.
++
++    Args:
++        scenario (dict, optional): A dictionary defining scenario-specific components,
++            such as intervention parameters and TB simulation settings. Expected keys:
++                - 'tbpars' (dict): TB-specific simulation parameters.
++                - 'tptintervention' (dict, optional): Parameters for TPT intervention.
++                - 'bcgintervention' (dict, optional): Parameters for BCG intervention.
++        spars (dict, optional): General simulation parameters (e.g., timestep, duration).
++            These override values in the DEFAULT_SPARS global dictionary.
++
++    Returns:
++        ss.Sim: A fully initialized simulation object containing:
++            - A population (`People`) with TB-related extra states.
++            - A TB disease module initialized with merged parameters.
++            - A list of social and household network layers.
++            - Optional interventions (TPT or BCG) as defined by the scenario.
++            - Demographic processes like births and deaths.
++            - Core simulation parameters merged from defaults and user inputs.
++
++    Notes:
++        - If no scenario is provided, defaults are used.
++        - Intervention objects (`TPTInitiation`, `BCGProtection`) are conditionally added
++          based on the scenario dictionary contents.
++        - The population size is fixed at 100 agents for simplicity.
++        - This function is typically used to instantiate simulations for batch execution,
++          comparison, or visualization.
++    
++    Example:
++        sim = build_sim(scenario=my_scenario, spars={'n_steps': 200})
++        sim.run()
++    """
++    scenario = scenario or {}
++    # merge and override default parameters
++    
++    spars = {**DEFAULT_SPARS, **(spars or {})}  # Merge user spars with default
++    tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})} 
++    pp.pp(spars)
++    pp.pp(tbpars)
++    
++    # Set up interventions safely
++    inv = []
++    for key, cls in [('tptintervention', mtb.TPTInitiation), 
++                     ('bcgintervention', mtb.BCGProtection)]:
++        params = scenario.get(key)
++        if params:
++            inv.append(cls(pars=params))
++
++    # Core sim components
++    pop = ss.People(n_agents=500, age_data=age_data, extra_states=mtb.get_extrastates())
++    tb = mtb.TB(pars=tbpars)
++    networks = [ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
++                mtb.HouseholdNet(),
++                ss.MaternalNet()]
++    
++    demographics = [ss.Births(pars={'birth_rate': 15}),
++                    ss.Deaths(pars={'death_rate': 15})]
++
++    # Create and return simulation
++    return ss.Sim(
++        people=pop,
++        networks=networks,
++        interventions=inv,
++        diseases=tb,
++        demographics=demographics,
++        pars=spars,
++    )
++
++
++def get_scenarios():
++    """
++    Define a set of simulation scenarios for evaluating TB interventions.
++
++    Returns:
++        dict: A dictionary where each key is the name of a scenario and the value is 
++        a dictionary of simulation parameters. Each scenario may include:
++            - 'name' (str): A human-readable scenario name.
++            - 'tbpars' (dict, optional): Parameters controlling the simulation timeframe.
++            - 'bcgintervention' (dict, optional): BCG vaccine intervention settings.
++            - 'tptintervention' (dict, optional): Tuberculosis Preventive Therapy settings.
++    
++    Scenarios included:
++        - 'Baseline': No intervention, default simulation window.
++        - 'BCG': BCG vaccination with 90% coverage.
++        - 'TPT': TPT with full eligibility, conditional on HIV status.
++    """
++    
++    return {
++        'Baseline': {
++            'name': 'BASELINE',
++            'tbpars': dict(start=sc.date('1975-02-07'), 
++                stop=sc.date('2030-12-31')),
++        },
++        'BCG': {
++            'name': 'BCG PROTECTION',
++            'tbpars': dict(start=sc.date('1975-02-15'), 
++                           stop=sc.date('2030-12-31')),
++            'bcgintervention': dict(
++                coverage=0.90,
++                start=sc.date('1970-01-01'),
++                stop=sc.date('2030-12-31'),
++                max_age=15,
++            ),
++        },
++        # Under construction, not yet finished 
++        # 'TPT': {
++        #     'name': 'TPT INITIATION',
++        #     'tptintervention': dict(
++        #         p_tpt=ss.bernoulli(1.0),
++        #         tpt_duration=2.0,
++        #         max_age=25,
++        #         hiv_status_threshold=True,
++        #         p_3HP=0.8,
++        #         start=sc.date('1970-01-01'),
++        #     ),
++        # },
++    }
++
++
++def run_scenarios(plot=True):
++    """
++    Execute all defined TB simulation scenarios and optionally visualize results.
++
++    Args:
++        plot (bool, optional): If True (default), generates comparative plots of 
++        scenario outcomes using a built-in plotting module.
++
++    Returns:
++        None: Results are stored locally within the function and plotted if requested.
++
++    Workflow:
++        1. Retrieves all predefined scenarios using get_scenarios().
++        2. Runs a simulation for each scenario using build_sim().
++        3. Collects and flattens the results for each simulation.
++        4. Optionally plots results in a grid layout with custom styling.
++    
++    Example:
++        >>> run_scenarios(True)
++        
++    
++    NOTE:  
++    -----
++    This line:
++        >>> results[name] = sim.results.flatten()
++         
++    Converts the simulation's time series outputs into a flat dictionary or DataFrame.
++    Makes results easier to compare across scenarios (e.g., plotting incidence over time).
++    The results dictionary now maps scenario names to their flattened outputs:
++    {
++        'BCG': <results>,
++        'TPT': <results>,
++        ...
++    }
++    """
++
++    import tbsim.utils.plots as pl
++
++    results = {}
++    for name, scenario in get_scenarios().items():
++        print(f"\nRunning scenario: {name}")
++        sim = build_sim(scenario=scenario)
++        sim.run()
++        
++        # 
++        results[name] = sim.results.flatten()     
++
++    if plot:
++        pl.plot_results(results, n_cols=5, dark=True, cmap='viridis', heightfold=2, outdir='results/interventions',)
++        plt.show()
++
++
++if __name__ == '__main__':
++    run_scenarios()
+diff --git a/tbsim/__init__.py b/tbsim/__init__.py
+index 3d01b41..4145ed2 100644
+--- a/tbsim/__init__.py
++++ b/tbsim/__init__.py
+@@ -7,8 +7,14 @@ from .comorbidities.hiv.hiv import HIV
+ from .comorbidities.hiv.hiv import HIVState
+ from .comorbidities.hiv.intervention import HivInterventions
+ from .config import *
+-from .interventions import *
++from .interventions.interventions import *
++from .interventions.tpt import *
++from .interventions.bcg import *
+ from .networks import HouseholdNet
+ from .comorbidities.hiv.tb_hiv_cnn import *
+ from .comorbidities.malnutrition.tb_malnut_cnn import TB_Nutrition_Connector
+-from .analyzers import DwtAnalyzer, DwtPlotter, DwtPostProcessor
+\ No newline at end of file
++from .analyzers import DwtAnalyzer, DwtPlotter, DwtPostProcessor
++from .utils.probabilities import *
++from .utils.plots import *
++from .wrappers import Agents
++from .misc.tbterms import TBTerms, TermsExport
+diff --git a/tbsim/interventions/bcg.py b/tbsim/interventions/bcg.py
+new file mode 100644
+index 0000000..3b0ef79
+--- /dev/null
++++ b/tbsim/interventions/bcg.py
+@@ -0,0 +1,204 @@
++import numpy as np
++import starsim as ss
++from tbsim.utils.probabilities import Probability
++from tbsim.wrappers import Agents
++import sciris as sc
++import logging
++
++__all__ = ['BCGProtection']
++
++logger = logging.getLogger(__name__)
++
++class BCGProtection(ss.Intervention):
++    """
++    Simulates BCG-like vaccination for tuberculosis prevention in children under a specified age.
++
++    This intervention identifies children below a configurable age limit who have not yet 
++    been vaccinated. At each timestep, a proportion of these eligible individuals are 
++    selected based on the `coverage` parameter to receive simulated BCG protection.
++
++    Once vaccinated, individuals are considered protected for a fixed number of years 
++    (`duration`). While protected, their TB-related risk modifiers — activation, clearance, 
++    and death — are adjusted using scaled and sampled values from a BCG-specific probability 
++    model (`BCGProb`).
++
++    Parameters:
++        pars (dict, optional): Dictionary of parameters. Supported keys:
++            - 'coverage' (float): Fraction of eligible individuals vaccinated per timestep (default: 0.9).
++            - 'start' (int): Year when the intervention starts (default: 1900).
++            - 'stop' (int): Year when the intervention stops (default: 2100).
++            - 'efficacy' (float): Scaling factor applied to sampled risk modifiers (default: 0.8).
++            - 'duration' (int): Duration (in years) for which BCG protection remains effective (default: 10).
++            - 'age_limit' (int): Maximum age (in years) to be considered eligible for vaccination (default: 5).
++            - 'prob_file' (str): Optional path to a JSON or CSV file defining probability distributions.
++
++    Attributes:
++        bcg_probs (BCGProb): Instance that stores and samples from the defined probability ranges.
++        vaccinated (ss.State): Boolean array indicating vaccination status.
++        ti_bcgvaccinated (ss.State): Array storing the timestep at which individuals were vaccinated.
++        n_eligible (int): Number of individuals eligible for vaccination in the current step.
++        eligible (np.ndarray): Boolean mask of currently eligible individuals.
++
++    States:
++        vaccinated (bool): Indicates whether an individual has received the BCG vaccine.
++        ti_bcgvaccinated (float): Timestep at which the individual was vaccinated.
++
++    Methods:
++        check_eligibility(): Identify and randomly select eligible individuals for vaccination.
++        is_protected(uids, current_time): Return boolean mask indicating protected individuals.
++        step(): Apply BCG protection and adjust TB risk modifiers accordingly.
++        init_results(): Define simulation result metrics.
++        update_results(): Record the number of vaccinated and eligible individuals each timestep.
++
++    Notes:
++        This intervention assumes the presence of a TB disease model attached to the simulation 
++        and modifies its rr_activation, rr_clearance, and rr_death arrays.
++    """
++
++    def __init__(self, pars={}, **kwargs):
++        super().__init__(**kwargs)
++        self.coverage = pars.get('coverage', 0.6)
++        self.start = pars.get('start', sc.date('1900-01-01'))            
++        self.stop = pars.get('stop', sc.date('2100-12-31'))
++        self.efficacy = pars.get('efficacy', 0.8)      # BCGProb of protection
++        self.duration = pars.get('duration', 10)       # Duration of protection in years
++        self.age_limit = pars.get('age_limit', 5)      # Max age for eligibility
++        self.n_eligible = 0
++        self.eligible = []
++        self.probs = BCGProb()
++
++        self.define_states(
++            ss.BoolArr('vaccinated', default=False),
++            ss.FloatArr('ti_bcgvaccinated'), 
++        )
++        logger.debug(self.pars)
++        
++    def check_eligibility(self):
++        ages = self.sim.people.age
++        under_age = ages <= self.age_limit
++
++        eligible = under_age & ~self.vaccinated
++        eligible_uids = np.where(eligible)[0]
++        n_to_vaccinate = int(len(eligible_uids) * self.coverage)
++        if n_to_vaccinate > 0:
++            chosen = np.random.choice(eligible_uids, size=n_to_vaccinate, replace=False)
++            self.eligible = np.zeros_like(eligible)
++            self.eligible[chosen] = True
++        else:
++            chosen = np.array([], dtype=int)
++            self.eligible = np.zeros_like(eligible)
++        self.n_eligible = len(chosen)
++        return ss.uids(chosen)
++
++    def is_protected(self, uids, current_time):
++        """Return boolean array: True if still protected (within duration), else False."""
++        return (self.vaccinated[uids]) & ((current_time - self.ti_bcgvaccinated[uids]) <= self.duration)
++
++    def step(self):
++        # Check if now is the right time to vaccinate
++        now = sc.date(self.sim.now)
++        if now < self.start or now > self.stop:
++            return
++        
++        current_time = self.ti  # Assuming sim.t is in years
++        eligible = self.check_eligibility()
++        if len(eligible) == 0:
++            return
++        # Vaccinate
++        self.vaccinated[eligible] = True
++        self.ti_bcgvaccinated[eligible] = self.ti
++        tb = self.sim.diseases.tb
++        # Only apply effect to those who are protected (within duration)
++        protected = self.is_protected(eligible, current_time)
++        protected_uids = eligible[protected]
++        if len(protected_uids) > 0:
++            tb.rr_activation[protected_uids] *= self.efficacy * self.probs.activation()
++            tb.rr_clearance[protected_uids] *= self.probs.clearance()
++            tb.rr_death[protected_uids] *= self.probs.death()
++
++    def init_results(self):
++        self.define_results(
++            ss.Result('n_vaccinated', dtype=int),
++            ss.Result('n_eligible', dtype=int),
++        )
++
++    def update_results(self):
++        self.results['n_vaccinated'][self.ti] = np.count_nonzero(self.vaccinated)
++        self.results['n_eligible'][self.ti] = self.n_eligible
++
++
++class BCGProb(Probability):
++    """
++    Specialized `Probability` class for BCG-related tuberculosis risk modifiers.
++
++    This class predefines three common parameters relevant to BCG vaccination impact
++    on tuberculosis outcomes:
++
++    - **activation**: Modifier for TB activation risk (default: uniform between 0.5 and 0.65).
++    - **clearance**: Modifier for bacterial clearance probability (default: uniform between 1.3 and 1.5).
++    - **death**: Modifier for TB-related mortality risk (default: uniform between 0.05 and 0.15).
++
++    Additional distributions may be loaded or overridden via JSON or CSV.
++
++    Parameters
++    ----------
++    from_file : str, optional
++        Path to a `.json` or `.csv` file containing custom probability definitions.
++        If provided, the file is used to override or supplement the default values.
++
++    Attributes
++    ----------
++    values : RangeDict
++        Container for all named `Range` objects, supporting both dict- and dot-access.
++
++    Methods
++    -------
++    activation(size=None)
++        Sample from the activation modifier distribution.
++
++    clearance(size=None)
++        Sample from the clearance modifier distribution.
++
++    death(size=None)
++        Sample from the TB mortality modifier distribution.
++
++    from_json(filename)
++        Load distributions from a JSON file with structure: {name: {min, max, dist}}.
++
++    from_csv(filename)
++        Load distributions from a CSV file with columns: name, min, max [,dist].
++
++    from_dict(data)
++        Load distributions from a dictionary (same structure as JSON).
++
++    sample(name, size=None)
++        Sample from any named distribution using the specified distribution type.
++
++    """
++
++    def __init__(self, from_file=None):
++        super().__init__()
++        self.from_dict({
++            "activation": {"min": 0.5, "max": 0.65},
++            "clearance": {"min": 1.3, "max": 1.5},
++            "death": {"min": 0.05, "max": 0.15}
++        })
++        if from_file:
++            if from_file.endswith('.json'):
++                self.from_json(from_file)
++            elif from_file.endswith('.csv'):
++                self.from_csv(from_file)
++            else:
++                raise ValueError("Unsupported file format. Use .json or .csv.")
++
++    def activation(self, size=None):
++        """Sample from the activation risk modifier distribution."""
++        return self.sample("activation", size)
++
++    def clearance(self, size=None):
++        """Sample from the clearance modifier distribution."""
++        return self.sample("clearance", size)
++
++    def death(self, size=None):
++        """Sample from the TB mortality modifier distribution."""
++        return self.sample("death", size)
+diff --git a/tbsim/interventions.py b/tbsim/interventions/interventions.py
+similarity index 69%
+rename from tbsim/interventions.py
+rename to tbsim/interventions/interventions.py
+index dcebd31..132fe9a 100644
+--- a/tbsim/interventions.py
++++ b/tbsim/interventions/interventions.py
+@@ -3,8 +3,35 @@ import sciris as sc
+ import numpy as np
+ from tbsim import TBS
+ import datetime as dt
++import tbsim as mtb
++import pandas as pd
+ 
+-__all__ = ['Product', 'TBVaccinationCampaign']
++__all__ = ['Product', 'TBVaccinationCampaign', 'get_extrastates']
++
++
++def get_extrastates():
++    exs = [ss.State('sought_care', default=False),
++        ss.State('returned_to_community', default=False),
++        ss.State('received_tpt', default=False),
++        ss.State('tb_treatment_success', default=False),
++        ss.State('tested', default=False),
++        ss.State('test_result', default=np.nan),
++        ss.State('diagnosed', default=False),
++        ss.State('on_tpt', default=True),
++        ss.State('tb_smear', default=False),
++        ss.State('hiv_positive', default=False),
++        ss.State('eptb', default=False),
++        ss.State('symptomatic', default=False),
++        ss.State('presymptomatic', default=False),
++        ss.State('non_symptomatic', default=True),
++        ss.State('screen_negative', default=True),
++        ss.State('household_contact', default=False),
++        ss.State('treatment_success', default=False),
++        ss.State('treatment_failure', default=False),
++        ss.State('hhid', default=False),
++        ss.FloatArr('vaccination_year', default=np.nan),]
++    return exs
++   
+ 
+ class Product(ss.Module):
+     """
+diff --git a/tbsim/interventions/tpt.py b/tbsim/interventions/tpt.py
+new file mode 100644
+index 0000000..3d6d5b5
+--- /dev/null
++++ b/tbsim/interventions/tpt.py
+@@ -0,0 +1,98 @@
++import numpy as np
++import starsim as ss
++
++__all__ = ['TPTInitiation']
++
++
++class TPTInitiation(ss.Intervention):
++    """
++    Tuberculosis Preventive Therapy (TPT) intervention for entire eligible households.
++
++    This intervention identifies households with at least one TB-treated individual, and offers TPT to all
++    other members of those households who meet the following eligibility criteria:
++    
++    Eligibility criteria:
++        - Must reside in a household where at least one member is on TB treatment
++        - Must not already be on TB treatment themselves
++        - Must be screen-negative or non-symptomatic
++        - Optionally filtered by age and/or HIV status (logic can be extended)
++    
++    Treatment logic:
++        - A Bernoulli trial (`p_tpt`) is used to determine which eligible individuals receive TPT
++        - If initiated, individuals are marked as `on_tpt` and receive a fixed protection duration (`tpt_duration`)
++        - After the specified `start` date, a proportion (`p_3HP`) receive the 3HP regimen
++    
++    Parameters:
++        p_tpt (float or ss.Bernoulli): Probability of initiating TPT for an eligible individual
++        tpt_duration (float): Duration of protection in years
++        max_age (int): Optional filter for outcome reporting (default: 5)
++        hiv_status_threshold (bool): Reserved for HIV-based filtering (default: False)
++        p_3HP (float): Proportion of individuals initiated on 3HP after the `start` date
++        start (date): Rollout date after which 3HP becomes available
++
++    Results tracked:
++        n_eligible (int): Number of individuals in eligible households meeting criteria
++        n_tpt_initiated (int): Number of individuals actually started on TPT
++        n_3HP_assigned (int): Subset of TPT individuals presumed to receive 3HP
++
++    Notes:
++        - Requires people to have a 'hhid' attribute (household ID).
++        - Assumes states like 'on_tpt', 'received_tpt', 'screen_negative' are initialized.
++        - Requires HouseHoldNet or similar to define household structure.   
++    """
++
++    def __init__(self, pars=None, **kwargs):
++        super().__init__(**kwargs)
++        self.define_pars(
++            p_tpt=ss.bernoulli(1.0),
++            tpt_duration=2.0,
++            max_age=5,
++            hiv_status_threshold=False,
++            p_3HP=0.3,
++            start=ss.date('2000-01-01'),
++        )
++        self.update_pars(pars=pars, **kwargs)
++
++    def step(self):
++        sim = self.sim
++        ppl = sim.people
++        tb = sim.diseases.tb
++
++        # Identify households with at least one member currently on TB treatment
++        treated = tb.on_treatment & ppl.alive
++        eligible_hhids = np.unique(ppl['hhid'][treated])
++
++        # Identify all members of those households
++        in_eligible_households = np.isin(ppl['hhid'], eligible_hhids)
++        eligible = in_eligible_households & (~tb.on_treatment) & (ppl['screen_negative'] | ppl['non_symptomatic'])
++
++        tpt_candidates = self.pars.p_tpt.filter(eligible.uids)
++
++        if len(tpt_candidates):
++            use_3HP = sim.year >= self.pars.start.year
++            assigned_3HP = np.random.rand(len(tpt_candidates)) < self.pars.p_3HP if use_3HP else np.zeros(len(tpt_candidates), dtype=bool)
++
++            if not hasattr(tb, 'on_treatment_duration'):
++                tb.define_states(ss.FloatArr('on_treatment_duration', default=0.0))
++
++            tb.start_treatment(tpt_candidates)
++            tb.on_treatment_duration[tpt_candidates] = self.pars.tpt_duration
++            ppl['on_tpt'][tpt_candidates] = True
++            ppl['received_tpt'][tpt_candidates] = True
++
++            self.results['n_eligible'][self.ti] = np.count_nonzero(eligible)
++            self.results['n_tpt_initiated'][self.ti] = len(tpt_candidates)
++            self.results['n_3HP_assigned'][self.ti] = np.count_nonzero(assigned_3HP)
++
++    def init_results(self):
++        self.define_results(
++            ss.Result('n_eligible', dtype=int),
++            ss.Result('n_tpt_initiated', dtype=int),
++            ss.Result('n_3HP_assigned', dtype=int),
++        )
++
++    def update_results(self):
++        ppl = self.sim.people
++        self.results['n_eligible'][self.ti] = np.count_nonzero(ppl['on_tpt'] | ppl['received_tpt'])
++        self.results['n_tpt_initiated'][self.ti] = np.count_nonzero(ppl['on_tpt'])
++        self.results['n_3HP_assigned'][self.ti] = np.count_nonzero(ppl['on_tpt'] & (ppl.age < self.pars.max_age))
+\ No newline at end of file
+diff --git a/tbsim/misc/__init__.py b/tbsim/misc/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/tbsim/misc/tbterms.py b/tbsim/misc/tbterms.py
+new file mode 100644
+index 0000000..701d97e
+--- /dev/null
++++ b/tbsim/misc/tbterms.py
+@@ -0,0 +1,209 @@
++from enum import Enum
++from typing import List, Dict
++import csv
++
++__all__ = ["TBTerms", "TermsExport"]
++class TBTerms(Enum):
++    """
++    Enumeration of tuberculosis-related terms and their full descriptions.
++
++    This enum provides:
++    - Safe, structured access to common TB-related abbreviations.
++    - Reverse lookup using original terms such as 'RR-TB' or '1HP'.
++    - Integration with tools for tooltips, autocomplete, and documentation.
++    - Friendly string representations for use in UIs or logs.
++
++    Example:
++        >>> TBTerms.RR.name
++        'RR'
++        >>> TBTerms.RR.value
++        'relative risk'
++        >>> TBTerms._1HP.orig()
++        '1HP'
++        >>> TBTerms.from_key("RR_TB").value
++        'rifampicin-resistant TB'
++        >>> TBTerms.as_dict()["TPT"]
++        'tuberculosis preventive treatment'
++    """
++
++    _1HP = "1 month of daily rifapentine plus isoniazid"
++    _3HP = "3 months of weekly rifapentine plus isoniazid"
++    _3HR = "3 months of daily rifampicin plus isoniazid"
++    _4R = "4 months of daily rifampicin monotherapy"
++    _6H = "6 months of daily isoniazid monotherapy"
++    _6Lfx = "6 months of daily levofloxacin monotherapy"
++    _9H = "9 months of daily isoniazid monotherapy"
++    mtb = "Mycobacterium tuberculosis"
++    ACF = "active case finding"
++    ART = "antiretroviral therapy"
++    ARV = "antiretroviral drugs"
++    BCG = "bacille Calmette-Guérin"
++    CAD = "computer-aided detection"
++    CRP = "C-reactive protein"
++    CXR = "chest radiography"
++    DSD = "differentiated HIV service delivery"
++    ELISA = "enzyme-linked immunosorbent assay"
++    FDC = "fixed-dose combination"
++    GDG = "Guideline Development Group"
++    HMIS = "health management information system"
++    IFN_γ = "interferon-γ"
++    IGRA = "interferon-γ release assay"
++    IPT = "isoniazid preventive treatment"
++    LF = "latent fast TB infection"
++    LFT = "liver function test"
++    Lfx = "levofloxacin"
++    LS = "latent slow TB infection"
++    M_E = "monitoring and evaluation"
++    MDR_TB = "multidrug-resistant tuberculosis"
++    mWRD = "molecular WHO-recommended rapid diagnostic test"
++    NGO = "nongovernmental organization"
++    NNRTI = "non-nucleoside reverse transcriptase inhibitor"
++    NRTI = "nucleotide reverse transcriptase inhibitor"
++    PI = "protease inhibitor"
++    PMTPT = "programmatic management of tuberculosis preventive treatment"
++    PPD = "purified protein derivative"
++    RCT = "randomized controlled trial"
++    RR = "relative risk"
++    RR_TB = "rifampicin-resistant TB"
++    SMNEG = "Smear-negative TB"
++    SMPOS = "Smear-positive TB"
++    SOP = "standard operating procedure"
++    TB = "tuberculosis"
++    TBST = "Mycobacterium tuberculosis antigen-based skin test"
++    TDF = "tenofovir-disoproxil fumarate"
++    TNF = "tumour necrosis factor"
++    TPT = "tuberculosis preventive treatment"
++    XPTB = "extrapulmonary TB"
++
++    def orig(self) -> str:
++        """
++        Return the original representation of the abbreviation.
++
++        Returns:
++            str: Original key, e.g., '1HP', 'RR-TB'.
++
++        Example:
++            >>> TBTerms._3HP.orig()
++            '3HP'
++        """
++        name = self.name
++        if name.startswith("_"):
++            name = name[1:]
++        return name.replace("_", "-") if "-" in name or "_" in self.name else name
++
++    def help(self) -> str:
++        """
++        Return a human-friendly string representation.
++
++        Returns:
++            str: Label in the form 'KEY: description'.
++
++        Example:
++            >>> TBTerms.RR.help()
++            'RR: relative risk'
++        """
++        return f"{self.orig()}: {self.value}"
++
++    def __str__(self) -> str:
++        """String representation for display purposes."""
++        return self.help()
++
++    def __repr__(self) -> str:
++        """Debug-friendly representation."""
++        return f"<{self.__class__.__name__}.{self.name}: '{self.value}'>"
++
++    @classmethod
++    def get(cls, key: str) -> "TBTerms":
++        """
++        Retrieve an enum item from the original key format.
++
++        Args:
++            key (str): Key such as 'RR-TB', '1HP', etc.
++
++        Returns:
++            TBTerms: Corresponding enum entry.
++
++        Raises:
++            TypeError: If the input is not a string.
++            KeyError: If no matching key is found.
++
++        Example:
++            >>> TBTerms.from_key("TDF")
++            <TBTerms.TDF: 'tenofovir-disoproxil fumarate'>
++        """
++        if not isinstance(key, str):
++            raise TypeError(f"Expected string, got {type(key).__name__}")
++        key_fmt = key.replace("-", "_")
++        if key_fmt and key_fmt[0].isdigit():
++            key_fmt = "_" + key_fmt
++        try:
++            return cls[key_fmt]
++        except KeyError:
++            valid_keys = [term.orig() for term in cls]
++            raise KeyError(f"'{key}' is not a valid TB term. Valid options include: {valid_keys}")
++
++    @classmethod
++    def keys(cls) -> List[str]:
++        """
++        List all internal enum-safe keys.
++
++        Returns:
++            List[str]: Enum member names.
++
++        Example:
++            >>> TBTerms.keys()[:3]
++            ['_1HP', '_3HP', '_3HR']
++        """
++        return [member.name for member in cls]
++
++    @classmethod
++    def values(cls) -> List[str]:
++        """
++        List all term descriptions.
++
++        Returns:
++            List[str]: Values of all terms.
++        """
++        return [member.value for member in cls]
++
++    @classmethod
++    def as_dict(cls) -> Dict[str, str]:
++        """
++        Return a dictionary mapping original keys to descriptions.
++
++        Returns:
++            Dict[str, str]: Original key → description.
++        """
++        return {member.orig(): member.value for member in cls}
++
++class TermsExport():
++    @staticmethod
++    def export_tbterms_to_csv(filepath: str) -> None:
++        """
++        Write the TBTerms glossary to a CSV file.
++
++        Args:
++            filepath (str): Path to write the file.
++        """
++        from tbsim.misc.tbterms import TBTerms  # Lazy import to avoid circular dependency
++        with open(filepath, mode='w', newline='', encoding='utf-8') as file:
++            writer = csv.writer(file)
++            writer.writerow(["Term", "Description"])
++            for term in TBTerms:
++                writer.writerow([term.orig(), term.value])
++
++    @staticmethod
++    def export_tbterms_to_markdown() -> str:
++        """
++        Generate a markdown-formatted glossary of all TBTerms.
++
++        Returns:
++            str: A Markdown string with a glossary table.
++        """
++        from tbsim.misc.tbterms import TBTerms  # Lazy import to avoid circular dependency
++        header = "| Term | Description |\n|------|-------------|\n"
++        rows = [f"| {term.orig()} | {term.value} |" for term in TBTerms]
++        return header + "\n".join(rows)
++
++        # Save to file or print
++        print(export_tbterms_to_markdown())
+\ No newline at end of file
+diff --git a/tbsim/networks.py b/tbsim/networks.py
+index eec4219..4594f45 100644
+--- a/tbsim/networks.py
++++ b/tbsim/networks.py
+@@ -5,6 +5,45 @@ import networkx as nx
+ __all__ = ['HouseholdNet']
+ 
+ class HouseholdNet(ss.Network):
++    """
++    A household-level contact network for agent-based simulations using Starsim.
++
++    This network constructs complete graphs among household members and supports 
++    dynamically adding newborns to the simulation and linking them to their household 
++    based on the parent-child relationship. It is especially useful in intervention 
++    trials where household structure and arm assignment are important (e.g., RATIONS trial).
++
++    Parameters
++    ----------
++    hhs : list of lists or arrays of int, optional
++        A list of households, where each household is represented by a list or array of agent UIDs.
++    pars : dict, optional
++        Dictionary of network parameters. Supports:
++            - `add_newborns` (bool): Whether to dynamically add newborns to households.
++    **kwargs : dict
++        Additional keyword arguments passed to the `Network` base class.
++
++    Attributes
++    ----------
++    hhs : list
++        List of household UID groups.
++    pars : sc.objdict
++        Dictionary-like container of network parameters.
++    edges : Starsim EdgeStruct
++        Container for the network's edges (p1, p2, and beta arrays).
++
++    Methods
++    -------
++    add_hh(uids):
++        Add a complete graph among the given UIDs to the network.
++    
++    init_pre(sim):
++        Initialize the network prior to simulation start. Adds initial household connections.
++
++    step():
++        During simulation, adds newborns to the network by linking them to their household contacts 
++        and assigning household-level attributes (e.g., hhid, trial arm).
++    """
+     def __init__(self, hhs=None, pars=None, **kwargs):
+         super().__init__(**kwargs)
+ 
+@@ -43,10 +82,8 @@ class HouseholdNet(ss.Network):
+         self.edges.p2 = ss.uids(self.edges.p2)
+ 
+         return
+-
+-    def step(self):
++    def step(self): 
+         """ Adds newborns to the trial population, including hhid, arm, and household contacts """
+-        super().step()
+ 
+         if not self.pars.add_newborns:
+             return
+diff --git a/tbsim/utils/plots.py b/tbsim/utils/plots.py
+new file mode 100644
+index 0000000..5612ff1
+--- /dev/null
++++ b/tbsim/utils/plots.py
+@@ -0,0 +1,153 @@
++import os
++import numpy as np
++import matplotlib.pyplot as plt
++import sciris as sc
++from typing import Dict, List, Tuple
++import starsim as ss
++import datetime
++import sys
++
++
++def plot_results(flat_results, keywords=None, exclude=('15',), n_cols=5,
++                 dark=True, cmap='tab20', heightfold=3, 
++                 style='default', savefig=True, outdir=None):
++    """
++    Visualize simulation outputs from multiple scenarios in a structured grid layout.
++
++    Args:
++        flat_results (dict): Nested dictionary of the form:
++            {
++                'Scenario A': {'metric1': Result, 'metric2': Result, ...},
++                'Scenario B': {'metric1': Result, 'metric2': Result, ...},
++                ...
++            }
++            Each Result must have `timevec` and `values` attributes representing
++            time series data for a given metric.
++
++        keywords (list[str], optional): If provided, only plot metrics containing at least one of these substrings.
++        exclude (tuple[str], optional): Substrings of metric names to skip. Default is ('15',).
++        n_cols (int, optional): Number of columns in the plot grid. Default is 5.
++        dark (bool, optional): If True (default), uses a gray-on-dark theme for improved contrast.
++        cmap (str, optional): Name of a matplotlib colormap (e.g., 'viridis', 'tab10'). Default is 'tab20'.
++        heightfold (int, optional): Height multiplier per row of subplots. Default is 3.
++        style (str, optional): Matplotlib style to apply. Defaults to 'default'. Falls back to 'default' if not found.
++        savefig (bool, optional): If True (default), saves the figure as a PNG file with a timestamped filename.
++        outdir (str, optional): Directory to save the figure. If None, saves in the current script's directory under 'results'.
++    
++    Returns:
++        None: The figure is displayed and also saved as a PNG with a timestamped filename.
++
++    Workflow:
++        1. Collects all metric names across scenarios.
++        2. Filters metrics based on `keywords` and `exclude`.
++        3. Lays out subplots based on the number of metrics and specified `n_cols`.
++        4. Iterates over each metric and plots it across all scenarios.
++        5. Adjusts appearance (background, style, gridlines, labels).
++        6. Saves the figure as 'scenarios_<timestamp>.png'.
++
++    Example:
++        >>> results = {
++        ...     'BCG': {
++        ...         'incidence': Result(timevec=[0, 1, 2], values=[0.1, 0.2, 0.3]),
++        ...         'mortality': Result(timevec=[0, 1, 2], values=[0.05, 0.07, 0.1])
++        ...     },
++        ...     'TPT': {
++        ...         'incidence': Result(timevec=[0, 1, 2], values=[0.08, 0.15, 0.25]),
++        ...         'mortality': Result(timevec=[0, 1, 2], values=[0.03, 0.05, 0.08])
++        ...     }
++        ... }
++        >>> plot_results(results, keywords=['incidence'], n_cols=2, dark=False, cmap='viridis')
++
++    NOTE:
++    -----
++    This plotting utility assumes results have already been flattened, such that
++    each scenario maps to a dictionary of named time series outputs. This structure
++    enables clean side-by-side comparisons of metrics like incidence or mortality
++    across scenarios in a single visual layout.
++    
++    FLATTENING RESULTS:
++    ---------------
++    This line:
++        >>> results['Any_Name'] = sim.results.flatten()       <-- The name will be used for the series name
++         
++    Converts the simulation's time series outputs into a flat dictionary or DataFrame.
++    Makes results easier to compare across scenarios (e.g., plotting incidence over time).
++    The results dictionary now maps scenario names to their flattened outputs:
++    {
++        'BCG': <results>,
++        'TPT': <results>,
++        ...
++    }
++    
++    """
++
++
++    try:
++        plt.style.use(style)
++    except Exception:
++        print(f"Warning: {style} style not found. Using default style.")
++        plt.style.use('default')
++
++    # collect & filter metric names
++    all_metrics = {m for flat in flat_results.values() for m in flat}
++    if keywords is not None:
++        all_metrics = {m for m in all_metrics if any(kw in m for kw in keywords)}
++    metrics = sorted(m for m in all_metrics if not any(ex in m for ex in exclude))
++    if not metrics:
++        print("No metrics to plot.")
++        return
++
++    # plot layout and colors
++    n_rows = int(np.ceil(len(metrics) / n_cols))
++    fig, axs = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, heightfold*n_rows))
++    axs = np.array(axs).flatten()
++
++    if dark:
++        fig.patch.set_facecolor('lightgray')  # figure background
++        for ax in axs:
++            ax.set_facecolor('darkgray')
++    palette = plt.cm.get_cmap(cmap, len(flat_results))
++
++    # plot each metric
++    for i, metric in enumerate(metrics):
++        ax = axs[i]
++        for j, (scen, flat) in enumerate(flat_results.items()):
++            if metric in flat:
++                r = flat[metric]
++                ax.plot(r.timevec, r.values, lw=0.8, label=scen, color=palette(j))
++        ax.set_title(metric, fontsize=10)
++        vmax = max(flat.get(metric, r).values)
++        if vmax < 1.001:
++            ax.set_ylim(0, max(0.5, vmax))
++            ax.set_ylabel('%')
++        else:
++            ax.set_ylabel('Value')
++        ax.set_xlabel('Time')
++
++        # grid lines
++        ax.grid(True, color='white' if dark else 'gray', alpha=0.3)
++        leg = ax.legend(fontsize=6 if len(flat_results)>5 else 7)
++        if leg: leg.get_frame().set_alpha(0.3)
++
++    # remove unused axes
++    for ax in axs[len(metrics):]:
++        fig.delaxes(ax)
++
++    plt.tight_layout()
++    if savefig:
++        # save figure
++        timestamp = sc.now(dateformat='%Y%m%d_%H%M%S') 
++        # Determine script directory in a cross-platform way
++        if hasattr(sys.modules['__main__'], '__file__'):
++            script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
++        else:
++            script_dir = os.getcwd()
++
++        outdir = 'results' if outdir is None else outdir
++        outdir = os.path.join(script_dir, outdir)
++        os.makedirs(outdir, exist_ok=True)
++
++        out = os.path.join(outdir, f'scenarios_{timestamp}.png')
++        fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
++        print(f"Saved figure to {out}")
++    plt.show()
+\ No newline at end of file
+diff --git a/tbsim/utils/probabilities.py b/tbsim/utils/probabilities.py
+new file mode 100644
+index 0000000..46d208c
+--- /dev/null
++++ b/tbsim/utils/probabilities.py
+@@ -0,0 +1,288 @@
++import json
++import csv
++import numpy as np
++from dataclasses import dataclass, asdict
++from typing import Optional, Union, Dict
++
++
++@dataclass
++class Range:
++    """
++    Represents a numeric range for a named parameter with a probability distribution.
++
++    Attributes:
++        min (float): Lower bound or mean, depending on the distribution type.
++        max (float): Upper bound or standard deviation, depending on the distribution type.
++        dist (str): Distribution type: 'uniform', 'normal', or 'lognormal'. Defaults to 'uniform'.
++    """
++    min: float
++    max: float
++    dist: str = "uniform"
++
++    def validate(self):
++        """
++        Validates the range configuration based on the distribution type.
++
++        Raises:
++            ValueError: If the range is improperly configured.
++        """
++        if self.dist == "uniform" and self.min > self.max:
++            raise ValueError(f"Invalid uniform range: min={self.min} > max={self.max}")
++        if self.dist in {"normal", "lognormal"} and self.max <= 0:
++            raise ValueError(f"Standard deviation must be > 0 for {self.dist} distribution.")
++
++    def sample(self, size: Optional[Union[int, tuple]] = None) -> Union[float, np.ndarray]:
++        """
++        Generate samples from the defined probability distribution.
++
++        Parameters:
++            size (int or tuple, optional): Number of samples or shape of sample array.
++
++        Returns:
++            float or np.ndarray: Sampled value(s).
++        """
++        
++        # TODO: change this to use Starsim distributions
++        self.validate()
++        if self.dist == "uniform":
++            return np.random.uniform(self.min, self.max, size=size)
++        elif self.dist == "normal":
++            return np.random.normal(loc=self.min, scale=self.max, size=size)
++        elif self.dist == "lognormal":
++            return np.random.lognormal(mean=self.min, sigma=self.max, size=size)
++        else:
++            raise ValueError(f"Unsupported distribution type: {self.dist}")
++
++
++class RangeDict:
++    """
++    Dictionary-like container for named probability ranges.
++
++    Provides both dictionary-style and attribute-style access to `Range` instances.
++
++    Example:
++        ranges.activation.min
++        ranges["activation"].sample(10)
++    """
++
++    def __init__(self):
++        self._data = {}
++
++    def add(self, name: str, min_val: float, max_val: float, dist: str = "uniform"):
++        """
++        Add a new named range.
++
++        Parameters:
++            name (str): Name of the parameter.
++            min_val (float): Minimum value or mean.
++            max_val (float): Maximum value or standard deviation.
++            dist (str): Distribution type. Defaults to 'uniform'.
++        """
++        rng = Range(min=min_val, max=max_val, dist=dist)
++        rng.validate()
++        self._data[name] = rng
++        setattr(self, name, rng)
++
++    def __getitem__(self, key): return self._data[key]
++    def __contains__(self, key): return key in self._data
++    def keys(self): return self._data.keys()
++    def items(self): return self._data.items()
++    def values(self): return self._data.values()
++    def __repr__(self): return f"RangeDict({self._data})"
++
++    def to_dict(self) -> Dict[str, dict]:
++        """
++        Convert the internal data to a plain dictionary.
++
++        Returns:
++            dict: Dictionary with keys and serializable Range definitions.
++        """
++        return {k: asdict(v) for k, v in self._data.items()}
++
++
++class Probability:
++    """
++    General-purpose class for managing and sampling from parameter ranges.
++
++    Supports:
++        - Uniform, normal, and lognormal distributions
++        - Loading from JSON, CSV, or Python dict
++        - Dot-style and dict-style access
++        - Export to JSON and CSV
++    """
++
++    def __init__(self):
++        self.values = RangeDict()
++
++    def from_dict(self, data: Dict[str, dict]):
++        """
++        Load probability ranges from a Python dictionary.
++
++        Format:
++            {
++                "param_name": {"min": 0.1, "max": 0.9, "dist": "uniform"},
++                ...
++            }
++
++        Parameters:
++            data (dict): Dictionary with named parameter configurations.
++
++        Raises:
++            ValueError: If required fields are missing or invalid.
++        """
++        for name, entry in data.items():
++            if 'min' not in entry or 'max' not in entry:
++                raise ValueError(f"Missing 'min' or 'max' in entry for '{name}'")
++            self.values.add(
++                name=name,
++                min_val=entry['min'],
++                max_val=entry['max'],
++                dist=entry.get('dist', 'uniform')
++            )
++
++    def from_json(self, filename: str):
++        """
++        Load probability ranges from a JSON file and store them in `self.values`.
++
++        The JSON file must contain a dictionary where each key is the name of a probability
++        parameter, and the value is a dictionary with at least:
++            - min (float): Minimum value or mean (for normal/lognormal)
++            - max (float): Maximum value or std dev (for normal/lognormal)
++            - dist (str, optional): Distribution type ('uniform', 'normal', 'lognormal').
++            Defaults to 'uniform' if not provided.
++
++        Example JSON:
++            {
++                "activation": {"min": 0.5, "max": 0.65},
++                "clearance": {"min": 1.3, "max": 1.5, "dist": "normal"}
++            }
++
++        Parameters:
++            filename (str): Path to the JSON file.
++
++        Populates:
++            self.values (RangeDict): A dictionary-like object mapping each parameter name
++            to a validated Range object that supports sampling and access via dot/dict notation.
++
++        Raises:
++            FileNotFoundError: If the file does not exist or cannot be opened.
++            json.JSONDecodeError: If the file content is not valid JSON.
++            ValueError: If required fields are missing or cannot be parsed.
++        """
++        try:
++            with open(filename, 'r') as f:
++                data = json.load(f)
++
++            if not isinstance(data, dict):
++                raise ValueError("Top-level JSON structure must be a dictionary.")
++
++            for name, entry in data.items():
++                if not isinstance(entry, dict):
++                    raise ValueError(f"Invalid structure for parameter '{name}': must be a dictionary.")
++                if 'min' not in entry or 'max' not in entry:
++                    raise ValueError(f"Missing 'min' or 'max' for parameter '{name}'.")
++
++                try:
++                    min_val = float(entry['min'])
++                    max_val = float(entry['max'])
++                    dist = entry.get('dist', 'uniform')
++                    self.values.add(name=name, min_val=min_val, max_val=max_val, dist=dist)
++                except (ValueError, TypeError) as e:
++                    raise ValueError(f"Invalid values for '{name}': {entry} — {e}")
++
++        except FileNotFoundError as fnf:
++            raise FileNotFoundError(f"JSON file not found: {filename}") from fnf
++        except json.JSONDecodeError as jde:
++            raise json.JSONDecodeError(f"Failed to decode JSON in file '{filename}': {jde.msg}", jde.doc, jde.pos)
++
++
++    def from_csv(self, filename: str):
++        """
++        Load probability ranges from a CSV file and store them in `self.values`.
++
++        The CSV file must contain a header row with the following columns:
++            - name (str): Identifier for each probability (e.g., 'activation').
++            - min (float): Minimum value or mean (for normal/lognormal).
++            - max (float): Maximum value or std dev (for normal/lognormal).
++            - dist (str, optional): Distribution type ('uniform', 'normal', 'lognormal').
++            Defaults to 'uniform' if not provided.
++
++        Parameters:
++            filename (str): Path to the input CSV file.
++
++        Populates:
++            self.values (RangeDict): A dictionary-like object mapping each parameter name
++            to a validated Range object that supports sampling and access via dot/dict notation.
++
++        Raises:
++            FileNotFoundError: If the file is not found or cannot be opened.
++            ValueError: If the CSV is missing required columns or contains invalid data.
++            csv.Error: If the file format is malformed and cannot be parsed.
++        """
++        required_columns = {'name', 'min', 'max'}
++
++        try:
++            with open(filename, newline='') as f:
++                reader = csv.DictReader(f)
++
++                if not reader.fieldnames:
++                    raise ValueError("CSV file is empty or missing a header row.")
++
++                missing = required_columns - set(reader.fieldnames)
++                if missing:
++                    raise ValueError(f"CSV file is missing required columns: {missing}")
++
++                for i, row in enumerate(reader, start=2):  # Line 2 = first data row
++                    try:
++                        name = row['name'].strip()
++                        min_val = float(row['min'])
++                        max_val = float(row['max'])
++                        dist = row.get('dist', 'uniform')
++                        self.values.add(name=name, min_val=min_val, max_val=max_val, dist=dist)
++                    except (ValueError, TypeError) as e:
++                        raise ValueError(f"Error parsing row {i}: {row} — {e}")
++
++        except FileNotFoundError as fnf:
++            raise FileNotFoundError(f"CSV file not found: {filename}") from fnf
++        except csv.Error as ce:
++            raise csv.Error(f"Malformed CSV file: {ce}") from ce
++        
++    # this is where the value is actually sampled
++    def sample(self, name: str, size: Optional[Union[int, tuple]] = None) -> Union[float, np.ndarray]:
++        """
++        Sample from the distribution for a specific parameter.
++
++        Parameters:
++            name (str): Parameter name to sample.
++            size (int or tuple, optional): Shape of the sampled output.
++        Returns:
++            float or np.ndarray: Sampled value(s).
++        Raises:
++            KeyError: If the parameter is not found.
++        """
++        if name not in self.values:
++            raise KeyError(f"Parameter '{name}' not found.")
++        return self.values[name].sample(size=size)
++
++    def to_json(self, filename: str):
++        """
++        Export current parameter ranges to a JSON file.
++        """
++        with open(filename, 'w') as f:
++            json.dump(self.values.to_dict(), f, indent=2)
++
++    def to_csv(self, filename: str):
++        """
++        Export current parameter ranges to a CSV file.
++        """
++        fieldnames = ['name', 'min', 'max', 'dist']
++        with open(filename, 'w', newline='') as f:
++            writer = csv.DictWriter(f, fieldnames=fieldnames)
++            writer.writeheader()
++            for name, rng in self.values.items():
++                writer.writerow({
++                    'name': name,
++                    'min': rng.min,
++                    'max': rng.max,
++                    'dist': rng.dist
++                })
+diff --git a/tbsim/wrappers.py b/tbsim/wrappers.py
+new file mode 100644
+index 0000000..6f234df
+--- /dev/null
++++ b/tbsim/wrappers.py
+@@ -0,0 +1,81 @@
++import numpy as np
++import starsim as ss
++
++__all__ = ['Agents']
++
++    
++class Agents:
++    """
++    Static utility methods for filtering agents by age, alive status, etc.
++    """
++    @staticmethod
++    def under_5(people):
++        """
++        Return UIDs of alive individuals <= 5 years old.
++
++        Parameters:
++            people (People): The sim.people object
++
++        Returns:
++            UIDs: The selected individuals
++        """
++        alive = people.auids
++        age = people.age[alive]
++        mask = age <= 5
++        return ss.uids(alive[mask])
++    
++    @staticmethod
++    def over_5(people):
++        """
++        Return UIDs of alive individuals > 5 years old.
++
++        Parameters:
++            people (People): The sim.people object
++
++        Returns:
++            UIDs: The selected individuals
++        """
++        alive = people.auids
++        age = people.age[alive]
++        mask = age > 5
++        return ss.uids(alive[mask])
++    
++    @staticmethod
++    def get_by_age(people, max_age=None, min_age=None):
++        """
++        Return UIDs of individuals filtered by age.
++
++        Parameters:
++            people (People): The sim.people object
++            max_age (float, optional): Upper age bound (inclusive)
++            min_age (float, optional): Lower age bound (exclusive)
++
++        Returns:
++            UIDs: The selected individuals
++        """
++        age = people.age
++        mask = np.ones_like(age, dtype=bool)
++        if max_age is not None:
++            mask &= age <= max_age
++        if min_age is not None:
++            mask &= age > min_age
++        return ss.uids(np.where(mask)[0])
++
++    @staticmethod
++    def get_alive(people):
++        """Return UIDs of currently alive individuals."""
++        return people.auids
++
++    @staticmethod
++    def get_alive_by_age(people, max_age=None, min_age=None):
++        """
++        Return UIDs of alive individuals filtered by age.
++        """
++        alive = people.auids
++        age = people.age[alive]
++        mask = np.ones(len(alive), dtype=bool)
++        if max_age is not None:
++            mask &= age <= max_age
++        if min_age is not None:
++            mask &= age > min_age
++        return ss.uids(alive[mask])
+diff --git a/tests/common_functions.py b/tests/common_functions.py
+new file mode 100644
+index 0000000..e69e97c
+--- /dev/null
++++ b/tests/common_functions.py
+@@ -0,0 +1,131 @@
++import starsim as ss 
++import sciris as sc
++import tbsim as mtb 
++import numpy as np 
++import matplotlib.pyplot as plt
++import pandas as pd
++import os
++
++def make_tb(pars = None):
++    """
++    Set up the TB simulation with default parameters.
++    """
++    # Define simulation parameters
++    if pars is None: 
++        pars = dict(
++            beta = ss.beta(0.1),
++            init_prev = ss.bernoulli(p=0.25),
++            unit = 'day'
++        )
++    return mtb.TB(pars=pars)
++
++
++def make_pop(pars = None, n_agents=500):
++    """
++    Set up the population with default parameters.
++    """
++    # Define population parameters
++    if pars is None: 
++        pars = dict(
++            n_agents=n_agents,  # Number of agents in the population
++            age_date=load_age_data('default'),  # Load age data from a CSV file or use default data
++        )
++        
++    pop = ss.People(
++        n_agents = n_agents,
++        age_data = load_age_data,
++    )
++    return pop
++
++def make_net(pars = None):
++    """
++    Set up the network with default parameters.
++    """
++    # Define network parameters
++    if pars is None: 
++        pars = dict(
++            n_contacts=ss.poisson(lam=5),  # Number of contacts per agent
++            dur=0,  # Duration of contacts
++            # Add any other default parameters here
++        )
++    return ss.RandomNet(pars=pars)
++
++
++def make_births(pars = None):
++    """
++    Set up the births demographic with default parameters.
++    """
++    # Define births parameters
++    if pars is None: 
++        pars = dict(
++            birth_rate=15,  # Birth rate
++            # Add any other default parameters here
++        )
++    return ss.Births(pars=pars)
++
++
++def make_deaths(pars = None):
++    """
++    Set up the deaths demographic with default parameters.
++    """
++    # Define deaths parameters
++    if pars is None: 
++        pars = dict(
++            death_rate=15,  # Death rate
++            # Add any other default parameters here
++        )
++    return ss.Deaths(pars=pars)
++
++def make_intervention(pars = None):
++    """
++    Set up the intervention with default parameters.
++    """
++    # Define intervention parameters
++    if pars is None: 
++        pars = dict(    )
++    return ss.Intervention(pars=pars)  # Placeholder for the actual intervention class
++
++def make_hiv(pars = None):
++    """
++    Set up the HIV intervention with default parameters.
++    """
++    # Define HIV parameters
++    if pars is None: 
++        pars = dict(
++            # Add any default parameters here
++        )
++    return ss.HIV(pars=pars)  # Placeholder for the actual HIV class
++
++def make_cnn(pars = None):
++    """
++    Set up the CNN intervention with default parameters.
++    """
++    # Define CNN parameters
++    if pars is None: 
++        pars = dict(
++            # Add any default parameters here
++        )
++    return ss.CNN(pars=pars)  # Placeholder for the actual CNN class
++
++def load_age_data(source='default', file_path=''):
++    """
++    Load population data from a CSV file or use default data.
++    """
++    if source == 'default':
++        # Default population data
++        # Gathered from WPP, https://population.un.org/wpp/Download/Standard/MostUsed/
++        age_data = pd.DataFrame({ 
++            'age': np.arange(0, 101, 5),
++            'value': [5791, 4446, 3130, 2361, 2279, 2375, 2032, 1896, 1635, 1547, 1309, 1234, 927, 693, 460, 258, 116, 36, 5, 1, 0]  # 1960
++        })
++    elif source == 'json':
++        if not file_path:
++            raise ValueError("file_path must be provided when source is 'json'.")
++        if not os.path.exists(file_path):
++            raise FileNotFoundError(f"The file at {file_path} does not exist.")
++        data = pd.read_json(file_path)
++        age_data = pd.DataFrame(data)
++    else:
++        raise ValueError("Invalid source. Use 'default' or 'json'.")
++    return age_data
++
+diff --git a/tests/test_bcg.py b/tests/test_bcg.py
+new file mode 100644
+index 0000000..2ba6ba2
+--- /dev/null
++++ b/tests/test_bcg.py
+@@ -0,0 +1,206 @@
++import numpy as np
++import pytest
++from unittest import mock
++from tbsim.interventions.bcg import BCGProtection, BCGProb
++import starsim as ss
++import tbsim as mtb
++import json
++import csv
++import pandas as pd
++import sciris as sc
++
++class DummyTB:
++    def __init__(self, n):
++        self.rr_activation = np.ones(n)
++        self.rr_clearance = np.ones(n)
++        self.rr_death = np.ones(n)
++
++class DummyPeople:
++    def __init__(self, ages):
++        self.age = np.array(ages)
++
++class DummySim:
++    def __init__(self, ages):
++        self.people = DummyPeople(ages)
++        self.diseases = mock.Mock()
++        self.diseases.tb = DummyTB(len(ages))
++        self.t = 0
++
++class DummyState(np.ndarray):
++    """A dummy state array that supports boolean indexing and assignment."""
++    def __new__(cls, shape, dtype=bool, default=False):
++        obj = np.full(shape, default, dtype=dtype).view(cls)
++        return obj
++
++def dummy_define_states(*args, **kwargs):
++    # Patch for ss.Intervention.define_states
++    pass
++
++def dummy_define_results(*args, **kwargs):
++    # Patch for ss.Intervention.define_results
++    pass
++
++def dummy_uids(arr):
++    # Patch for ss.uids
++    return np.array(arr, dtype=int)
++
++def make_sim(agents=20, start=sc.date('2000-01-01'), stop=sc.date('2020-12-31'), dt=7/365):
++    pop = ss.People(n_agents=agents)
++    tb = mtb.TB(pars={'beta': ss.beta(0.01), 'init_prev': 0.25})
++    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
++    pars=dict(dt=dt, start=start, stop=stop)
++    return pop, tb, net, pars
++
++@pytest.fixture
++def patch_ss(monkeypatch):
++    import tbsim.interventions.bcg as bcgmod
++    monkeypatch.setattr(bcgmod, "ss", mock.Mock())
++    bcgmod.ss.uids = dummy_uids
++    bcgmod.ss.BoolArr = lambda name, default=False: DummyState((5,), dtype=bool, default=default)
++    bcgmod.ss.FloatArr = lambda name: DummyState((5,), dtype=float, default=0.0)
++    bcgmod.ss.Intervention = object
++    bcgmod.ss.Result = mock.Mock()
++    # Patch ss.Arr so DummyState is a subclass of it
++    class DummyArr(np.ndarray):
++        pass
++    DummyState.__bases__ = (DummyArr,)
++
++    bcgmod.ss.Arr = DummyArr
++    yield
++
++def test_bcgprob_sampling():
++    prob = BCGProb()
++    a = prob.activation(size=100)
++    c = prob.clearance(size=100)
++    d = prob.death(size=100)
++    assert np.all((a >= 0.5) & (a <= 0.65))
++    assert np.all((c >= 1.3) & (c <= 1.5))
++    assert np.all((d >= 0.05) & (d <= 0.15))
++
++def test_bcgprob_file_json(tmp_path):
++    # Test loading from JSON file
++    data = {
++        "activation": {"min": 0.6, "max": 0.7},
++        "clearance": {"min": 1.4, "max": 1.6},
++        "death": {"min": 0.1, "max": 0.2}
++    }
++    f = tmp_path / "bcgprob.json"
++    with open(f, "w", encoding="utf-8") as fp:
++        json.dump(data, fp)
++    prob = BCGProb(from_file=str(f))
++    a = prob.activation(size=10)
++    assert np.all((a >= 0.6) & (a <= 0.7))
++
++def test_bcgprob_file_csv(tmp_path):
++    # Test loading from CSV file
++    f = tmp_path / "bcgprob.csv"
++    with open(f, "w", newline="", encoding="utf-8") as fp:
++        writer = csv.writer(fp)
++        writer.writerow(["name", "min", "max"])
++        writer.writerow(["activation", 0.6, 0.7])
++        writer.writerow(["clearance", 1.4, 1.6])
++        writer.writerow(["death", 0.1, 0.2])
++    prob = BCGProb(from_file=str(f))
++    a = prob.activation(size=10)
++    assert np.all((a >= 0.6) & (a <= 0.7))
++
++def test_bcg_intervention_default_values():
++    # Test BCGProtection intervention with default parameters
++    nagents = 100
++    pop, tb, net, pars = make_sim(agents=nagents)
++    itv = mtb.BCGProtection()
++    assert isinstance(itv, mtb.BCGProtection)
++    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
++    sim.init()    
++    bcg = sim.interventions['bcgprotection']
++    assert bcg.coverage== 0.6, "Default coverage should be 0.6"
++    assert bcg.efficacy == 0.8, "Default efficacy should be 0.8"
++    assert bcg.start == sc.date('1900-01-01'), "Default start year should be 1900-01-01 with type sc.date"
++    assert bcg.stop == sc.date('2100-12-31'), "Default stop year should be 2100-12-31 with type sc.date"
++    assert bcg.duration == 10, "Default duration should be 10 years"
++    assert bcg.age_limit == 5, "Default age limit should be 5 years"
++    assert len(bcg.vaccinated) == nagents, "Vaccinated array should match population size"
++    assert len(bcg.ti_bcgvaccinated) == nagents, "ti_bcgvaccinated array should match population size"
++
++    
++def test_bcg_intervention_custom_values():
++    # Test BCGProtection intervention with custom parameters
++    nagents = 100
++    pop, tb, net, pars = make_sim(agents=nagents)
++    itv = mtb.BCGProtection(pars={
++        'coverage': 0.75,
++        'efficacy': 0.9,
++        'start': sc.date('2000-01-01'),
++        'stop' : sc.date('2015-01-01'),
++        'duration': 15,
++        'age_limit': 10
++    })
++    assert isinstance(itv, mtb.BCGProtection)
++    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
++    sim.init()    
++    bcg = sim.interventions['bcgprotection']
++    assert bcg.coverage == 0.75, "Custom coverage should be 0.75"
++    assert bcg.efficacy == 0.9, "Custom efficacy should be 0.9"
++    assert bcg.start == sc.date('2000-01-01'), "Custom start year should be 2000-01-01 with type sc.date"
++    assert bcg.stop == sc.date('2015-01-01'), "Custom stop year should be 2015-01-01 with type sc.date"
++    assert bcg.duration == 15, "Custom duration should be 15 years"
++    assert bcg.age_limit == 10, "Custom age limit should be 10 years"
++    assert len(bcg.vaccinated) == nagents, "Vaccinated array should match population size"
++    assert len(bcg.ti_bcgvaccinated) == nagents, "ti_bcgvaccinated array should match population size"
++
++age_data = pd.DataFrame({
++    'age':   [0, 2, 4, 10, 15, 20, 30, 40, 50, 60, 70, 80],
++    'value': [20, 10, 25, 15, 10, 5, 4, 3, 2, 1, 1, 1]  # Skewed toward younger ages
++})
++
++def test_bcg_eligibility_and_vaccination():
++    # this tests checks the eligibility and vaccination of individuals for BCG
++    nagents = 100
++    pop, tb, net, pars = make_sim(agents=nagents)
++    pop = ss.People(n_agents=nagents, age_data=age_data)
++    # pars['start'] = sc.date('2000-01-01')
++    # pars['stop'] = sc.date('2015-01-01')
++    inv_pars={
++        # 'start': sc.date('2000-01-01'),         
++        # 'stop' : sc.date('2014-01-01'),
++    }
++    itv = mtb.BCGProtection(inv_pars)
++    assert isinstance(itv, mtb.BCGProtection)
++    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
++    sim.init()  
++    bcg = sim.interventions['bcgprotection']
++    assert len(bcg.vaccinated) == nagents, "Vaccinated array should match population size"    
++    
++    # Considering default values, only ages <= 5 should be eligible
++    eligible = bcg.check_eligibility()
++    assert len(eligible) > 0, "There should be eligible individuals for vaccination"
++    assert np.all(bcg.vaccinated[eligible] == False), "Eligible individuals should not be vaccinated yet"
++    # Simulate a step to perform vaccination
++    bcg.step()
++    # After step, eligible individuals should be vaccinated
++    assert np.any(bcg.vaccinated[eligible]), "Some eligible individuals should be vaccinated after step"
++    
++def test_bcg_improves_tb_outcomes():
++    # this tests checks the improvement in TB outcomes due to BCG vaccination
++    nagents = 100
++    pop, tb, net, pars = make_sim(agents=nagents)
++    pop = ss.People(n_agents=nagents, age_data=age_data)
++    itv = mtb.BCGProtection()
++    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
++    sim.init()  
++    bcg = sim.interventions['bcgprotection']
++    
++    tb = sim.diseases.tb
++    # Store initial TB outcomes
++    initial_rr_activation = tb.rr_activation.copy()
++    initial_rr_clearance = tb.rr_clearance.copy()
++    initial_rr_death = tb.rr_death.copy()
++    
++    # Simulate a step to apply BCG intervention
++    bcg.step()
++    # Check if TB outcomes have improved
++    assert np.any(tb.rr_activation < initial_rr_activation), "BCG should reduce activation risk"
++    assert np.any(tb.rr_clearance > initial_rr_clearance), "BCG should improve clearance rate"
++    assert np.any(tb.rr_death < initial_rr_death), "BCG should reduce death risk"
++    
++        
+\ No newline at end of file
+diff --git a/tests/test_plots.py b/tests/test_plots.py
+new file mode 100644
+index 0000000..658f8e7
+--- /dev/null
++++ b/tests/test_plots.py
+@@ -0,0 +1,157 @@
++
++import pytest
++import numpy as np
++from unittest import mock
++import matplotlib
++import sys
++from tbsim.utils import plots
++import tempfile
++import os
++import shutil
++import sciris as sc
++ 
++matplotlib.use('Agg')  # Use non-interactive backend for testing
++# Patch sys.modules to mock sciris and starsim if not installed
++modules_to_mock = {}
++for mod in ['sciris', 'starsim']:
++    if mod not in sys.modules:
++        modules_to_mock[mod] = mock.MagicMock()
++sys.modules.update(modules_to_mock)
++ 
++class DummyResult:
++    def __init__(self, timevec, values):
++        self.timevec = np.array(timevec)
++        self.values = np.array(values)
++ 
++@pytest.fixture
++def flat_results():
++    return {
++        'Scenario1': {
++            'incidence': DummyResult([0, 1, 2], [0.1, 0.2, 0.3]),
++            'mortality': DummyResult([0, 1, 2], [0.05, 0.07, 0.1]),
++            'metric15': DummyResult([0, 1, 2], [1, 2, 3]),
++        },
++        'Scenario2': {
++            'incidence': DummyResult([0, 1, 2], [0.08, 0.15, 0.25]),
++            'mortality': DummyResult([0, 1, 2], [0.03, 0.05, 0.08]),
++        }
++    }
++    
++@mock.patch('tbsim.utils.plots.sc')
++@mock.patch('tbsim.utils.plots.plt.show')
++def test_plot_results_creates_valid_png(mock_show, mock_sc, tmp_path, flat_results):
++    # This test checks that the saved file is a valid PNG image
++    import PIL.Image
++    import io
++
++    # Patch sciris.now to return a fixed timestamp
++    mock_sc.now.return_value = '20240101_120000'
++    # Use a custom output directory
++    outdir = tmp_path / "png_check"
++    plots.plot_results(flat_results, outdir=str(outdir), savefig=True)
++    # Check that the PNG file exists
++    png_file = outdir / "scenarios_20240101_120000.png"
++    assert png_file.exists()
++    # Try to open the file as an image
++    with open(png_file, "rb") as f:
++        img_bytes = f.read()
++        img = PIL.Image.open(io.BytesIO(img_bytes))
++        assert img.format == "PNG"
++    assert mock_show.called
++            
++@mock.patch('tbsim.utils.plots.sc')
++@mock.patch('tbsim.utils.plots.plt.show')
++def test_plot_results_custom_outdir(mock_show, mock_sc, flat_results, tmp_path):
++    mock_sc.now.return_value = '20240101_120000'
++    mock_sc.thisdir.return_value = str(tmp_path)
++    outdir = tmp_path / "custom_results"
++    # Ensure directory does not exist before
++    if outdir.exists():
++        shutil.rmtree(outdir)
++    plots.plot_results(flat_results, outdir=str(outdir))
++    # Check that the file was created in the custom outdir
++    files = list(outdir.glob("scenarios_20240101_120000.png"))
++    assert len(files) == 1
++    assert files[0].is_file()
++    assert mock_show.called
++
++@mock.patch('tbsim.utils.plots.sc')
++@mock.patch('tbsim.utils.plots.plt.show')
++def test_plot_results_savefig_false(mock_show, mock_sc, flat_results, tmp_path):
++    mock_sc.now.return_value = '20240101_120000'
++    mock_sc.thisdir.return_value = str(tmp_path)
++    outdir = tmp_path / "nosave_results"
++    plots.plot_results(flat_results, outdir=str(outdir), savefig=False)
++    # Directory should not be created since savefig is False
++    assert not outdir.exists()
++    assert mock_show.called
++
++@mock.patch('tbsim.utils.plots.sc')
++@mock.patch('tbsim.utils.plots.plt.show')
++def test_plot_results_dark_theme(mock_show, mock_sc, flat_results, tmp_path):
++    mock_sc.now.return_value = '20240101_120000'
++    mock_sc.thisdir.return_value = str(tmp_path)
++    plots.plot_results(flat_results, dark=True, savefig=False)
++    assert mock_show.called
++
++@mock.patch('tbsim.utils.plots.sc')
++@mock.patch('tbsim.utils.plots.plt.show')
++def test_plot_results_light_theme(mock_show, mock_sc, flat_results, tmp_path):
++    mock_sc.now.return_value = '20240101_120000'
++    mock_sc.thisdir.return_value = str(tmp_path)
++    plots.plot_results(flat_results, dark=False, savefig=False)
++    assert mock_show.called
++
++@mock.patch('tbsim.utils.plots.sc')
++@mock.patch('tbsim.utils.plots.plt.show')
++def test_plot_results_multiple_metrics_and_scenarios(mock_show, mock_sc, flat_results, tmp_path):
++    mock_sc.now.return_value = '20240101_120000'
++    mock_sc.thisdir.return_value = str(tmp_path)
++    # Should plot both 'incidence' and 'mortality' for both scenarios
++    plots.plot_results(flat_results, n_cols=2, savefig=False)
++    assert mock_show.called
++    
++@mock.patch('tbsim.utils.plots.sc')
++@mock.patch('tbsim.utils.plots.plt.show')
++def test_plot_results_keywords_and_exclude(mock_show, mock_sc, flat_results):
++    mock_sc.now.return_value = '20240101_120000'
++    mock_sc.thisdir.return_value = '.'
++    # Only 'incidence' should be plotted, 'metric15' excluded by default
++    plots.plot_results(flat_results, keywords=['incidence'], n_cols=1)
++    assert mock_show.called
++ 
++@mock.patch('tbsim.utils.plots.sc')
++@mock.patch('tbsim.utils.plots.plt.show')
++ 
++def test_plot_results_no_metrics(mock_show, mock_sc, flat_results, capsys):
++    mock_sc.now.return_value = '20240101_120000'
++    mock_sc.thisdir.return_value = '.'
++    # Use a keyword that doesn't match any metric
++    plots.plot_results(flat_results, keywords=['notfound'])
++    captured = capsys.readouterr()
++    assert "No metrics to plot." in captured.out
++ 
++@mock.patch('tbsim.utils.plots.sc')
++@mock.patch('tbsim.utils.plots.plt.show')
++def test_plot_results_style_fallback(mock_show, mock_sc, flat_results, capsys):
++    mock_sc.now.return_value = '20240101_120000'
++    mock_sc.thisdir.return_value = '.'
++    # Use a non-existent style to trigger fallback
++    plots.plot_results(flat_results, style='nonexistent_style')
++    captured = capsys.readouterr()
++    assert "Warning: nonexistent_style style not found" in captured.out
++ 
++# @mock.patch('tbsim.utils.plots.sc')
++# @mock.patch('tbsim.utils.plots.plt.show')
++# def test_plot_results_handles_empty(flat_results, mock_show, mock_sc, capsys):
++@mock.patch('tbsim.utils.plots.plt.show')
++@mock.patch('tbsim.utils.plots.sc')
++def test_plot_results_handles_empty(mock_sc, mock_show, flat_results, capsys):
++    mock_sc.now.return_value = '20240101_120000'
++    mock_sc.thisdir.return_value = '.'
++    # Empty input
++    plots.plot_results({})
++    captured = capsys.readouterr()
++    assert "No metrics to plot." in captured.out
++ 
++ 
+\ No newline at end of file
+diff --git a/tests/test_wrappers.py b/tests/test_wrappers.py
+new file mode 100644
+index 0000000..47ae8aa
+--- /dev/null
++++ b/tests/test_wrappers.py
+@@ -0,0 +1,76 @@
++import numpy as np
++import pytest
++from unittest import mock
++
++import tbsim.wrappers as wrappers
++
++class DummyPeople:
++    def __init__(self, age, auids=None):
++        self.age = np.array(age)
++        if auids is None:
++            # All alive by default
++            self.auids = np.arange(len(age))
++        else:
++            self.auids = np.array(auids)
++
++@pytest.fixture
++def dummy_uids():
++    # Patch ss.uids to just return the array for test simplicity
++    with mock.patch('tbsim.wrappers.ss.uids', side_effect=lambda x: np.array(x)) as _fixture:
++        yield
++
++def test_under_5(dummy_uids):
++    people = DummyPeople(age=[2, 6, 4, 10, 5])
++    # All alive
++    result = wrappers.Agents.under_5(people)
++    # Should return indices 0,2,4 (ages 2,4,5)
++    np.testing.assert_array_equal(result, [0, 2, 4])
++
++def test_over_5(dummy_uids):
++    people = DummyPeople(age=[2, 6, 4, 10, 5])
++    result = wrappers.Agents.over_5(people)
++    # Should return indices 1,3 (ages 6,10)
++    np.testing.assert_array_equal(result, [1, 3])
++
++def test_get_by_age_max(dummy_uids):
++    people = DummyPeople(age=[2, 6, 4, 10, 5])
++    result = wrappers.Agents.get_by_age(people, max_age=5)
++    # Should return indices 0,2,4 (ages 2,4,5)
++    np.testing.assert_array_equal(result, [0, 2, 4])
++
++def test_get_by_age_min(dummy_uids):
++    people = DummyPeople(age=[2, 6, 4, 10, 5])
++    result = wrappers.Agents.get_by_age(people, min_age=5)
++    # Should return indices 1,3 (ages 6,10)
++    np.testing.assert_array_equal(result, [1, 3])
++
++def test_get_by_age_min_max(dummy_uids):
++    people = DummyPeople(age=[2, 6, 4, 10, 5])
++    result = wrappers.Agents.get_by_age(people, min_age=2, max_age=6)
++    # Should return indices 1,2,4 (ages 6,4,5) but min_age is exclusive, so 2 is excluded
++    # Actually, min_age is exclusive, so ages >2 and <=6: indices 1,2,4 (ages 6,4,5)
++    np.testing.assert_array_equal(result, [1, 2, 4])
++
++def test_get_alive(dummy_uids):
++    people = DummyPeople(age=[2, 6, 4, 10, 5], auids=[0, 2, 4])
++    result = wrappers.Agents.get_alive(people)
++    np.testing.assert_array_equal(result, [0, 2, 4])
++
++def test_get_alive_by_age_max(dummy_uids):
++    people = DummyPeople(age=[2, 6, 4, 10, 5], auids=[0, 2, 4])
++    # Only indices 0,2,4 are alive, with ages 2,4,5
++    result = wrappers.Agents.get_alive_by_age(people, max_age=4)
++    # Should return indices 0,2 (ages 2,4)
++    np.testing.assert_array_equal(result, [0, 2])
++
++def test_get_alive_by_age_min(dummy_uids):
++    people = DummyPeople(age=[2, 6, 4, 10, 5], auids=[0, 2, 4])
++    result = wrappers.Agents.get_alive_by_age(people, min_age=4)
++    # Should return index 4 (age 5)
++    np.testing.assert_array_equal(result, [4])
++
++def test_get_alive_by_age_min_max(dummy_uids):
++    people = DummyPeople(age=[2, 6, 4, 10, 5], auids=[0, 2, 4])
++    result = wrappers.Agents.get_alive_by_age(people, min_age=2, max_age=4)
++    # Should return index 2 (age 4)
++    np.testing.assert_array_equal(result, [2])
+\ No newline at end of file

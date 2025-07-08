@@ -1,10 +1,33 @@
 import starsim as ss
 import sciris as sc
 import numpy as np
-from tbsim import TBS
-import datetime as dt
 
-__all__ = ['Product', 'TBVaccinationCampaign']
+__all__ = ['Product', 'TBVaccinationCampaign', 'get_extrastates']
+
+
+def get_extrastates():
+    exs = [ss.State('sought_care', default=False),
+        ss.State('returned_to_community', default=False),
+        ss.State('received_tpt', default=False),
+        ss.State('tb_treatment_success', default=False),
+        ss.State('tested', default=False),
+        ss.State('test_result', default=np.nan),
+        ss.State('diagnosed', default=False),
+        ss.State('on_tpt', default=True),
+        ss.State('tb_smear', default=False),
+        ss.State('hiv_positive', default=False),
+        ss.State('eptb', default=False),
+        ss.State('symptomatic', default=False),
+        ss.State('presymptomatic', default=False),
+        ss.State('non_symptomatic', default=True),
+        ss.State('screen_negative', default=True),
+        ss.State('household_contact', default=False),
+        ss.State('treatment_success', default=False),
+        ss.State('treatment_failure', default=False),
+        ss.State('hhid', default=False),
+        ss.FloatArr('vaccination_year', default=np.nan),]
+    return exs
+   
 
 class Product(ss.Module):
     """
