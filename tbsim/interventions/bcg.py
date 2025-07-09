@@ -26,9 +26,9 @@ class BCGProtection(ss.Intervention):
             - 'efficacy'            (float): Probability of effective vaccine response (default: 0.8).
             - 'duration'            (int): Duration (in years) for which BCG protection remains effective (default: 10).
             - 'age_range'           (tuple): Age range (min_age, max_age) for vaccination eligibility (default: (0, 5)).
-            - 'activation_modifier' (ss.uniform): Distribution for TB activation risk modifier (default: uniform(0.5, 0.65)).
-            - 'clearance_modifier'  (ss.uniform): Distribution for bacterial clearance modifier (default: uniform(1.3, 1.5)).
-            - 'death_modifier'      (ss.uniform): Distribution for TB mortality modifier (default: uniform(0.05, 0.15)).
+            - 'activation_modifier' (ss.uniform): Distribution for TB activation risk modifier (default: uniform(0.5, 0.65)) - reduces activation risk
+            - 'clearance_modifier'  (ss.uniform): Distribution for bacterial clearance modifier (default: uniform(1.3, 1.5)) - increases clearance probability
+            - 'death_modifier'      (ss.uniform): Distribution for TB mortality modifier (default: uniform(0.05, 0.15)) - reduces mortality risk (lower values = better protection)
     Usage Examples:
         # Basic usage with default parameters (targets individuals 0-5 years)
         bcg = BCGProtection()
@@ -102,9 +102,9 @@ class BCGProtection(ss.Intervention):
             age_range=(0, 5),  # Age range (min_age, max_age) for vaccination eligibility
             
             # BCG-specific probability distributions for TB risk modifiers
-            activation_modifier=ss.uniform(0.5, 0.65),  # Modifier for TB activation risk
-            clearance_modifier=ss.uniform(1.3, 1.5),    # Modifier for bacterial clearance probability
-            death_modifier=ss.uniform(0.05, 0.15),      # Modifier for TB-related mortality risk
+            activation_modifier=ss.uniform(0.5, 0.65),  # Modifier for TB activation risk (reduces risk)
+            clearance_modifier=ss.uniform(1.3, 1.5),    # Modifier for bacterial clearance probability (increases clearance)
+            death_modifier=ss.uniform(0.05, 0.15),      # Modifier for TB-related mortality risk (reduces mortality - lower values = better protection)
         )
         self.update_pars(pars)
 
@@ -122,6 +122,10 @@ class BCGProtection(ss.Intervention):
             ss.FloatArr('ti_bcg_vaccinated'),               # Timestep of vaccination
             ss.Arr('ti_bcg_protection_expires'),            # Timestep when protection expires
             ss.FloatArr('age_at_vaccination'),              # Age when vaccinated
+            # Track the original modifiers applied to each individual to avoid multiple applications
+            ss.FloatArr('bcg_activation_modifier_applied'), # Store the activation modifier applied
+            ss.FloatArr('bcg_clearance_modifier_applied'),  # Store the clearance modifier applied
+            ss.FloatArr('bcg_death_modifier_applied'),      # Store the death modifier applied
         )
         
         # Log intervention configuration
@@ -184,7 +188,15 @@ class BCGProtection(ss.Intervention):
         # Convert uids to ss.uids if it's a numpy array
         if isinstance(uids, np.ndarray):
             uids = ss.uids(uids)
-        return (self.is_bcg_vaccinated[uids]) & ((current_time - self.ti_bcg_vaccinated[uids]) <= self.pars.duration)
+        
+        # Check if individuals are vaccinated and still within protection duration
+        vaccinated = self.is_bcg_vaccinated[uids]
+        within_duration = (current_time - self.ti_bcg_vaccinated[uids]) <= self.pars.duration
+        
+        # Also check if protection expiration time is set (for vaccine responders)
+        has_protection_expiry = ~np.isnan(self.ti_bcg_protection_expires[uids])
+        
+        return vaccinated & within_duration & has_protection_expiry
     
     def step(self):
         """
@@ -282,8 +294,8 @@ class BCGProtection(ss.Intervention):
         # 8. Adjust TB risk modifiers: apply BCG-specific modifiers to TB activation, clearance, and death rates
         self._apply_protection_effects(vaccine_responders)
         
-        # 9. Maintain ongoing protection effects for all currently protected individuals
-        self._maintain_ongoing_protection(current_time)
+        # Note: Removed _maintain_ongoing_protection call to prevent multiple applications of protection effects
+        # The protection effects are applied once when vaccination occurs and persist until expiration
         
     def _apply_protection_effects(self, protected_uids):
         """
@@ -297,10 +309,21 @@ class BCGProtection(ss.Intervention):
             
         tb = self.sim.diseases.tb
         
+        # Check if modifiers have already been applied to avoid multiple applications
+        already_protected = ~np.isnan(self.bcg_activation_modifier_applied[protected_uids])
+        if np.any(already_protected):
+            logger.warning(f"BCG protection effects already applied to {np.sum(already_protected)} individuals. Skipping re-application.")
+            return
+        
         # Sample individual protection levels using starsim probability distributions
         activation_modifiers = self.pars.activation_modifier.rvs(protected_uids)
         clearance_modifiers = self.pars.clearance_modifier.rvs(protected_uids)
         death_modifiers = self.pars.death_modifier.rvs(protected_uids)
+        
+        # Store the modifiers applied to each individual
+        self.bcg_activation_modifier_applied[protected_uids] = activation_modifiers
+        self.bcg_clearance_modifier_applied[protected_uids] = clearance_modifiers
+        self.bcg_death_modifier_applied[protected_uids] = death_modifiers
         
         # Apply modifiers to TB risk rates
         tb.rr_activation[protected_uids] *= activation_modifiers
@@ -319,19 +342,40 @@ class BCGProtection(ss.Intervention):
             
         tb = self.sim.diseases.tb
         
-        # Reset TB risk modifiers to baseline (divide by the applied modifiers)
-        # Note: This is a simplified approach. In practice, you might want to track
-        # the original values and restore them exactly
-        activation_modifiers = self.pars.activation_modifier.rvs(expired_uids)
-        clearance_modifiers = self.pars.clearance_modifier.rvs(expired_uids)
-        death_modifiers = self.pars.death_modifier.rvs(expired_uids)
+        # Get the stored modifiers that were originally applied
+        activation_modifiers = self.bcg_activation_modifier_applied[expired_uids]
+        clearance_modifiers = self.bcg_clearance_modifier_applied[expired_uids]
+        death_modifiers = self.bcg_death_modifier_applied[expired_uids]
         
-        tb.rr_activation[expired_uids] /= activation_modifiers
-        tb.rr_clearance[expired_uids] /= clearance_modifiers
-        tb.rr_death[expired_uids] /= death_modifiers
+        # Check if modifiers were actually applied (not NaN)
+        valid_modifiers = ~np.isnan(activation_modifiers)
+        if not np.any(valid_modifiers):
+            logger.warning("No valid BCG modifiers found for expired individuals. Skipping removal.")
+            return
+            
+        # Only process individuals with valid modifiers
+        valid_uids = expired_uids[valid_modifiers]
+        valid_activation = activation_modifiers[valid_modifiers]
+        valid_clearance = clearance_modifiers[valid_modifiers]
+        valid_death = death_modifiers[valid_modifiers]
+        
+        # Reset TB risk modifiers to baseline by dividing by the applied modifiers
+        tb.rr_activation[valid_uids] /= valid_activation
+        tb.rr_clearance[valid_uids] /= valid_clearance
+        tb.rr_death[valid_uids] /= valid_death
+        
+        # Clear the stored modifiers
+        self.bcg_activation_modifier_applied[expired_uids] = np.nan
+        self.bcg_clearance_modifier_applied[expired_uids] = np.nan
+        self.bcg_death_modifier_applied[expired_uids] = np.nan
         
         # Clear protection expiration time
         self.ti_bcg_protection_expires[expired_uids] = np.nan
+        
+        # Reset vaccination status to False when protection expires
+        self.is_bcg_vaccinated[expired_uids] = False
+        self.ti_bcg_vaccinated[expired_uids] = np.nan
+        self.age_at_vaccination[expired_uids] = np.nan
         
     def _maintain_ongoing_protection(self, current_time):
         """
