@@ -128,23 +128,13 @@ def get_scenarios():
             'tbpars': dict(start=sc.date('1970-02-07'), 
                            stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
-                coverage=0.30,
+                coverage=0.4,
                 start=sc.date('1975-01-01'),
                 stop=sc.date('2020-12-31'),
-                age_range=(1, 5),
+                age_range=(1, 10),
             ),
         },
-        'BCG 30 to 50 Adult': {
-            'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1970-02-07'), 
-                           stop=sc.date('2030-12-31')),
-            'bcgintervention': dict(
-                coverage=0.10,
-                start=sc.date('1975-01-01'),
-                stop=sc.date('2020-12-31'),
-                age_range=(30, 50),
-            ),
-        },
+  
         # Under construction, not yet finished 
         # 'TPT': {
         #     'name': 'TPT INITIATION',
@@ -207,7 +197,9 @@ def run_scenarios(plot=True):
         results[name] = sim.results.flatten()     
         
     if plot:
-        pl.plot_combined(results, dark=True, heightfold=2, outdir='results/interventions', filter=mtb.FILTERS.important_metrics)
+        pl.plot_combined(results, dark=True, cmap='viridis',  
+                         heightfold=2, outdir='results/interventions',
+                         filter=mtb.FILTERS.important_metrics)
         plt.show()
 
 
