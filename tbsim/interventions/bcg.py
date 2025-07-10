@@ -93,18 +93,19 @@ class BCGProtection(ss.Intervention):
     """
     def __init__(self, pars={}, **kwargs):
         super().__init__(**kwargs)
-        # TESTING: Use strong default values for coverage, efficacy, and modifiers
+        # Handle duration as alias for immunity_period
+           
         self.define_pars(
-            coverage=ss.bernoulli(p=pars.get('coverage', 1.0)),  # 100% coverage for testing
+            coverage=ss.bernoulli(p=pars.get('coverage', 0.5)),  # Default 50% coverage
             start=sc.date('1900-01-01'),
             stop=sc.date('2100-12-31'),
-            efficacy=pars.get('efficacy', 1.0),  # 100% efficacy for testing
-            immunity_period=ss.years(pars.get('immunity_period', 13)),
-            age_range=pars.get('age_range', (0, 5)),
-            # STRONGER MODIFIERS FOR TESTING
-            activation_modifier=pars.get('activation_modifier', ss.uniform(0.1, 0.2)),  # Much lower risk
-            clearance_modifier=pars.get('clearance_modifier', ss.uniform(2.0, 2.5)),    # Much higher clearance
-            death_modifier=pars.get('death_modifier', ss.uniform(0.01, 0.02)),          # Much lower death risk
+            efficacy= 0.8,  # Default 80% efficacy
+            immunity_period=ss.years(10),  # Default 10 years
+            age_range=(0, 5),
+            # Default modifiers
+            activation_modifier= ss.uniform(0.5, 0.65),  # Reduces activation risk
+            clearance_modifier=ss.uniform(1.3, 1.5),    # Increases clearance
+            death_modifier=ss.uniform(0.05, 0.15),          # Reduces death risk
         )
         self.update_pars(pars)
         self.min_age = self.pars.age_range[0]
@@ -131,35 +132,6 @@ class BCGProtection(ss.Intervention):
         # which is called in the parent init_pre method
         return
     
-    # def check_eligibility(self):
-    #     """
-    #     Identify and randomly select eligible individuals for vaccination.
-        
-    #     This method checks for individuals within the configured age range who have not
-    #     been vaccinated yet, and applies the coverage probability to select which
-    #     eligible individuals will be vaccinated.
-        
-    #     Returns:
-    #         ss.uids: Array of UIDs selected for vaccination
-    #     """
-    #     ages = self.sim.people.age
-    #     under_age = (ages >= self.min_age) & (ages <= self.max_age)
-    #     eligible = under_age & ~self.is_bcg_vaccinated
-    #     eligible_uids = np.where(eligible)[0]
-        
-    #     # Debug logging
-    #     logger.debug(f"BCG Eligibility Check: age_range={self.pars.age_range}, total_pop={len(ages)}, under_age={np.sum(under_age)}, already_vaccinated={np.sum(self.is_bcg_vaccinated)}, eligible={len(eligible_uids)}")
-        
-    #     n_to_vaccinate = int(len(eligible_uids) * self.pars.coverage)
-    #     if n_to_vaccinate > 0:
-    #         chosen = self.pars.coverage.filter(eligible_uids)
-    #         self.eligible = np.zeros_like(eligible)
-    #         self.eligible[chosen] = True
-    #     else:
-    #         chosen = np.array([], dtype=int)
-    #         self.eligible = np.zeros_like(eligible)
-    #     self.n_eligible = len(chosen)
-    #     return ss.uids(chosen)
     
     def check_eligibility(self):
         """
@@ -579,10 +551,91 @@ class BCGProtection(ss.Intervention):
         ages = self.sim.people.age
         total_pop = len(ages)
         
+        # Count individuals in the configured age range
+        min_age, max_age = self.pars.age_range
+        in_age_range = np.sum((ages >= min_age) & (ages <= max_age))
+        vaccinated_in_range = np.sum((ages >= min_age) & (ages <= max_age) & self.is_bcg_vaccinated)
+        eligible_in_range = np.sum((ages >= min_age) & (ages <= max_age) & ~self.is_bcg_vaccinated)
+        
         debug_info = {
             'total_population': total_pop,
             'age_range': self.pars.age_range,
+            f'age_{min_age}_{max_age}': in_age_range,
+            f'vaccinated_{min_age}_{max_age}': vaccinated_in_range,
+            f'eligible_{min_age}_{max_age}': eligible_in_range,
         }
         
         logger.info(f"BCG Population Debug: {debug_info}")
         return debug_info
+    
+    def calculate_tb_impact(self, tb_model):
+        """
+        Calculate the impact of BCG vaccination on TB outcomes.
+        
+        Parameters:
+            tb_model: The TB disease model
+            
+        Returns:
+            dict: Dictionary containing TB impact metrics
+        """
+        if not hasattr(self, 'sim') or self.sim is None:
+            return {'error': 'Simulation not initialized'}
+            
+        # Get vaccinated and unvaccinated individuals
+        vaccinated_uids = self.is_bcg_vaccinated.uids
+        unvaccinated_uids = (~self.is_bcg_vaccinated).uids
+        
+        # Calculate TB outcomes by vaccination status
+        tb_states = tb_model.state.raw
+        
+        # Check if arrays are initialized and have the right size
+        if len(tb_states) == 0:
+            return {
+                'vaccinated_tb_deaths': 0,
+                'unvaccinated_tb_deaths': 0,
+                'vaccinated_tb_cases': 0,
+                'unvaccinated_tb_cases': 0,
+                'vaccinated_death_modifier': 1.0,
+                'unvaccinated_death_modifier': 1.0,
+                'deaths_averted': 0,
+                'cases_averted': 0,
+                'error': 'TB model not initialized'
+            }
+        
+        # Check bounds before indexing
+        max_uid = max(np.max(vaccinated_uids) if len(vaccinated_uids) > 0 else 0,
+                     np.max(unvaccinated_uids) if len(unvaccinated_uids) > 0 else 0)
+        
+        if max_uid >= len(tb_states):
+            return {
+                'vaccinated_tb_deaths': 0,
+                'unvaccinated_tb_deaths': 0,
+                'vaccinated_tb_cases': 0,
+                'unvaccinated_tb_cases': 0,
+                'vaccinated_death_modifier': 1.0,
+                'unvaccinated_death_modifier': 1.0,
+                'deaths_averted': 0,
+                'cases_averted': 0,
+                'error': 'UIDs out of bounds for TB state array'
+            }
+        
+        vaccinated_tb_deaths = np.sum(tb_states[vaccinated_uids] == 4) if len(vaccinated_uids) > 0 else 0
+        unvaccinated_tb_deaths = np.sum(tb_states[unvaccinated_uids] == 4) if len(unvaccinated_uids) > 0 else 0
+        
+        vaccinated_tb_cases = np.sum(tb_states[vaccinated_uids] == 2) if len(vaccinated_uids) > 0 else 0
+        unvaccinated_tb_cases = np.sum(tb_states[unvaccinated_uids] == 2) if len(unvaccinated_uids) > 0 else 0
+        
+        # Calculate risk modifiers
+        vaccinated_death_modifier = np.mean(tb_model.rr_death.raw[vaccinated_uids]) if len(vaccinated_uids) > 0 else 1.0
+        unvaccinated_death_modifier = np.mean(tb_model.rr_death.raw[unvaccinated_uids]) if len(unvaccinated_uids) > 0 else 1.0
+        
+        return {
+            'vaccinated_tb_deaths': vaccinated_tb_deaths,
+            'unvaccinated_tb_deaths': unvaccinated_tb_deaths,
+            'vaccinated_tb_cases': vaccinated_tb_cases,
+            'unvaccinated_tb_cases': unvaccinated_tb_cases,
+            'vaccinated_death_modifier': vaccinated_death_modifier,
+            'unvaccinated_death_modifier': unvaccinated_death_modifier,
+            'deaths_averted': unvaccinated_tb_deaths - vaccinated_tb_deaths,
+            'cases_averted': unvaccinated_tb_cases - vaccinated_tb_cases,
+        }
