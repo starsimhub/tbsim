@@ -93,7 +93,7 @@ def build_sim(scenario=None, spars=None):
         people=pop,
         networks=networks,
         interventions=inv,
-        diseases=tb,
+        diseases=[tb],
         demographics=demographics,
         pars=spars,
     )
@@ -128,10 +128,10 @@ def get_scenarios():
             'tbpars': dict(start=sc.date('1970-02-07'), 
                            stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
-                coverage=0.4,
+                coverage=0.8,
                 start=sc.date('1975-01-01'),
                 stop=sc.date('2020-12-31'),
-                age_range=(1, 10),
+                age_range=(1, 5),
             ),
         },
   
@@ -198,8 +198,8 @@ def run_scenarios(plot=True):
         
     if plot:
         pl.plot_combined(results, dark=True, cmap='viridis',  
-                         heightfold=2, outdir='results/interventions',
-                         filter=mtb.FILTERS.important_metrics)
+                         heightfold=2, outdir='results/interventions')
+                        #  heightfold=2, outdir='results/interventions', filter=mtb.FILTERS.important_metrics)
         plt.show()
 
 

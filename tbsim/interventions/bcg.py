@@ -286,9 +286,19 @@ class BCGProtection(ss.Intervention):
         # 8. Adjust TB risk modifiers: apply BCG-specific modifiers to TB activation, clearance, and death rates
         self._apply_protection_effects(vaccine_responders)
         
-        # Note: Removed _maintain_ongoing_protection call to prevent multiple applications of protection effects
-        # The protection effects are applied once when vaccination occurs and persist until expiration
+        # 9. Maintain protection effects for all currently protected individuals
+        # This is necessary because the TB model resets risk modifiers every timestep
+        self._maintain_ongoing_protection(current_time)
         
+    def begin_step(self):
+        """
+        Called at the very start of each simulation timestep, before any disease model steps.
+        Ensures that BCG protection effects are applied to all currently protected individuals
+        before the TB model uses the risk modifiers.
+        """
+        current_time = self.sim.ti
+        self._maintain_ongoing_protection(current_time)
+
     def _apply_protection_effects(self, protected_uids):
         """
         Apply BCG protection effects to TB risk modifiers.
@@ -321,6 +331,43 @@ class BCGProtection(ss.Intervention):
         tb.rr_activation[protected_uids] *= activation_modifiers
         tb.rr_clearance[protected_uids] *= clearance_modifiers
         tb.rr_death[protected_uids] *= death_modifiers
+    
+    def _apply_protection_effects_force(self, protected_uids):
+        """
+        Apply BCG protection effects to TB risk modifiers, bypassing the "already applied" check.
+        
+        This method is used to re-apply protection effects every timestep since the TB model
+        resets risk modifiers at the end of each timestep.
+        
+        Parameters:
+            protected_uids: Array of UIDs who are currently protected
+        """
+        if len(protected_uids) == 0:
+            return
+            
+        tb = self.sim.diseases.tb
+        
+        # Get the stored modifiers that were originally applied to each individual
+        activation_modifiers = self.bcg_activation_modifier_applied[protected_uids]
+        clearance_modifiers = self.bcg_clearance_modifier_applied[protected_uids]
+        death_modifiers = self.bcg_death_modifier_applied[protected_uids]
+        
+        # Check if modifiers were actually applied (not NaN)
+        valid_modifiers = ~np.isnan(activation_modifiers)
+        if not np.any(valid_modifiers):
+            logger.warning("No valid BCG modifiers found for protected individuals. Skipping re-application.")
+            return
+            
+        # Only process individuals with valid modifiers
+        valid_uids = protected_uids[valid_modifiers]
+        valid_activation = activation_modifiers[valid_modifiers]
+        valid_clearance = clearance_modifiers[valid_modifiers]
+        valid_death = death_modifiers[valid_modifiers]
+        
+        # Re-apply modifiers to TB risk rates (TB model resets them to 1 each timestep)
+        tb.rr_activation[valid_uids] *= valid_activation
+        tb.rr_clearance[valid_uids] *= valid_clearance
+        tb.rr_death[valid_uids] *= valid_death
     
     def _remove_protection(self, expired_uids):
         """
@@ -375,6 +422,7 @@ class BCGProtection(ss.Intervention):
         
         This ensures that protection effects are continuously applied to all
         vaccinated individuals who are still within their protection period.
+        This is necessary because the TB model resets risk modifiers every timestep.
         
         Parameters:
             current_time: Current simulation timestep
@@ -390,7 +438,8 @@ class BCGProtection(ss.Intervention):
         
         if len(protected_uids) > 0:
             # Re-apply protection effects to ensure they persist
-            self._apply_protection_effects(protected_uids)
+            # We need to bypass the "already applied" check since TB model resets modifiers
+            self._apply_protection_effects_force(protected_uids)
             
     def init_results(self):
         """
