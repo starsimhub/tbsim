@@ -13,25 +13,23 @@ logger.setLevel(logging.ERROR)
 class BCGProtection(ss.Intervention):
     """
     Simulates BCG-like vaccination for tuberculosis prevention in individuals within a specified age range.
-    This intervention identifies individuals within a configurable age range who have not yet 
-    been vaccinated. At each timestep, a proportion of these eligible individuals is 
-    selected based on the `coverage` parameter to receive simulated BCG protection.
-    Once vaccinated, individuals are considered protected for a fixed number of years 
-    (`immunity_period`). While protected, their TB-related risk modifiers — activation, clearance, 
-    and death — are adjusted using scaled and sampled values from BCG-specific probability 
-    distributions.
-    Parameters:
-        pars (dict, optional): Dictionary of parameters. Supported keys:
-            - 'coverage'            (float): Fraction of eligible individuals vaccinated per timestep (default: 0.6).
-            - 'start'               (str/datetime.date): Start date for the intervention (default: '1900-01-01').
-            - 'stop'                (str/datetime.date): Stop date for the intervention (default: '2100-12-31').
-            - 'efficacy'            (float): Probability of effective vaccine response (default: 0.8).
-            - 'immunity_period'            (int): immunity_period (in years) for which BCG protection remains effective (default: 10).
-            - 'age_range'           (tuple): Age range (min_age, max_age) for vaccination eligibility (default: (0, 5)).
-            - 'activation_modifier' (ss.uniform): Distribution for TB activation risk modifier (default: uniform(0.5, 0.65)) - reduces activation risk
-            - 'clearance_modifier'  (ss.uniform): Distribution for bacterial clearance modifier (default: uniform(1.3, 1.5)) - increases clearance probability
-            - 'death_modifier'      (ss.uniform): Distribution for TB mortality modifier (default: uniform(0.05, 0.15)) - reduces mortality risk (lower values = better protection)
-    Usage Examples:
+    
+    This intervention identifies individuals within a configurable age range who have not yet been vaccinated. At each timestep, a proportion of these eligible individuals is selected based on the `coverage` parameter to receive simulated BCG protection. Once vaccinated, individuals are considered protected for a fixed number of years (`immunity_period`). While protected, their TB-related risk modifiers — activation, clearance, and death — are adjusted using scaled and sampled values from BCG-specific probability distributions.
+
+    PARAMETERS:
+        pars (`dict`, optional): Dictionary of parameters. Supported keys:
+        - `coverage` (`float`): Fraction of eligible individuals vaccinated per timestep (default: 0.5).
+        - `start` (`str`/`datetime.date`): Start date for the intervention (default: '1900-01-01').
+        - `stop` (`str`/`datetime.date`): Stop date for the intervention (default: '2100-12-31').
+        - `efficacy` (`float`): Probability of effective vaccine response (default: 0.8).
+        - `immunity_period` (`int`): Immunity period (in years) for which BCG protection remains effective (default: 10).
+        - `age_range` (`tuple`): Age range (`min_age`, `max_age`) for vaccination eligibility (default: (0, 5)).
+        - `activation_modifier` (`ss.uniform`): Distribution for TB activation risk modifier (default: `uniform(0.5, 0.65)`) - reduces activation risk.
+        - `clearance_modifier` (`ss.uniform`): Distribution for bacterial clearance modifier (default: `uniform(1.3, 1.5)`) - increases clearance probability.
+        - `death_modifier` (`ss.uniform`): Distribution for TB mortality modifier (default: `uniform(0.05, 0.15)`) - reduces mortality risk (lower values = better protection).
+
+    USAGE EXAMPLES:
+        ```python
         # Basic usage with default parameters (targets individuals 0-5 years)
         bcg = BCGProtection()
         
@@ -59,7 +57,9 @@ class BCGProtection(ss.Intervention):
             'clearance_modifier': ss.uniform(1.2, 1.6),
             'death_modifier': ss.uniform(0.03, 0.12)
         })
-    Attributes:
+        ```
+
+    ATTRIBUTES:
         coverage_dist (ss.bernoulli): Probability distribution for vaccination coverage.
         eligible      (np.ndarray): Boolean mask of currently eligible individuals.
         n_eligible    (int): Number of individuals eligible for vaccination in the current step.
@@ -68,14 +68,17 @@ class BCGProtection(ss.Intervention):
         stop          (datetime.date): Stop date for the intervention.
         min_age       (float): Minimum age for vaccination eligibility.
         max_age       (float): Maximum age for vaccination eligibility.
-    States:
+        
+    STATES:
         is_bcg_vaccinated (bool): Indicates whether an individual has received the BCG vaccine.
         ti_bcg_vaccinated (float): Timestep at which the individual was vaccinated.
         ti_bcg_protection_expires (float): Timestep when protection expires.
         age_at_vaccination (float): Age when the individual was vaccinated.
+        bcg_activation_modifier_applied (float): Activation risk modifier applied to each individual.
+        bcg_clearance_modifier_applied (float): Clearance modifier applied to each individual.
+        bcg_death_modifier_applied (float): Death risk modifier applied to each individual.
     Methods:
         check_eligibility(): Identify and randomly select eligible individuals for vaccination.
-        check_eligibility_short(): Simplified eligibility check using starsim indexing.
         is_protected(uids, current_time): Return boolean mask indicating protected individuals.
         step(): Apply BCG protection and adjust TB risk modifiers accordingly.
         _apply_protection_effects(protected_uids): Apply BCG protection effects to TB risk modifiers.
@@ -85,14 +88,20 @@ class BCGProtection(ss.Intervention):
         update_results(): Record the number of vaccinated and eligible individuals each timestep.
         get_summary_stats(): Get summary statistics for the intervention.
         debug_population(): Debug method to check population demographics and vaccination status.
+        calculate_tb_impact(tb_model): Calculate the impact of BCG vaccination on TB outcomes.
     Notes:
-        This intervention assumes the presence of a TB disease model attached to the simulation 
-        and modifies its rr_activation, rr_clearance, and rr_death arrays. The intervention
-        uses starsim probability distributions for stochastic modeling and proper date handling
-        for temporal eligibility checks. The age_range parameter allows targeting of any age group,
-        making this intervention suitable for both pediatric and adult vaccination strategies.
+        This intervention assumes the presence of a TB disease model attached to the simulation and modifies its rr_activation, rr_clearance, and rr_death arrays. The intervention uses starsim probability distributions for stochastic modeling and proper date handling for temporal eligibility checks. The age_range parameter allows targeting of any age group, making this intervention suitable for both pediatric and adult vaccination strategies.
     """
     def __init__(self, pars={}, **kwargs):
+        """
+        Initialize a BCGProtection intervention instance.
+
+        This constructor sets up the BCG vaccination intervention with user-specified or default parameters. It defines the probability distributions for coverage, efficacy, and risk modifiers, as well as the age range and timing for eligibility. It also initializes the state arrays that track vaccination and protection status for each individual in the simulation.
+
+        Parameters:
+            pars (`dict`, optional): Dictionary of intervention parameters. See class docstring for details.
+            **kwargs: Additional keyword arguments passed to the parent Intervention class.
+        """
         super().__init__(**kwargs)
         # Handle duration as alias for immunity_period
            
@@ -136,13 +145,12 @@ class BCGProtection(ss.Intervention):
     
     def check_eligibility(self):
         """
-        Simplified eligibility check using starsim indexing.
-        
-        This is a more concise version of check_eligibility() that uses
-        starsim's indexing methods for better performance.
-        
+        Identify and randomly select eligible individuals for BCG vaccination in the current timestep.
+
+        This method uses starsim's efficient indexing to find individuals who are within the configured age range and have not yet been vaccinated. It then applies the coverage probability to randomly select a subset of these eligible individuals for vaccination.
+
         Returns:
-            ss.uids: Array of UIDs selected for vaccination
+            ss.uids: Array of UIDs selected for vaccination in this timestep.
         """
         eli = ((self.sim.people.age >= self.min_age) & (self.sim.people.age <= self.max_age) & ~self.is_bcg_vaccinated).uids
         chos = self.pars.coverage.filter(eli)
@@ -624,3 +632,5 @@ class BCGProtection(ss.Intervention):
             'deaths_averted': unvaccinated_tb_deaths - vaccinated_tb_deaths,
             'cases_averted': unvaccinated_tb_cases - vaccinated_tb_cases,
         }
+
+

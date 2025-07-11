@@ -28,7 +28,7 @@ age_data = pd.DataFrame({
 })
 
 def build_sim(scenario=None, spars=None):
-    """
+    """ HELP:
     Build and return a complete Starsim-based simulation instance for TB modeling,
     incorporating optional interventions and user-defined parameters.
 
@@ -98,9 +98,8 @@ def build_sim(scenario=None, spars=None):
         pars=spars,
     )
 
-
 def get_scenarios():
-    """
+    """ HELP
     Define a set of simulation scenarios for evaluating TB interventions.
 
     Returns:
@@ -159,7 +158,7 @@ def get_scenarios():
 
 
 def run_scenarios(plot=True):
-    """
+    """ HELP:
     Execute all defined TB simulation scenarios and optionally visualize results.
 
     Args:
@@ -208,11 +207,9 @@ def run_scenarios(plot=True):
         
     if plot:
         pl.plot_combined(results, dark=True, cmap='viridis',  
-                         heightfold=2, outdir='results/interventions')
-                        #  heightfold=2, outdir='results/interventions', filter=mtb.FILTERS.important_metrics)
+                        # heightfold=2, outdir='results/interventions')
+                        heightfold=2, outdir='results/interventions', filter=mtb.FILTERS.important_metrics)
         plt.show()
-
-
 
 if __name__ == '__main__':
     run_scenarios()
