@@ -229,11 +229,6 @@ class BCGProtection(ss.Intervention):
         
         # 3. Determine immunization eligibility: identify individuals meeting age criteria who have not been vaccinated
         eligible = self.check_eligibility()
-        
-        # Debug: Check population demographics periodically
-        if self.ti % 10 == 0:  # Every 10 timesteps
-            self.debug_population()
-        
         if len(eligible) == 0:
             return
             
@@ -334,15 +329,10 @@ class BCGProtection(ss.Intervention):
             
         # Only process individuals with valid modifiers
         valid_uids = protected_uids[valid_modifiers]
-        valid_activation = activation_modifiers[valid_modifiers]
-        valid_clearance = clearance_modifiers[valid_modifiers]
-        valid_death = death_modifiers[valid_modifiers]
-        
-        # Re-apply modifiers to TB risk rates (TB model resets them to 1 each timestep)
-        tb.rr_activation[valid_uids] *= valid_activation
-        tb.rr_clearance[valid_uids] *= valid_clearance
-        tb.rr_death[valid_uids] *= valid_death
-    
+        tb.rr_activation[valid_uids] *= activation_modifiers[valid_modifiers]
+        tb.rr_clearance[valid_uids] *= clearance_modifiers[valid_modifiers]
+        tb.rr_death[valid_uids] *= death_modifiers[valid_modifiers]
+
     def _remove_protection(self, expired_uids):
         """
         Remove BCG protection effects when protection expires.
@@ -368,16 +358,9 @@ class BCGProtection(ss.Intervention):
             
         # Only process individuals with valid modifiers
         valid_uids = expired_uids[valid_modifiers]
-        valid_activation = activation_modifiers[valid_modifiers]
-        valid_clearance = clearance_modifiers[valid_modifiers]
-        valid_death = death_modifiers[valid_modifiers]
-        
-        # Reset TB risk modifiers to baseline by dividing by the applied modifiers
-        tb.rr_activation[valid_uids] /= valid_activation
-        tb.rr_clearance[valid_uids] /= valid_clearance
-        tb.rr_death[valid_uids] /= valid_death
-        
-        # Clear the stored modifiers
+        tb.rr_activation[valid_uids] /= activation_modifiers[valid_modifiers]
+        tb.rr_clearance[valid_uids] /= clearance_modifiers[valid_modifiers]
+        tb.rr_death[valid_uids] /= death_modifiers[valid_modifiers]
         self.bcg_activation_modifier_applied[expired_uids] = np.nan
         self.bcg_clearance_modifier_applied[expired_uids] = np.nan
         self.bcg_death_modifier_applied[expired_uids] = np.nan

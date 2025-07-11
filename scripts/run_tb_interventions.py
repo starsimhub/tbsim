@@ -9,7 +9,7 @@ import pandas as pd
 DEFAULT_SPARS = dict(
     unit='day',
     dt=7,
-    start=sc.date('1965-01-01'),
+    start=sc.date('1950-01-01'),
     stop=sc.date('2035-12-31'),
     rand_seed=123,
     verbose =0,
@@ -120,12 +120,12 @@ def get_scenarios():
     return {
         'Baseline': {
             'name': 'BASELINE',
-            'tbpars': dict(start=sc.date('1970-02-07'), 
+            'tbpars': dict(start=sc.date('1950-02-07'), 
                 stop=sc.date('2030-12-31')),
         },
         'BCG 1 - 5': {
             'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1970-02-07'), 
+            'tbpars': dict(start=sc.date('1950-02-07'), 
                            stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
                 coverage=0.8,
@@ -136,7 +136,7 @@ def get_scenarios():
         },
           'BCG 20 - 50': {
             'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1970-02-07'), 
+            'tbpars': dict(start=sc.date('1950-02-07'), 
                            stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
                 coverage=0.2,
