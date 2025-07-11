@@ -1,8 +1,10 @@
 import numpy as np
 import starsim as ss
+import tbsim as mtb
+from collections import namedtuple
+from enum import Enum
 
-__all__ = ['TPTInitiation']
-
+__all__ = ['TPTInitiation', 'TPTRegimes']
 
 class TPTInitiation(ss.Intervention):
     """
@@ -11,6 +13,9 @@ class TPTInitiation(ss.Intervention):
     This intervention identifies households with at least one TB-treated individual, and offers TPT to all
     other members of those households who meet the following eligibility criteria:
     
+    Requirements:
+        - Must have been in a previous intervention which updates screen_negative and non_symptomatic attributes
+    
     Eligibility criteria:
         - Must reside in a household where at least one member is on TB treatment
         - Must not already be on TB treatment themselves
@@ -18,81 +23,130 @@ class TPTInitiation(ss.Intervention):
         - Optionally filtered by age and/or HIV status (logic can be extended)
     
     Treatment logic:
-        - A Bernoulli trial (`p_tpt`) is used to determine which eligible individuals receive TPT
-        - If initiated, individuals are marked as `on_tpt` and receive a fixed protection duration (`tpt_duration`)
-        - After the specified `start` date, a proportion (`p_3HP`) receive the 3HP regimen
+        - A Bernoulli trial (`p_tpt`) is used to determine which eligible individuals initiate TPT
+        - If initiated, individuals are flagged as `on_tpt` for the treatment duration (`tpt_treatment_duration`)
+        - After completing treatment, individuals become `protected_from_tb` for a fixed duration (`tpt_protection_duration`)
+        - Protection starts at `tpt_treatment_until` and ends at `tpt_protection_until`
     
     Parameters:
         p_tpt (float or ss.Bernoulli): Probability of initiating TPT for an eligible individual
-        tpt_duration (float): Duration of protection in years
         max_age (int): Optional filter for outcome reporting (default: 5)
         hiv_status_threshold (bool): Reserved for HIV-based filtering (default: False)
-        p_3HP (float): Proportion of individuals initiated on 3HP after the `start` date
-        start (date): Rollout date after which 3HP becomes available
+        tpt_treatment_duration (float): Duration of TPT administration (e.g., 3 months)
+        tpt_protection_duration (float): Duration of post-treatment protection (e.g., 2 years)
+        start (date): Start date for offering TPT
+        stop (date): Stop date for offering TPT
 
     Results tracked:
-        n_eligible (int): Number of individuals in eligible households meeting criteria
-        n_tpt_initiated (int): Number of individuals actually started on TPT
-        n_3HP_assigned (int): Subset of TPT individuals presumed to receive 3HP
+        n_eligible (int): Number of individuals meeting criteria
+        n_tpt_initiated (int): Number of individuals who started TPT
 
     Notes:
-        - Requires people to have a 'hhid' attribute (household ID).
-        - Assumes states like 'on_tpt', 'received_tpt', 'screen_negative' are initialized.
-        - Requires HouseHoldNet or similar to define household structure.   
+        - Requires 'hhid', 'on_tpt', 'received_tpt', 'screen_negative' attributes on people
+        - Assumes household structure is available (e.g., via HouseHoldNet)
+        - TB disease model must support 'protected_from_tb', 'tpt_treatment_until', and 'tpt_protection_until' states
     """
 
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         self.define_pars(
-            p_tpt=ss.bernoulli(1.0),
-            tpt_duration=2.0,
+            p_tpt=ss.bernoulli(p=1.0),
             max_age=5,
             hiv_status_threshold=False,
-            p_3HP=0.3,
+            tpt_treatment_duration=ss.peryear(0.25),   # 3 months of treatment
+            tpt_protection_duration=ss.peryear(2.0),   # 2 years of protection
             start=ss.date('2000-01-01'),
+            stop=ss.date('2100-12-31'),
         )
         self.update_pars(pars=pars, **kwargs)
-
+    
     def step(self):
         sim = self.sim
         ppl = sim.people
         tb = sim.diseases.tb
 
-        # Identify households with at least one member currently on TB treatment
-        treated = tb.on_treatment & ppl.alive
+        # Initialize states if not already present
+        if not hasattr(tb, 'protected_from_tb'):
+            tb.define_states(
+                ss.BoolArr('protected_from_tb', default=False),
+                ss.Arr('tpt_treatment_until', default=None),
+                ss.Arr('tpt_protection_until', default=None),
+            )
+
+        # Households with TB cases
+        treated = tb.on_treatment
         eligible_hhids = np.unique(ppl['hhid'][treated])
 
-        # Identify all members of those households
+        # Eligibility screening
         in_eligible_households = np.isin(ppl['hhid'], eligible_hhids)
         eligible = in_eligible_households & (~tb.on_treatment) & (ppl['screen_negative'] | ppl['non_symptomatic'])
 
-        tpt_candidates = self.pars.p_tpt.filter(eligible.uids)
+        # Bernoulli selection
+        tpt_candidates = self.pars.p_tpt.filter(eligible)
 
         if len(tpt_candidates):
-            use_3HP = sim.year >= self.pars.start.year
-            assigned_3HP = np.random.rand(len(tpt_candidates)) < self.pars.p_3HP if use_3HP else np.zeros(len(tpt_candidates), dtype=bool)
-
-            if not hasattr(tb, 'on_treatment_duration'):
-                tb.define_states(ss.FloatArr('on_treatment_duration', default=0.0))
-
-            tb.start_treatment(tpt_candidates)
-            tb.on_treatment_duration[tpt_candidates] = self.pars.tpt_duration
+            # Treatment phase
             ppl['on_tpt'][tpt_candidates] = True
             ppl['received_tpt'][tpt_candidates] = True
 
+            # Track treatment and future protection schedule
+            treatment_end = sim.date + self.pars.tpt_treatment_duration
+            protection_end = treatment_end + self.pars.tpt_protection_duration
+
+            tb.tpt_treatment_until[tpt_candidates] = treatment_end
+            tb.tpt_protection_until[tpt_candidates] = protection_end
+
+            # Result tracking
             self.results['n_eligible'][self.ti] = np.count_nonzero(eligible)
             self.results['n_tpt_initiated'][self.ti] = len(tpt_candidates)
-            self.results['n_3HP_assigned'][self.ti] = np.count_nonzero(assigned_3HP)
 
     def init_results(self):
         self.define_results(
             ss.Result('n_eligible', dtype=int),
             ss.Result('n_tpt_initiated', dtype=int),
-            ss.Result('n_3HP_assigned', dtype=int),
         )
 
     def update_results(self):
         ppl = self.sim.people
         self.results['n_eligible'][self.ti] = np.count_nonzero(ppl['on_tpt'] | ppl['received_tpt'])
         self.results['n_tpt_initiated'][self.ti] = np.count_nonzero(ppl['on_tpt'])
-        self.results['n_3HP_assigned'][self.ti] = np.count_nonzero(ppl['on_tpt'] & (ppl.age < self.pars.max_age))
+
+        
+
+class TPTRegimes():
+    """
+    Tuberculosis Preventive Therapy (TPT) Regimens - CDC 2024 Recommendations
+
+    This class defines latent TB infection (LTBI) treatment regimens and their
+    standard durations using `ss.peryear(...)`.
+
+    Regimens:
+        - 3HP: Isoniazid + Rifapentine, once weekly for 3 months
+            → ss.peryear(0.25)
+            Recommended for ages 2+ and people with HIV if ART-compatible.
+
+        - 4R: Rifampin, daily for 4 months
+            → ss.peryear(1/3)
+            Recommended for HIV-negative individuals and INH-intolerant cases.
+
+        - 3HR: Isoniazid + Rifampin, daily for 3 months
+            → ss.peryear(0.25)
+            Recommended for all ages, including some on ART.
+
+        - 6H: Isoniazid, daily for 6 months
+            → ss.peryear(0.5)
+            Used when rifamycins are not feasible.
+
+        - 9H: Isoniazid, daily for 9 months
+            → ss.peryear(0.75)
+            Alternative when shorter regimens are not suitable.
+
+    Source:
+        https://www.cdc.gov/tb/hcp/treatment/latent-tuberculosis-infection.html
+    """
+    cdc_3HP = ss.peryear(0.25)
+    cdc_4R  = ss.peryear(1/3)
+    cdc_3HR = ss.peryear(0.25)
+    cdc_6H  = ss.peryear(0.5)
+    cdc_9H  = ss.peryear(0.75)
+
