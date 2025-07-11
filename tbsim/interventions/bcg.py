@@ -4,32 +4,32 @@ import sciris as sc
 import logging
 import datetime
 from tbsim.wrappers import Agents
+from tbsim.tb import TBS
 
 __all__ = ['BCGProtection']
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 class BCGProtection(ss.Intervention):
     """
     Simulates BCG-like vaccination for tuberculosis prevention in individuals within a specified age range.
-    This intervention identifies individuals within a configurable age range who have not yet 
-    been vaccinated. At each timestep, a proportion of these eligible individuals is 
-    selected based on the `coverage` parameter to receive simulated BCG protection.
-    Once vaccinated, individuals are considered protected for a fixed number of years 
-    (`duration`). While protected, their TB-related risk modifiers — activation, clearance, 
-    and death — are adjusted using scaled and sampled values from BCG-specific probability 
-    distributions.
-    Parameters:
-        pars (dict, optional): Dictionary of parameters. Supported keys:
-            - 'coverage'            (float): Fraction of eligible individuals vaccinated per timestep (default: 0.6).
-            - 'start'               (str/datetime.date): Start date for the intervention (default: '1900-01-01').
-            - 'stop'                (str/datetime.date): Stop date for the intervention (default: '2100-12-31').
-            - 'efficacy'            (float): Probability of effective vaccine response (default: 0.8).
-            - 'duration'            (int): Duration (in years) for which BCG protection remains effective (default: 10).
-            - 'age_range'           (tuple): Age range (min_age, max_age) for vaccination eligibility (default: (0, 5)).
-            - 'activation_modifier' (ss.uniform): Distribution for TB activation risk modifier (default: uniform(0.5, 0.65)).
-            - 'clearance_modifier'  (ss.uniform): Distribution for bacterial clearance modifier (default: uniform(1.3, 1.5)).
-            - 'death_modifier'      (ss.uniform): Distribution for TB mortality modifier (default: uniform(0.05, 0.15)).
-    Usage Examples:
+    
+    This intervention identifies individuals within a configurable age range who have not yet been vaccinated. At each timestep, a proportion of these eligible individuals is selected based on the `coverage` parameter to receive simulated BCG protection. Once vaccinated, individuals are considered protected for a fixed number of years (`immunity_period`). While protected, their TB-related risk modifiers — activation, clearance, and death — are adjusted using scaled and sampled values from BCG-specific probability distributions.
+
+    PARAMETERS:
+        pars (`dict`, optional): Dictionary of parameters. Supported keys:
+        - `coverage` (`float`): Fraction of eligible individuals vaccinated per timestep (default: 0.5).
+        - `start` (`str`/`datetime.date`): Start date for the intervention (default: '1900-01-01').
+        - `stop` (`str`/`datetime.date`): Stop date for the intervention (default: '2100-12-31').
+        - `efficacy` (`float`): Probability of effective vaccine response (default: 0.8).
+        - `immunity_period` (`int`): Immunity period (in years) for which BCG protection remains effective (default: 10).
+        - `age_range` (`tuple`): Age range (`min_age`, `max_age`) for vaccination eligibility (default: (0, 5)).
+        - `activation_modifier` (`ss.uniform`): Distribution for TB activation risk modifier (default: `uniform(0.5, 0.65)`) - reduces activation risk.
+        - `clearance_modifier` (`ss.uniform`): Distribution for bacterial clearance modifier (default: `uniform(1.3, 1.5)`) - increases clearance probability.
+        - `death_modifier` (`ss.uniform`): Distribution for TB mortality modifier (default: `uniform(0.05, 0.15)`) - reduces mortality risk (lower values = better protection).
+
+    USAGE EXAMPLES:
+        ```python
         # Basic usage with default parameters (targets individuals 0-5 years)
         bcg = BCGProtection()
         
@@ -39,7 +39,7 @@ class BCGProtection(ss.Intervention):
             'start': '2020-01-01',
             'stop': '2030-12-31',
             'efficacy': 0.9,
-            'duration': 15,
+            'immunity_period': 15,
             'age_range': (1, 7)
         })
         
@@ -48,7 +48,7 @@ class BCGProtection(ss.Intervention):
             'age_range': (18, 65),
             'coverage': 0.4,
             'efficacy': 0.7,
-            'duration': 8
+            'immunity_period': 8
         })
         
         # Custom probability distributions
@@ -57,7 +57,9 @@ class BCGProtection(ss.Intervention):
             'clearance_modifier': ss.uniform(1.2, 1.6),
             'death_modifier': ss.uniform(0.03, 0.12)
         })
-    Attributes:
+        ```
+
+    ATTRIBUTES:
         coverage_dist (ss.bernoulli): Probability distribution for vaccination coverage.
         eligible      (np.ndarray): Boolean mask of currently eligible individuals.
         n_eligible    (int): Number of individuals eligible for vaccination in the current step.
@@ -66,14 +68,17 @@ class BCGProtection(ss.Intervention):
         stop          (datetime.date): Stop date for the intervention.
         min_age       (float): Minimum age for vaccination eligibility.
         max_age       (float): Maximum age for vaccination eligibility.
-    States:
+        
+    STATES:
         is_bcg_vaccinated (bool): Indicates whether an individual has received the BCG vaccine.
         ti_bcg_vaccinated (float): Timestep at which the individual was vaccinated.
         ti_bcg_protection_expires (float): Timestep when protection expires.
         age_at_vaccination (float): Age when the individual was vaccinated.
+        bcg_activation_modifier_applied (float): Activation risk modifier applied to each individual.
+        bcg_clearance_modifier_applied (float): Clearance modifier applied to each individual.
+        bcg_death_modifier_applied (float): Death risk modifier applied to each individual.
     Methods:
         check_eligibility(): Identify and randomly select eligible individuals for vaccination.
-        check_eligibility_short(): Simplified eligibility check using starsim indexing.
         is_protected(uids, current_time): Return boolean mask indicating protected individuals.
         step(): Apply BCG protection and adjust TB risk modifiers accordingly.
         _apply_protection_effects(protected_uids): Apply BCG protection effects to TB risk modifiers.
@@ -81,50 +86,52 @@ class BCGProtection(ss.Intervention):
         _maintain_ongoing_protection(current_time): Maintain protection effects for all currently protected individuals.
         init_results(): Define simulation result metrics.
         update_results(): Record the number of vaccinated and eligible individuals each timestep.
-        calculate_tb_impact(tb_disease): Calculate estimated TB cases and deaths averted by BCG vaccination.
         get_summary_stats(): Get summary statistics for the intervention.
         debug_population(): Debug method to check population demographics and vaccination status.
+        calculate_tb_impact(tb_model): Calculate the impact of BCG vaccination on TB outcomes.
     Notes:
-        This intervention assumes the presence of a TB disease model attached to the simulation 
-        and modifies its rr_activation, rr_clearance, and rr_death arrays. The intervention
-        uses starsim probability distributions for stochastic modeling and proper date handling
-        for temporal eligibility checks. The age_range parameter allows targeting of any age group,
-        making this intervention suitable for both pediatric and adult vaccination strategies.
+        This intervention assumes the presence of a TB disease model attached to the simulation and modifies its rr_activation, rr_clearance, and rr_death arrays. The intervention uses starsim probability distributions for stochastic modeling and proper date handling for temporal eligibility checks. The age_range parameter allows targeting of any age group, making this intervention suitable for both pediatric and adult vaccination strategies.
     """
     def __init__(self, pars={}, **kwargs):
+        """
+        Initialize a BCGProtection intervention instance.
+
+        This constructor sets up the BCG vaccination intervention with user-specified or default parameters. It defines the probability distributions for coverage, efficacy, and risk modifiers, as well as the age range and timing for eligibility. It also initializes the state arrays that track vaccination and protection status for each individual in the simulation.
+
+        Parameters:
+            pars (`dict`, optional): Dictionary of intervention parameters. See class docstring for details.
+            **kwargs: Additional keyword arguments passed to the parent Intervention class.
+        """
         super().__init__(**kwargs)
+        # Handle duration as alias for immunity_period
+           
         self.define_pars(
-            coverage=ss.bernoulli(p=0.50),  # Fraction of eligible individuals vaccinated per timestep
-            start=sc.date('1900-01-01'),  # Year when the intervention starts
-            stop=sc.date('2100-12-31'),  # Year when the intervention stops
-            efficacy=0.8,  # Probability of protection
-            duration=10,  # Duration (in years) for which BCG protection remains effective
-            age_range=(0, 5),  # Age range (min_age, max_age) for vaccination eligibility
-            
-            # BCG-specific probability distributions for TB risk modifiers
-            activation_modifier=ss.uniform(0.5, 0.65),  # Modifier for TB activation risk
-            clearance_modifier=ss.uniform(1.3, 1.5),    # Modifier for bacterial clearance probability
-            death_modifier=ss.uniform(0.05, 0.15),      # Modifier for TB-related mortality risk
+            coverage=ss.bernoulli(p=pars.get('coverage', 0.5)),  # Default 50% coverage
+            start=sc.date('1900-01-01'),
+            stop=sc.date('2100-12-31'),
+            efficacy= 0.8,  # Default 80% efficacy
+            immunity_period=ss.years(10),  # Default 10 years
+            age_range=(0, 5),
+            # Default modifiers
+            activation_modifier= ss.uniform(0.5, 0.65),  # Reduces activation risk
+            clearance_modifier=ss.uniform(1.3, 1.5),    # Increases clearance
+            death_modifier=ss.uniform(0.05, 0.15),          # Reduces death risk
         )
         self.update_pars(pars)
-
         self.min_age = self.pars.age_range[0]
         self.max_age = self.pars.age_range[1]
         self.n_eligible = 0
         self.eligible = []
-        
-        # Create probability objects for vaccine response 
         self.p_vaccine_response = ss.bernoulli(p=self.pars.efficacy)
-        
-        # Define state arrays with clearer names
         self.define_states(
-            ss.BoolArr('is_bcg_vaccinated', default=False), # Indicates if vaccinated
-            ss.FloatArr('ti_bcg_vaccinated'),               # Timestep of vaccination
-            ss.Arr('ti_bcg_protection_expires'),            # Timestep when protection expires
-            ss.FloatArr('age_at_vaccination'),              # Age when vaccinated
+            ss.BoolArr('is_bcg_vaccinated', default=False),
+            ss.FloatArr('ti_bcg_vaccinated'),
+            ss.Arr('ti_bcg_protection_expires'),
+            ss.FloatArr('age_at_vaccination'),
+            ss.FloatArr('bcg_activation_modifier_applied'),
+            ss.FloatArr('bcg_clearance_modifier_applied'),
+            ss.FloatArr('bcg_death_modifier_applied'),
         )
-        
-        # Log intervention configuration
         logger.info(f"BCG Intervention configured: start={self.pars.start}, stop={self.pars.stop}, age_range={self.pars.age_range}, coverage={self.pars.coverage}, efficacy={self.pars.efficacy}")
         logger.debug(self.pars)
         
@@ -135,56 +142,34 @@ class BCGProtection(ss.Intervention):
         # which is called in the parent init_pre method
         return
     
-    # def check_eligibility(self):
-    #     """
-    #     Identify and randomly select eligible individuals for vaccination.
-        
-    #     This method checks for individuals within the configured age range who have not
-    #     been vaccinated yet, and applies the coverage probability to select which
-    #     eligible individuals will be vaccinated.
-        
-    #     Returns:
-    #         ss.uids: Array of UIDs selected for vaccination
-    #     """
-    #     ages = self.sim.people.age
-    #     under_age = (ages >= self.min_age) & (ages <= self.max_age)
-    #     eligible = under_age & ~self.is_bcg_vaccinated
-    #     eligible_uids = np.where(eligible)[0]
-        
-    #     # Debug logging
-    #     logger.debug(f"BCG Eligibility Check: age_range={self.pars.age_range}, total_pop={len(ages)}, under_age={np.sum(under_age)}, already_vaccinated={np.sum(self.is_bcg_vaccinated)}, eligible={len(eligible_uids)}")
-        
-    #     n_to_vaccinate = int(len(eligible_uids) * self.pars.coverage)
-    #     if n_to_vaccinate > 0:
-    #         chosen = self.pars.coverage.filter(eligible_uids)
-    #         self.eligible = np.zeros_like(eligible)
-    #         self.eligible[chosen] = True
-    #     else:
-    #         chosen = np.array([], dtype=int)
-    #         self.eligible = np.zeros_like(eligible)
-    #     self.n_eligible = len(chosen)
-    #     return ss.uids(chosen)
     
     def check_eligibility(self):
         """
-        Simplified eligibility check using starsim indexing.
-        
-        This is a more concise version of check_eligibility() that uses
-        starsim's indexing methods for better performance.
-        
+        Identify and randomly select eligible individuals for BCG vaccination in the current timestep.
+
+        This method uses starsim's efficient indexing to find individuals who are within the configured age range and have not yet been vaccinated. It then applies the coverage probability to randomly select a subset of these eligible individuals for vaccination.
+
         Returns:
-            ss.uids: Array of UIDs selected for vaccination
+            ss.uids: Array of UIDs selected for vaccination in this timestep.
         """
         eli = ((self.sim.people.age >= self.min_age) & (self.sim.people.age <= self.max_age) & ~self.is_bcg_vaccinated).uids
         chos = self.pars.coverage.filter(eli)
         return chos
         
     def is_protected(self, uids, current_time):
-        """Return boolean array: True if still protected (within duration), else False."""
+        """Return boolean array: True if still protected (within immunity_period), else False."""
         # Convert uids to ss.uids if it's a numpy array
         if isinstance(uids, np.ndarray):
             uids = ss.uids(uids)
-        return (self.is_bcg_vaccinated[uids]) & ((current_time - self.ti_bcg_vaccinated[uids]) <= self.pars.duration)
+        
+        # Check if individuals are vaccinated and still within protection immunity_period
+        vaccinated = self.is_bcg_vaccinated[uids]
+        within_duration = (current_time - self.ti_bcg_vaccinated[uids]) <= self.pars.immunity_period
+        
+        # Also check if protection expiration time is set (for vaccine responders)
+        has_protection_expiry = ~np.isnan(self.ti_bcg_protection_expires[uids])
+        
+        return vaccinated & within_duration & has_protection_expiry
     
     def step(self):
         """
@@ -209,8 +194,8 @@ class BCGProtection(ss.Intervention):
         5. **Vaccine response modeling**:
            Simulates individual vaccine response using efficacy probability. Only responders
            receive protection benefits.
-        6. **Protection duration assignment**:
-           Sets expiration timestep for vaccine responders based on protection duration.
+        6. **Protection immunity_period assignment**:
+           Sets expiration timestep for vaccine responders based on protection immunity_period.
         7. **TB risk modification**:
            Applies BCG-specific modifiers to TB activation, clearance, and death rates
            using starsim probability distributions for individual heterogeneity.
@@ -252,11 +237,6 @@ class BCGProtection(ss.Intervention):
         
         # 3. Determine immunization eligibility: identify individuals meeting age criteria who have not been vaccinated
         eligible = self.check_eligibility()
-        
-        # Debug: Check population demographics periodically
-        if self.ti % 10 == 0:  # Every 10 timesteps
-            self.debug_population()
-        
         if len(eligible) == 0:
             return
             
@@ -275,16 +255,26 @@ class BCGProtection(ss.Intervention):
         if len(vaccine_responders) == 0:
             return
             
-        # 7. Calculate immunological protection duration: set the timepoint when vaccine-induced immunity wanes
-        protection_expires = current_time + self.pars.duration
+        # 7. Calculate immunological protection immunity_period: set the timepoint when vaccine-induced immunity wanes
+        protection_expires = current_time + self.pars.immunity_period
         self.ti_bcg_protection_expires[vaccine_responders] = protection_expires
         
         # 8. Adjust TB risk modifiers: apply BCG-specific modifiers to TB activation, clearance, and death rates
         self._apply_protection_effects(vaccine_responders)
         
-        # 9. Maintain ongoing protection effects for all currently protected individuals
+        # 9. Maintain protection effects for all currently protected individuals
+        # This is necessary because the TB model resets risk modifiers every timestep
         self._maintain_ongoing_protection(current_time)
         
+    def begin_step(self):
+        """
+        Called at the very start of each simulation timestep, before any disease model steps.
+        Ensures that BCG protection effects are applied to all currently protected individuals
+        before the TB model uses the risk modifiers.
+        """
+        current_time = self.sim.ti
+        self._maintain_ongoing_protection(current_time)
+
     def _apply_protection_effects(self, protected_uids):
         """
         Apply BCG protection effects to TB risk modifiers.
@@ -296,17 +286,61 @@ class BCGProtection(ss.Intervention):
             return
             
         tb = self.sim.diseases.tb
+        tb.state[protected_uids] = TBS.PROTECTED      # TB Protected status - 100 -> BCG
+        # Check if modifiers have already been applied to avoid multiple applications
+        
+        already_protected = ~np.isnan(self.bcg_activation_modifier_applied[protected_uids])
+        if np.any(already_protected):
+            logger.warning(f"BCG protection effects already applied to {np.sum(already_protected)} individuals. Skipping re-application.")
+            return
         
         # Sample individual protection levels using starsim probability distributions
         activation_modifiers = self.pars.activation_modifier.rvs(protected_uids)
         clearance_modifiers = self.pars.clearance_modifier.rvs(protected_uids)
         death_modifiers = self.pars.death_modifier.rvs(protected_uids)
         
+        # Store the modifiers applied to each individual
+        self.bcg_activation_modifier_applied[protected_uids] = activation_modifiers
+        self.bcg_clearance_modifier_applied[protected_uids] = clearance_modifiers
+        self.bcg_death_modifier_applied[protected_uids] = death_modifiers
+        
         # Apply modifiers to TB risk rates
         tb.rr_activation[protected_uids] *= activation_modifiers
         tb.rr_clearance[protected_uids] *= clearance_modifiers
         tb.rr_death[protected_uids] *= death_modifiers
     
+    def _apply_protection_effects_force(self, protected_uids):
+        """
+        Apply BCG protection effects to TB risk modifiers, bypassing the "already applied" check.
+        
+        This method is used to re-apply protection effects every timestep since the TB model
+        resets risk modifiers at the end of each timestep.
+        
+        Parameters:
+            protected_uids: Array of UIDs who are currently protected
+        """
+        if len(protected_uids) == 0:
+            return
+            
+        tb = self.sim.diseases.tb
+
+        # Get the stored modifiers that were originally applied to each individual
+        activation_modifiers = self.bcg_activation_modifier_applied[protected_uids]
+        clearance_modifiers = self.bcg_clearance_modifier_applied[protected_uids]
+        death_modifiers = self.bcg_death_modifier_applied[protected_uids]
+        
+        # Check if modifiers were actually applied (not NaN)
+        valid_modifiers = ~np.isnan(activation_modifiers)
+        if not np.any(valid_modifiers):
+            logger.warning("No valid BCG modifiers found for protected individuals. Skipping re-application.")
+            return
+            
+        # Only process individuals with valid modifiers
+        valid_uids = protected_uids[valid_modifiers]
+        tb.rr_activation[valid_uids] *= activation_modifiers[valid_modifiers]
+        tb.rr_clearance[valid_uids] *= clearance_modifiers[valid_modifiers]
+        tb.rr_death[valid_uids] *= death_modifiers[valid_modifiers]
+
     def _remove_protection(self, expired_uids):
         """
         Remove BCG protection effects when protection expires.
@@ -318,20 +352,34 @@ class BCGProtection(ss.Intervention):
             return
             
         tb = self.sim.diseases.tb
+        tb.state[expired_uids] = TBS.NONE
+        # Get the stored modifiers that were originally applied
+        activation_modifiers = self.bcg_activation_modifier_applied[expired_uids]
+        clearance_modifiers = self.bcg_clearance_modifier_applied[expired_uids]
+        death_modifiers = self.bcg_death_modifier_applied[expired_uids]
         
-        # Reset TB risk modifiers to baseline (divide by the applied modifiers)
-        # Note: This is a simplified approach. In practice, you might want to track
-        # the original values and restore them exactly
-        activation_modifiers = self.pars.activation_modifier.rvs(expired_uids)
-        clearance_modifiers = self.pars.clearance_modifier.rvs(expired_uids)
-        death_modifiers = self.pars.death_modifier.rvs(expired_uids)
-        
-        tb.rr_activation[expired_uids] /= activation_modifiers
-        tb.rr_clearance[expired_uids] /= clearance_modifiers
-        tb.rr_death[expired_uids] /= death_modifiers
+        # Check if modifiers were actually applied (not NaN)
+        valid_modifiers = ~np.isnan(activation_modifiers)
+        if not np.any(valid_modifiers):
+            logger.warning("No valid BCG modifiers found for expired individuals. Skipping removal.")
+            return
+            
+        # Only process individuals with valid modifiers
+        valid_uids = expired_uids[valid_modifiers]
+        tb.rr_activation[valid_uids] /= activation_modifiers[valid_modifiers]
+        tb.rr_clearance[valid_uids] /= clearance_modifiers[valid_modifiers]
+        tb.rr_death[valid_uids] /= death_modifiers[valid_modifiers]
+        self.bcg_activation_modifier_applied[expired_uids] = np.nan
+        self.bcg_clearance_modifier_applied[expired_uids] = np.nan
+        self.bcg_death_modifier_applied[expired_uids] = np.nan
         
         # Clear protection expiration time
         self.ti_bcg_protection_expires[expired_uids] = np.nan
+        
+        # Reset vaccination status to False when protection expires
+        self.is_bcg_vaccinated[expired_uids] = False
+        self.ti_bcg_vaccinated[expired_uids] = np.nan
+        self.age_at_vaccination[expired_uids] = np.nan
         
     def _maintain_ongoing_protection(self, current_time):
         """
@@ -339,6 +387,7 @@ class BCGProtection(ss.Intervention):
         
         This ensures that protection effects are continuously applied to all
         vaccinated individuals who are still within their protection period.
+        This is necessary because the TB model resets risk modifiers every timestep.
         
         Parameters:
             current_time: Current simulation timestep
@@ -354,7 +403,8 @@ class BCGProtection(ss.Intervention):
         
         if len(protected_uids) > 0:
             # Re-apply protection effects to ensure they persist
-            self._apply_protection_effects(protected_uids)
+            # We need to bypass the "already applied" check since TB model resets modifiers
+            self._apply_protection_effects_force(protected_uids)
             
     def init_results(self):
         """
@@ -366,7 +416,7 @@ class BCGProtection(ss.Intervention):
         - Coverage and effectiveness metrics
         - Age-specific metrics for 1-5, 5-15, and 15+ years
         - Cumulative metrics
-        - Intervention timing metrics (average age at vaccination, protection duration)
+        - Intervention timing metrics (average age at vaccination, protection immunity_period)
         - TB impact metrics (cases and deaths averted)
         """
         self.define_results(
@@ -385,17 +435,6 @@ class BCGProtection(ss.Intervention):
             ss.Result('protection_coverage', dtype=float),  # Protection rate (protected/total_pop)
             ss.Result('vaccine_effectiveness', dtype=float), # Response rate (responders/vaccinated)
             
-            # Age-specific metrics (manual calculation)
-            ss.Result('n_eligible_1_5', dtype=int),         # Eligible 1-5 years
-            ss.Result('n_vaccinated_1_5', dtype=int),       # Vaccinated 1-5 years
-            ss.Result('coverage_1_5', dtype=float),         # Coverage 1-5 years
-            ss.Result('n_eligible_5_15', dtype=int),        # Eligible 5-15 years
-            ss.Result('n_vaccinated_5_15', dtype=int),      # Vaccinated 5-15 years
-            ss.Result('coverage_5_15', dtype=float),        # Coverage 5-15 years
-            ss.Result('n_eligible_15_plus', dtype=int),     # Eligible 15+ years
-            ss.Result('n_vaccinated_15_plus', dtype=int),   # Vaccinated 15+ years
-            ss.Result('coverage_15_plus', dtype=float),     # Coverage 15+ years
-            
             # Cumulative metrics
             ss.Result('cumulative_vaccinated', dtype=int),  # Total ever vaccinated
             ss.Result('cumulative_responders', dtype=int),  # Total ever responded
@@ -403,42 +442,30 @@ class BCGProtection(ss.Intervention):
             
             # Intervention timing metrics
             ss.Result('avg_age_at_vaccination', dtype=float), # Average age when vaccinated
-            ss.Result('avg_protection_duration', dtype=float), # Average protection duration
+            ss.Result('avg_protection_duration', dtype=float), # Average protection immunity_period
             
-            # TB impact metrics (if TB disease is present)
-            ss.Result('tb_cases_averted', dtype=int),       # TB cases prevented (estimated)
-            ss.Result('tb_deaths_averted', dtype=int),      # TB deaths prevented (estimated)
+            
         )
 
     def update_results(self):
         """
         Update all result metrics for the current timestep.
-        
         This method calculates and stores all the intervention metrics including:
         - Basic vaccination counts and rates
         - Protection status for vaccinated individuals
         - Age-specific coverage metrics for 1-5, 5-15, and 15+ years
         - Cumulative totals
-        - Average age at vaccination and protection duration
-        - TB impact estimates (placeholder values)
+        - Average age at vaccination and protection immunity_period
+        - TB impact estimates (now calculated, not placeholder)
         """
         current_time = self.ti
-        
-        # Basic vaccination metrics
         self.results['n_vaccinated'][self.ti] = np.count_nonzero(self.is_bcg_vaccinated)
         self.results['n_eligible'][self.ti] = self.n_eligible
-        
-        # Calculate newly vaccinated this timestep
         newly_vaccinated = np.sum((self.ti_bcg_vaccinated == current_time) & self.is_bcg_vaccinated)
         self.results['n_newly_vaccinated'][self.ti] = newly_vaccinated
-        
-        # Calculate vaccine responders (those with protection expiration set)
-        # Convert to numpy array first to avoid starsim BooleanOperationError
         protection_expires_array = np.array(self.ti_bcg_protection_expires)
         vaccine_responders = np.sum(~np.isnan(protection_expires_array))
         self.results['n_vaccine_responders'][self.ti] = vaccine_responders
-        
-        # Protection status metrics
         all_vaccinated = self.is_bcg_vaccinated.uids
         if len(all_vaccinated) > 0:
             currently_protected = self.is_protected(all_vaccinated, current_time)
@@ -447,129 +474,35 @@ class BCGProtection(ss.Intervention):
         else:
             n_protected = 0
             n_expired = 0
-            
         self.results['n_protected'][self.ti] = n_protected
         self.results['n_protection_expired'][self.ti] = n_expired
-        
-        # Coverage and effectiveness metrics
         total_pop = len(self.sim.people)
         if self.n_eligible > 0:
             vaccination_coverage = newly_vaccinated / self.n_eligible
         else:
             vaccination_coverage = 0.0
-            
         protection_coverage = n_protected / total_pop if total_pop > 0 else 0.0
-        
         total_vaccinated = np.count_nonzero(self.is_bcg_vaccinated)
         if total_vaccinated > 0:
             vaccine_effectiveness = vaccine_responders / total_vaccinated
         else:
             vaccine_effectiveness = 0.0
-            
         self.results['vaccination_coverage'][self.ti] = vaccination_coverage
         self.results['protection_coverage'][self.ti] = protection_coverage
         self.results['vaccine_effectiveness'][self.ti] = vaccine_effectiveness
-        
-        # Age-specific metrics (manual calculation)
-        ages = self.sim.people.age
-        
-        # Calculate eligible and vaccinated by age groups (only for age groups within our target range)
-        eligible_1_5 = np.sum((ages > 1) & (ages <= 5) & (ages >= self.min_age) & (ages <= self.max_age) & ~self.is_bcg_vaccinated)
-        vaccinated_1_5 = np.sum((ages > 1) & (ages <= 5) & self.is_bcg_vaccinated)
-        
-        eligible_5_15 = np.sum((ages > 5) & (ages <= 15) & (ages >= self.min_age) & (ages <= self.max_age) & ~self.is_bcg_vaccinated)
-        vaccinated_5_15 = np.sum((ages > 5) & (ages <= 15) & self.is_bcg_vaccinated)
-        
-        eligible_15_plus = np.sum((ages > 15) & (ages >= self.min_age) & (ages <= self.max_age) & ~self.is_bcg_vaccinated)
-        vaccinated_15_plus = np.sum((ages > 15) & self.is_bcg_vaccinated)
-        
-        self.results['n_eligible_1_5'][self.ti] = eligible_1_5
-        self.results['n_vaccinated_1_5'][self.ti] = vaccinated_1_5
-        self.results['coverage_1_5'][self.ti] = vaccinated_1_5 / eligible_1_5 if eligible_1_5 > 0 else 0.0
-        
-        self.results['n_eligible_5_15'][self.ti] = eligible_5_15
-        self.results['n_vaccinated_5_15'][self.ti] = vaccinated_5_15
-        self.results['coverage_5_15'][self.ti] = vaccinated_5_15 / eligible_5_15 if eligible_5_15 > 0 else 0.0
-        
-        self.results['n_eligible_15_plus'][self.ti] = eligible_15_plus
-        self.results['n_vaccinated_15_plus'][self.ti] = vaccinated_15_plus
-        self.results['coverage_15_plus'][self.ti] = vaccinated_15_plus / eligible_15_plus if eligible_15_plus > 0 else 0.0
-        
-        # Cumulative metrics
         self.results['cumulative_vaccinated'][self.ti] = total_vaccinated
         self.results['cumulative_responders'][self.ti] = vaccine_responders
         self.results['cumulative_expired'][self.ti] = n_expired
-        
-        # Intervention timing metrics
-        # Calculate average age at vaccination using stored age at vaccination
         if total_vaccinated > 0:
             ages_at_vaccination = self.age_at_vaccination[self.is_bcg_vaccinated]
             avg_age_at_vaccination = np.mean(ages_at_vaccination)
         else:
             avg_age_at_vaccination = 0.0
-            
-        # Average protection duration is the configured duration (since it's fixed for all individuals)
-        avg_protection_duration = self.pars.duration
-            
+        avg_protection_duration = self.pars.immunity_period
         self.results['avg_age_at_vaccination'][self.ti] = avg_age_at_vaccination
         self.results['avg_protection_duration'][self.ti] = avg_protection_duration
-        
-        # TB impact metrics (simplified estimates)
-        # These would need to be calculated based on TB disease state and risk reduction
-        # For now, we'll set placeholder values that could be updated by the TB disease model
-        self.results['tb_cases_averted'][self.ti] = 0  # Placeholder
-        self.results['tb_deaths_averted'][self.ti] = 0  # Placeholder
 
-    def calculate_tb_impact(self, tb_disease):
-        """
-        Calculate estimated TB cases and deaths averted by BCG vaccination.
-        
-        This method should be called by the TB disease model to estimate the impact
-        of BCG vaccination on TB outcomes.
-        
-        Parameters:
-            tb_disease: The TB disease model instance
-            
-        Returns:
-            dict: Dictionary containing estimated cases and deaths averted
-        """
-        if not hasattr(self.sim, 'diseases') or not hasattr(self.sim.diseases, 'tb'):
-            return {'cases_averted': 0, 'deaths_averted': 0}
-            
-        # Get currently protected individuals
-        all_vaccinated = self.is_bcg_vaccinated.uids
-        if len(all_vaccinated) == 0:
-            return {'cases_averted': 0, 'deaths_averted': 0}
-            
-        currently_protected = self.is_protected(all_vaccinated, self.ti)
-        protected_uids = all_vaccinated[currently_protected]
-        
-        if len(protected_uids) == 0:
-            return {'cases_averted': 0, 'deaths_averted': 0}
-        
-        # Calculate risk reduction for protected individuals
-        # This is a simplified calculation - in practice, you'd want to track
-        # the actual risk reduction applied to each individual
-        
-        # Estimate cases averted based on activation risk reduction
-        activation_reduction = 1.0 - np.mean(self.pars.activation_modifier.rvs(protected_uids))
-        potential_cases = len(protected_uids) * 0.01  # Assume 1% baseline activation rate
-        cases_averted = int(potential_cases * activation_reduction)
-        
-        # Estimate deaths averted based on death risk reduction
-        death_reduction = 1.0 - np.mean(self.pars.death_modifier.rvs(protected_uids))
-        potential_deaths = len(protected_uids) * 0.001  # Assume 0.1% baseline death rate
-        deaths_averted = int(potential_deaths * death_reduction)
-        
-        # Update results
-        self.results['tb_cases_averted'][self.ti] = cases_averted
-        self.results['tb_deaths_averted'][self.ti] = deaths_averted
-        
-        return {
-            'cases_averted': cases_averted,
-            'deaths_averted': deaths_averted,
-            'protected_individuals': len(protected_uids)
-        }
+
 
     def get_summary_stats(self):
         """
@@ -611,34 +544,93 @@ class BCGProtection(ss.Intervention):
         ages = self.sim.people.age
         total_pop = len(ages)
         
-        # Age distribution
-        age_1_5 = np.sum((ages > 1) & (ages <= 5))
-        age_5_15 = np.sum((ages > 5) & (ages <= 15))
-        age_15_plus = np.sum(ages > 15)
-        
-        # Vaccination status by age
-        vaccinated_1_5 = np.sum((ages > 1) & (ages <= 5) & self.is_bcg_vaccinated)
-        vaccinated_5_15 = np.sum((ages > 5) & (ages <= 15) & self.is_bcg_vaccinated)
-        vaccinated_15_plus = np.sum((ages > 15) & self.is_bcg_vaccinated)
-        
-        # Eligible by age (considering age_range)
-        eligible_1_5 = np.sum((ages > 1) & (ages <= 5) & (ages >= self.min_age) & (ages <= self.max_age) & ~self.is_bcg_vaccinated)
-        eligible_5_15 = np.sum((ages > 5) & (ages <= 15) & (ages >= self.min_age) & (ages <= self.max_age) & ~self.is_bcg_vaccinated)
-        eligible_15_plus = np.sum((ages > 15) & (ages >= self.min_age) & (ages <= self.max_age) & ~self.is_bcg_vaccinated)
+        # Count individuals in the configured age range
+        min_age, max_age = self.pars.age_range
+        in_age_range = np.sum((ages >= min_age) & (ages <= max_age))
+        vaccinated_in_range = np.sum((ages >= min_age) & (ages <= max_age) & self.is_bcg_vaccinated)
+        eligible_in_range = np.sum((ages >= min_age) & (ages <= max_age) & ~self.is_bcg_vaccinated)
         
         debug_info = {
             'total_population': total_pop,
             'age_range': self.pars.age_range,
-            'age_1_5': age_1_5,
-            'age_5_15': age_5_15,
-            'age_15_plus': age_15_plus,
-            'vaccinated_1_5': vaccinated_1_5,
-            'vaccinated_5_15': vaccinated_5_15,
-            'vaccinated_15_plus': vaccinated_15_plus,
-            'eligible_1_5': eligible_1_5,
-            'eligible_5_15': eligible_5_15,
-            'eligible_15_plus': eligible_15_plus,
+            f'age_{min_age}_{max_age}': in_age_range,
+            f'vaccinated_{min_age}_{max_age}': vaccinated_in_range,
+            f'eligible_{min_age}_{max_age}': eligible_in_range,
         }
         
         logger.info(f"BCG Population Debug: {debug_info}")
         return debug_info
+    
+    def calculate_tb_impact(self, tb_model):
+        """
+        Calculate the impact of BCG vaccination on TB outcomes.
+        
+        Parameters:
+            tb_model: The TB disease model
+            
+        Returns:
+            dict: Dictionary containing TB impact metrics
+        """
+        if not hasattr(self, 'sim') or self.sim is None:
+            return {'error': 'Simulation not initialized'}
+            
+        # Get vaccinated and unvaccinated individuals
+        vaccinated_uids = self.is_bcg_vaccinated.uids
+        unvaccinated_uids = (~self.is_bcg_vaccinated).uids
+        
+        # Calculate TB outcomes by vaccination status
+        tb_states = tb_model.state.raw
+        
+        # Check if arrays are initialized and have the right size
+        if len(tb_states) == 0:
+            return {
+                'vaccinated_tb_deaths': 0,
+                'unvaccinated_tb_deaths': 0,
+                'vaccinated_tb_cases': 0,
+                'unvaccinated_tb_cases': 0,
+                'vaccinated_death_modifier': 1.0,
+                'unvaccinated_death_modifier': 1.0,
+                'deaths_averted': 0,
+                'cases_averted': 0,
+                'error': 'TB model not initialized'
+            }
+        
+        # Check bounds before indexing
+        max_uid = max(np.max(vaccinated_uids) if len(vaccinated_uids) > 0 else 0,
+                     np.max(unvaccinated_uids) if len(unvaccinated_uids) > 0 else 0)
+        
+        if max_uid >= len(tb_states):
+            return {
+                'vaccinated_tb_deaths': 0,
+                'unvaccinated_tb_deaths': 0,
+                'vaccinated_tb_cases': 0,
+                'unvaccinated_tb_cases': 0,
+                'vaccinated_death_modifier': 1.0,
+                'unvaccinated_death_modifier': 1.0,
+                'deaths_averted': 0,
+                'cases_averted': 0,
+                'error': 'UIDs out of bounds for TB state array'
+            }
+        
+        vaccinated_tb_deaths = np.sum(tb_states[vaccinated_uids] == 4) if len(vaccinated_uids) > 0 else 0
+        unvaccinated_tb_deaths = np.sum(tb_states[unvaccinated_uids] == 4) if len(unvaccinated_uids) > 0 else 0
+        
+        vaccinated_tb_cases = np.sum(tb_states[vaccinated_uids] == 2) if len(vaccinated_uids) > 0 else 0
+        unvaccinated_tb_cases = np.sum(tb_states[unvaccinated_uids] == 2) if len(unvaccinated_uids) > 0 else 0
+        
+        # Calculate risk modifiers
+        vaccinated_death_modifier = np.mean(tb_model.rr_death.raw[vaccinated_uids]) if len(vaccinated_uids) > 0 else 1.0
+        unvaccinated_death_modifier = np.mean(tb_model.rr_death.raw[unvaccinated_uids]) if len(unvaccinated_uids) > 0 else 1.0
+        
+        return {
+            'vaccinated_tb_deaths': vaccinated_tb_deaths,
+            'unvaccinated_tb_deaths': unvaccinated_tb_deaths,
+            'vaccinated_tb_cases': vaccinated_tb_cases,
+            'unvaccinated_tb_cases': unvaccinated_tb_cases,
+            'vaccinated_death_modifier': vaccinated_death_modifier,
+            'unvaccinated_death_modifier': unvaccinated_death_modifier,
+            'deaths_averted': unvaccinated_tb_deaths - vaccinated_tb_deaths,
+            'cases_averted': unvaccinated_tb_cases - vaccinated_tb_cases,
+        }
+
+
