@@ -94,7 +94,7 @@ def build_sim(scenario=None, spars=None):
         networks=networks,
         interventions=inv,
         diseases=[tb],
-        demographics=demographics,
+        # demographics=demographics,
         pars=spars,
     )
 
@@ -134,7 +134,17 @@ def get_scenarios():
                 age_range=(1, 5),
             ),
         },
-  
+          'BCG 20 - 50': {
+            'name': 'BCG PROTECTION',
+            'tbpars': dict(start=sc.date('1970-02-07'), 
+                           stop=sc.date('2030-12-31')),
+            'bcgintervention': dict(
+                coverage=0.2,
+                start=sc.date('1975-01-01'),
+                stop=sc.date('2020-12-31'),
+                age_range=(20, 50),
+            ),
+        },
         # Under construction, not yet finished 
         # 'TPT': {
         #     'name': 'TPT INITIATION',

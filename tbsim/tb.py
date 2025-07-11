@@ -16,6 +16,7 @@ class TBS(IntEnum):
     ACTIVE_SMNEG    = 4     # Active TB, smear negative
     ACTIVE_EXPTB    = 5     # Active TB, extra-pulmonary
     DEAD            = 8     # TB death
+    PROTECTED       = 100
 
 
 class TB(ss.Infection):

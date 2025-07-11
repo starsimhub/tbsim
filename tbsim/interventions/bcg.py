@@ -4,6 +4,7 @@ import sciris as sc
 import logging
 import datetime
 from tbsim.wrappers import Agents
+from tbsim.tb import TBS
 
 __all__ = ['BCGProtection']
 logger = logging.getLogger(__name__)
@@ -282,8 +283,9 @@ class BCGProtection(ss.Intervention):
             return
             
         tb = self.sim.diseases.tb
-        
+        tb.state[protected_uids] = TBS.PROTECTED      # TB Protected status - 100 -> BCG
         # Check if modifiers have already been applied to avoid multiple applications
+        
         already_protected = ~np.isnan(self.bcg_activation_modifier_applied[protected_uids])
         if np.any(already_protected):
             logger.warning(f"BCG protection effects already applied to {np.sum(already_protected)} individuals. Skipping re-application.")
@@ -318,7 +320,7 @@ class BCGProtection(ss.Intervention):
             return
             
         tb = self.sim.diseases.tb
-        
+
         # Get the stored modifiers that were originally applied to each individual
         activation_modifiers = self.bcg_activation_modifier_applied[protected_uids]
         clearance_modifiers = self.bcg_clearance_modifier_applied[protected_uids]
@@ -352,7 +354,7 @@ class BCGProtection(ss.Intervention):
             return
             
         tb = self.sim.diseases.tb
-        
+        tb.state[expired_uids] = TBS.NONE
         # Get the stored modifiers that were originally applied
         activation_modifiers = self.bcg_activation_modifier_applied[expired_uids]
         clearance_modifiers = self.bcg_clearance_modifier_applied[expired_uids]
