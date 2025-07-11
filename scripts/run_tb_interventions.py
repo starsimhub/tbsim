@@ -9,7 +9,7 @@ import pandas as pd
 DEFAULT_SPARS = dict(
     unit='day',
     dt=7,
-    start=sc.date('1965-01-01'),
+    start=sc.date('1950-01-01'),
     stop=sc.date('2035-12-31'),
     rand_seed=123,
     verbose =0,
@@ -28,7 +28,7 @@ age_data = pd.DataFrame({
 })
 
 def build_sim(scenario=None, spars=None):
-    """
+    """ HELP:
     Build and return a complete Starsim-based simulation instance for TB modeling,
     incorporating optional interventions and user-defined parameters.
 
@@ -93,14 +93,13 @@ def build_sim(scenario=None, spars=None):
         people=pop,
         networks=networks,
         interventions=inv,
-        diseases=tb,
-        demographics=demographics,
+        diseases=[tb],
+        # demographics=demographics,
         pars=spars,
     )
 
-
 def get_scenarios():
-    """
+    """ HELP
     Define a set of simulation scenarios for evaluating TB interventions.
 
     Returns:
@@ -120,29 +119,29 @@ def get_scenarios():
     return {
         'Baseline': {
             'name': 'BASELINE',
-            'tbpars': dict(start=sc.date('1970-02-07'), 
+            'tbpars': dict(start=sc.date('1950-02-07'), 
                 stop=sc.date('2030-12-31')),
         },
         'BCG 1 - 5': {
             'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1970-02-07'), 
+            'tbpars': dict(start=sc.date('1950-02-07'), 
                            stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
-                coverage=0.30,
+                coverage=0.8,
                 start=sc.date('1975-01-01'),
                 stop=sc.date('2020-12-31'),
                 age_range=(1, 5),
             ),
         },
-        'BCG 30 to 50 Adult': {
+          'BCG 20 - 50': {
             'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1970-02-07'), 
+            'tbpars': dict(start=sc.date('1950-02-07'), 
                            stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
-                coverage=0.10,
+                coverage=0.2,
                 start=sc.date('1975-01-01'),
                 stop=sc.date('2020-12-31'),
-                age_range=(30, 50),
+                age_range=(20, 50),
             ),
         },
         # Under construction, not yet finished 
@@ -159,7 +158,7 @@ def get_scenarios():
 
 
 def run_scenarios(plot=True):
-    """
+    """ HELP:
     Execute all defined TB simulation scenarios and optionally visualize results.
 
     Args:
@@ -207,10 +206,10 @@ def run_scenarios(plot=True):
         results[name] = sim.results.flatten()     
         
     if plot:
-        pl.plot_combined(results, dark=True, heightfold=2, outdir='results/interventions', filter=mtb.FILTERS.important_metrics)
+        pl.plot_combined(results, dark=True, cmap='viridis',  
+                        # heightfold=2, outdir='results/interventions')
+                        heightfold=2, outdir='results/interventions', filter=mtb.FILTERS.important_metrics)
         plt.show()
-
-
 
 if __name__ == '__main__':
     run_scenarios()
