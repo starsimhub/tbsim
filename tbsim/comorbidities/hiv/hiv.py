@@ -181,7 +181,10 @@ class HIV(ss.Disease):
         n = len(uids)
         
         states = self.state[uids]
-        res.hiv_prevalence[ti] = np.count_nonzero(np.isin(self.state, [HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS]))/n
+        if n_alive > 0:
+            res.hiv_prevalence[ti] = np.count_nonzero(np.isin(self.state, [HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS])) / n_alive
+        else:
+            res.hiv_prevalence[ti] = 0.0
         res.infected[ti] = np.count_nonzero(np.isin(self.state, [HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS]))
         res.atrisk[ti]     = np.count_nonzero(self.state == HIVState.ATRISK)/n_alive
         res.acute[ti]      = np.count_nonzero(self.state == HIVState.ACUTE)/n_alive
