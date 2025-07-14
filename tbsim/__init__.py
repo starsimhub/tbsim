@@ -8,6 +8,7 @@ from .comorbidities.hiv.hiv import HIVState
 from .comorbidities.hiv.intervention import HivInterventions
 from .config import *
 from .interventions.interventions import *
+from .interventions.beta import BetaIntervention
 from .interventions.tpt import *
 from .interventions.bcg import *
 from .networks import HouseholdNet
