@@ -106,10 +106,24 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, heightfold*n_rows))
     axs = np.array(axs).flatten()
 
+    # Calculate global X-axis range across all metrics
+    all_x_min = None
+    all_x_max = None
+    for flat in flat_results.values():
+        for metric in metrics:
+            if metric in flat:
+                r = flat[metric]
+                if all_x_min is None:
+                    all_x_min = min(r.timevec)
+                    all_x_max = max(r.timevec)
+                else:
+                    all_x_min = min(all_x_min, min(r.timevec))
+                    all_x_max = max(all_x_max, max(r.timevec))
+
     if dark:
-        fig.patch.set_facecolor('lightgray')  # figure background
+        fig.patch.set_facecolor('#606060')  # medium dark gray background
         for ax in axs:
-            ax.set_facecolor('darkgray')
+            ax.set_facecolor('#404040')  # dark gray for axes
     palette = plt.cm.get_cmap(cmap, len(flat_results))
 
     # plot each metric
@@ -119,14 +133,17 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
             if metric in flat:
                 r = flat[metric]
                 ax.plot(r.timevec, r.values, lw=0.8, label=scen, color=palette(j))
-        ax.set_title(metric, fontsize=10)
+        ax.set_title(metric, fontsize=10, color='white' if dark else 'black')
         vmax = max(flat.get(metric, r).values)
         if vmax < 1.001:
             ax.set_ylim(0, max(0.5, vmax))
-            ax.set_ylabel('%')
+            ax.set_ylabel('%', color='white' if dark else 'black')
         else:
-            ax.set_ylabel('Value')
-        ax.set_xlabel('Time')
+            ax.set_ylabel('Value', color='white' if dark else 'black')
+        ax.set_xlabel('Time', color='white' if dark else 'black')
+        ax.tick_params(axis='both', colors='white' if dark else 'black')
+        # Set consistent X-axis range for all plots
+        ax.set_xlim(all_x_min, all_x_max)
 
         # grid lines
         ax.grid(True, color='white' if dark else 'gray', alpha=0.3)
@@ -259,11 +276,25 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(4.5*n_cols, heightfold*n_rows+1))
     axs = np.array(axs).flatten()
 
+    # Calculate global X-axis range across all metrics
+    all_x_min = None
+    all_x_max = None
+    for flat in flat_results.values():
+        for metric in metrics:
+            if metric in flat:
+                r = flat[metric]
+                if all_x_min is None:
+                    all_x_min = min(r.timevec)
+                    all_x_max = max(r.timevec)
+                else:
+                    all_x_min = min(all_x_min, min(r.timevec))
+                    all_x_max = max(all_x_max, max(r.timevec))
+
     # Fancy background gradient
     if dark:
-        fig.patch.set_facecolor("#d3d3d3")  # light gray background
+        fig.patch.set_facecolor("#606060")  # medium dark gray background
         for ax in axs:
-            ax.set_facecolor('#b3b3b3b3')  #('#e0e0e0')  # lighter gray for axes
+            ax.set_facecolor('#404040')  # dark gray for axes
             ax.set_axisbelow(True)
             ax.tick_params(colors='#222', which='both', width=spine_linewidth)
             for spine in ax.spines.values():
@@ -300,10 +331,12 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
                             alpha=alpha, marker=marker, markersize=marker_size, 
                             markeredgewidth=markeredgewidth, markeredgecolor='darkgrey')
                     
-        ax.set_title(metric, fontsize=title_fontsize, fontweight='light', color='#222')
-        ax.set_xlabel('Time', fontsize=label_fontsize, color='#222', fontweight='light')
-        ax.tick_params(axis='both', labelsize=tick_fontsize)
+        ax.set_title(metric, fontsize=title_fontsize, fontweight='light', color='white' if dark else 'black')
+        ax.set_xlabel('Time', fontsize=label_fontsize, color='white' if dark else 'black', fontweight='light')
+        ax.tick_params(axis='both', labelsize=tick_fontsize, colors='white' if dark else 'black')
         ax.grid(True, color='white' if dark else 'gray', alpha=grid_alpha, linestyle='--', linewidth=grid_linewidth)
+        # Set consistent X-axis range for all plots
+        ax.set_xlim(all_x_min, all_x_max)
         leg = ax.legend(fontsize=legend_fontsize, frameon=True, loc='best')
         if leg: 
             leg.get_frame().set_alpha(0.7)

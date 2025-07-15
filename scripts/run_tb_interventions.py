@@ -143,14 +143,14 @@ def get_scenarios():
     """
     
     return {
-        # 'Baseline': {
-        #     'name': 'No interventions',
-        #     'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-        # },
         'Baseline': {
             'name': 'No interventions',
             'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-            'betabyyear':dict(years=[1990, 2000], x_beta=1.4)
+        },
+        'Baseline and BetaByYear': {
+            'name': 'No interventions',
+            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+            'betabyyear':dict(years=[1990, 2000], x_beta=[0.5, 1.4])
         },
         'Single BCG': {
             'name': 'Single BCG intervention',
@@ -159,59 +159,28 @@ def get_scenarios():
                 coverage=0.8,
                 start=sc.date('1980-01-01'),
                 stop=sc.date('2020-12-31'),
-                age_range=(1, 5),
+                age_range=[1, 5],
             ),
         },
         
-        # 'Multiple BCG': {
-        #     'name': 'Multiple BCG interventions',cls
-        #     'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-        #     'bcgintervention': [
-        #         dict(
-        #             coverage=0.9,
-        #             start=sc.date('1980-01-01'),
-        #             stop=sc.date('2020-12-31'),
-        #             age_range=(0, 2),           # For children
-        #         ),
-        #         dict(
-        #             coverage=0.3,
-        #             start=sc.date('1985-01-01'),
-        #             stop=sc.date('2015-12-31'),
-        #             age_range=(25, 40),         # For adults
-        #         ),
-        #     ],
-        # },
-        
-        # 'BCG + TPT': {
-        #     'name': 'BCG and TPT together',
-        #     'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-        #     'bcgintervention': dict(
-        #         coverage=0.8,
-        #         start=sc.date('1980-01-01'),
-        #         stop=sc.date('2020-12-31'),
-        #         age_range=(1, 5),
-        #     ),
-        #     'tptintervention': dict(
-        #         p_tpt=ss.bernoulli(0.7),
-        #         max_age=50,
-        #         hiv_status_threshold=True,
-        #         start=sc.date('1990-01-01'),
-        #     ),
-        # },
-        
-        # 'Multiple TPT': {
-        #     'name': 'Multiple TPT strategies',
-        #     'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-        #     'tptintervention': [
-        #         dict(
-        #             p_tpt=ss.bernoulli(0.9),
-        #             max_age=35,
-        #             hiv_status_threshold=True,
-        #             start=sc.date('1980-01-01'),
-        #             stop=sc.date('2000-12-31'),
-        #         ),
-        #     ],
-        # },
+        'Multiple BCG': {
+            'name': 'Multiple BCG interventions',
+            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+            'bcgintervention': [
+                dict(
+                    coverage=0.9,
+                    start=sc.date('1980-01-01'),
+                    stop=sc.date('2020-12-31'),
+                    age_range=[0, 2],           # For children
+                ),
+                dict(
+                    coverage=0.3,
+                    start=sc.date('1985-01-01'),
+                    stop=sc.date('2015-12-31'),
+                    age_range=[25, 40],         # For adults
+                ),
+            ],
+        },
     }
 
 def run_scenarios(plot=True):
@@ -229,8 +198,9 @@ def run_scenarios(plot=True):
     
     if plot:
         pl.plot_combined(results, dark=True, cmap='viridis',  
-                        heightfold=2, outdir='results/interventions', 
-                        filter=mtb.FILTERS.important_metrics)
+                        heightfold=2, outdir='results/interventions')
+                        
+                        # filter=mtb.FILTERS.important_metrics)
         plt.show()
     
     return results

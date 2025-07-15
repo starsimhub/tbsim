@@ -78,7 +78,7 @@ class BetaByYear(ss.Intervention):
         if len(self.pars.years)>0:
             target_year = self.pars.years[idx]
             x_beta = self._x_beta_list[idx]
-            if (year >= target_year) & (year < target_year + self.t.dt_year):
+            if (year >= target_year) and (year < target_year + self.t.dt_year):
                 print(f"NEW BETA: At year:{year}, Value:{x_beta}")
                 self.sim.diseases.tb.pars['beta'] *= x_beta
                 for net in self.sim.networks.values():
