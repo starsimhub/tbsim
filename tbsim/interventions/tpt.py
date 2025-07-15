@@ -75,78 +75,110 @@ class TPTInitiation(ss.Intervention):
             stop=ss.date('2100-12-31'),
         )
         self.update_pars(pars=pars, **kwargs)
+
+        # --- Parameter validation ---
+        try:
+            if not isinstance(self.pars.age_range, (list, tuple)) or len(self.pars.age_range) != 2:
+                raise ValueError("age_range must be a list or tuple of length 2 (min_age, max_age).")
+            min_age, max_age = self.pars.age_range
+            if not (isinstance(min_age, (int, float)) and isinstance(max_age, (int, float))):
+                raise ValueError("age_range values must be numeric.")
+            if min_age < 0 or max_age <= min_age:
+                raise ValueError("age_range must have 0 <= min_age < max_age.")
+            if not (0 <= self.pars.p_tpt.p <= 1):
+                raise ValueError("p_tpt must be a probability between 0 and 1.")
+            if not hasattr(self.pars, 'tpt_treatment_duration') or self.pars.tpt_treatment_duration <= 0:
+                raise ValueError("tpt_treatment_duration must be positive.")
+            if not hasattr(self.pars, 'tpt_protection_duration') or self.pars.tpt_protection_duration < 0:
+                raise ValueError("tpt_protection_duration must be non-negative.")
+        except Exception as e:
+            print(f"[TPTInitiation] Parameter validation error: {e}")
+            raise
     
     def step(self):
         """
         Execute the TPT intervention step, applying TPT and protection logic at each timestep.
-
-        - Removes protection for individuals whose TPT protection has expired (tb.state set to TBS.NONE)
-        - Identifies eligible individuals based on household, treatment, screening, age_range, and HIV status
-        - Uses a Bernoulli trial to select candidates for TPT
-        - Sets on_tpt and received_tpt flags for those who start TPT
-        - Sets tpt_treatment_until and tpt_protection_until for those who start TPT
-        - Sets tb.state to TBS.PROTECTED for the protection period after treatment
-        - Tracks results for eligibility and initiation
         """
-        sim = self.sim
-        ppl = sim.people
-        tb = sim.diseases.tb
+        try:
+            sim = self.sim
+            ppl = sim.people
+            tb = sim.diseases.tb
 
-        # Initialize states if not already present
-        if not hasattr(tb, 'protected_from_tb'):
-            tb.define_states(
-                ss.BoolArr('protected_from_tb', default=False),
-                ss.Arr('tpt_treatment_until', default=None),
-                ss.Arr('tpt_protection_until', default=None),
-            )
+            # --- Start/stop window check ---
+            now_date = sim.date
+            if now_date < self.pars.start or now_date > self.pars.stop:
+                return
 
-        # --- Remove protection if expired ---
-        if hasattr(tb, 'tpt_protection_until'):
-            expired = (tb.state == mtb.TBS.PROTECTED) & (sim.date >= tb.tpt_protection_until)
-            if np.any(expired):
-                tb.state[expired] = mtb.TBS.NONE
-                tb.tpt_protection_until[expired] = None
+            # Initialize states if not already present
+            if not hasattr(tb, 'protected_from_tb'):
+                tb.define_states(
+                    ss.BoolArr('protected_from_tb', default=False),
+                    ss.Arr('tpt_treatment_until', default=None),
+                    ss.Arr('tpt_protection_until', default=None),
+                )
 
-        # Households with TB cases
-        treated = tb.on_treatment
-        eligible_hhids = np.unique(ppl['hhid'][treated])
+            # --- Remove protection if expired ---
+            if hasattr(tb, 'tpt_protection_until'):
+                expired = (tb.state == mtb.TBS.PROTECTED) & (sim.date >= tb.tpt_protection_until)
+                if np.any(expired):
+                    tb.state[expired] = mtb.TBS.NONE
+                    tb.tpt_protection_until[expired] = None
 
-        # Eligibility screening
-        in_eligible_households = np.isin(ppl['hhid'], eligible_hhids)
-        eligible = in_eligible_households & (~tb.on_treatment) & (ppl['screen_negative'] | ppl['non_symptomatic'])
+            # Households with TB cases
+            if not hasattr(tb, 'on_treatment'):
+                print("[TPTInitiation] Error: tb.on_treatment attribute missing.")
+                return
+            if not hasattr(ppl, 'hhid'):
+                print("[TPTInitiation] Error: people.hhid attribute missing.")
+                return
+            treated = tb.on_treatment
+            eligible_hhids = np.unique(ppl['hhid'][treated])
 
-        # Age range filter (if age_range is set and present)
-        if hasattr(ppl, 'age') and self.pars.age_range is not None:
-            age_range = list(self.pars.age_range)
-            min_age, max_age = age_range[0], age_range[1]
-            eligible = eligible & (ppl['age'] >= min_age) & (ppl['age'] < max_age)
+            # Eligibility screening
+            if not hasattr(ppl, 'screen_negative') or not hasattr(ppl, 'non_symptomatic'):
+                print("[TPTInitiation] Error: people must have 'screen_negative' and 'non_symptomatic' attributes.")
+                return
+            in_eligible_households = np.isin(ppl['hhid'], eligible_hhids)
+            eligible = in_eligible_households & (~tb.on_treatment) & (ppl['screen_negative'] | ppl['non_symptomatic'])
 
-        # HIV status filter (if hiv_status_threshold is set True and attribute present)
-        if self.pars.hiv_status_threshold and hasattr(ppl, 'hiv_positive'):
-            eligible = eligible & (ppl['hiv_positive'] == True)
+            # Age range filter (if age_range is set and present)
+            if hasattr(ppl, 'age') and self.pars.age_range is not None:
+                age_range = list(self.pars.age_range)
+                min_age, max_age = age_range[0], age_range[1]
+                eligible = eligible & (ppl['age'] >= min_age) & (ppl['age'] < max_age)
 
-        # Bernoulli selection
-        tpt_candidates = self.pars.p_tpt.filter(eligible)
+            # HIV status filter (if hiv_status_threshold is set True and attribute present)
+            if self.pars.hiv_status_threshold:
+                if not hasattr(ppl, 'hiv_positive'):
+                    print("[TPTInitiation] Error: hiv_status_threshold is True but people.hiv_positive attribute is missing.")
+                    return
+                eligible = eligible & (ppl['hiv_positive'] == True)
 
-        if len(tpt_candidates):
-            # Treatment phase
-            ppl['on_tpt'][tpt_candidates] = True
-            ppl['received_tpt'][tpt_candidates] = True
+            # Bernoulli selection
+            tpt_candidates = self.pars.p_tpt.filter(eligible)
 
-            # Track treatment and future protection schedule
-            treatment_end = sim.date + self.pars.tpt_treatment_duration
-            protection_end = treatment_end + self.pars.tpt_protection_duration
+            if len(tpt_candidates):
+                # Treatment phase
+                ppl['on_tpt'][tpt_candidates] = True
+                ppl['received_tpt'][tpt_candidates] = True
 
-            tb.tpt_treatment_until[tpt_candidates] = treatment_end
-            tb.tpt_protection_until[tpt_candidates] = protection_end
+                # Track treatment and future protection schedule
+                treatment_end = sim.date + self.pars.tpt_treatment_duration
+                protection_end = treatment_end + self.pars.tpt_protection_duration
 
-            # Set TB state to PROTECTED after treatment ends
-            # (Assume protection starts immediately after treatment for simplicity)
-            tb.state[tpt_candidates] = mtb.TBS.PROTECTED
+                tb.tpt_treatment_until[tpt_candidates] = treatment_end
+                tb.tpt_protection_until[tpt_candidates] = protection_end
 
-            # Result tracking
-            self.results['n_eligible'][self.ti] = np.count_nonzero(eligible)
-            self.results['n_tpt_initiated'][self.ti] = len(tpt_candidates)
+                # Set TB state to PROTECTED after treatment ends
+                # (Assume protection starts immediately after treatment for simplicity)
+                tb.state[tpt_candidates] = mtb.TBS.PROTECTED
+
+                # Result tracking
+                self.results['n_eligible'][self.ti] = np.count_nonzero(eligible)
+                self.results['n_tpt_initiated'][self.ti] = len(tpt_candidates)
+        except Exception as e:
+            print(f"[TPTInitiation] Runtime error in step: {e}")
+            raise
 
     def init_results(self):
         self.define_results(
