@@ -5,30 +5,33 @@ import matplotlib.pyplot as plt
 import pprint as pprint
 import pandas as pd
 
-# Default simulation parameters
+# Simple default parameters
 DEFAULT_SPARS = dict(
     unit='day',
     dt=7,
-    start=sc.date('1950-01-01'),
-    stop=sc.date('2035-12-31'),
+    start=sc.date('1975-01-01'),
+    stop=sc.date('2030-12-31'),
     rand_seed=123,
-    verbose =0,
+    verbose=0,
 )
+
 DEFAULT_TBPARS = dict(
-        beta = ss.rate_prob(0.0025),
-        init_prev = ss.bernoulli(p=0.25),
-        unit = 'day',
-        dt=7,      
-        start=sc.date('1975-02-01'),
-        stop=sc.date('2030-12-31'),
-    )
+    beta=ss.rate_prob(0.0025),
+    init_prev=ss.bernoulli(p=0.25),
+    unit='day',
+    dt=7,      
+    start=sc.date('1975-02-01'),
+    stop=sc.date('2030-12-31'),
+)
+
+# Simple age distribution
 age_data = pd.DataFrame({
-    'age':   [0, 2, 4, 10, 15, 20, 30, 40, 50, 60, 70, 80],
+    'age': [0, 2, 4, 10, 15, 20, 30, 40, 50, 60, 70, 80],
     'value': [20, 10, 25, 15, 10, 5, 4, 3, 2, 1, 1, 1]  # Skewed toward younger ages
 })
 
 def build_sim(scenario=None, spars=None):
-    """ HELP:
+    """
     Build and return a complete Starsim-based simulation instance for TB modeling,
     incorporating optional interventions and user-defined parameters.
 
@@ -46,55 +49,77 @@ def build_sim(scenario=None, spars=None):
             - A population (`People`) with TB-related extra states.
             - A TB disease module initialized with merged parameters.
             - A list of social and household network layers.
-            - Optional interventions (TPT or BCG) as defined by the scenario.
+            - Optional interventions (TPT, BCG or Beta) as defined by the scenario.
             - Demographic processes like births and deaths.
             - Core simulation parameters merged from defaults and user inputs.
 
     Notes:
-        - If no scenario is provided, defaults are used.
-        - Intervention objects (`TPTInitiation`, `BCGProtection`) are conditionally added
-          based on the scenario dictionary contents.
-        - The population size is fixed at 100 agents for simplicity.
-        - This function is typically used to instantiate simulations for batch execution,
-          comparison, or visualization.
+        - If no parameters are provided, it will use the default values of the participating
+          simulation components.
     
     Example:
         sim = build_sim(scenario=my_scenario, spars={'n_steps': 200})
         sim.run()
     """
     scenario = scenario or {}
-    # merge and override default parameters
     
-    spars = {**DEFAULT_SPARS, **(spars or {})}  # Merge user spars with default
-    tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})} 
-    pprint.pp(spars)
-    pprint.pp(tbpars)
-
-    # Set up interventions safely
-    inv = []
-    for key, cls in [('tptintervention', mtb.TPTInitiation), 
-                     ('bcgintervention', mtb.BCGProtection)]:
-        params = scenario.get(key)
-        if params:
-            inv.append(cls(pars=params))
-
-    # Core sim components
+    # Merge parameters
+    spars = {**DEFAULT_SPARS, **(spars or {})}
+    tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})}
+    
+    # Create interventions list
+    interventions = []
+    
+    # Add BCG interventions (can be single or multiple)
+    bcg_params = scenario.get('bcgintervention')
+    if bcg_params:
+        if isinstance(bcg_params, dict):
+            # Single BCG intervention
+            interventions.append(mtb.BCGProtection(pars=bcg_params))
+        elif isinstance(bcg_params, list):
+            # Multiple BCG interventions
+            for i, params in enumerate(bcg_params):
+                params['name'] = f'BCG_{i}'  # Give unique name
+                interventions.append(mtb.BCGProtection(pars=params))
+    
+    # Add TPT interventions (can be single or multiple)
+    tpt_params = scenario.get('tptintervention')
+    if tpt_params:
+        if isinstance(tpt_params, dict):
+            # Single TPT intervention
+            interventions.append(mtb.TPTInitiation(pars=tpt_params))
+        elif isinstance(tpt_params, list):
+            # Multiple TPT interventions
+            for i, params in enumerate(tpt_params):
+                params['name'] = f'TPT_{i}'  # Give unique name
+                interventions.append(mtb.TPTInitiation(pars=params))
+    
+    # Add Beta interventions (can be single or multiple)
+    beta_params = scenario.get('betabyyear')
+    if beta_params:
+        if isinstance(beta_params, dict):
+            # Single Beta intervention
+            interventions.append(mtb.BetaByYear(pars=beta_params))
+        elif isinstance(beta_params, list):
+            # Multiple Beta interventions
+            for i, params in enumerate(beta_params):
+                params['name'] = f'Beta_{i}'  # Give unique name
+                interventions.append(mtb.BetaByYear(pars=params))
+    
+    # Create simulation components
     pop = ss.People(n_agents=500, age_data=age_data, extra_states=mtb.get_extrastates())
-    # pop = ss.People(n_agents=500, extra_states=mtb.get_extrastates())
     tb = mtb.TB(pars=tbpars)
-    networks = [ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
-                mtb.HouseholdNet()]
+    networks = [
+        ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
+        mtb.HouseholdNet()
+    ]
     
-    demographics = [ss.Births(pars={'birth_rate': 20}),
-                    ss.Deaths(pars={'death_rate': 15})]
-
     # Create and return simulation
     return ss.Sim(
         people=pop,
         networks=networks,
-        interventions=inv,
+        interventions=interventions,
         diseases=[tb],
-        # demographics=demographics,
         pars=spars,
     )
 
@@ -109,6 +134,7 @@ def get_scenarios():
             - 'tbpars' (dict, optional): Parameters controlling the simulation timeframe.
             - 'bcgintervention' (dict, optional): BCG vaccine intervention settings.
             - 'tptintervention' (dict, optional): Tuberculosis Preventive Therapy settings.
+            - 'betabyyear' : (dict, optional): For changing the value of beta during the same simulation period.
     
     Scenarios included:
         - 'Baseline': No intervention, default simulation window.
@@ -118,98 +144,67 @@ def get_scenarios():
     
     return {
         'Baseline': {
-            'name': 'BASELINE',
-            'tbpars': dict(start=sc.date('1950-02-07'), 
-                stop=sc.date('2030-12-31')),
+            'name': 'No interventions',
+            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
         },
-        'BCG 1 - 5': {
-            'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1950-02-07'), 
-                           stop=sc.date('2030-12-31')),
+        'Baseline and BetaByYear': {
+            'name': 'No interventions',
+            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+            'betabyyear':dict(years=[1990, 2000], x_beta=[0.5, 1.4])
+        },
+        'Single BCG': {
+            'name': 'Single BCG intervention',
+            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
             'bcgintervention': dict(
                 coverage=0.8,
-                start=sc.date('1975-01-01'),
+                start=sc.date('1980-01-01'),
                 stop=sc.date('2020-12-31'),
-                age_range=(1, 5),
+                age_range=[1, 5],
             ),
         },
-          'BCG 20 - 50': {
-            'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1950-02-07'), 
-                           stop=sc.date('2030-12-31')),
-            'bcgintervention': dict(
-                coverage=0.2,
-                start=sc.date('1975-01-01'),
-                stop=sc.date('2020-12-31'),
-                age_range=(20, 50),
-            ),
+        
+        'Multiple BCG': {
+            'name': 'Multiple BCG interventions',
+            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+            'bcgintervention': [
+                dict(
+                    coverage=0.9,
+                    start=sc.date('1980-01-01'),
+                    stop=sc.date('2020-12-31'),
+                    age_range=[0, 2],           # For children
+                ),
+                dict(
+                    coverage=0.3,
+                    start=sc.date('1985-01-01'),
+                    stop=sc.date('2015-12-31'),
+                    age_range=[25, 40],         # For adults
+                ),
+            ],
         },
-        # Under construction, not yet finished 
-        # 'TPT': {
-        #     'name': 'TPT INITIATION',
-        #     'tptintervention': dict(
-        #         p_tpt=ss.bernoulli(1.0),
-        #         max_age=55,
-        #         hiv_status_threshold=True,
-        #         start=sc.date('1970-01-01'),
-        #     ),
-        # },
     }
-
 
 def run_scenarios(plot=True):
-    """ HELP:
-    Execute all defined TB simulation scenarios and optionally visualize results.
-
-    Args:
-        plot (bool, optional): If True (default), generates comparative plots of 
-        scenario outcomes using a built-in plotting module.
-
-    Returns:
-        None: Results are stored locally within the function and plotted if requested.
-
-    Workflow:
-        1. Retrieves all predefined scenarios using get_scenarios().
-        2. Runs a simulation for each scenario using build_sim().
-        3. Collects and flattens the results for each simulation.
-        4. Optionally plots results in a grid layout with custom styling.
-    
-    Example:
-        >>> run_scenarios(True)
-        
-    
-    NOTE:  
-    -----
-    This line:
-        >>> results[name] = sim.results.flatten()
-         
-    Converts the simulation's time series outputs into a flat dictionary or DataFrame.
-    Makes results easier to compare across scenarios (e.g., plotting incidence over time).
-    The results dictionary now maps scenario names to their flattened outputs:
-    {
-        'BCG': <results>,
-        'TPT': <results>,
-        ...
-    }
-    """
-
+    """Run all scenarios and optionally plot results."""
     import tbsim.utils.plots as pl
-
+    
+    scenarios = get_scenarios()
     results = {}
-    sims = []
-    for name, scenario in get_scenarios().items():
-        print(f"\nRunning scenario: {name}")
+    
+    for name, scenario in scenarios.items():
+        print(f"\nRunning: {name}")
         sim = build_sim(scenario=scenario)
         sim.run()
-        sims.append(sim)
-        # 
-        results[name] = sim.results.flatten()     
-        
+        results[name] = sim.results.flatten()
+    
     if plot:
         pl.plot_combined(results, dark=True, cmap='viridis',  
-                        # heightfold=2, outdir='results/interventions')
-                        heightfold=2, outdir='results/interventions', filter=mtb.FILTERS.important_metrics)
+                        heightfold=2, outdir='results/interventions')
+                        
+                        # filter=mtb.FILTERS.important_metrics)
         plt.show()
+    
+    return results
 
 if __name__ == '__main__':
-    run_scenarios()
+    # Run all scenarios
+    results = run_scenarios(plot=True)

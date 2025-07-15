@@ -111,7 +111,7 @@ class BCGProtection(ss.Intervention):
             stop=sc.date('2100-12-31'),
             efficacy= 0.8,  # Default 80% efficacy
             immunity_period=ss.years(10),  # Default 10 years
-            age_range=(0, 5),
+            age_range=[0, 5],
             # Default modifiers
             activation_modifier= ss.uniform(0.5, 0.65),  # Reduces activation risk
             clearance_modifier=ss.uniform(1.3, 1.5),    # Increases clearance

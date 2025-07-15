@@ -88,7 +88,7 @@ def test_bcg_intervention_default_values():
     assert bcg.pars.stop == sc.date('2100-12-31'), "Default stop year should be 2100-12-31 with type sc.date"
     # Check that immunity_period is approximately 10 years (in timesteps)
     assert abs(bcg.pars.immunity_period.values - 521.43) < 1.0, "Default immunity_period should be approximately 10 years"
-    assert bcg.pars.age_range == (0, 5), "Default age range should be (0, 5)"
+    assert bcg.pars.age_range == [0, 5], "Default age range should be [0, 5]"
     assert bcg.min_age == 0, "Default min_age should be 0"
     assert bcg.max_age == 5, "Default max_age should be 5"
     assert len(bcg.is_bcg_vaccinated) == nagents, "is_bcg_vaccinated array should match population size"
@@ -390,6 +390,6 @@ def test_bcg_debug_population():
     assert isinstance(debug_info, dict)
     for key in ['total_population', 'age_range', 'age_0_5', 'vaccinated_0_5', 'eligible_0_5']:
         assert key in debug_info, f"debug_population should return key {key}"
-    assert debug_info['age_range'] == (0, 5), "Default age range should be (0, 5)"
+    assert debug_info['age_range'] == [0, 5], "Default age range should be [0, 5]"
     assert debug_info['total_population'] == nagents, "Total population should match number of agents"
         
