@@ -79,7 +79,7 @@ class BetaByYear(ss.Intervention):
             target_year = self.pars.years[idx]
             x_beta = self._x_beta_list[idx]
             if (year >= target_year) and (year < target_year + self.t.dt_year):
-                self.sim.logger.info(f"NEW BETA: At year:{year}, Value:{x_beta}")
+                #print(f"NEW BETA: At year:{year}, Value:{x_beta}")
                 self.sim.diseases.tb.pars['beta'] *= x_beta
                 for net in self.sim.networks.values():
                     if isinstance(net, ss.MixingPools):

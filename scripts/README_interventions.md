@@ -23,7 +23,7 @@ scenario = {
         'coverage': 0.8,
         'start': sc.date('1980-01-01'),
         'stop': sc.date('2020-12-31'),
-        'age_range': (1, 5),
+        'age_range': [0, 5],
     }
 }
 ```
@@ -55,7 +55,7 @@ scenario = {
         'coverage': 0.8,
         'start': sc.date('1980-01-01'),
         'stop': sc.date('2020-12-31'),
-        'age_range': (1, 5),
+        'age_range': [0, 5],
     },
     'tptintervention': {
         'p_tpt': ss.bernoulli(0.7),
