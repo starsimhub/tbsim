@@ -11,6 +11,17 @@ class BetaByYear(ss.Intervention):
     scenarios. The intervention multiplies the current beta value by a specified factor at each
     target year, creating a sustained reduction in transmission rates.
 
+    IMPORTANT:
+    -------------
+    The modifier (x_beta) is always applied to the **current/latest value** of beta at the time of intervention,
+    not the original or baseline value. This means that if multiple interventions are scheduled, each one
+    will multiply the beta value as it exists after all previous modifications. The effect is **cumulative and multiplicative**.
+
+    For example:
+        - If beta starts at 0.01, and x_beta=0.5 is applied in 2000, beta becomes 0.005.
+        - If another x_beta=0.8 is applied in 2010, beta becomes 0.004 (0.005 * 0.8).
+        - This is NOT a reset to the original value; each change compounds on the last.
+
     Attributes:
         years (list): List of years when the intervention should be applied. Default is [2000].
         x_beta (float or list): Multiplicative factor(s) to apply to the current beta value.
@@ -23,6 +34,7 @@ class BetaByYear(ss.Intervention):
         - If x_beta is a list, its length must match years, or a ValueError is raised.
         - Changes are applied to both the main disease beta parameter and all mixing pools in the network to ensure consistency.
         - This is a multiplicative change, not additive. For example, x_beta=0.5 reduces transmission by 50%, while x_beta=0.8 reduces it by 20%.
+        - **Multiple interventions compound:** Each new x_beta is applied to the already-modified beta value.
 
     Examples:
         ```python
@@ -74,10 +86,9 @@ class BetaByYear(ss.Intervention):
         Execute the intervention step, applying beta modifications at specified years.
         """
         year = int(self.sim.t.now('year'))
-        idx = 0
         if len(self.pars.years)>0:
-            target_year = self.pars.years[idx]
-            x_beta = self._x_beta_list[idx]
+            target_year = self.pars.years[0]
+            x_beta = self._x_beta_list[0]
             if (year >= target_year) and (year < target_year + self.t.dt_year):
                 #print(f"NEW BETA: At year:{year}, Value:{x_beta}")
                 self.sim.diseases.tb.pars['beta'] *= x_beta
@@ -88,9 +99,7 @@ class BetaByYear(ss.Intervention):
                     elif isinstance(net, ss.MixingPool):
                         net.pars.beta = self.sim.diseases.tb.pars['beta']
                 # Always remove the year and x_beta after application
-                self.pars.years.pop(idx)
-                self._x_beta_list.pop(idx)
+                self.pars.years.pop(0)
+                self._x_beta_list.pop(0)
                 # Do not increment idx, as lists have shifted
-            else:
-                idx += 1
                         
