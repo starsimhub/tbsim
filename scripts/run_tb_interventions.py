@@ -147,11 +147,11 @@ def get_scenarios():
             'name': 'No interventions',
             'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
         },
-        'Baseline and BetaByYear': {
-            'name': 'No interventions',
-            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-            'betabyyear':dict(years=[1990, 2000], x_beta=[0.5, 1.4])
-        },
+        # 'Baseline and BetaByYear': {
+        #     'name': 'No interventions',
+        #     'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+        #     'betabyyear':dict(years=[1990, 2000], x_beta=[0.5, 1.4])
+        # },
         'Single BCG': {
             'name': 'Single BCG intervention',
             'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
@@ -163,24 +163,24 @@ def get_scenarios():
             ),
         },
         
-        'Multiple BCG': {
-            'name': 'Multiple BCG interventions',
-            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-            'bcgintervention': [
-                dict(
-                    coverage=0.9,
-                    start=sc.date('1980-01-01'),
-                    stop=sc.date('2020-12-31'),
-                    age_range=[0, 2],           # For children
-                ),
-                dict(
-                    coverage=0.3,
-                    start=sc.date('1985-01-01'),
-                    stop=sc.date('2015-12-31'),
-                    age_range=[25, 40],         # For adults
-                ),
-            ],
-        },
+        # 'Multiple BCG': {
+        #     'name': 'Multiple BCG interventions',
+        #     'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+        #     'bcgintervention': [
+        #         dict(
+        #             coverage=0.9,
+        #             start=sc.date('1980-01-01'),
+        #             stop=sc.date('2020-12-31'),
+        #             age_range=[0, 2],           # For children
+        #         ),
+        #         dict(
+        #             coverage=0.3,
+        #             start=sc.date('1985-01-01'),
+        #             stop=sc.date('2015-12-31'),
+        #             age_range=[25, 40],         # For adults
+        #         ),
+        #     ],
+        # },
     }
 
 def run_scenarios(plot=True):
@@ -197,7 +197,7 @@ def run_scenarios(plot=True):
         results[name] = sim.results.flatten()
     
     if plot:
-        pl.plot_combined(results, dark=True, cmap='viridis',  
+        pl.plot_combined(results, 
                         heightfold=2, outdir='results/interventions')
                         
                         # filter=mtb.FILTERS.important_metrics)

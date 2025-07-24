@@ -168,7 +168,7 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
                  style='default', savefig=True, outdir=None, plot_type='line',
                  marker_styles=None, alpha=0.85, grid_alpha=0.4, title_fontsize=10, legend_fontsize=6, 
                  line_width=0.3, marker_size=2, markeredgewidth=0.2, grid_linewidth=0.5, 
-                 spine_linewidth=0.5, label_fontsize=5, tick_fontsize=4, filter=None):
+                 spine_linewidth=0.5, label_fontsize=6, tick_fontsize=6, filter=None):
     """
     Visualize simulation outputs from multiple scenarios in a structured grid layout.
 
@@ -292,9 +292,11 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
 
     # Fancy background gradient
     if dark:
-        fig.patch.set_facecolor("#606060")  # medium dark gray background
+        # fig.patch.set_facecolor("#606060")  # medium dark gray background
+        fig.patch.set_facecolor('lightgray') 
         for ax in axs:
-            ax.set_facecolor('#404040')  # dark gray for axes
+            #ax.set_facecolor('#404040')  # dark gray for axes
+            ax.set_facecolor('darkgray')
             ax.set_axisbelow(True)
             ax.tick_params(colors='#222', which='both', width=spine_linewidth)
             for spine in ax.spines.values():
@@ -331,9 +333,9 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
                             alpha=alpha, marker=marker, markersize=marker_size, 
                             markeredgewidth=markeredgewidth, markeredgecolor='darkgrey')
                     
-        ax.set_title(metric, fontsize=title_fontsize, fontweight='light', color='white' if dark else 'black')
-        ax.set_xlabel('Time', fontsize=label_fontsize, color='white' if dark else 'black', fontweight='light')
-        ax.tick_params(axis='both', labelsize=tick_fontsize, colors='white' if dark else 'black')
+        ax.set_title(metric, fontsize=title_fontsize, fontweight='light', color='navy' if dark else 'black')
+        ax.set_xlabel('Time', fontsize=label_fontsize, color='black' if dark else 'black', fontweight='light')
+        ax.tick_params(axis='both', labelsize=tick_fontsize, colors='black')
         ax.grid(True, color='white' if dark else 'gray', alpha=grid_alpha, linestyle='--', linewidth=grid_linewidth)
         # Set consistent X-axis range for all plots
         ax.set_xlim(all_x_min, all_x_max)
