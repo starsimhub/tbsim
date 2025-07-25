@@ -1,6 +1,10 @@
 # Tuberculosis Modeling using starsim (TBSim)
 
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/starsimhub/tbsim/main?filepath=docs%2Ftutorials%2Ftb_interventions_tutorial.ipynb)
+
 This repository contains the implementation of a new Tuberculosis (TB) Model using the StarSim package. The model aims to simulate the dynamics of TB spread and treatment efficacy under various scenarios.
+
+**🚀 Try the tutorials online!** Click the Binder badge above to launch an interactive environment with all tutorials ready to run.
 
 ## Introduction
 
@@ -16,7 +20,23 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
 
 ## Getting Started
 
-### Prerequisites
+### Option 1: Run Online (Recommended for Beginners)
+
+The easiest way to get started is to run the tutorials online using Binder:
+
+1. **Click the Binder badge** at the top of this README
+2. **Wait for the environment to build** (takes 2-3 minutes)
+3. **Navigate to the `tutorials` directory**
+4. **Open any tutorial notebook** and start exploring!
+
+Available tutorials:
+- `tb_interventions_tutorial.ipynb` - TB interventions modeling
+- `tbhiv_comorbidity.ipynb` - TB-HIV comorbidity analysis  
+- `tuberculosis_sim.ipynb` - Basic TB simulation
+
+### Option 2: Local Installation
+
+#### Prerequisites
 
 - Python 3.x
 - StarSim package
