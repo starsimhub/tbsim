@@ -23,6 +23,5 @@ tbsim API Reference
    api/tbsim.utils.demographics
    api/tbsim.utils.plots
    api/tbsim.utils.probabilities
-   api/tbsim.utils.results
    api/tbsim.version
    api/tbsim.wrappers 
