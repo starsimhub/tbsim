@@ -57,6 +57,16 @@ jobs:
         run: |
           make html
           ls -la _build/html/
+          echo "=== Checking for index.html ==="
+          if [ -f "_build/html/index.html" ]; then
+            echo "✅ index.html found!"
+            ls -la _build/html/index.html
+          else
+            echo "❌ index.html not found!"
+            echo "Available files:"
+            ls -la _build/html/
+            exit 1
+          fi
 
       - name: Upload documentation artifacts
         uses: actions/upload-artifact@v4
@@ -78,6 +88,20 @@ jobs:
         with:
           name: documentation
           path: docs/_build/html/
+
+      - name: Verify downloaded artifacts
+        run: |
+          echo "=== Verifying downloaded artifacts ==="
+          ls -la docs/_build/html/
+          if [ -f "docs/_build/html/index.html" ]; then
+            echo "✅ index.html found in downloaded artifacts!"
+            ls -la docs/_build/html/index.html
+          else
+            echo "❌ index.html not found in downloaded artifacts!"
+            echo "Available files:"
+            ls -la docs/_build/html/
+            exit 1
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
