@@ -1,4 +1,4 @@
-tbsim package
+tbsim
 =============
 
 .. automodule:: tbsim
