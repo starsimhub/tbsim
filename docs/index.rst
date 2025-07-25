@@ -6,7 +6,7 @@ Welcome to tbsim's documentation!
    :caption: Contents:
 
    modules
-   tutorials/example_tutorial
+   tutorials
 
 Indices and tables
 ==================
