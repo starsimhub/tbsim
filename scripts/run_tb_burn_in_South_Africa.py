@@ -90,6 +90,21 @@ except NameError:
     script_dir = os.getcwd()
 sys.path.insert(0, os.path.abspath(os.path.join(script_dir, '..')))
 
+# Helper function to get output path based on extension
+def get_output_path(filename):
+    ext = filename.split('.')[-1].lower()
+    subdir = {
+        'pdf': '../samples/pdf/',
+        'csv': '../samples/csv/',
+        'png': '../samples/png/',
+        'json': '../samples/json/',
+        'md': '../samples/md/',
+    }.get(ext, '../samples/')
+    # Ensure the directory exists
+    outdir = os.path.join(os.path.dirname(__file__), subdir)
+    os.makedirs(outdir, exist_ok=True)
+    return os.path.join(outdir, filename)
+
 class GradualHIVIntervention(ss.Intervention):
     """
     Custom HIV intervention that implements gradual ramp-up based on van Schalkwyk et al. 2021 data
@@ -1879,18 +1894,3 @@ def test_health_seeking_diagnostic_integration():
 
 # Uncomment the line below to run the health-seeking and diagnostic integration test
 # test_health_seeking_diagnostic_integration()
-
-# Helper function to get output path based on extension
-def get_output_path(filename):
-    ext = filename.split('.')[-1].lower()
-    subdir = {
-        'pdf': '../samples/pdf/',
-        'csv': '../samples/csv/',
-        'png': '../samples/png/',
-        'json': '../samples/json/',
-        'md': '../samples/md/',
-    }.get(ext, '../samples/')
-    # Ensure the directory exists
-    outdir = os.path.join(os.path.dirname(__file__), subdir)
-    os.makedirs(outdir, exist_ok=True)
-    return os.path.join(outdir, filename)
