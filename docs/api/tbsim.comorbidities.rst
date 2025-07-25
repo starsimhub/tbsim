@@ -1,4 +1,4 @@
-tbsim.comorbidities package
+tbsim.comorbidities
 ===========================
 
 Subpackages

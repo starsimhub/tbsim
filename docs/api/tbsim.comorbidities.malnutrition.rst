@@ -1,10 +1,10 @@
-tbsim.comorbidities.malnutrition package
+tbsim.comorbidities.malnutrition
 ========================================
 
-Submodules
+Subpackages
 ----------
 
-tbsim.comorbidities.malnutrition.malnutrition module
+tbsim.comorbidities.malnutrition.malnutrition
 ----------------------------------------------------
 
 .. automodule:: tbsim.comorbidities.malnutrition.malnutrition
@@ -12,7 +12,7 @@ tbsim.comorbidities.malnutrition.malnutrition module
    :undoc-members:
    :show-inheritance:
 
-tbsim.comorbidities.malnutrition.tb\_malnut\_cnn module
+tbsim.comorbidities.malnutrition.tb_malnut_cnn
 -------------------------------------------------------
 
 .. automodule:: tbsim.comorbidities.malnutrition.tb_malnut_cnn

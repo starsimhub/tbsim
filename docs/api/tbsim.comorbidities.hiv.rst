@@ -1,10 +1,10 @@
-tbsim.comorbidities.hiv package
+tbsim.comorbidities.hiv
 ===============================
 
-Submodules
+Subpackages
 ----------
 
-tbsim.comorbidities.hiv.hiv module
+tbsim.comorbidities.hiv.hiv
 ----------------------------------
 
 .. automodule:: tbsim.comorbidities.hiv.hiv
@@ -12,7 +12,7 @@ tbsim.comorbidities.hiv.hiv module
    :undoc-members:
    :show-inheritance:
 
-tbsim.comorbidities.hiv.intervention module
+tbsim.comorbidities.hiv.intervention
 -------------------------------------------
 
 .. automodule:: tbsim.comorbidities.hiv.intervention
@@ -20,7 +20,7 @@ tbsim.comorbidities.hiv.intervention module
    :undoc-members:
    :show-inheritance:
 
-tbsim.comorbidities.hiv.tb\_hiv\_cnn module
+tbsim.comorbidities.hiv.tb_hiv_cnn
 -------------------------------------------
 
 .. automodule:: tbsim.comorbidities.hiv.tb_hiv_cnn

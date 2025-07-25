@@ -82,3 +82,18 @@ The code in this repository was developed by IDM, the Burnet Institute, and othe
 ## References
 
 [Epidemiological benefits of more-effective tuberculosis vaccines, drugs, and diagnostics](https://www.pnas.org/doi/abs/10.1073/pnas.0901720106?url_ver=Z39.88-2003&rfr_id=ori%3Arid%3Acrossref.org&rfr_dat=cr_pub++0pubmed)
+
+## Building the Documentation
+
+To build the documentation locally:
+
+1. Install the documentation dependencies:
+   ```bash
+   pip install -r docs/requirements.txt
+   ```
+2. Build the docs:
+   ```bash
+   cd docs
+   make html
+   ```
+3. The generated HTML will be in `docs/_build/html/index.html`.

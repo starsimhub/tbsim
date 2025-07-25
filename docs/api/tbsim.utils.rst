@@ -1,7 +1,7 @@
-tbsim.misc
+tbsim.utils
 ==================
 
-.. automodule:: tbsim.misc
+.. automodule:: tbsim.utils
    :members:
    :undoc-members:
    :show-inheritance:
@@ -12,4 +12,6 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   tbsim.misc.tbterms
+   tbsim.utils.demographics
+   tbsim.utils.plots
+   tbsim.utils.probabilities 
