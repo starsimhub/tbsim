@@ -60,169 +60,22 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip freeze
-          
+
       - name: Verify Binder configuration
-        run: |
-          echo "=== Checking Binder configuration ==="
-          if [ -f "binder/requirements.txt" ]; then
-            echo "✓ Binder requirements.txt exists"
-            echo "Content preview:"
-            head -10 binder/requirements.txt
-          else
-            echo "✗ Binder requirements.txt missing"
-            exit 1
-          fi
-          
-          if [ -f "binder/postBuild" ]; then
-            echo "✓ Binder postBuild script exists"
-            echo "Content preview:"
-            head -5 binder/postBuild
-          else
-            echo "✗ Binder postBuild script missing"
-            exit 1
-          fi
-          
-          if [ -f "binder/runtime.txt" ]; then
-            echo "✓ Binder runtime.txt exists"
-            cat binder/runtime.txt
-          else
-            echo "✗ Binder runtime.txt missing"
-            exit 1
-          fi
-          
-          echo "=== Checking README for Binder badge ==="
-          if grep -q "mybinder.org" README.md; then
-            echo "✓ Binder badge found in README"
-          else
-            echo "✗ Binder badge not found in README"
-            exit 1
-          fi
+        run: python .github/scripts/verify_binder.py
 
       - name: Build documentation
         working-directory: ./docs
-        run: |
-          echo "=== Checking pandoc installation ==="
-          pandoc --version
-          echo "=== Checking nbsphinx installation ==="
-          python -c "import nbsphinx; print('nbsphinx version:', nbsphinx.__version__)"
-          echo "=== Checking myst-parser installation ==="
-          python -c "import myst_parser; print('myst-parser version:', myst_parser.__version__)"
-          echo "=== Building documentation ==="
-          make html 2>&1 | tee build.log
-          echo "=== Build completed, checking output ==="
-          ls -la _build/html/
-          echo "=== Checking for index.html ==="
-          if [ -f "_build/html/index.html" ]; then
-            echo "     index.html found!"
-            ls -la _build/html/index.html
-          else
-            echo "     index.html not found!"
-            echo "Available files:"
-            ls -la _build/html/
-            echo "=== Build log ==="
-            cat build.log
-            exit 1
-          fi
-          
-          echo "=== Verifying tutorial files ==="
-          ls -la _build/html/tutorials/
-          echo "=== Checking for TB interventions tutorial ==="
-          if [ -f "_build/html/tutorials/tb_interventions_tutorial.html" ]; then
-            echo "     ✓ TB interventions tutorial HTML found!"
-            ls -la _build/html/tutorials/tb_interventions_tutorial.html
-          else
-            echo "     ✗ TB interventions tutorial HTML not found!"
-            exit 1
-          fi
-          
-          if [ -f "_build/html/tutorials/tb_interventions_tutorial.ipynb" ]; then
-            echo "     ✓ TB interventions tutorial notebook found!"
-            ls -la _build/html/tutorials/tb_interventions_tutorial.ipynb
-          else
-            echo "     ✗ TB interventions tutorial notebook not found!"
-            exit 1
-          fi
-          
-          echo "=== Checking Binder configuration ==="
-          if [ -f "../../binder/requirements.txt" ]; then
-            echo "     ✓ Binder requirements.txt found!"
-          else
-            echo "     ✗ Binder requirements.txt not found!"
-          fi
-          
-          if [ -f "../../binder/postBuild" ]; then
-            echo "     ✓ Binder postBuild script found!"
-          else
-            echo "     ✗ Binder postBuild script not found!"
-          fi
+        run: make html
+
+      - name: Verify build output
+        working-directory: ./docs
+        run: python ../.github/scripts/verify_build.py
 
       - name: Test tutorial functionality
         run: |
-          echo "=== Testing tutorial imports ==="
           cd docs
-          python -c "
-          try:
-              import sys
-              sys.path.append('..')
-              import tbsim
-              import tbsim.interventions.bcg as bcg
-              import tbsim.interventions.tpt as tpt
-              import tbsim.interventions.beta as beta
-              print('✓ All intervention modules imported successfully')
-          except ImportError as e:
-              print(f'✗ Import error: {e}')
-              exit(1)
-          except Exception as e:
-              print(f'✗ Unexpected error: {e}')
-              exit(1)
-          "
-          
-          echo "=== Testing tutorial script ==="
-          cd ..
-          if [ -f "scripts/run_tb_interventions.py" ]; then
-            echo "✓ Tutorial source script found"
-            python -c "
-            import sys
-            import os
-            sys.path.insert(0, os.path.join(os.getcwd(), 'scripts'))
-            try:
-                import run_tb_interventions
-                print('✓ Tutorial script imported successfully')
-                
-                if hasattr(run_tb_interventions, 'build_sim'):
-                    print('✓ build_sim function found')
-                else:
-                    print('✗ build_sim function not found')
-                    exit(1)
-                    
-                if hasattr(run_tb_interventions, 'get_scenarios'):
-                    print('✓ get_scenarios function found')
-                    try:
-                        scenarios = run_tb_interventions.get_scenarios()
-                        print(f'✓ {len(scenarios)} scenarios created')
-                    except Exception as e:
-                        if 'rate_prob' in str(e) or 'starsim' in str(e):
-                            print(f'⚠ Scenario creation failed due to API compatibility: {e}')
-                            print('   This is expected due to starsim API changes')
-                        else:
-                            print(f'⚠ Scenario creation failed: {e}')
-                else:
-                    print('✗ get_scenarios function not found')
-                    exit(1)
-                    
-            except Exception as e:
-                if 'rate_prob' in str(e) or 'starsim' in str(e):
-                    print(f'⚠ Tutorial import failed due to API compatibility: {e}')
-                    print('   This is expected due to starsim API changes')
-                    print('   The tutorial notebook has been updated to handle this')
-                else:
-                    print(f'✗ Tutorial import error: {e}')
-                    exit(1)
-            "
-          else
-            echo "✗ Tutorial source script not found"
-            exit 1
-          fi
+          python ../.github/scripts/test_tutorial_imports.py
 
       - name: Upload documentation artifacts
         uses: actions/upload-artifact@v4
@@ -299,7 +152,7 @@ jobs:
           path: docs/_build/html/
           retention-days: 7
 
-      - name: Comment PR with preview info
+
         uses: actions/github-script@v7
         with:
           script: |
