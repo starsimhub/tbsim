@@ -90,7 +90,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build-docs
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/docs-july24'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/docs-pages'
     steps:
       - name: Download documentation artifacts
         uses: actions/download-artifact@v4
