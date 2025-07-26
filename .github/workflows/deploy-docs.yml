@@ -5,16 +5,22 @@ on:
   push:
     branches:
       - main
+      - docs-july24
     paths:
       - 'docs/**'
       - 'tbsim/**'
+      - 'scripts/**'
       - '.github/workflows/deploy-docs.yml'
+      - 'binder/**'
   pull_request:
     branches:
       - main
+      - docs-july24
     paths:
       - 'docs/**'
       - 'tbsim/**'
+      - 'scripts/**'
+      - 'binder/**'
 
 permissions:
   contents: read
@@ -39,6 +45,11 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Install pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
       - name: Install tbsim package
         run: |
           pip install -e .
@@ -50,11 +61,21 @@ jobs:
           pip install -r requirements.txt
           pip freeze
 
+      - name: Verify Binder configuration
+        run: python .github/scripts/verify_binder.py
+
       - name: Build documentation
         working-directory: ./docs
+        run: make html
+
+      - name: Verify build output
+        working-directory: ./docs
+        run: python ../.github/scripts/verify_build.py
+
+      - name: Test tutorial functionality
         run: |
-          make html
-          ls -la _build/html/
+          cd docs
+          python ../.github/scripts/test_tutorial_imports.py
 
       - name: Upload documentation artifacts
         uses: actions/upload-artifact@v4
@@ -69,13 +90,27 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build-docs
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/docs-july24'
     steps:
       - name: Download documentation artifacts
         uses: actions/download-artifact@v4
         with:
           name: documentation
           path: docs/_build/html/
+
+      - name: Verify downloaded artifacts
+        run: |
+          echo "=== Verifying downloaded artifacts ==="
+          ls -la docs/_build/html/
+          if [ -f "docs/_build/html/index.html" ]; then
+            echo "     index.html found in downloaded artifacts!"
+            ls -la docs/_build/html/index.html
+          else
+            echo "     index.html not found in downloaded artifacts!"
+            echo "Available files:"
+            ls -la docs/_build/html/
+            exit 1
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -91,9 +126,9 @@ jobs:
 
       - name: Print deployment URL
         run: |
-          echo "🚀 Documentation deployed successfully!"
-          echo "📖 Documentation URL: ${{ steps.deployment.outputs.page_url }}"
-          echo "🔗 GitHub Pages URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          echo " Documentation deployed successfully!"
+          echo " Documentation URL: ${{ steps.deployment.outputs.page_url }}"
+          echo " GitHub Pages URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
           
           # Store URL for potential use in other steps
           echo "DEPLOYMENT_URL=${{ steps.deployment.outputs.page_url }}" >> $GITHUB_ENV
@@ -116,58 +151,3 @@ jobs:
           name: documentation-preview
           path: docs/_build/html/
           retention-days: 7
-
-      - name: Comment PR with preview info
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            
-            // Check if documentation was built successfully
-            const docsPath = 'docs/_build/html/';
-            if (fs.existsSync(docsPath)) {
-              const files = fs.readdirSync(docsPath);
-              const hasIndex = files.includes('index.html');
-              
-              if (hasIndex) {
-                github.rest.issues.createComment({
-                  issue_number: context.issue.number,
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  body: `📚 **Documentation Preview Available**
-                  
-                  Documentation has been built successfully for this PR. You can download the preview artifacts to view the changes locally.
-                  
-                  **Files built:**
-                  - ${files.length} files generated
-                  - Main entry point: \`index.html\`
-                  
-                  To view the preview:
-                  1. Go to the Actions tab
-                  2. Find this workflow run
-                  3. Download the "documentation-preview" artifact
-                  4. Extract and open \`index.html\` in your browser
-                  
-                  Once this PR is merged to main, the documentation will be automatically deployed to GitHub Pages.`
-                });
-              } else {
-                github.rest.issues.createComment({
-                  issue_number: context.issue.number,
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  body: `⚠️ **Documentation Build Issue**
-                  
-                  Documentation was built but \`index.html\` was not found. Please check the build logs for any errors.`
-                });
-              }
-            } else {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `❌ **Documentation Build Failed**
-                
-                The documentation build directory was not found. Please check the build logs for errors.`
-              });
-            } 

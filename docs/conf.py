@@ -12,6 +12,8 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx_rtd_theme',
+    'nbsphinx',
+    'myst_parser',  # Alternative to nbsphinx for markdown notebooks
 ]
 
 templates_path = ['_templates']
@@ -20,6 +22,15 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 autodoc_mock_imports = ["starsim"]
+
+# nbsphinx configuration
+nbsphinx_execute = 'never'  # Don't execute notebooks during build
+nbsphinx_allow_errors = True  # Allow errors in notebooks
+nbsphinx_timeout = 600  # 10 minutes timeout
+nbsphinx_requirejs_path = ''  # Disable require.js
+nbsphinx_widgets_path = ''  # Disable widgets
+nbsphinx_thumbnails_path = ''  # Disable thumbnails
+nbsphinx_use_rtd_theme = True  # Use Read the Docs theme
 
 # Theme configuration
 html_theme_options = {
