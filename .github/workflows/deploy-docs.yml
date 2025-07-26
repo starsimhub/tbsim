@@ -9,7 +9,9 @@ on:
     paths:
       - 'docs/**'
       - 'tbsim/**'
+      - 'scripts/**'
       - '.github/workflows/deploy-docs.yml'
+      - 'binder/**'
   pull_request:
     branches:
       - main
@@ -17,6 +19,8 @@ on:
     paths:
       - 'docs/**'
       - 'tbsim/**'
+      - 'scripts/**'
+      - 'binder/**'
 
 permissions:
   contents: read
@@ -56,6 +60,43 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip freeze
+          
+      - name: Verify Binder configuration
+        run: |
+          echo "=== Checking Binder configuration ==="
+          if [ -f "binder/requirements.txt" ]; then
+            echo "✓ Binder requirements.txt exists"
+            echo "Content preview:"
+            head -10 binder/requirements.txt
+          else
+            echo "✗ Binder requirements.txt missing"
+            exit 1
+          fi
+          
+          if [ -f "binder/postBuild" ]; then
+            echo "✓ Binder postBuild script exists"
+            echo "Content preview:"
+            head -5 binder/postBuild
+          else
+            echo "✗ Binder postBuild script missing"
+            exit 1
+          fi
+          
+          if [ -f "binder/runtime.txt" ]; then
+            echo "✓ Binder runtime.txt exists"
+            cat binder/runtime.txt
+          else
+            echo "✗ Binder runtime.txt missing"
+            exit 1
+          fi
+          
+          echo "=== Checking README for Binder badge ==="
+          if grep -q "mybinder.org" README.md; then
+            echo "✓ Binder badge found in README"
+          else
+            echo "✗ Binder badge not found in README"
+            exit 1
+          fi
 
       - name: Build documentation
         working-directory: ./docs
@@ -72,14 +113,86 @@ jobs:
           ls -la _build/html/
           echo "=== Checking for index.html ==="
           if [ -f "_build/html/index.html" ]; then
-            echo "✅ index.html found!"
+            echo "     index.html found!"
             ls -la _build/html/index.html
           else
-            echo "❌ index.html not found!"
+            echo "     index.html not found!"
             echo "Available files:"
             ls -la _build/html/
             echo "=== Build log ==="
             cat build.log
+            exit 1
+          fi
+          
+          echo "=== Verifying tutorial files ==="
+          ls -la _build/html/tutorials/
+          echo "=== Checking for TB interventions tutorial ==="
+          if [ -f "_build/html/tutorials/tb_interventions_tutorial.html" ]; then
+            echo "     ✓ TB interventions tutorial HTML found!"
+            ls -la _build/html/tutorials/tb_interventions_tutorial.html
+          else
+            echo "     ✗ TB interventions tutorial HTML not found!"
+            exit 1
+          fi
+          
+          if [ -f "_build/html/tutorials/tb_interventions_tutorial.ipynb" ]; then
+            echo "     ✓ TB interventions tutorial notebook found!"
+            ls -la _build/html/tutorials/tb_interventions_tutorial.ipynb
+          else
+            echo "     ✗ TB interventions tutorial notebook not found!"
+            exit 1
+          fi
+          
+          echo "=== Checking Binder configuration ==="
+          if [ -f "../../binder/requirements.txt" ]; then
+            echo "     ✓ Binder requirements.txt found!"
+          else
+            echo "     ✗ Binder requirements.txt not found!"
+          fi
+          
+          if [ -f "../../binder/postBuild" ]; then
+            echo "     ✓ Binder postBuild script found!"
+          else
+            echo "     ✗ Binder postBuild script not found!"
+          fi
+
+      - name: Test tutorial functionality
+        run: |
+          echo "=== Testing tutorial imports ==="
+          cd docs
+          python -c "
+          try:
+              import sys
+              sys.path.append('..')
+              import tbsim
+              import tbsim.interventions.bcg as bcg
+              import tbsim.interventions.tpt as tpt
+              import tbsim.interventions.beta as beta
+              print('✓ All intervention modules imported successfully')
+          except ImportError as e:
+              print(f'✗ Import error: {e}')
+              exit(1)
+          except Exception as e:
+              print(f'✗ Unexpected error: {e}')
+              exit(1)
+          "
+          
+          echo "=== Testing tutorial script ==="
+          cd ..
+          if [ -f "scripts/run_tb_interventions.py" ]; then
+            echo "✓ Tutorial source script found"
+            python -c "
+            import sys
+            sys.path.append('.')
+            try:
+                from scripts.run_tb_interventions import build_sim, get_scenarios
+                print('✓ Tutorial functions imported successfully')
+            except Exception as e:
+                print(f'✗ Tutorial import error: {e}')
+                exit(1)
+            "
+          else
+            echo "✗ Tutorial source script not found"
             exit 1
           fi
 
@@ -109,10 +222,10 @@ jobs:
           echo "=== Verifying downloaded artifacts ==="
           ls -la docs/_build/html/
           if [ -f "docs/_build/html/index.html" ]; then
-            echo "✅ index.html found in downloaded artifacts!"
+            echo "     index.html found in downloaded artifacts!"
             ls -la docs/_build/html/index.html
           else
-            echo "❌ index.html not found in downloaded artifacts!"
+            echo "     index.html not found in downloaded artifacts!"
             echo "Available files:"
             ls -la docs/_build/html/
             exit 1
@@ -132,9 +245,9 @@ jobs:
 
       - name: Print deployment URL
         run: |
-          echo "🚀 Documentation deployed successfully!"
-          echo "📖 Documentation URL: ${{ steps.deployment.outputs.page_url }}"
-          echo "🔗 GitHub Pages URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          echo " Documentation deployed successfully!"
+          echo " Documentation URL: ${{ steps.deployment.outputs.page_url }}"
+          echo " GitHub Pages URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
           
           # Store URL for potential use in other steps
           echo "DEPLOYMENT_URL=${{ steps.deployment.outputs.page_url }}" >> $GITHUB_ENV
@@ -172,17 +285,40 @@ jobs:
               const hasIndex = files.includes('index.html');
               
               if (hasIndex) {
+                // Check for specific tutorial files
+                const tutorialsPath = 'docs/_build/html/tutorials/';
+                const hasTbInterventions = fs.existsSync(tutorialsPath + 'tb_interventions_tutorial.html');
+                const hasBinderConfig = fs.existsSync('binder/requirements.txt');
+                
+                let additionalInfo = '';
+                if (hasTbInterventions) {
+                  additionalInfo += '\n- ✅ TB Interventions Tutorial included';
+                }
+                if (hasBinderConfig) {
+                  additionalInfo += '\n- ✅ Binder configuration verified';
+                }
+                
                 github.rest.issues.createComment({
                   issue_number: context.issue.number,
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  body: `📚 **Documentation Preview Available**
+                  body: `   **Documentation Preview Available**
                   
                   Documentation has been built successfully for this PR. You can download the preview artifacts to view the changes locally.
                   
                   **Files built:**
                   - ${files.length} files generated
-                  - Main entry point: \`index.html\`
+                  - Main entry point: \`index.html\`${additionalInfo}
+                  
+                  **Available Tutorials:**
+                  - TB Interventions Tutorial (new!)
+                  - TB HIV Comorbidity
+                  - Basic TB Simulation
+                  - Example Tutorial
+                  
+                  **Online Access:**
+                  - Binder: https://mybinder.org/v2/gh/starsimhub/tbsim/main
+                  - Direct to TB Interventions: https://mybinder.org/v2/gh/starsimhub/tbsim/main?filepath=docs%2Ftutorials%2Ftb_interventions_tutorial.ipynb
                   
                   To view the preview:
                   1. Go to the Actions tab
@@ -197,7 +333,7 @@ jobs:
                   issue_number: context.issue.number,
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  body: `⚠️ **Documentation Build Issue**
+                  body: ` **Documentation Build Issue**
                   
                   Documentation was built but \`index.html\` was not found. Please check the build logs for any errors.`
                 });
@@ -207,7 +343,7 @@ jobs:
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `❌ **Documentation Build Failed**
+                body: ` **Documentation Build Failed**
                 
                 The documentation build directory was not found. Please check the build logs for errors.`
               });

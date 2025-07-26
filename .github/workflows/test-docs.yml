@@ -1,0 +1,201 @@
+name: Test Documentation Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_binder:
+        description: 'Test Binder configuration'
+        required: false
+        default: true
+        type: boolean
+      test_tutorial:
+        description: 'Test tutorial functionality'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  test-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: Install tbsim package
+        run: |
+          pip install -e .
+          pip freeze
+
+      - name: Install documentation dependencies
+        working-directory: ./docs
+        run: |
+          pip install -r requirements.txt
+          pip freeze
+
+      - name: Test Binder configuration
+        if: ${{ github.event.inputs.test_binder }}
+        run: |
+          echo "=== Testing Binder Configuration ==="
+          
+          # Check Binder files exist
+          if [ ! -f "binder/requirements.txt" ]; then
+            echo "✗ binder/requirements.txt missing"
+            exit 1
+          fi
+          echo "✓ binder/requirements.txt exists"
+          
+          if [ ! -f "binder/postBuild" ]; then
+            echo "✗ binder/postBuild missing"
+            exit 1
+          fi
+          echo "✓ binder/postBuild exists"
+          
+          if [ ! -f "binder/runtime.txt" ]; then
+            echo "✗ binder/runtime.txt missing"
+            exit 1
+          fi
+          echo "✓ binder/runtime.txt exists"
+          
+          # Check README has Binder badge
+          if ! grep -q "mybinder.org" README.md; then
+            echo "✗ Binder badge not found in README"
+            exit 1
+          fi
+          echo "✓ Binder badge found in README"
+          
+          # Test Binder requirements syntax
+          echo "=== Testing Binder requirements ==="
+          python -c "
+          import pkg_resources
+          with open('binder/requirements.txt', 'r') as f:
+              requirements = f.read().splitlines()
+          
+          for req in requirements:
+              if req.strip() and not req.startswith('#'):
+                  try:
+                      pkg_resources.require(req)
+                      print(f'✓ {req}')
+                  except Exception as e:
+                      print(f'⚠ {req} - {e}')
+          "
+          
+          echo "=== Binder configuration test completed ==="
+
+      - name: Test tutorial functionality
+        if: ${{ github.event.inputs.test_tutorial }}
+        run: |
+          echo "=== Testing Tutorial Functionality ==="
+          
+          # Check tutorial source exists
+          if [ ! -f "scripts/run_tb_interventions.py" ]; then
+            echo "✗ scripts/run_tb_interventions.py missing"
+            exit 1
+          fi
+          echo "✓ Tutorial source script exists"
+          
+          # Check tutorial notebook exists
+          if [ ! -f "docs/tutorials/tb_interventions_tutorial.ipynb" ]; then
+            echo "✗ docs/tutorials/tb_interventions_tutorial.ipynb missing"
+            exit 1
+          fi
+          echo "✓ Tutorial notebook exists"
+          
+          # Test imports
+          echo "=== Testing imports ==="
+          python -c "
+          import sys
+          sys.path.append('.')
+          
+          try:
+              import tbsim
+              print('✓ tbsim imported')
+          except Exception as e:
+              print(f'✗ tbsim import failed: {e}')
+              exit(1)
+          
+          try:
+              import tbsim.interventions.bcg
+              print('✓ tbsim.interventions.bcg imported')
+          except Exception as e:
+              print(f'✗ tbsim.interventions.bcg import failed: {e}')
+              exit(1)
+          
+          try:
+              import tbsim.interventions.tpt
+              print('✓ tbsim.interventions.tpt imported')
+          except Exception as e:
+              print(f'✗ tbsim.interventions.tpt import failed: {e}')
+              exit(1)
+          
+          try:
+              import tbsim.interventions.beta
+              print('✓ tbsim.interventions.beta imported')
+          except Exception as e:
+              print(f'✗ tbsim.interventions.beta import failed: {e}')
+              exit(1)
+          "
+          
+          # Test tutorial functions
+          echo "=== Testing tutorial functions ==="
+          python -c "
+          import sys
+          sys.path.append('.')
+          
+          try:
+              from scripts.run_tb_interventions import build_sim, get_scenarios
+              print('✓ Tutorial functions imported')
+              
+              # Test scenario creation
+              scenarios = get_scenarios()
+              print(f'✓ {len(scenarios)} scenarios created')
+              
+          except Exception as e:
+              print(f'✗ Tutorial function test failed: {e}')
+              exit(1)
+          "
+          
+          echo "=== Tutorial functionality test completed ==="
+
+      - name: Build documentation (quick test)
+        run: |
+          echo "=== Quick Documentation Build Test ==="
+          cd docs
+          
+          # Just check if we can start the build process
+          python -c "
+          import sphinx
+          import nbsphinx
+          import myst_parser
+          print('✓ All required packages available')
+          "
+          
+          echo "✓ Documentation build environment ready"
+          echo "Full build can be tested with the deploy-docs workflow"
+
+      - name: Summary
+        run: |
+          echo "=== Test Summary ==="
+          echo "✅ Repository structure verified"
+          echo "✅ Dependencies installed"
+          if [ "${{ github.event.inputs.test_binder }}" = "true" ]; then
+            echo "✅ Binder configuration tested"
+          fi
+          if [ "${{ github.event.inputs.test_tutorial }}" = "true" ]; then
+            echo "✅ Tutorial functionality tested"
+          fi
+          echo "✅ Documentation build environment ready"
+          echo ""
+          echo "Next steps:"
+          echo "- Use the 'deploy-docs' workflow for full documentation build and deployment"
+          echo "- Check Binder links: https://mybinder.org/v2/gh/starsimhub/tbsim/main"
+          echo "- Review tutorial: docs/tutorials/tb_interventions_tutorial.ipynb" 

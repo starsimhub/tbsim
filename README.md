@@ -4,7 +4,7 @@
 
 This repository contains the implementation of a new Tuberculosis (TB) Model using the StarSim package. The model aims to simulate the dynamics of TB spread and treatment efficacy under various scenarios.
 
-**🚀 Try the tutorials online!** Click the Binder badge above to launch an interactive environment with all tutorials ready to run.
+** Try the tutorials online!** Click the Binder badge above to launch an interactive environment with all tutorials ready to run.
 
 ## Introduction
 
