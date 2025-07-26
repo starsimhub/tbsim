@@ -1,3 +1,72 @@
+"""
+TB Simulation Dwell Time Analysis and Visualization Module
+
+This module provides comprehensive tools for analyzing and visualizing dwell time data
+from tuberculosis simulation runs. It includes three main classes:
+
+1. DwtAnalyzer: Records dwell times during simulation execution
+2. DwtPlotter: Creates various visualizations of dwell time data
+3. DwtPostProcessor: Aggregates and processes multiple simulation results
+
+The module supports multiple visualization types including:
+- Sankey diagrams for state transitions
+- Interactive bar charts and histograms
+- Network graphs of state transitions
+- Kaplan-Meier survival curves
+- Reinfection analysis
+
+Key Features:
+- Real-time dwell time tracking during simulation
+- Multiple data aggregation methods
+- Interactive and static visualizations
+- Comprehensive statistical analysis
+- Support for multiple simulation scenarios
+
+Usage Examples:
+
+Basic Analysis Setup:
+```python
+import starsim as ss
+from tbsim import TB
+from tbsim.analyzers import DwtAnalyzer
+
+# Create simulation with analyzer
+sim = ss.Sim(diseases=[TB()])
+sim.add_analyzer(DwtAnalyzer(scenario_name="Baseline"))
+sim.run()
+
+# Access analyzer results
+analyzer = sim.analyzers[0]
+analyzer.plot_dwell_time_validation()
+```
+
+Post-Processing Multiple Runs:
+```python
+from tbsim.analyzers import DwtPostProcessor
+
+# Aggregate multiple simulation results
+postproc = DwtPostProcessor(directory='results', prefix='Baseline')
+postproc.sankey_agents()
+postproc.histogram_with_kde()
+```
+
+Direct Data Analysis:
+```python
+from tbsim.analyzers import DwtPlotter
+
+# Analyze existing data file
+plotter = DwtPlotter(file_path='results/Baseline-20240101120000.csv')
+plotter.sankey_agents()
+plotter.graph_state_transitions_curved()
+```
+
+References:
+- NetworkX for graph visualizations
+- Plotly for interactive plots
+- Lifelines for survival analysis
+- Seaborn for statistical visualizations
+"""
+
 import matplotlib.colors as mcolors
 import pandas as pd
 import starsim as ss
@@ -21,8 +90,79 @@ import itertools as it
 __all__ = ['DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor']
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
+
 class DwtPlotter:
+    """
+    Dwell Time Plotter for TB Simulation Data Visualization
+    
+    This class provides comprehensive visualization tools for analyzing dwell time data
+    from tuberculosis simulations. It supports both interactive (Plotly) and static
+    (Matplotlib) visualizations with various chart types including Sankey diagrams,
+    bar charts, histograms, and network graphs.
+    
+    The class can work with data from:
+    - Direct DataFrame input
+    - CSV file paths
+    - Aggregated simulation results
+    
+    Key Visualization Types:
+    - Sankey diagrams for state transition flows
+    - Interactive bar charts for dwell time distributions
+    - Network graphs showing state transition relationships
+    - Histograms with kernel density estimation
+    - Kaplan-Meier survival curves
+    - Reinfection analysis plots
+    
+    Attributes:
+        data (pd.DataFrame): The dwell time data to be visualized
+        data_file (str): Path to the source data file (if loaded from file)
+        
+    Example Usage:
+    ```python
+    # Load data from file
+    plotter = DwtPlotter(file_path='results/simulation_data.csv')
+    plotter.sankey_agents()
+    plotter.histogram_with_kde()
+    
+    # Work with existing DataFrame
+    df = pd.read_csv('data.csv')
+    plotter = DwtPlotter(data=df)
+    plotter.graph_state_transitions_curved()
+    ```
+    """
+    
     def __init__(self, data=None, file_path=None):
+        """
+        Initialize the DwtPlotter with dwell time data.
+        
+        Args:
+            data (pd.DataFrame, optional): DataFrame containing dwell time data.
+                                         Must have columns: 'state_name', 'going_to_state', 
+                                         'dwell_time', 'agent_id', 'age'
+            file_path (str, optional): Path to CSV file containing dwell time data.
+                                     If provided, data will be loaded and cleaned.
+                                     
+        Raises:
+            ValueError: If neither data nor file_path is provided.
+            
+        Data Requirements:
+            The data should contain the following columns:
+            - state_name: Name of the current state
+            - going_to_state: Name of the state being transitioned to
+            - dwell_time: Time spent in the current state
+            - agent_id: Unique identifier for each agent
+            - age: Age of the agent at transition time
+            
+        Example:
+        ```python
+        # Initialize with file
+        plotter = DwtPlotter(file_path='results/Baseline-20240101120000.csv')
+        
+        # Initialize with DataFrame
+        df = pd.read_csv('data.csv')
+        plotter = DwtPlotter(data=df)
+        ```
+        """
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif file_path is not None:
@@ -34,13 +174,43 @@ class DwtPlotter:
             
     def sankey_agents_by_age_subplots(self, bins=[0, 5, 200], scenario="", includecycles=False):
         """
-        Generates and displays a single figure with multiple Sankey diagrams of state transitions,
-        filtering data by age bins .
-
-        Parameters:
-        - bins: List of age bins to filter the data by. Default is [5, 16, 200].
-        - scenario: Scenario name to be displayed in the plot title.
+        Generate Sankey diagrams of state transitions filtered by age bins.
         
+        Creates multiple Sankey diagrams showing state transition flows for different
+        age groups. Each diagram visualizes how agents move between states within
+        specific age ranges.
+        
+        Mathematical Model:
+            For each age bin [bin_min, bin_max):
+            - Filter agents where age ∈ [bin_min, bin_max)
+            - Count transitions: T(state_i → state_j) = count
+            - Create Sankey diagram with nodes = states, flows = transition counts
+            
+        Args:
+            bins (list): Age bin boundaries. Default [0, 5, 200] creates two bins:
+                        [0-5) and [5-200) years
+            scenario (str): Scenario name for plot titles
+            includecycles (bool): Whether to include self-transitions (currently unused)
+                                
+        Returns:
+            None: Displays interactive Plotly Sankey diagrams
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Create age-specific Sankey diagrams
+        plotter.sankey_agents_by_age_subplots(
+            bins=[0, 18, 65, 100],  # Child, Adult, Elderly
+            scenario="Baseline TB Model"
+        )
+        ```
+        
+        Visualization Features:
+        - Interactive hover information showing transition counts
+        - Color-coded nodes and links
+        - Age-specific filtering for targeted analysis
+        - Automatic layout optimization
         """
         data = self.data
         data['age'] = data['age'].astype(float)
@@ -91,16 +261,40 @@ class DwtPlotter:
 
     def sankey_agents_even_age_ranges(self, number_of_plots=2, scenario=""):
         """
-        Generates and displays multiple Sankey diagrams of state transitions,
-        filtering data by age bins.
-
-        Parameters:
-        - number_of_plots: Number of age bins to create. Default is 2.
-        - scenario: Scenario name to be displayed in the plot title.
-
-        This function automatically determines num_of_plots age bins and generates
-        separate Sankey diagrams for each bin based on the Min and Max age values in the data.
-        The age bins are evenly distributed across the range of ages in the data
+        Generate Sankey diagrams with evenly distributed age ranges.
+        
+        Creates multiple Sankey diagrams by automatically dividing the age range
+        into equal-width bins. This is useful for comparing state transitions
+        across different age groups without manual bin specification.
+        
+        Mathematical Model:
+            age_range = max_age - min_age
+            bin_width = age_range / number_of_plots
+            bins[i] = min_age + i * bin_width for i = 0 to number_of_plots
+            
+        Args:
+            number_of_plots (int): Number of age bins to create. Default 2
+            scenario (str): Scenario name for plot titles
+                            
+        Returns:
+            None: Displays interactive Plotly Sankey diagrams
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Create 4 evenly-spaced age groups
+        plotter.sankey_agents_even_age_ranges(
+            number_of_plots=4,
+            scenario="Age-stratified Analysis"
+        )
+        ```
+        
+        Features:
+        - Automatic age range calculation
+        - Even distribution across age spectrum
+        - Interactive hover information
+        - Consistent layout across all diagrams
         """
         data = self.data
         # Define age bins
@@ -148,19 +342,39 @@ class DwtPlotter:
 
     def sankey_agents(self, subtitle = ""):
         """
-        Generates and displays a Sankey diagram of state transitions based on the count of agents.
-
-        Parameters:
-        file_path (str, optional): The path to a CSV file containing the data. If not provided, 
-                                    the method will use the data stored in self.data.
-
-        The CSV file or self.data should contain the following columns:
-        - 'state_name': The name of the current state.
-        - 'going_to_state': The name of the state to which the transition is made.
-
-        If neither file_path nor self.data is provided, the method will print "No data provided." and return.
-
-        The method uses Plotly to create and display the Sankey diagram.
+        Generate a comprehensive Sankey diagram of all state transitions.
+        
+        Creates a single Sankey diagram showing the complete flow of agents
+        between all states in the simulation. The diagram visualizes both
+        the direction and magnitude of state transitions.
+        
+        Mathematical Model:
+            For each transition (state_i → state_j):
+            - Count agents: N_ij = count(agents transitioning from i to j)
+            - Create flow: flow_i→j = N_ij
+            - Node size ∝ total transitions (in + out)
+            - Link width ∝ transition count
+            
+        Args:
+            subtitle (str): Additional subtitle for the plot
+                           
+        Returns:
+            None: Displays interactive Plotly Sankey diagram
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Create comprehensive state transition diagram
+        plotter.sankey_agents(subtitle="Baseline TB Model Results")
+        ```
+        
+        Visualization Features:
+        - Color-coded nodes and links
+        - Interactive hover showing exact transition counts
+        - Automatic layout optimization
+        - Proportional sizing based on transition frequency
+        - Professional styling with grid and annotations
         """
         
         if self.__data_error__():
@@ -227,21 +441,39 @@ class DwtPlotter:
 
     def sankey_dwelltimes(self, subtitle=''):
         """
-        NOTE: Very large data sets may cause the plot to be slow or unresponsive.
-        Generates and displays a Sankey diagram of state transitions and dwell times.
-
-        Parameters:
-        file_path (str, optional): The path to a CSV file containing the data. If not provided, 
-                                   the method will use the data stored in self.data.
-
-        The CSV file or self.data should contain the following columns:
-        - 'state_name': The name of the current state.
-        - 'going_to_state': The name of the state to which the transition is made.
-        - 'dwell_time': The time spent in the current state before transitioning.
-
-        If neither file_path nor self.data is provided, the method will print "No data provided." and return.
-
-        The method uses Plotly to create and display the Sankey diagram.
+        Generate a Sankey diagram weighted by dwell times.
+        
+        Creates a Sankey diagram where the flow thickness represents the total
+        dwell time rather than the number of agents. This visualization shows
+        the time-weighted importance of different state transitions.
+        
+        Mathematical Model:
+            For each transition (state_i → state_j):
+            - Sum dwell times: T_ij = Σ(dwell_time for i→j transitions)
+            - Create flow: flow_i→j = T_ij
+            - Link width ∝ total dwell time
+            - Node size ∝ total time spent in state
+            
+        Args:
+            subtitle (str): Additional subtitle for the plot
+                           
+        Returns:
+            None: Displays interactive Plotly Sankey diagram
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Create dwell time-weighted diagram
+        plotter.sankey_dwelltimes(subtitle="Time-weighted Analysis")
+        ```
+        
+        Features:
+        - Dwell time-weighted flows
+        - Interactive hover showing total time
+        - Color-coded nodes and links
+        - Professional styling and layout
+        - Time unit annotations
         """
         
 
@@ -306,17 +538,46 @@ class DwtPlotter:
 
     def barchar_all_state_transitions_interactive(self, dwell_time_bins=None, filter_states=None):
         """
-        Generates an interactive bar chart of state transitions grouped by dwell time categories.
-
-        Parameters:
-        dwell_time_bins (list, optional): List of bin edges for categorizing dwell times. 
-                                          Defaults to [0, 50, 100, 150, 200, 250].
-        filter_states (list, optional): List of states to filter the data by. If None, no filtering is applied.
-
+        Generate an interactive bar chart of state transitions grouped by dwell time categories.
+        
+        Creates a horizontal bar chart showing the distribution of state transitions
+        across different dwell time ranges. This visualization helps identify patterns
+        in how long agents spend in different states before transitioning.
+        
+        Mathematical Model:
+            For each dwell time bin [bin_min, bin_max):
+            - Filter transitions: T where dwell_time ∈ [bin_min, bin_max)
+            - Count transitions: N(state_i → state_j) in bin
+            - Create bar: height = N, label = "state_i → state_j (bin_range)"
+            
+        Args:
+            dwell_time_bins (list, optional): Bin edges for categorizing dwell times.
+                                            Default: [0, 50, 100, 150, 200, 250, ∞]
+            filter_states (list, optional): States to include in analysis.
+                                          If None, includes all states
+                                          
         Returns:
-        None: Displays an interactive Plotly bar chart.
+            None: Displays interactive Plotly bar chart
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Custom dwell time bins
+        bins = [0, 30, 90, 180, 365, float('inf')]  # Monthly, quarterly, etc.
+        plotter.barchar_all_state_transitions_interactive(
+            dwell_time_bins=bins,
+            filter_states=['Latent', 'Active', 'Treatment']
+        )
+        ```
+        
+        Features:
+        - Interactive hover information
+        - Customizable dwell time bins
+        - State filtering capabilities
+        - Automatic height adjustment
+        - Professional styling
         """
-
 
         
 
@@ -394,18 +655,35 @@ class DwtPlotter:
 
     def stacked_bars_states_per_agent_static(self):
         """
-        Plots a stacked bar chart showing the cumulative dwell time in step_time_units for each state per agent.
-
-        This function reads data from a CSV file or uses an existing DataFrame to calculate the cumulative dwell time
-        for each agent and state. It then converts the dwell time to step_time_units and creates a pivot table to get the cumulative
-        dwell time for each state. Finally, it plots a stacked bar chart to visualize the cumulative time in step_time_units spent
-        in each state for all agents.
-
-        Parameters:
-        file_path (str, optional): The path to the CSV file containing the data. If not provided, the function will use
-                                   the data stored in `self.data`.
-
+        Create a stacked bar chart showing cumulative dwell time per agent.
+        
+        Generates a static matplotlib visualization showing how much time each
+        agent spent in different states throughout the simulation. Each bar
+        represents an agent, with segments showing time spent in each state.
+        
+        Mathematical Model:
+            For each agent i and state j:
+            - Calculate cumulative time: T_ij = Σ(dwell_time for agent i in state j)
+            - Create stacked bar: agent i = [T_i1, T_i2, ..., T_in]
+            - Total bar height = Σ(T_ij) for all states j
+            
         Returns:
+            None: Displays static matplotlib stacked bar chart
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Show cumulative time per agent
+        plotter.stacked_bars_states_per_agent_static()
+        ```
+        
+        Features:
+        - Color-coded state segments
+        - Agent-level analysis
+        - Cumulative time visualization
+        - Professional styling with legends
+        - Automatic figure sizing
         """
         if self.__data_error__():
             return
@@ -439,13 +717,44 @@ class DwtPlotter:
 
     def reinfections_age_bins_bars_interactive(self, target_states, barmode = 'group', scenario=''):
         """
-        Plots the maximum number of reinfections for agents and groups them interactively using Plotly.
-
-        This method calculates the maximum number of reinfections for each agent
-        and generates an interactive bar plot to visualize the distribution of reinfections by age bins.
-
+        Analyze reinfection patterns by age groups using interactive bar charts.
+        
+        Creates an interactive visualization showing the distribution of maximum
+        reinfection counts across different age groups. This helps identify
+        age-specific patterns in TB reinfection rates.
+        
+        Mathematical Model:
+            For each agent i:
+            - Find maximum reinfection count: max_inf_i = max(infection_num for agent i)
+            - Assign age group: age_group_i = bin(age_i)
+            - Count by age group: N(age_group, reinfection_count)
+            
+        Args:
+            target_states (list): States that count as infections (e.g., [0.0, 1.0])
+            barmode (str): Bar mode for grouping ('group', 'stack', 'overlay')
+            scenario (str): Scenario name for plot title
+                           
         Returns:
-            None
+            None: Displays interactive Plotly bar chart
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Analyze reinfections by age
+        plotter.reinfections_age_bins_bars_interactive(
+            target_states=[0.0, 1.0],  # Active TB states
+            barmode='group',
+            scenario="Age-stratified Reinfection Analysis"
+        )
+        ```
+        
+        Features:
+        - Age group stratification
+        - Interactive hover information
+        - Multiple bar modes
+        - Automatic age binning
+        - Professional styling
         """
 
 
@@ -480,17 +789,42 @@ class DwtPlotter:
 
     def reinfections_percents_bars_interactive(self, target_states, scenario=''):
         """
-        Plots the maximum number of reinfections for agents and groups them interactively using Plotly.
-
-        This method calculates the maximum number of reinfections for each agent
-        and generates an interactive bar plot to visualize the distribution of reinfections by age bins.
-        Parameters:
-            target_states (list): List of target states to filter the data. i.e. [-1.0, 0.0, 1.0]
-            scenario (str): Scenario name for the plot title.
+        Visualize reinfection percentages across the population.
+        
+        Creates an interactive bar chart showing the percentage of the population
+        that experienced different numbers of reinfections. This provides a
+        population-level view of reinfection patterns.
+        
+        Mathematical Model:
+            For each reinfection count k:
+            - Count agents: N_k = count(agents with max_infection = k)
+            - Calculate percentage: P_k = N_k / total_agents * 100
+            - Create bar: height = P_k, x = k
+            
+        Args:
+            target_states (list): States that count as infections
+            scenario (str): Scenario name for plot title
+                           
         Returns:
-            None
+            None: Displays interactive Plotly bar chart
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Show reinfection percentages
+        plotter.reinfections_percents_bars_interactive(
+            target_states=[0.0, 1.0],
+            scenario="Population Reinfection Analysis"
+        )
+        ```
+        
+        Features:
+        - Percentage-based visualization
+        - Interactive hover showing exact percentages
+        - Color-coded bars
+        - Professional styling with percentage formatting
         """
-
         if self.__data_error__():
             return
 
@@ -514,16 +848,44 @@ class DwtPlotter:
 
     def reinfections_bystates_bars_interactive(self, target_states, scenario='', barmode='group'):
         """
-        Plots the maximum number of reinfections for agents and groups them interactively using Plotly.
-
-        This method calculates the maximum number of reinfections for each agent
-        and generates an interactive bar plot to visualize the distribution of reinfections by state transitions.
-
+        Analyze reinfection patterns by state transitions.
+        
+        Creates an interactive visualization showing how reinfection patterns
+        vary across different state transitions. This helps identify which
+        transition paths are associated with higher reinfection rates.
+        
+        Mathematical Model:
+            For each state transition (state_i → state_j):
+            - Find agents with this transition: A_ij = agents with transition i→j
+            - Calculate max reinfections: max_inf_ij = max(infection_num for A_ij)
+            - Count by reinfection number: N(transition, reinfection_count)
+            
+        Args:
+            target_states (list): States that count as infections
+            scenario (str): Scenario name for plot title
+            barmode (str): Bar mode for grouping
+                           
         Returns:
-            None
+            None: Displays interactive Plotly bar chart
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Analyze reinfections by state transitions
+        plotter.reinfections_bystates_bars_interactive(
+            target_states=[0.0, 1.0],
+            barmode='group',
+            scenario="State Transition Reinfection Analysis"
+        )
+        ```
+        
+        Features:
+        - State transition analysis
+        - Interactive hover information
+        - Multiple bar modes
+        - Professional styling
         """
-
-
         if self.__data_error__():
             return
 
@@ -551,23 +913,43 @@ class DwtPlotter:
 
     def stackedbars_dwelltime_state_interactive(self, bin_size=3, num_bins=20):
         """
-        Generates an interactive stacked bar chart of dwell times by state using Plotly.
-
-        Parameters:
-        bin_size (int): The size of each bin for dwell times. Default is 50.
-        num_bins (int): The number of bins to divide the dwell times into. Default is 20.
+        Create interactive stacked bar charts of dwell times by state.
         
+        Generates an interactive visualization showing the distribution of dwell
+        times for each state, with transitions to other states stacked within
+        each dwell time bin. This helps identify timing patterns in state transitions.
+        
+        Mathematical Model:
+            For each state i and dwell time bin [b, b+bin_size):
+            - Filter transitions: T where state=i and dwell_time ∈ [b, b+bin_size)
+            - Count by target state: N(state_i → state_j) in bin
+            - Create stacked bar: height = Σ(N) for all target states j
+            
+        Args:
+            bin_size (int): Size of each dwell time bin. Default 3
+            num_bins (int): Number of bins to create. Default 20
+                           
         Returns:
-        None: Displays an interactive Plotly figure.
+            None: Displays interactive Plotly stacked bar chart
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
         
-        Notes:
-        - If the self.data DataFrame is empty, the function will print a message and return without plotting.
-        - The function creates bins for dwell times and labels them in step_time_units.
-        - It generates a stacked bar chart for each state, showing the count of transitions to other states within each dwell time bin.
-        - The height of the figure is dynamically adjusted based on the number of states.
+        # Analyze dwell time patterns
+        plotter.stackedbars_dwelltime_state_interactive(
+            bin_size=5,    # 5 time unit bins
+            num_bins=15    # 15 bins total
+        )
+        ```
+        
+        Features:
+        - Interactive hover information
+        - Stacked bar visualization
+        - Customizable bin sizes
+        - State-specific analysis
+        - Professional styling
         """
-
-
         if self.__data_error__():
             return
 
@@ -614,28 +996,45 @@ class DwtPlotter:
 
     def subplot_custom_transitions(self, transitions_dict=None):
         """
-        Plots the cumulative distribution of dwell times for different state transitions.
-
-        This function generates a plot with individual lines representing the cumulative 
-        distribution of dwell times for each specified state transition. If no transitions 
-        dictionary is provided, a default one is used.
-
-        Parameters:
-        -----------
-        transitions_dict (dict): A dictionary where keys are state names and values are 
-            lists of states to which transitions are considered. If None, a default 
-            dictionary is used.
-
-            i.e.:
-
-            transitions_dict = {
-                'None': ['Latent Slow', 'Latent Fast'],
-                'Active Presymp': ['Active Smpos', 'Active Smneg', 'Active Exptb'],
-            }
+        Plot cumulative distribution of dwell times for custom state transitions.
+        
+        Creates subplots showing the cumulative distribution function (CDF) of
+        dwell times for specific state transitions. This helps analyze the
+        timing patterns of particular transition types.
+        
+        Mathematical Model:
+            For each transition (state_i → state_j):
+            - Extract dwell times: T_ij = {dwell_time for i→j transitions}
+            - Sort times: T_sorted = sort(T_ij)
+            - Create CDF: CDF(t) = count(T_sorted ≤ t) / |T_ij|
+            - Plot: x = T_sorted, y = CDF(T_sorted)
+            
+        Args:
+            transitions_dict (dict): Dictionary mapping source states to target state lists.
+                                   Format: {'source_state': ['target1', 'target2', ...]}
+                                   If None, uses default transitions
+                                   
         Returns:
-        None: The function displays the plot and does not return any value.
+            None: Displays matplotlib subplot figure
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Custom transition analysis
+        transitions = {
+            'Latent': ['Active', 'Cleared'],
+            'Active': ['Treatment', 'Death']
+        }
+        plotter.subplot_custom_transitions(transitions)
+        ```
+        
+        Features:
+        - Custom transition specification
+        - Cumulative distribution plots
+        - Multiple subplot layout
+        - Professional styling with legends
         """
-
         if self.__data_error__():
             return
 
@@ -668,24 +1067,45 @@ class DwtPlotter:
 
     def stackedbars_subplots_state_transitions(self, bin_size=1, num_bins=50):
         """
-        Plots binned stacked bar charts for state transitions based on dwell times.
-
-        Parameters:
-        bin_size (int): The size of each bin for dwell times in step_time_units. Default is 50.
-        num_bins (int): The number of bins to create. Default is 8.
-
+        Create subplot stacked bar charts for state transitions by dwell time.
+        
+        Generates a multi-panel visualization with each subplot showing the dwell
+        time distribution for a specific state. Each subplot contains stacked bars
+        representing transitions to different target states within dwell time bins.
+        
+        Mathematical Model:
+            For each state i:
+            - Create dwell time bins: [0, bin_size, 2*bin_size, ..., num_bins*bin_size)
+            - For each bin [b, b+bin_size):
+                - Filter transitions: T where state=i and dwell_time ∈ [b, b+bin_size)
+                - Count by target: N(state_i → state_j) in bin
+                - Create stacked bar: height = Σ(N) for all target states j
+                
+        Args:
+            bin_size (int): Size of each dwell time bin in time units. Default 1
+            num_bins (int): Number of bins to create. Default 50
+                           
         Returns:
-        None: This function does not return any value. It displays a plot.
-
-        Notes:
-        - The function checks if the data is empty and prints a message if no data is available.
-        - It creates bins for dwell times and labels them accordingly.
-        - A figure with subplots is created for each unique state in the data.
-        - Each subplot shows a stacked bar chart of state transitions grouped by dwell time bins.
-        - Any empty subplots are removed before displaying the plot.
+            None: Displays matplotlib subplot figure
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Create detailed dwell time analysis
+        plotter.stackedbars_subplots_state_transitions(
+            bin_size=2,    # 2 time unit bins
+            num_bins=25    # 25 bins total
+        )
+        ```
+        
+        Features:
+        - Multi-panel layout (4 columns)
+        - State-specific analysis
+        - Stacked bar visualization
+        - Color-coded transitions
+        - Professional styling with legends
         """
-
-
         if self.__data_error__():
             return
 
@@ -730,19 +1150,42 @@ class DwtPlotter:
 
     def histogram_with_kde(self, subtitle=""):
         """
-        Plots histograms with Kernel Density Estimation (KDE) for dwell times of different states.
-        Parameters:
-        num_bins (int): Number of bins for the histogram. Default is 50.
-        bin_size (int): Size of each bin. Default is 30.
+        Create histograms with kernel density estimation for dwell time distributions.
+        
+        Generates a multi-panel visualization showing the distribution of dwell
+        times for each state, including both histograms and kernel density
+        estimation curves. This provides both discrete and continuous views
+        of the dwell time distributions.
+        
+        Mathematical Model:
+            For each state i:
+            - Extract dwell times: T_i = {dwell_time for state i}
+            - Create histogram: H_i(bin) = count(T_i in bin)
+            - Calculate KDE: KDE_i(t) = Σ(K(t-t_j, h)) / (n*h)
+                where K is kernel function, h is bandwidth, n = |T_i|
+            - Plot: histogram + KDE curve
+                
+        Args:
+            subtitle (str): Additional subtitle for the plot
+                           
         Returns:
-        None: Displays the histogram with KDE plots.
-        Notes:
-        - If the data is empty, the function will print a message and return without plotting.
-        - The function creates subplots for each unique state in the data.
-        - Each subplot shows the distribution of dwell times for a state, with KDE and stacked histograms based on the 'going_to_state' column.
-        - Unused subplots are removed from the figure.
+            None: Displays matplotlib subplot figure
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Analyze dwell time distributions
+        plotter.histogram_with_kde(subtitle="Distribution Analysis")
+        ```
+        
+        Features:
+        - Multi-panel layout (4 columns)
+        - Histogram + KDE visualization
+        - State-specific analysis
+        - Automatic bin sizing
+        - Professional styling with legends
         """
-
         if self.__data_error__():
             return
 
@@ -798,39 +1241,51 @@ class DwtPlotter:
     
     def graph_state_transitions(self, states=None, subtitle="", layout=None, curved_ratio=0.1, colormap='Paired', onlymodel=True):
         """
-        Plot a state transition graph with mean and mode dwell times annotated on the edges.
+        Create a network graph visualization of state transitions.
         
-        Parameters:
-        -----------
-        curved_ratio (float, optional): Ratio to curve the edges. Default is 0.05.
-        colormap (str, optional): Name of the colormap to use for coloring nodes. Default is 'tab20'.
-        states (list, optional): A list of states to include in the graph. If None, all states in the self.data will be included.
-        layout (dict, optional): A dictionary specifying the layout positions of nodes. If None, a spring layout is used.
-                0: (Default) Spring layout.
-                1: Circular layout
-                2: Spiral layout
-                3: Spectral layout
-                4: Shell layout
-                5: Kamada-Kawai layout
-                6: Planar layout
-                7: Random layout
-                8: Circular layout
-                9: Fruchterman-Reingold layout
-
+        Generates a directed graph showing the relationships between states,
+        with edges representing transitions and annotations showing mean/mode
+        dwell times and agent counts for each transition.
+        
+        Mathematical Model:
+            For each transition (state_i → state_j):
+            - Calculate statistics: mean_ij, mode_ij, count_ij
+            - Create edge: node_i → node_j
+            - Annotate edge: "Mean: mean_ij, Mode: mode_ij, Agents: count_ij"
+            - Node size ∝ total transitions (in + out)
+            - Edge thickness ∝ transition count
+            
+        Args:
+            states (list, optional): Specific states to include. If None, includes all states
+            subtitle (str): Additional subtitle for the plot
+            layout (int, optional): Layout algorithm (0-9). Default uses spring layout
+            curved_ratio (float): Edge curvature factor. Default 0.1
+            colormap (str): Matplotlib colormap name. Default 'Paired'
+            onlymodel (bool): If True, exclude certain non-model states
+                           
         Returns:
-        --------
-        None: This function does not return any value. It displays a plot of the state transition graph.
-
-        Notes:
-        -------
-        - The function uses NetworkX to create a directed graph where nodes represent states and edges represent transitions.
-        - Each edge is annotated with the mean and mode dwell times, as well as the number of agents that made the transition.
-        - If the self.data is empty, the function prints a message and returns without plotting.
-        - The graph layout is generated using a spring layout for better visualization.
-        - Nodes are colored using a colormap, and edges are drawn with arrows to indicate direction.
-        - The graph is displayed using Matplotlib.
+            None: Displays matplotlib network graph
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Create state transition network
+        plotter.graph_state_transitions(
+            states=['Latent', 'Active', 'Treatment', 'Recovered'],
+            subtitle="Core TB States",
+            layout=1,  # Circular layout
+            colormap='viridis'
+        )
+        ```
+        
+        Features:
+        - Directed graph visualization
+        - Statistical annotations on edges
+        - Multiple layout algorithms
+        - Color-coded nodes and edges
+        - Professional styling
         """
-
         if self.__data_error__():  return
         df = self.data
         if states is not None: 
@@ -883,23 +1338,51 @@ class DwtPlotter:
 
     def graph_state_transitions_curved(self, states=None, subtitle="", layout=None, curved_ratio=0.09, colormap='Paired', onlymodel=True, graphseed=42):
         """
-        Plot a state transition graph with curved edges, where edge thickness is proportional to agent count.
+        Create a curved network graph with edge thickness proportional to agent count.
         
-        Parameters:
-        -----------
-        states (list, optional): A list of states to include in the graph. If None, all states in self.data will be included.
-        subtitle (str, optional): Subtitle for the graph.
-        layout (int, optional): Layout type for node positioning.
-        curved_ratio (float, optional): Curve factor for edges.
-        colormap (str, optional): Matplotlib colormap for node coloring.
-        onlymodel (bool, optional): If True, exclude certain state transitions.
-        graphseed (int, optional): Random seed for layout consistency.
-
+        Generates a directed graph with curved edges where the thickness represents
+        the number of agents making each transition. This provides a visual
+        representation of transition frequency and importance.
+        
+        Mathematical Model:
+            For each transition (state_i → state_j):
+            - Calculate agent count: N_ij = count(agents with transition i→j)
+            - Create edge: node_i → node_j
+            - Edge thickness: thickness_ij = 1 + (4 * N_ij / max_count)
+            - Annotate edge: "state_i → state_j, μ:mean_ij, Mo:mode_ij, Agents:N_ij"
+            
+        Args:
+            states (list, optional): Specific states to include
+            subtitle (str): Additional subtitle for the plot
+            layout (int, optional): Layout algorithm (0-9)
+            curved_ratio (float): Edge curvature factor. Default 0.09
+            colormap (str): Matplotlib colormap name. Default 'Paired'
+            onlymodel (bool): If True, exclude certain non-model states
+            graphseed (int): Random seed for layout consistency. Default 42
+                           
         Returns:
-        --------
-        None: Displays a directed graph of state transitions.
+            None: Displays matplotlib network graph
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Create curved transition network
+        plotter.graph_state_transitions_curved(
+            subtitle="Agent-weighted Transitions",
+            curved_ratio=0.15,  # More curved edges
+            colormap='plasma',
+            graphseed=123
+        )
+        ```
+        
+        Features:
+        - Curved edge visualization
+        - Edge thickness proportional to agent count
+        - Statistical annotations on edges
+        - Color-coded nodes and edges
+        - Professional styling with consistent layouts
         """
-
         if self.__data_error__():  
             return
         df = self.data
@@ -971,23 +1454,36 @@ class DwtPlotter:
 
     def plot_dwell_time_validation(self):
         """
-        Plot the results of the dwell time validation.
-
-        This method generates a histogram for the dwell times of different states
-        in the dataset. Each state's dwell time is plotted in a separate histogram
-        with a unique label.
-
-        The method performs the following steps:
-        1. Creates a figure and axis for the plot.
-        2. Retrieves the unique states from the dataset.
-        3. Iterates over each state and extracts the dwell times for that state.
-        4. Plots a histogram of the dwell times for each state.
-        5. Sets the x-axis label to 'Dwell Time' and the y-axis label to 'Frequency'.
-        6. Adds a legend to the plot.
-        7. Displays the plot.
-
+        Create a histogram validation plot for dwell time distributions.
+        
+        Generates a single histogram showing the distribution of dwell times
+        across all states, with different colors for each state. This provides
+        a quick validation of dwell time data quality and distribution patterns.
+        
+        Mathematical Model:
+            For each state i:
+            - Extract dwell times: T_i = {dwell_time for state i}
+            - Create histogram: H_i(bin) = count(T_i in bin)
+            - Plot: overlay histograms for all states
+            - Color coding: each state gets unique color
+            
         Returns:
-            None
+            None: Displays matplotlib histogram
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Validate dwell time distributions
+        plotter.plot_dwell_time_validation()
+        ```
+        
+        Features:
+        - Overlaid histograms for all states
+        - Color-coded state identification
+        - Automatic bin sizing
+        - Professional styling with legends
+        - Data quality validation
         """
         # Plot the results of the dwell time validation. 
         if self.__data_error__():
@@ -1011,18 +1507,36 @@ class DwtPlotter:
     
     def plot_dwell_time_validation_interactive(self):
         """
-        Plots an interactive histogram for dwell time validation using Plotly.
-
-        This method generates an interactive histogram plot of the dwell time data,
-        categorized by state names. The histogram is overlaid with different colors
-        representing different states, and the plot includes labels and a title for
-        better readability.
-
-        The histogram is displayed using Plotly's `show` method, which opens the plot
-        in a web browser.
-
+        Create an interactive histogram validation plot for dwell time distributions.
+        
+        Generates an interactive Plotly histogram showing the distribution of
+        dwell times across all states, with hover information and interactive
+        features for detailed analysis.
+        
+        Mathematical Model:
+            For each state i:
+            - Extract dwell times: T_i = {dwell_time for state i}
+            - Create histogram: H_i(bin) = count(T_i in bin)
+            - Plot: interactive histogram with state overlay
+            - Hover information: exact counts and percentages
+            
         Returns:
-            None
+            None: Displays interactive Plotly histogram
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Interactive dwell time validation
+        plotter.plot_dwell_time_validation_interactive()
+        ```
+        
+        Features:
+        - Interactive hover information
+        - Overlaid histograms for all states
+        - Color-coded state identification
+        - Automatic bin sizing
+        - Professional styling with legends
         """
         if self.__data_error__():
             return
@@ -1038,16 +1552,44 @@ class DwtPlotter:
     
     def plot_kaplan_meier(self, dwell_time_col, event_observed_col=None):
         """
-        Plots a Kaplan-Meier survival curve for the given data.
-
-        Parameters:
-            data (pd.DataFrame): Input DataFrame containing survival data.
-            dwell_time_col (str): Column name representing dwell times.
-            event_observed_col (str, optional): Column indicating if the event was observed (1) or censored (0).
-                If None, assumes all events are observed.
-
+        Create a Kaplan-Meier survival curve for dwell time analysis.
+        
+        Generates a survival curve showing the probability of remaining in a
+        state over time. This is useful for analyzing the "survival" of agents
+        in different states and comparing transition timing patterns.
+        
+        Mathematical Model:
+            For dwell times T = {t_1, t_2, ..., t_n}:
+            - Sort times: T_sorted = sort(T)
+            - Calculate survival function: S(t) = ∏(1 - d_i/n_i) for t_i ≤ t
+                where d_i = events at time t_i, n_i = at risk at time t_i
+            - Plot: x = time, y = S(t)
+            
+        Args:
+            dwell_time_col (str): Column name containing dwell times
+            event_observed_col (str, optional): Column indicating event observation (1=observed, 0=censored)
+                If None, assumes all events are observed
+                           
         Returns:
-            None: Displays the Kaplan-Meier survival plot.
+            None: Displays matplotlib survival curve
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Create survival curve for dwell times
+        plotter.plot_kaplan_meier(
+            dwell_time_col='dwell_time',
+            event_observed_col='event_observed'
+        )
+        ```
+        
+        Features:
+        - Kaplan-Meier survival analysis
+        - Confidence intervals (if available)
+        - Professional styling with grid
+        - Clear axis labels and title
+        - Statistical validation
         """
         if self.__data_error__():
             return
@@ -1074,6 +1616,44 @@ class DwtPlotter:
         plt.show()
 
     def __generate_reinfection_data__(self, file_path=None, target_states=[], scenario=''): 
+        """
+        Generate reinfection analysis data from dwell time logs.
+        
+        Processes the dwell time data to identify and count reinfections for each
+        agent. Creates a new dataset with infection counts and percentages for
+        population-level reinfection analysis.
+        
+        Mathematical Model:
+            For each agent i:
+            - Find transitions to target states: T_i = {transitions where going_to_state ∈ target_states}
+            - Count infections: infection_count_i = |T_i|
+            - Calculate percentage: percent_i = infection_count_i / total_infections * 100
+            - Keep maximum: max_infection_i = max(infection_count_i for all transitions of agent i)
+            
+        Args:
+            file_path (str, optional): Path to data file. If None, uses self.data
+            target_states (list): States that count as infections (e.g., [0.0, 1.0])
+            scenario (str): Scenario name for output file naming
+                           
+        Returns:
+            tuple: (reinfection_dataframe, total_infection_count)
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Generate reinfection data
+        reinfection_df, total_count = plotter.__generate_reinfection_data__(
+            target_states=[0.0, 1.0],  # Active TB states
+            scenario="Baseline"
+        )
+        print(f"Total infections: {total_count}")
+        ```
+        
+        Output File:
+        - Creates CSV file: {scenario}_WithReinfection.csv
+        - Contains columns: agent_id, infection_num, percent, age, etc.
+        """
         if file_path is None:
             df = self.data
             reinfection_file_name = Utils.to_filename_friendly(scenario) + '_WithReinfection.csv'
@@ -1104,6 +1684,20 @@ class DwtPlotter:
         return df, total_count
         
     def __data_error__(self):
+        """
+        Check for data availability and validity.
+        
+        Validates that the dwell time data is available and contains the required
+        columns for analysis. This is a helper method used by all plotting methods.
+        
+        Returns:
+            bool: True if data is missing or invalid, False if data is valid
+            
+        Validation Checks:
+        - Data is not None
+        - Data is not empty
+        - 'dwell_time' column exists
+        """
         # data error handling - check if data is available
 
         if self.data is None or self.data.empty or 'dwell_time' not in self.data.columns:
@@ -1112,7 +1706,43 @@ class DwtPlotter:
         return False
 
     def __cleandata__(self, filename):
-
+        """
+        Clean and validate dwell time data from CSV file.
+        
+        Reads a CSV file containing dwell time data and performs data cleaning
+        operations including type conversion, missing value handling, and
+        data validation.
+        
+        Data Cleaning Process:
+        1. Read CSV as strings to avoid import errors
+        2. Convert numeric columns with error handling
+        3. Remove rows with missing critical data
+        4. Reset index for clean data structure
+        
+        Args:
+            filename (str): Path to CSV file containing dwell time data
+            
+        Returns:
+            pd.DataFrame: Cleaned and validated dwell time data
+            
+        Required Columns:
+        - agent_id: Unique agent identifier
+        - state: Current state identifier
+        - entry_time: Time entering current state
+        - exit_time: Time exiting current state
+        - dwell_time: Time spent in state
+        - state_name: Human-readable state name
+        - going_to_state_id: Target state identifier
+        - going_to_state: Target state name
+        - age: Agent age at transition time
+        
+        Example:
+        ```python
+        plotter = DwtPlotter()
+        clean_data = plotter.__cleandata__('raw_data.csv')
+        print(f"Cleaned {len(clean_data)} records")
+        ```
+        """
         # Define column types as expected
         dtype_dict = {
             "agent_id": float,  # Using float initially to avoid casting errors
@@ -1148,6 +1778,44 @@ class DwtPlotter:
 
     @staticmethod
     def __select_graph_pos__(G, layout, seed=42):
+        """
+        Select graph layout algorithm for network visualizations.
+        
+        Provides access to various NetworkX layout algorithms for positioning
+        nodes in network graphs. Each layout offers different visual characteristics
+        suitable for different types of network analysis.
+        
+        Args:
+            G (nx.Graph): NetworkX graph object
+            layout (int): Layout algorithm selection (0-9)
+            seed (int): Random seed for reproducible layouts. Default 42
+            
+        Returns:
+            dict: Node positions as {node: (x, y)} dictionary
+            
+        Layout Options:
+        0: Spring layout (default) - Force-directed placement
+        1: Circular layout - Nodes arranged in circle
+        2: Spiral layout - Nodes arranged in spiral pattern
+        3: Spectral layout - Based on graph Laplacian eigenvectors
+        4: Shell layout - Nodes in concentric shells
+        5: Kamada-Kawai layout - Force-directed with Kamada-Kawai algorithm
+        6: Planar layout - For planar graphs only
+        7: Random layout - Random positioning
+        8: Circular layout (alternative) - Another circular arrangement
+        9: Fruchterman-Reingold layout - Force-directed with F-R algorithm
+        
+        Example:
+        ```python
+        import networkx as nx
+        G = nx.DiGraph()
+        # Add edges...
+        
+        # Use circular layout
+        pos = DwtPlotter.__select_graph_pos__(G, layout=1, seed=123)
+        nx.draw(G, pos)
+        ```
+        """
         import networkx as nx
         
         if layout == 1: 
@@ -1175,22 +1843,76 @@ class DwtPlotter:
         return pos
 
 class DwtPostProcessor(DwtPlotter):
+    """
+    Post-Processing Analyzer for Multiple Simulation Results
+    
+    Extends DwtPlotter to provide aggregation and analysis capabilities for
+    multiple simulation runs. This class can combine results from multiple
+    CSV files and perform comparative analysis across different scenarios.
+    
+    Key Features:
+    - Aggregates multiple simulation results by file prefix
+    - Handles agent ID conflicts across runs
+    - Provides batch processing capabilities
+    - Supports scenario comparison analysis
+    
+    Mathematical Model:
+        For multiple files with prefix P:
+        - Load files: F = {f_1, f_2, ..., f_n} where f_i matches pattern P*.csv
+        - Adjust agent IDs: agent_id_i = agent_id_i + (file_index * 10000)
+        - Combine data: combined_data = ∪(data_i for all f_i in F)
+        - Preserve file associations through agent ID ranges
+        
+    Example Usage:
+    ```python
+    # Aggregate multiple baseline runs
+    postproc = DwtPostProcessor(directory='results', prefix='Baseline')
+    postproc.sankey_agents()
+    postproc.histogram_with_kde()
+    
+    # Save combined results
+    postproc.save_combined_dataframe('baseline_combined.csv')
+    ```
+    
+    Attributes:
+        directory (str): Directory containing simulation result files
+        prefix (str): File prefix for identifying related simulations
+        debug (bool): Enable debug output for troubleshooting
+        data (pd.DataFrame): Combined data from all matching files
+    """
+    
     def __init__(self, directory='', prefix='', data=None, debug=False, **kwargs) :
         """
-        Initializes the post-analyzer with the data from the DwtAnalyzer.
-
+        Initialize the post-processor with simulation result aggregation.
+        
+        Sets up the post-processor to work with multiple simulation results,
+        either by aggregating files from a directory or using pre-loaded data.
+        
         Args:
-            data (pd.DataFrame): A DataFrame containing the dwell time data. Default is None.
-
-        How to use it:
-        1. Create an instance of the post-analyzer with the data from the DwtAnalyzer.
-        2. Call the method you want to use.
-
+            directory (str): Directory containing CSV result files
+            prefix (str): File prefix for identifying related simulations
+                         (e.g., "BaselineLSHTM" or "BaselineTBSim")
+            data (pd.DataFrame, optional): Pre-loaded data. If None, loads from directory
+            debug (bool): Enable debug output. Default False
+            **kwargs: Additional arguments passed to DwtPlotter
+            
         Example:
+        ```python
+        # Initialize with directory and prefix
+        postproc = DwtPostProcessor(
+            directory='results',
+            prefix='BaselineLSHTM',
+            debug=True
+        )
+        
+        # Initialize with existing data
+        df = pd.read_csv('combined_data.csv')
+        postproc = DwtPostProcessor(data=df)
         ```
-        postproc = DwtPostProcessor(directory='results', prefix='BaselineLSHTM')
-        postproc.sandkey()
-        ```
+        
+        File Pattern:
+        - Searches for files matching: {directory}/{prefix}*.csv
+        - Example: results/BaselineLSHTM-20240101120000.csv
         """
         self.directory = directory
         self.prefix = prefix
@@ -1205,16 +1927,44 @@ class DwtPostProcessor(DwtPlotter):
 
     def aggregate_simulation_results(self, directory: str, prefix: str) -> pd.DataFrame:
         """
-        Aggregates all CSV files of the same kind (e.g., BaselineLSHTM, BaselineTBSim)
-        into a single DataFrame.
-
+        Aggregate multiple CSV files into a single DataFrame.
+        
+        Combines all CSV files with the same prefix into a single dataset,
+        handling agent ID conflicts by adding offsets to ensure uniqueness
+        across different simulation runs.
+        
+        Mathematical Model:
+            For files F = {f_1, f_2, ..., f_n}:
+            - Load each file: data_i = read_csv(f_i)
+            - Adjust agent IDs: agent_id_i = agent_id_i + (i * 10000)
+            - Combine: combined_data = concat(data_1, data_2, ..., data_n)
+            - Result: unique agent IDs across all runs
+            
         Args:
-            directory (str): The path to the directory containing the CSV files.
-            prefix (str): The common prefix identifying the group of files to aggregate
-                          (e.g., "BaselineLSHTM" or "BaselineTBSim").
-
+            directory (str): Directory containing CSV files
+            prefix (str): Common prefix for files to aggregate
+                         (e.g., "BaselineLSHTM" or "BaselineTBSim")
+                         
         Returns:
-            pd.DataFrame: A concatenated DataFrame containing all data from matching files.
+            pd.DataFrame: Combined data from all matching files
+            
+        Example:
+        ```python
+        postproc = DwtPostProcessor()
+        
+        # Aggregate baseline results
+        combined_data = postproc.aggregate_simulation_results(
+            directory='results',
+            prefix='BaselineLSHTM'
+        )
+        print(f"Aggregated {len(combined_data)} records from multiple runs")
+        ```
+        
+        File Handling:
+        - Uses glob pattern: {directory}/{prefix}*.csv
+        - Skips files that can't be read
+        - Reports number of files found and processed
+        - Handles missing directories gracefully
         """
         import glob
 
@@ -1252,13 +2002,30 @@ class DwtPostProcessor(DwtPlotter):
 
     def save_combined_dataframe(self, output_file):
         """
-        Saves the combined DataFrame to a specified CSV file.
-
+        Save the combined DataFrame to a CSV file.
+        
+        Exports the aggregated simulation results to a CSV file for
+        further analysis or sharing with other tools.
+        
         Args:
-            output_file (str): The path to the output CSV file.
-
+            output_file (str): Path to the output CSV file
+            
         Returns:
             None
+            
+        Example:
+        ```python
+        postproc = DwtPostProcessor(directory='results', prefix='Baseline')
+        
+        # Save combined results
+        postproc.save_combined_dataframe('baseline_combined.csv')
+        print("Combined data saved successfully")
+        ```
+        
+        Error Handling:
+        - Checks for data availability before saving
+        - Reports success or failure messages
+        - Handles file system errors gracefully
         """
         if self.data is None or self.data.empty:
             print("No data available to save.")
@@ -1271,35 +2038,90 @@ class DwtPostProcessor(DwtPlotter):
             print(f"Error saving DataFrame to {output_file}: {e}")
             
 class DwtAnalyzer(ss.Analyzer, DwtPlotter):
+    """
+    Dwell Time Analyzer for TB Simulation
+    
+    Records and analyzes dwell times during simulation execution. This analyzer
+    tracks how long agents spend in different states and provides comprehensive
+    analysis capabilities for understanding state transition patterns.
+    
+    Key Features:
+    - Real-time dwell time tracking during simulation
+    - Automatic state change detection
+    - Support for multiple state enumeration systems
+    - Comprehensive data export and analysis
+    
+    Mathematical Model:
+        For each agent i and state transition:
+        - Entry time: t_entry = time when agent enters state
+        - Exit time: t_exit = time when agent leaves state  
+        - Dwell time: dwell_time = t_exit - t_entry
+        - State tracking: state_i(t) = current state of agent i at time t
+        
+    Example Usage:
+    ```python
+    import starsim as ss
+    from tbsim import TB
+    from tbsim.analyzers import DwtAnalyzer
+    
+    # Create simulation with analyzer
+    sim = ss.Sim(diseases=[TB()])
+    sim.add_analyzer(DwtAnalyzer(scenario_name="Baseline"))
+    sim.run()
+    
+    # Access analyzer results
+    analyzer = sim.analyzers[0]
+    analyzer.plot_dwell_time_validation()
+    analyzer.sankey_agents()
+    ```
+    
+    Attributes:
+        eSTATES (IntEnum): State enumeration system (e.g., TBS, TBSL)
+        adjust_to_unit (bool): Whether to adjust dwell times to specific units
+        unit (float): Time unit multiplier for dwell time adjustment
+        scenario_name (str): Name of the simulation scenario
+        data (pd.DataFrame): Collected dwell time data
+        __latest_sts_df__ (pd.DataFrame): Internal state tracking
+    """
+    
     def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=mtb.TBS, scenario_name=''):
         """
-        Initializes the analyzer with optional adjustments to step_time_units.
-
+        Initialize the dwell time analyzer.
+        
+        Sets up the analyzer to track dwell times during simulation execution,
+        with options for unit adjustment and state enumeration system selection.
+        
         Args:
-            adjust_to_unit (bool): If True, adjusts the dwell times to step_time_units by multiplying the recorded dwell_time by the provided multiplier.
-            Default is True.
-            
-            unit (float | ss.t ):  TODO: Implement its use.
-            states_ennumerator (IntEnum): An IntEnum class that enumerates the states in the simulation. Default is mtb.TBS but it will accept any equivalent IntEnum class.
-
-
-        Notes:
-        Please note, states -2 has been added to represent Agents NEVER INFECTED state and state -3.0 is to represent NON-TB DEAD.
-
-        How to use it:
-        1. Add the analyzer to the sim object.
-        2. Run the simulation.
-        3. Optional: Create an instance of the analyzer and call the method you want to use.
-        
+            adjust_to_unit (bool): If True, adjusts dwell times by multiplying by unit.
+                                 Default False
+            unit (float | ss.t): Time unit multiplier for dwell time adjustment.
+                               Default 1.0
+            states_ennumerator (IntEnum): State enumeration class (e.g., TBS, TBSL).
+                                        Default mtb.TBS
+            scenario_name (str): Name for the simulation scenario. Default ''
+                                
         Example:
-        ```
-        sim = tb.Sim()
-        sim.add_analyzer(DwtAnalyzer())
-        sim.run()
-        analyzer = sim.analyzers[0]
-        analyzer.plot_dwell_time_validation()
+        ```python
+        # Basic analyzer
+        analyzer = DwtAnalyzer()
+        
+        # Analyzer with unit adjustment
+        analyzer = DwtAnalyzer(
+            adjust_to_unit=True,
+            unit=24.0,  # Convert to days
+            scenario_name="Baseline_TB_Model"
+        )
+        
+        # Analyzer with custom state enumeration
+        from tb_acf import TBSL
+        analyzer = DwtAnalyzer(states_ennumerator=TBSL)
         ```
         
+        State Tracking:
+        - Tracks all state transitions during simulation
+        - Handles births and deaths automatically
+        - Records entry/exit times for each state
+        - Calculates dwell times automatically
         """
         ss.Analyzer.__init__(self)
         self.eSTATES = states_ennumerator
@@ -1313,6 +2135,25 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         return
     
     def __initialize_dataframes__(self):
+        """
+        Initialize internal data structures for state tracking.
+        
+        Sets up the internal DataFrame that tracks the current state of each
+        agent. This method is called automatically during the first simulation
+        step to prepare the tracking system.
+        
+        Mathematical Model:
+            For each agent i:
+            - Initialize last_state_i = -1 (default state)
+            - Initialize last_state_time_i = 0 (simulation start time)
+            - Create tracking record: (agent_id_i, last_state_i, last_state_time_i)
+            
+        Implementation Details:
+        - Creates DataFrame with columns: agent_id, last_state, last_state_time
+        - Initializes all agents to state -1 (default/susceptible)
+        - Sets all entry times to 0 (simulation start)
+        - Handles unit configuration for time scaling
+        """
         # Initialize the latest state dataframe
         # NOTE: This module assumes the default state is '-1'
         if self.unit is None:
@@ -1327,6 +2168,35 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         return
     
     def step(self):
+        """
+        Execute one time step of dwell time analysis.
+        
+        Called at each simulation time step to track state changes and record
+        dwell times. This method handles state transitions, births, and deaths
+        automatically.
+        
+        Step Process:
+        1. Initialize tracking on first step (if needed)
+        2. Check for new births and add to tracking
+        3. Update state change data for existing agents
+        4. Record natural deaths for deceased agents
+        
+        Mathematical Model:
+            For each agent i at time t:
+            - Current state: state_i(t) = TB.state[agent_i]
+            - Previous state: last_state_i(t-1) = tracked state
+            - If state_i(t) ≠ last_state_i(t-1):
+                - Record dwell time: dwell_time = t - last_state_time_i
+                - Update tracking: last_state_i(t) = state_i(t), last_state_time_i(t) = t
+                
+        Example:
+        ```python
+        # The step method is called automatically during simulation
+        sim = ss.Sim(diseases=[TB()])
+        sim.add_analyzer(DwtAnalyzer())
+        sim.run()  # step() is called internally at each time step
+        ```
+        """
         if not self.sim.ti: self.__initialize_dataframes__()
         self.__check_for_new_borns__()       
         self.__update_state_change_data__()
@@ -1334,6 +2204,28 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         return
     
     def __update_state_change_data__(self):
+        """
+        Update dwell time data when agents change states.
+        
+        Detects state changes for all agents and records the dwell times
+        for the previous state. This is the core method for tracking
+        state transitions and calculating dwell times.
+        
+        Mathematical Model:
+            For each agent i:
+            - Current state: current_state_i = TB.state[agent_i]
+            - Previous state: last_state_i = tracked last state
+            - If current_state_i ≠ last_state_i:
+                - Dwell time: dwell_time_i = current_time - last_state_time_i
+                - Record transition: (agent_i, last_state_i, dwell_time_i, current_state_i)
+                - Update tracking: last_state_i = current_state_i, last_state_time_i = current_time
+                
+        Implementation Details:
+        - Compares current TB state with tracked last state
+        - Calculates dwell times for state transitions
+        - Updates internal tracking DataFrame
+        - Handles only alive agents (filters by auids)
+        """
         # Get the current state of the agents
         ti = self.ti
         tb = self.sim.diseases.tb
@@ -1361,8 +2253,27 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         self.__latest_sts_df__.loc[self.__latest_sts_df__['agent_id'].isin(uids), 'last_state_time'] = ti
         return
 
-    # TODO:  IN PROGRESS
     def __record_natural_deaths__(self):
+        """
+        Record dwell times for agents who died from natural causes.
+        
+        Identifies agents who died from non-TB causes and records their
+        final state dwell time. This ensures complete tracking of all
+        agent lifecycles.
+        
+        Mathematical Model:
+            For each dead agent i:
+            - If agent_i ∈ dead_agents and last_state_i < 0 (non-TB state):
+                - Final dwell time: dwell_time_i = current_time - last_state_time_i
+                - Record transition: (agent_i, last_state_i, dwell_time_i, -3.0)
+                where -3.0 represents natural death
+                
+        Implementation Details:
+        - Checks for agents in dead population
+        - Filters for non-TB states (state < 0)
+        - Avoids duplicate recording
+        - Records final dwell time before death
+        """
         # Get the current state of the agents
         ti = self.ti
         dead_uids = ss.uids(self.sim.people.dead)
@@ -1384,6 +2295,25 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             )
             
     def __check_for_new_borns__(self):
+        """
+        Add new agents (births) to the state tracking system.
+        
+        Detects when new agents are added to the simulation (births) and
+        initializes their state tracking. This ensures all agents are
+        properly tracked throughout their lifecycle.
+        
+        Mathematical Model:
+            For new agents N = {new_agent_1, new_agent_2, ...}:
+            - Initialize: last_state_i = -1 (default state)
+            - Initialize: last_state_time_i = current_time
+            - Add to tracking: (agent_id_i, last_state_i, last_state_time_i)
+            
+        Implementation Details:
+        - Compares current population size with tracking DataFrame size
+        - Identifies new agent IDs
+        - Initializes new agents to default state (-1)
+        - Handles multiple births in single time step
+        """
         # check if the number of agents has changed
         if len(self.sim.people.auids) != len(self.__latest_sts_df__):
             #identify which agent ids are new and add them to the __latest_sts_df__
@@ -1411,6 +2341,40 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         return
 
     def finalize(self):
+        """
+        Finalize the dwell time analysis and save results.
+        
+        Called at the end of simulation to complete the analysis, process
+        final state data, and save results to files. This method handles
+        agents who never changed states and prepares data for analysis.
+        
+        Finalization Process:
+        1. Record agents who never changed states (never infected)
+        2. Detect and use appropriate state enumeration system
+        3. Map state IDs to human-readable names
+        4. Apply unit adjustments if configured
+        5. Save results to CSV and metadata files
+        
+        Mathematical Model:
+            For agents who never changed states:
+            - Agent i with last_state_i = -1 and last_state_time_i = 0:
+                - Record: (agent_i, -1, 0, simulation_end_time, -2.0)
+                where -2.0 represents "never infected"
+                
+        Example:
+        ```python
+        # finalize() is called automatically at the end of simulation
+        sim.run()  # finalize() is called internally
+        
+        # Access results after finalization
+        analyzer = sim.analyzers[0]
+        print(f"Recorded {len(analyzer.data)} state transitions")
+        ```
+        
+        Output Files:
+        - CSV file: {scenario_name}-{timestamp}.csv
+        - Metadata file: {scenario_name}-{timestamp}.json
+        """
         super().finalize()
         # record Never Infected (-2):
         # Identify agents with last_state == -1 (Not a single change of state was recorded)
@@ -1453,6 +2417,33 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         return
 
     def _log_dwell_time(self, agent_ids, states, entry_times, exit_times, going_to_state_ids, age):
+        """
+        Log dwell time data for state transitions.
+        
+        Records dwell time information for a batch of agents who have
+        changed states. This is the core data recording method used
+        throughout the simulation.
+        
+        Mathematical Model:
+            For each agent i in the batch:
+            - Dwell time: dwell_time_i = exit_time_i - entry_time_i
+            - Record: (agent_id_i, state_i, entry_time_i, exit_time_i, 
+                      dwell_time_i, going_to_state_id_i, age_i)
+                      
+        Args:
+            agent_ids (np.ndarray): Array of agent identifiers
+            states (np.ndarray): Current states before transition
+            entry_times (np.ndarray): Times when agents entered current states
+            exit_times (np.ndarray): Times when agents exited current states
+            going_to_state_ids (np.ndarray): Target state identifiers
+            age (np.ndarray): Agent ages at transition time
+            
+        Implementation Details:
+        - Calculates dwell times as exit_time - entry_time
+        - Handles NaN values in entry times (converts to 0)
+        - Creates DataFrame with all transition data
+        - Appends to main data collection
+        """
         entry_times = np.nan_to_num(entry_times, nan=0)
         dwell_times = exit_times - entry_times
         new_logs = pd.DataFrame({
@@ -1469,6 +2460,31 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         return
     
     def __save_to_file__(self):
+        """
+        Save dwell time data to CSV and metadata files.
+        
+        Creates timestamped files in the results directory with the
+        dwell time data and simulation parameters for later analysis.
+        
+        File Naming Convention:
+        - CSV file: {scenario_name}-{MMDDHHMMSS}.csv
+        - Metadata file: {scenario_name}-{MMDDHHMMSS}.json
+        
+        Returns:
+            str: Path to the saved CSV file
+            
+        Example:
+        ```python
+        # Files are saved automatically during finalize()
+        analyzer = DwtAnalyzer(scenario_name="Baseline_TB")
+        sim.run()
+        # Results saved to: results/Baseline_TB-20240101120000.csv
+        ```
+        
+        File Contents:
+        - CSV: All dwell time data with columns for analysis
+        - JSON: Simulation parameters and configuration
+        """
         resdir = os.path.dirname(cfg.create_res_dir())
         t = ddtt.datetime.now()
         prefix = f'{Utils.to_filename_friendly(self.scenario_name)}'
@@ -1486,6 +2502,47 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         return fn
 
     def validate_dwell_time_distributions(self, expected_distributions=None):
+        """
+        Validate dwell time distributions against expected patterns.
+        
+        Performs Kolmogorov-Smirnov tests to compare observed dwell time
+        distributions with expected theoretical distributions. This is
+        useful for model validation and quality assurance.
+        
+        Mathematical Model:
+            For each state i:
+            - Observed dwell times: T_obs = {dwell_times for state i}
+            - Expected CDF: F_expected(t) = theoretical distribution
+            - KS test: D = max|F_obs(t) - F_expected(t)|
+            - P-value: probability of observing D under null hypothesis
+            
+        Args:
+            expected_distributions (dict, optional): Dictionary mapping state IDs to expected CDF functions.
+                                                   If None, uses self.expected_distributions
+                                                   
+        Returns:
+            None: Prints validation results to console
+            
+        Example:
+        ```python
+        analyzer = DwtAnalyzer()
+        sim.run()
+        
+        # Define expected distributions
+        expected = {
+            0: lambda x: 1 - np.exp(-x/10),  # Exponential with mean 10
+            1: lambda x: 1 - np.exp(-x/5)    # Exponential with mean 5
+        }
+        
+        # Validate distributions
+        analyzer.validate_dwell_time_distributions(expected)
+        ```
+        
+        Output:
+        - Prints KS statistic and p-value for each state
+        - Warns if distributions deviate significantly (p < 0.05)
+        - Provides validation summary
+        """
         from scipy.stats import ks_1samp, ks_2samp
         expected_distributions = expected_distributions or self.expected_distributions
        
@@ -1502,19 +2559,73 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         return
 
 class Utils:
+    """
+    Utility functions for dwell time analysis.
+    
+    Provides helper functions for data processing, file handling, and
+    visualization support in the dwell time analysis framework.
+    """
+    
+    @staticmethod
     def to_filename_friendly(string=''):
+        """
+        Convert string to filename-safe format.
+        
+        Removes or replaces special characters that are not allowed
+        in filenames across different operating systems.
+        
+        Args:
+            string (str): Input string to convert
+            
+        Returns:
+            str: Filename-safe string with only alphanumeric characters
+            
+        Example:
+        ```python
+        safe_name = Utils.to_filename_friendly("Baseline TB Model (v1.0)")
+        print(safe_name)  # Output: "Baseline_TB_Model_v10"
+        ```
+        
+        Conversion Rules:
+        - Alphabetic characters: preserved
+        - Numeric characters: preserved  
+        - Special characters: replaced with underscores
+        - Multiple underscores: collapsed to single underscore
+        """
         import re
         string = "".join([c if c.isalpha() else "_" for c in string])
         return re.sub(r'[^a-zA-Z0-9]', '', string)
     
+    @staticmethod
     def colors():
         """
-        Returns a ListedColormap and corresponding state labels for TB states.
+        Get color mapping for TB state visualization.
+        
+        Returns a dictionary mapping state names to colors and a
+        matplotlib ListedColormap for consistent visualization
+        across all plotting functions.
         
         Returns:
-            cmap (ListedColormap): Colormap object for use in plots.
-            state_labels (list): Ordered state names.
-        """        
+            tuple: (state_colors_dict, matplotlib.colors.ListedColormap)
+            
+        Color Mapping:
+        - Death states: cyan, gray, black
+        - Susceptible states: yellow, orange, purple
+        - Infection states: blue, purple, pink
+        - Active states: brown, red, darkred, cyan
+        - Treatment states: lightblue, darkgreen
+        
+        Example:
+        ```python
+        state_colors, cmap = Utils.colors()
+        
+        # Use in plotting
+        plt.scatter(x, y, c=[state_colors[state] for state in states])
+        
+        # Or use colormap
+        plt.imshow(data, cmap=cmap)
+        ```
+        """
         import matplotlib.colors as mcolors
 
         state_colors = {
