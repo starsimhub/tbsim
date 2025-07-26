@@ -72,10 +72,10 @@ jobs:
           ls -la _build/html/
           echo "=== Checking for index.html ==="
           if [ -f "_build/html/index.html" ]; then
-            echo "✅ index.html found!"
+            echo "     index.html found!"
             ls -la _build/html/index.html
           else
-            echo "❌ index.html not found!"
+            echo "     index.html not found!"
             echo "Available files:"
             ls -la _build/html/
             echo "=== Build log ==="
@@ -109,10 +109,10 @@ jobs:
           echo "=== Verifying downloaded artifacts ==="
           ls -la docs/_build/html/
           if [ -f "docs/_build/html/index.html" ]; then
-            echo "✅ index.html found in downloaded artifacts!"
+            echo "     index.html found in downloaded artifacts!"
             ls -la docs/_build/html/index.html
           else
-            echo "❌ index.html not found in downloaded artifacts!"
+            echo "     index.html not found in downloaded artifacts!"
             echo "Available files:"
             ls -la docs/_build/html/
             exit 1
@@ -132,9 +132,9 @@ jobs:
 
       - name: Print deployment URL
         run: |
-          echo "🚀 Documentation deployed successfully!"
-          echo "📖 Documentation URL: ${{ steps.deployment.outputs.page_url }}"
-          echo "🔗 GitHub Pages URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          echo " Documentation deployed successfully!"
+          echo " Documentation URL: ${{ steps.deployment.outputs.page_url }}"
+          echo " GitHub Pages URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
           
           # Store URL for potential use in other steps
           echo "DEPLOYMENT_URL=${{ steps.deployment.outputs.page_url }}" >> $GITHUB_ENV
@@ -176,7 +176,7 @@ jobs:
                   issue_number: context.issue.number,
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  body: `📚 **Documentation Preview Available**
+                  body: `   **Documentation Preview Available**
                   
                   Documentation has been built successfully for this PR. You can download the preview artifacts to view the changes locally.
                   
@@ -197,7 +197,7 @@ jobs:
                   issue_number: context.issue.number,
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  body: `⚠️ **Documentation Build Issue**
+                  body: ` **Documentation Build Issue**
                   
                   Documentation was built but \`index.html\` was not found. Please check the build logs for any errors.`
                 });
@@ -207,7 +207,7 @@ jobs:
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `❌ **Documentation Build Failed**
+                body: ` **Documentation Build Failed**
                 
                 The documentation build directory was not found. Please check the build logs for errors.`
               });
