@@ -348,6 +348,17 @@ class DwtPlotter:
         between all states in the simulation. The diagram visualizes both
         the direction and magnitude of state transitions.
         
+        .. image:: ../_static/sankey_diagram_example.png
+            :width: 600px
+            :alt: Sankey diagram showing TB state transitions
+            :align: center
+        
+        The Sankey diagram above shows:
+        - **Nodes**: TB states (Susceptible, Latent, Active, Treatment, etc.)
+        - **Flows**: Agent transitions between states
+        - **Width**: Proportional to the number of agents
+        - **Colors**: Different state categories
+        
         Mathematical Model:
             For each transition (state_i → state_j):
             - Count agents: N_ij = count(agents transitioning from i to j)
@@ -540,9 +551,19 @@ class DwtPlotter:
         """
         Generate an interactive bar chart of state transitions grouped by dwell time categories.
         
-        Creates a horizontal bar chart showing the distribution of state transitions
-        across different dwell time ranges. This visualization helps identify patterns
-        in how long agents spend in different states before transitioning.
+        This method provides detailed analysis of state transitions with
+        customizable dwell time categories and state filtering.
+        
+        .. image:: ../_static/interactive_bar_example.png
+            :width: 800px
+            :alt: Interactive bar chart of state transitions by dwell time
+            :align: center
+        
+        The interactive chart above shows:
+        - **Horizontal bars**: Each representing a state transition
+        - **Dwell time categories**: Grouped by time ranges (0-30d, 30-90d, etc.)
+        - **Bar heights**: Number of agents making each transition
+        - **Interactive features**: Hover details, zoom, and filtering
         
         Mathematical Model:
             For each dwell time bin [bin_min, bin_max):
@@ -791,9 +812,19 @@ class DwtPlotter:
         """
         Visualize reinfection percentages across the population.
         
-        Creates an interactive bar chart showing the percentage of the population
-        that experienced different numbers of reinfections. This provides a
-        population-level view of reinfection patterns.
+        This method visualizes the percentage of the population that experienced
+        different numbers of reinfections, important for TB epidemiology.
+        
+        .. image:: ../_static/reinfection_analysis_example.png
+            :width: 800px
+            :alt: Interactive bar chart of reinfection percentages
+            :align: center
+        
+        The interactive chart above provides:
+        - **Bar heights**: Percentage of population with each reinfection count
+        - **Hover information**: Exact percentages and counts
+        - **Color coding**: Different reinfection numbers
+        - **Interactive features**: Zoom, pan, and export capabilities
         
         Mathematical Model:
             For each reinfection count k:
@@ -1152,10 +1183,19 @@ class DwtPlotter:
         """
         Create histograms with kernel density estimation for dwell time distributions.
         
-        Generates a multi-panel visualization showing the distribution of dwell
-        times for each state, including both histograms and kernel density
-        estimation curves. This provides both discrete and continuous views
-        of the dwell time distributions.
+        This method shows how long agents spend in each TB state, providing
+        insights into the timing patterns of disease progression.
+        
+        .. image:: ../_static/histogram_kde_example.png
+            :width: 500px
+            :alt: Histogram with KDE showing dwell time distributions
+            :align: center
+        
+        The plot above demonstrates:
+        - **Histogram bars**: Frequency distribution of dwell times
+        - **KDE curve**: Smooth probability density estimation
+        - **Multi-panel layout**: One subplot per TB state
+        - **Automatic scaling**: Optimized bin sizes and ranges
         
         Mathematical Model:
             For each state i:
@@ -1340,9 +1380,20 @@ class DwtPlotter:
         """
         Create a curved network graph with edge thickness proportional to agent count.
         
-        Generates a directed graph with curved edges where the thickness represents
-        the number of agents making each transition. This provides a visual
-        representation of transition frequency and importance.
+        This method generates a directed graph visualization where nodes represent
+        TB states and edges show transitions with statistical annotations.
+        
+        .. image:: ../_static/network_graph_example.png
+            :width: 700px
+            :alt: Network graph of TB state transitions
+            :align: center
+        
+        The network above illustrates:
+        - **Nodes**: TB states (circles with state names)
+        - **Edges**: State transitions (curved arrows)
+        - **Edge thickness**: Proportional to transition frequency
+        - **Edge labels**: Mean dwell time, mode, and agent count
+        - **Color coding**: Different states and transition types
         
         Mathematical Model:
             For each transition (state_i → state_j):
@@ -2045,35 +2096,45 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
     tracks how long agents spend in different states and provides comprehensive
     analysis capabilities for understanding state transition patterns.
     
+    .. image:: ../_static/sankey_diagram_example.png
+        :width: 600px
+        :alt: Example Sankey diagram showing TB state transitions
+        :align: center
+    
+    The analyzer tracks how long agents spend in each TB state and
+    provides multiple visualization types including Sankey diagrams,
+    network graphs, histograms, and interactive charts.
+    
     Key Features:
-    - Real-time dwell time tracking during simulation
-    - Automatic state change detection
-    - Support for multiple state enumeration systems
-    - Comprehensive data export and analysis
+        - Real-time dwell time tracking during simulation
+        - Automatic state change detection
+        - Support for multiple state enumeration systems
+        - Comprehensive data export and analysis
+        - Multiple visualization types (Sankey, Network, Histogram, Interactive)
     
     Mathematical Model:
-        For each agent i and state transition:
+    For each agent i and state transition:
         - Entry time: t_entry = time when agent enters state
         - Exit time: t_exit = time when agent leaves state  
         - Dwell time: dwell_time = t_exit - t_entry
         - State tracking: state_i(t) = current state of agent i at time t
         
     Example Usage:
-    ```python
-    import starsim as ss
-    from tbsim import TB
-    from tbsim.analyzers import DwtAnalyzer
-    
-    # Create simulation with analyzer
-    sim = ss.Sim(diseases=[TB()])
-    sim.add_analyzer(DwtAnalyzer(scenario_name="Baseline"))
-    sim.run()
-    
-    # Access analyzer results
-    analyzer = sim.analyzers[0]
-    analyzer.plot_dwell_time_validation()
-    analyzer.sankey_agents()
-    ```
+        ```python
+        import starsim as ss
+        from tbsim import TB
+        from tbsim.analyzers import DwtAnalyzer
+        
+        # Create simulation with analyzer
+        sim = ss.Sim(diseases=[TB()])
+        sim.add_analyzer(DwtAnalyzer(scenario_name="Baseline"))
+        sim.run()
+        
+        # Access analyzer results
+        analyzer = sim.analyzers[0]
+        analyzer.plot_dwell_time_validation()
+        analyzer.sankey_agents()
+        ```
     
     Attributes:
         eSTATES (IntEnum): State enumeration system (e.g., TBS, TBSL)
@@ -2101,27 +2162,27 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             scenario_name (str): Name for the simulation scenario. Default ''
                                 
         Example:
-        ```python
-        # Basic analyzer
-        analyzer = DwtAnalyzer()
-        
-        # Analyzer with unit adjustment
-        analyzer = DwtAnalyzer(
-            adjust_to_unit=True,
-            unit=24.0,  # Convert to days
-            scenario_name="Baseline_TB_Model"
-        )
-        
-        # Analyzer with custom state enumeration
-        from tb_acf import TBSL
-        analyzer = DwtAnalyzer(states_ennumerator=TBSL)
-        ```
+            ```python
+            # Basic analyzer
+            analyzer = DwtAnalyzer()
+            
+            # Analyzer with unit adjustment
+            analyzer = DwtAnalyzer(
+                adjust_to_unit=True,
+                unit=24.0,  # Convert to days
+                scenario_name="Baseline_TB_Model"
+            )
+            
+            # Analyzer with custom state enumeration
+            from tb_acf import TBSL
+            analyzer = DwtAnalyzer(states_ennumerator=TBSL)
+            ```
         
         State Tracking:
-        - Tracks all state transitions during simulation
-        - Handles births and deaths automatically
-        - Records entry/exit times for each state
-        - Calculates dwell times automatically
+            - Tracks all state transitions during simulation
+            - Handles births and deaths automatically
+            - Records entry/exit times for each state
+            - Calculates dwell times automatically
         """
         ss.Analyzer.__init__(self)
         self.eSTATES = states_ennumerator
@@ -2149,10 +2210,10 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             - Create tracking record: (agent_id_i, last_state_i, last_state_time_i)
             
         Implementation Details:
-        - Creates DataFrame with columns: agent_id, last_state, last_state_time
-        - Initializes all agents to state -1 (default/susceptible)
-        - Sets all entry times to 0 (simulation start)
-        - Handles unit configuration for time scaling
+            - Creates DataFrame with columns: agent_id, last_state, last_state_time
+            - Initializes all agents to state -1 (default/susceptible)
+            - Sets all entry times to 0 (simulation start)
+            - Handles unit configuration for time scaling
         """
         # Initialize the latest state dataframe
         # NOTE: This module assumes the default state is '-1'
@@ -2176,10 +2237,10 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         automatically.
         
         Step Process:
-        1. Initialize tracking on first step (if needed)
-        2. Check for new births and add to tracking
-        3. Update state change data for existing agents
-        4. Record natural deaths for deceased agents
+            1. Initialize tracking on first step (if needed)
+            2. Check for new births and add to tracking
+            3. Update state change data for existing agents
+            4. Record natural deaths for deceased agents
         
         Mathematical Model:
             For each agent i at time t:
