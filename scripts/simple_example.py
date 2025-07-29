@@ -9,7 +9,7 @@ import starsim as ss
 import sciris as sc
 
 # Import the functions from our main script
-from run_tb_interventions import build_sim, run_scenarios
+from scripts.run_tb_bcg_beta import build_sim, run_scenarios
 
 def example_single_intervention():
     """Example: Single BCG intervention"""

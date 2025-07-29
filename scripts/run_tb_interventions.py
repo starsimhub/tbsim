@@ -163,24 +163,24 @@ def get_scenarios():
             ),
         },
         
-        # 'Multiple BCG': {
-        #     'name': 'Multiple BCG interventions',
-        #     'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-        #     'bcgintervention': [
-        #         dict(
-        #             coverage=0.9,
-        #             start=sc.date('1980-01-01'),
-        #             stop=sc.date('2020-12-31'),
-        #             age_range=[0, 2],           # For children
-        #         ),
-        #         dict(
-        #             coverage=0.3,
-        #             start=sc.date('1985-01-01'),
-        #             stop=sc.date('2015-12-31'),
-        #             age_range=[25, 40],         # For adults
-        #         ),
-        #     ],
-        # },
+        'Multiple BCG': {
+            'name': 'Multiple BCG interventions',
+            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+            'bcgintervention': [
+                dict(
+                    coverage=0.9,
+                    start=sc.date('1980-01-01'),
+                    stop=sc.date('2020-12-31'),
+                    age_range=[0, 2],           # For children
+                ),
+                dict(
+                    coverage=0.3,
+                    start=sc.date('1985-01-01'),
+                    stop=sc.date('2015-12-31'),
+                    age_range=[25, 40],         # For adults
+                ),
+            ],
+        },
     }
 
 def run_scenarios(plot=True):
