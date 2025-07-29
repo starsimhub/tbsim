@@ -12,4 +12,3 @@ This section contains step-by-step tutorials and examples for using the tbsim li
    tutorials/tb_interventions_tutorial.ipynb
    tutorials/run_tbhiv_scens.ipynb
    tutorials/tbhiv_comorbidity.ipynb
-   tutorials/comprehensive_analyzer_plots_example.ipynb 
