@@ -76,6 +76,7 @@ import pandas as pd
 import datetime
 import os
 import rdata
+import time
 
 import warnings
 warnings.filterwarnings("ignore", message='Missing constructor for R class "data.table".*')
@@ -246,6 +247,127 @@ from tbsim.interventions.tb_treatment import TBTreatment
 start_wallclock = time.time()
 start_datetime = datetime.datetime.now()
 print(f"Sweep started at {start_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+
+
+class AgeDependentTBProgression(ss.Intervention):
+    """
+    Intervention to modify TB progression rates and fast progressor fractions based on age groups.
+    
+    This intervention adjusts:
+    1. The relative risk (rr_activation) multiplier for TB progression from latent to active disease
+    2. The probability of becoming a fast progressor (p_latent_fast) after TB infection
+    
+    Age-specific multipliers:
+    - 0-4 years: 2.0x the base rate (higher progression and fast progressor fraction)
+    - 5-14 years: 0.5x the base rate (lower progression and fast progressor fraction)  
+    - 15+ years: 1.0x the base rate (base progression and fast progressor fraction)
+    """
+    
+    def __init__(self, pars, **kwargs):
+        super().__init__(**kwargs)
+        self.define_pars(
+            age_0_4_multiplier=2.0,    # 2x progression for 0-4 year olds
+            age_5_14_multiplier=0.5,   # 0.5x progression for 5-14 year olds
+            age_15plus_multiplier=1.0,  # 1x progression for 15+ year olds
+        )
+        self.update_pars(pars, **kwargs)
+    
+    def step(self):
+        """Apply age-dependent TB progression multipliers and fast progressor fractions"""
+        tb = self.sim.diseases['tb']
+        people = self.sim.people
+        
+        # Get ages of TB-infected individuals
+        uids_tb = tb.infected.uids
+        ages = people.age[uids_tb]
+        
+        # Apply age-specific multipliers to rr_activation
+        # 0-4 years: 2x progression
+        mask_0_4 = (ages >= 0) & (ages <= 4)
+        tb.rr_activation[uids_tb[mask_0_4]] *= self.pars.age_0_4_multiplier
+        
+        # 5-14 years: 0.5x progression
+        mask_5_14 = (ages >= 5) & (ages <= 14)
+        tb.rr_activation[uids_tb[mask_5_14]] *= self.pars.age_5_14_multiplier
+        
+        # 15+ years: 1x progression (base rate)
+        mask_15plus = ages >= 15
+        tb.rr_activation[uids_tb[mask_15plus]] *= self.pars.age_15plus_multiplier
+        
+        # Also modify the p_latent_fast parameter for new infections
+        # This affects the probability of becoming a fast progressor vs slow progressor
+        # We need to modify the underlying bernoulli distribution parameters
+        
+        # Get the base p_latent_fast value (typically 0.1)
+        base_p_latent_fast = 0.1  # This is the default value from the TB model
+        
+        # Create age-specific p_latent_fast values
+        p_latent_fast_0_4 = base_p_latent_fast * self.pars.age_0_4_multiplier  # 0.2 (20%)
+        p_latent_fast_5_14 = base_p_latent_fast * self.pars.age_5_14_multiplier  # 0.05 (5%)
+        p_latent_fast_15plus = base_p_latent_fast * self.pars.age_15plus_multiplier  # 0.1 (10%)
+        
+        # Store these values for use in the TB model's infection logic
+        # Note: This is a simplified approach - in a more complex implementation,
+        # we would need to modify the TB model's infection method directly
+        self.age_specific_p_latent_fast = {
+            '0_4': p_latent_fast_0_4,
+            '5_14': p_latent_fast_5_14,
+            '15plus': p_latent_fast_15plus
+        }
+        
+        # Override the TB model's p_latent_fast parameter with age-specific values
+        # This is a more direct approach to ensure the age-specific values are used
+        if hasattr(tb, 'p_latent_fast'):
+            # Store the original p_latent_fast for reference
+            if not hasattr(self, 'original_p_latent_fast'):
+                self.original_p_latent_fast = tb.p_latent_fast
+            
+            # Create age-specific bernoulli distributions
+            tb.p_latent_fast_0_4 = ss.bernoulli(p=p_latent_fast_0_4)
+            tb.p_latent_fast_5_14 = ss.bernoulli(p=p_latent_fast_5_14)
+            tb.p_latent_fast_15plus = ss.bernoulli(p=p_latent_fast_15plus)
+            
+            # Override the TB model's infection method to use age-specific p_latent_fast
+            if not hasattr(self, 'original_infect'):
+                self.original_infect = tb.infect
+                
+                def age_dependent_infect(tb_self, uids, hosp=None, hosp_max=None, source_uids=None, **kwargs):
+                    """Override the infect method to use age-specific p_latent_fast values"""
+                    # Call the original infect method first
+                    result = self.original_infect(tb_self, uids, hosp, hosp_max, source_uids, **kwargs)
+                    
+                    # Now modify the latent state assignment based on age
+                    people = self.sim.people
+                    ages = people.age[uids]
+                    
+                    # Get the newly infected individuals (those who just became latent)
+                    newly_infected = uids[tb_self.state[uids] == mtb.TBS.LATENT_SLOW]
+                    newly_infected = np.append(newly_infected, uids[tb_self.state[uids] == mtb.TBS.LATENT_FAST])
+                    
+                    if len(newly_infected) > 0:
+                        newly_infected_ages = people.age[newly_infected]
+                        
+                        # Apply age-specific fast progressor probabilities
+                        # 0-4 years: 20% fast progressors
+                        mask_0_4 = (newly_infected_ages >= 0) & (newly_infected_ages <= 4)
+                        fast_0_4 = tb_self.p_latent_fast_0_4.filter(newly_infected[mask_0_4])
+                        tb_self.state[newly_infected[mask_0_4]] = np.where(fast_0_4, mtb.TBS.LATENT_FAST, mtb.TBS.LATENT_SLOW)
+                        
+                        # 5-14 years: 5% fast progressors
+                        mask_5_14 = (newly_infected_ages >= 5) & (newly_infected_ages <= 14)
+                        fast_5_14 = tb_self.p_latent_fast_5_14.filter(newly_infected[mask_5_14])
+                        tb_self.state[newly_infected[mask_5_14]] = np.where(fast_5_14, mtb.TBS.LATENT_FAST, mtb.TBS.LATENT_SLOW)
+                        
+                        # 15+ years: 10% fast progressors (base rate)
+                        mask_15plus = newly_infected_ages >= 15
+                        fast_15plus = tb_self.p_latent_fast_15plus.filter(newly_infected[mask_15plus])
+                        tb_self.state[newly_infected[mask_15plus]] = np.where(fast_15plus, mtb.TBS.LATENT_FAST, mtb.TBS.LATENT_SLOW)
+                    
+                    return result
+                
+                # Replace the TB model's infect method
+                tb.infect = age_dependent_infect.__get__(tb, type(tb))
+
 
 def make_people(n_agents, age_data=None):
 
@@ -484,9 +606,9 @@ def compute_age_stratified_prevalence(sim, target_year=2018):
     ages = people.age[alive_mask]
     active_tb_ages = people.age[alive_mask & active_tb_mask]
     
-    # Define age groups matching the 2018 survey data
-    age_groups = [(15, 24), (25, 34), (35, 44), (45, 54), (55, 64), (65, 200)]
-    age_group_labels = ['15-24', '25-34', '35-44', '45-54', '55-64', '65+']
+    # Define age groups including children and adolescents
+    age_groups = [(0, 4), (5, 14), (15, 24), (25, 34), (35, 44), (45, 54), (55, 64), (65, 200)]
+    age_group_labels = ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+']
     
     prevalence_by_age = {}
     
@@ -1191,12 +1313,12 @@ def plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
     """Plot age-stratified TB prevalence for all parameter combinations
     
     This function creates a grid of plots showing age-stratified TB prevalence rates
-    by 10-year age bins for age 15 and over, normalized per 100,000 population.
-    The data is compared to the 2018 South Africa prevalence survey data.
+    by age groups including children (0-4, 5-14) and adults (15+), normalized per 100,000 population.
+    The data is compared to the 2018 South Africa prevalence survey data where available.
     """
     import matplotlib.ticker as mtick
 
-    # 2018 South Africa survey data (per 100,000 population)
+    # 2018 South Africa survey data (per 100,000 population) - only available for 15+
     sa_2018_data = {
         '15-24': 432,
         '25-34': 902,
@@ -1206,8 +1328,16 @@ def plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
         '65+': 1104
     }
     
-    age_groups = ['15-24', '25-34', '35-44', '45-54', '55-64', '65+']
-    sa_2018_values = [sa_2018_data[group] for group in age_groups]
+    # All age groups including children
+    all_age_groups = ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+']
+    
+    # Create extended data array with NaN for age groups without survey data
+    sa_2018_values = []
+    for group in all_age_groups:
+        if group in sa_2018_data:
+            sa_2018_values.append(sa_2018_data[group])
+        else:
+            sa_2018_values.append(np.nan)  # No data available for children
 
     nrows = len(tb_mortality_vals) * len(rel_sus_vals)
     ncols = len(beta_vals)
@@ -1220,22 +1350,24 @@ def plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
                 
                 # Compute age-stratified prevalence for 2018
                 age_prevalence = compute_age_stratified_prevalence(sim, target_year=2018)
-                model_prevalence = [age_prevalence[group]['prevalence_per_100k'] for group in age_groups]
+                model_prevalence = [age_prevalence[group]['prevalence_per_100k'] for group in all_age_groups]
 
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
                 
                 # Create bar plot
-                x_pos = np.arange(len(age_groups))
+                x_pos = np.arange(len(all_age_groups))
                 width = 0.35
                 
                 # Plot model results
                 bars1 = ax.bar(x_pos - width/2, model_prevalence, width, 
                               label='Model (2018)', alpha=0.8, color='blue')
                 
-                # Plot South Africa 2018 data
-                bars2 = ax.bar(x_pos + width/2, sa_2018_values, width, 
-                              label='SA Data (2018)', alpha=0.8, color='red')
+                # Plot South Africa 2018 data (only for age groups with data)
+                valid_data_mask = ~np.isnan(sa_2018_values)
+                bars2 = ax.bar(x_pos[valid_data_mask] + width/2, 
+                              [sa_2018_values[i] for i in range(len(sa_2018_values)) if valid_data_mask[i]], 
+                              width, label='SA Data (2018)', alpha=0.8, color='red')
                 
                 # Add value labels on bars
                 for bar in bars1:
@@ -1254,15 +1386,15 @@ def plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
                 ax.set_xlabel('Age Group')
                 ax.set_ylabel('TB Prevalence (per 100,000)')
                 ax.set_xticks(x_pos)
-                ax.set_xticklabels(age_groups, rotation=45)
+                ax.set_xticklabels(all_age_groups, rotation=45)
                 ax.grid(True, alpha=0.3)
                 
                 if m == 0 and i == 0 and j == 0:
                     ax.legend(fontsize=6)
                 
-                # Add percentage differences
+                # Add percentage differences (only for age groups with survey data)
                 for k, (model_val, data_val) in enumerate(zip(model_prevalence, sa_2018_values)):
-                    if data_val > 0:
+                    if not np.isnan(data_val) and data_val > 0:
                         pct_diff = ((model_val - data_val) / data_val) * 100
                         ax.annotate(f'{pct_diff:.1f}%', 
                                     xy=(k, max(model_val, data_val) + 100), 
@@ -1662,6 +1794,7 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
         beta=ss.rate_prob(beta, unit='day'),  # ss.beta(beta),
         init_prev=ss.bernoulli(p=0.10),  # Higher initial prevalence for South Africa context
         rel_sus_latentslow=rel_sus_latentslow,
+        p_latent_fast=ss.bernoulli(p=0.1),  # Base fast progressor fraction (will be overridden by age-specific intervention)
         # South Africa-specific adjustments
         rate_LS_to_presym=ss.perday(5e-5),  # Slightly higher progression for HIV context
         rate_LF_to_presym=ss.perday(8e-3),  # Higher fast progression rate
@@ -1722,8 +1855,15 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
         reset_flags=True,  # Reset diagnostic flags after treatment failure
     ))
 
+    # Add age-dependent TB progression intervention
+    age_tb_progression = AgeDependentTBProgression(pars=dict(
+        age_0_4_multiplier=2.0,    # 2x progression for 0-4 year olds
+        age_5_14_multiplier=0.5,   # 0.5x progression for 5-14 year olds
+        age_15plus_multiplier=1.0,  # 1x progression for 15+ year olds
+    ))
+
     # Combine all interventions
-    all_interventions = [hiv_intervention, health_seeking, tb_diagnostic, tb_treatment]
+    all_interventions = [hiv_intervention, health_seeking, tb_diagnostic, tb_treatment, age_tb_progression]
 
     sim = ss.Sim(
         people=people,
