@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pprint as pprint
 import pandas as pd
 import numpy as np
+from tbsim.utils.plots import plot_household_structure, plot_household_network_analysis
 
 # Simple default parameters
 DEFAULT_SPARS = dict(
@@ -44,7 +45,7 @@ def create_sample_households(n_agents=500):
         current_uid += household_size
     return households
 
-def build_sim(scenario=None, spars=None):
+def build_sim(scenario=None, spars=None, show_household_plot=False, household_plot_type='basic'):
     """
     Build and return a complete Starsim-based simulation instance for TB modeling,
     incorporating optional interventions and user-defined parameters.
@@ -126,6 +127,62 @@ def build_sim(scenario=None, spars=None):
     
     # Create household structure for HouseholdNetGeneric
     households = create_sample_households(500)
+    
+    # Show household plot if requested
+    if show_household_plot:
+        # Initialize people object for plotting
+        temp_sim = ss.Sim(
+            people=pop,
+            networks=[],
+            diseases=[],
+            pars=spars,
+        )
+        temp_sim.init()
+        
+        print(f"\nGenerating household plot (type: {household_plot_type})...")
+        if household_plot_type == 'basic':
+            plot_household_structure(
+                households=households,
+                people=pop,
+                title="HouseholdNetGeneric Structure",
+                show_household_ids=True,
+                show_agent_ids=False,
+                max_households_to_show=30,
+                dark=True,
+                savefig=True,
+                outdir='results/household_plots'
+            )
+        elif household_plot_type == 'analysis':
+            plot_household_network_analysis(
+                households=households,
+                people=pop,
+                figsize=(15, 10),
+                dark=True,
+                savefig=True,
+                outdir='results/household_plots'
+            )
+        elif household_plot_type == 'both':
+            # Show both plots
+            plot_household_structure(
+                households=households,
+                people=pop,
+                title="HouseholdNetGeneric Structure",
+                show_household_ids=True,
+                show_agent_ids=False,
+                max_households_to_show=30,
+                dark=True,
+                savefig=True,
+                outdir='results/household_plots'
+            )
+            plot_household_network_analysis(
+                households=households,
+                people=pop,
+                figsize=(15, 10),
+                dark=True,
+                savefig=True,
+                outdir='results/household_plots'
+            )
+        print("Household plot generation completed!")
     
     networks = [
         ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
@@ -215,7 +272,7 @@ def get_scenarios():
         # },
     }
 
-def run_scenarios(plot=True):
+def run_scenarios(plot=True, show_household_plot=False, household_plot_type='basic'):
     """Run all scenarios and optionally plot results."""
     import tbsim.utils.plots as pl
     
@@ -224,7 +281,7 @@ def run_scenarios(plot=True):
     
     for name, scenario in scenarios.items():
         print(f"\nRunning: {name}")
-        sim = build_sim(scenario=scenario)
+        sim = build_sim(scenario=scenario, show_household_plot=show_household_plot, household_plot_type=household_plot_type)
         sim.run()
         results[name] = sim.results.flatten()
     
@@ -237,6 +294,21 @@ def run_scenarios(plot=True):
     
     return results
 
+
+def test_household_plots_only():
+    """Test only the household plotting functionality without running full simulations."""
+    print("Testing HouseholdNetGeneric Plotting Functionality")
+    print("=" * 50)
+    
+    # Create a simple simulation just for testing household plots
+    sim = build_sim(show_household_plot=True, household_plot_type='both')
+    
+    print("\nHousehold plot testing completed!")
+    print("Check the 'results/household_plots' directory for saved figures.")
+
+
 if __name__ == '__main__':
-    # Run all scenarios
-    results = run_scenarios(plot=True)
+    # Run all scenarios with household plot option
+    # Options for household_plot_type: 'basic', 'analysis', 'both', or None
+    # Set show_household_plot=False to disable household plotting
+    results = run_scenarios(plot=True, show_household_plot=False, household_plot_type='analysis')
