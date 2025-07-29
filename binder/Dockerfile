@@ -17,15 +17,15 @@ USER jovyan
 WORKDIR /home/jovyan/work
 
 # Copy requirements and install Python packages
-COPY requirements.txt .
+COPY binder/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy postBuild script and make it executable
-COPY postBuild .
+COPY binder/postBuild .
 RUN chmod +x postBuild
 
 # Copy start script and make it executable
-COPY start .
+COPY binder/start .
 RUN chmod +x start
 
 # Expose port
