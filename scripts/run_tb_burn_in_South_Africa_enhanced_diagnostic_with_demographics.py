@@ -1985,6 +1985,11 @@ def run_multiple_diagnostic_scenarios(beta_vals, rel_sus_vals, tb_mortality_vals
     for scenario in diagnostic_scenarios:
         print(f"\n=== Running diagnostic scenario: {scenario} ===")
         scenario_results[scenario] = refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals, diagnostic_scenario=scenario)
+        print(f"Scenario {scenario} completed. Result type: {type(scenario_results[scenario])}")
+        if scenario_results[scenario] is not None:
+            print(f"  - Grid shape: {len(scenario_results[scenario])} x {len(scenario_results[scenario][0])} x {len(scenario_results[scenario][0][0])}")
+        else:
+            print(f"  - Warning: Result is None")
     
     # Create comparison plot
     plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_vals, tb_mortality_vals)
@@ -2010,9 +2015,19 @@ def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_val
         color = colors[i]
         scenario_name = scenario_names[i]
         
+        # Check if sim_grid is valid
+        if sim_grid is None:
+            print(f"Warning: sim_grid is None for scenario {scenario}")
+            continue
+            
         # For each scenario, we'll plot the average across all parameter combinations
-        # Get the first simulation to extract time data
-        first_sim = list(sim_grid.values())[0]
+        # Get the first simulation to extract time data (sim_grid is a 3D list)
+        first_sim = sim_grid[0][0][0]  # First mortality, first rel_sus, first beta
+        
+        # Check if first_sim is valid
+        if first_sim is None:
+            print(f"Warning: first_sim is None for scenario {scenario}")
+            continue
         
         # Plot 1: Active TB prevalence comparison
         if 'tb' in first_sim.results:
@@ -2192,6 +2207,9 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals, diagnostic_scenari
             individual_filename = f"age_stratified_prevalence_{clean_scenario_name}_{timestamp}.csv"
             age_prevalence_df.to_csv(get_output_path(individual_filename))
             print(f"✅ Saved individual scenario data: {individual_filename}")
+    
+    # Return the simulation grid for use by other functions
+    return sim_grid
 
 if __name__ == '__main__':
     # Setup for TB prevalence sweeps
