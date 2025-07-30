@@ -8,14 +8,14 @@ import datetime
 import sys
 
 
-def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
+def plot_results(flat_results=None, results=None, sim=None, age_bins=None, keywords=None, exclude=('None',), n_cols=5,
                  dark=True, cmap='tab20', heightfold=2, 
                  style='default', savefig=True, outdir=None, metric_filter=None):
     """
     Visualize simulation outputs from multiple scenarios in a structured grid layout.
 
     Args:
-        flat_results (dict): Nested dictionary of the form:
+        flat_results (dict, optional): Nested dictionary of the form:
             {
                 'Scenario A': {'metric1': Result, 'metric2': Result, ...},
                 'Scenario B': {'metric1': Result, 'metric2': Result, ...},
@@ -23,7 +23,17 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
             }
             Each Result must have `timevec` and `values` attributes representing
             time series data for a given metric.
-
+            
+        results (object, optional): A simulation results object (e.g., sim.results) that has a .flatten() method.
+            If provided along with age_bins, will generate age-stratified series.
+            
+        sim (object, optional): A simulation object (e.g., sim) that contains people and disease data.
+            Required for age stratification when using age_bins parameter.
+            
+        age_bins (list, optional): Age bin boundaries for stratifying results. 
+            Example: [0, 5, 15, 30, 50, 200] creates bins [0-5), [5-15), [15-30), [30-50), [50-200).
+            If provided with results and sim, will generate age-specific metrics for each bin.
+            
         keywords (list[str], optional): If provided, only plot metrics containing at least one of these substrings.
         exclude (tuple[str], optional): Substrings of metric names to skip. Default is ('15',).
         n_cols (int, optional): Number of columns in the plot grid. Default is 5.
@@ -39,14 +49,16 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
         None: The figure is displayed and also saved as a PNG with a timestamped filename.
 
     Workflow:
-        1. Collects all metric names across scenarios.
-        2. Filters metrics based on `keywords` and `exclude`.
-        3. Lays out subplots based on the number of metrics and specified `n_cols`.
-        4. Iterates over each metric and plots it across all scenarios.
-        5. Adjusts appearance (background, style, gridlines, labels).
-        6. Saves the figure as 'scenarios_<timestamp>.png'.
+        1. If results and age_bins are provided, generates age-stratified series from the results object.
+        2. Collects all metric names across scenarios.
+        3. Filters metrics based on `keywords` and `exclude`.
+        4. Lays out subplots based on the number of metrics and specified `n_cols`.
+        5. Iterates over each metric and plots it across all scenarios.
+        6. Adjusts appearance (background, style, gridlines, labels).
+        7. Saves the figure as 'scenarios_<timestamp>.png'.
 
     Example:
+        >>> # Using flat_results (existing functionality)
         >>> results = {
         ...     'BCG': {
         ...         'incidence': Result(timevec=[0, 1, 2], values=[0.1, 0.2, 0.3]),
@@ -57,14 +69,23 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
         ...         'mortality': Result(timevec=[0, 1, 2], values=[0.03, 0.05, 0.08])
         ...     }
         ... }
-        >>> plot_results(results, keywords=['incidence'], n_cols=2, dark=False, cmap='viridis')
+        >>> plot_results(flat_results=results, keywords=['incidence'], n_cols=2, dark=False, cmap='viridis')
+        
+        >>> # Using results object with age bins (new functionality)
+        >>> sim.run()
+        >>> plot_results(results=sim.results, sim=sim, age_bins=[0, 5, 15, 30, 50, 200], 
+        ...              keywords=['incidence'], n_cols=3)
 
     NOTE:
     -----
-    This plotting utility assumes results have already been flattened, such that
-    each scenario maps to a dictionary of named time series outputs. This structure
-    enables clean side-by-side comparisons of metrics like incidence or mortality
-    across scenarios in a single visual layout.
+    This plotting utility can work with either:
+    1. Pre-flattened results (flat_results parameter) - existing functionality
+    2. Results object with age bins (results + age_bins parameters) - new functionality
+    
+    When using results + age_bins, the function will:
+    - Flatten the results object
+    - Generate age-stratified versions of metrics for each age bin
+    - Create scenario names based on age bin ranges
     
     FLATTENING RESULTS:
     ---------------
@@ -80,8 +101,38 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
         ...
     }
     
+    AGE STRATIFICATION:
+    ---------------
+    When age_bins is provided, the function creates age-specific metrics:
+    - For each metric in the results, creates age-stratified versions
+    - Age bin [0, 5, 15, 30, 50, 200] creates scenarios: "0-5", "5-15", "15-30", "30-50", "50-200"
+    - Each scenario contains metrics filtered for agents in that age range
+    
     """
-
+    
+    # Handle results object with age bins
+    if results is not None and age_bins is not None:
+        if flat_results is not None:
+            print("Warning: Both flat_results and results provided. Using results with age_bins.")
+        
+        if sim is None:
+            raise ValueError("Simulation object (sim) is required for age stratification. Please provide the sim parameter.")
+        
+        # Flatten the results object
+        base_results = results.flatten()
+        
+        # Generate age-stratified results
+        flat_results = _generate_age_stratified_results(sim, base_results, age_bins)
+    
+    elif results is not None and age_bins is None:
+        # Just flatten the results object
+        if flat_results is not None:
+            print("Warning: Both flat_results and results provided. Using flat_results.")
+        else:
+            flat_results = {'Results': results.flatten()}
+    
+    elif flat_results is None:
+        raise ValueError("Either flat_results or results must be provided.")
 
     try:
         plt.style.use(style)
@@ -161,6 +212,205 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
         fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
         print(f"Saved figure to {out}")
     plt.show()
+
+
+def _generate_age_stratified_results(sim, base_results, age_bins):
+    """
+    Generate age-stratified results from a simulation object.
+    
+    Args:
+        sim: Simulation object with people and disease data
+        base_results: Flattened base results dictionary
+        age_bins: List of age bin boundaries
+        
+    Returns:
+        dict: Age-stratified results dictionary
+    """
+    stratified_results = {}
+    
+    # Get people and disease data
+    people = sim.people
+    
+    # Extract actual disease objects from sim.diseases
+    diseases = []
+    if hasattr(sim.diseases, 'keys'):
+        for key, disease in sim.diseases.items():
+            # Check if it's a disease object by looking for common disease attributes
+            if (hasattr(disease, 'state') and hasattr(disease, 'sim') and 
+                hasattr(disease, '__class__') and 'TB' in str(disease.__class__)):
+                diseases.append(disease)
+    else:
+        # Fallback: try to get diseases directly
+        diseases = sim.diseases if isinstance(sim.diseases, list) else []
+    
+    # Create age bin labels
+    age_labels = []
+    for i in range(len(age_bins) - 1):
+        if age_bins[i+1] == float('inf'):
+            age_labels.append(f"{int(age_bins[i])}+")
+        else:
+            age_labels.append(f"{int(age_bins[i])}-{int(age_bins[i+1])}")
+    
+    # Generate stratified results for each age bin
+    for i in range(len(age_bins) - 1):
+        age_min, age_max = age_bins[i], age_bins[i+1]
+        age_label = age_labels[i]
+        
+        # Create age mask
+        if age_max == float('inf'):
+            age_mask = people.age >= age_min
+        else:
+            age_mask = (people.age >= age_min) & (people.age < age_max)
+        
+        # Create stratified results for this age bin
+        age_results = _create_age_stratified_metrics(
+            base_results, people, diseases, age_mask, age_label
+        )
+        stratified_results[age_label] = age_results
+    
+    return stratified_results
+
+
+def _create_age_stratified_metrics(base_results, people, diseases, age_mask, age_label):
+    """
+    Create age-stratified metrics for a specific age range.
+    
+    Args:
+        base_results: Base flattened results dictionary
+        people: People object with age and alive attributes
+        diseases: List of disease objects
+        age_mask: Boolean mask for the age range
+        age_label: Label for the age range
+        
+    Returns:
+        dict: Age-stratified metrics
+    """
+    stratified_metrics = {}
+    
+    # Get time vector from base results
+    timevec = None
+    for metric_name, metric_data in base_results.items():
+        if hasattr(metric_data, 'timevec'):
+            timevec = metric_data.timevec
+            break
+    
+    if timevec is None:
+        print(f"Warning: Could not find time vector in results for age bin {age_label}")
+        return {}
+    
+    # Calculate age-stratified metrics
+    for metric_name, metric_data in base_results.items():
+        if not hasattr(metric_data, 'values'):
+            continue
+            
+        # Create age-stratified version of the metric
+        stratified_values = _calculate_age_stratified_metric(
+            metric_name, metric_data, people, diseases, age_mask, timevec
+        )
+        
+        if stratified_values is not None:
+            # Create a Result-like object
+            stratified_metrics[metric_name] = type('Result', (), {
+                'timevec': timevec,
+                'values': stratified_values
+            })()
+    
+    return stratified_metrics
+
+
+def _calculate_age_stratified_metric(metric_name, metric_data, people, diseases, age_mask, timevec):
+    """
+    Calculate age-stratified values for a specific metric.
+    
+    Args:
+        metric_name: Name of the metric
+        metric_data: Original metric data
+        people: People object
+        diseases: List of disease objects
+        age_mask: Boolean mask for the age range
+        timevec: Time vector
+        
+    Returns:
+        array: Age-stratified values or None if not supported
+    """
+    # Get TB disease if available
+    tb_disease = None
+    for disease in diseases:
+        if hasattr(disease, 'name') and disease.name == 'tb':
+            tb_disease = disease
+            break
+        elif hasattr(disease, '__class__') and 'TB' in disease.__class__.__name__:
+            tb_disease = disease
+            break
+    
+    if tb_disease is None:
+        # If no TB disease found, return None for this metric
+        return None
+    
+    # Import TB states if available
+    try:
+        from tbsim.tb import TBS
+        tb_states_available = True
+    except ImportError:
+        tb_states_available = False
+    
+    # Calculate age-stratified values based on metric type
+    if 'prevalence' in metric_name.lower():
+        # Prevalence metrics: count of people with condition in age group / total alive in age group
+        if 'active' in metric_name.lower():
+            # Active TB prevalence
+            if hasattr(tb_disease, 'state') and tb_states_available:
+                # Define active TB states
+                active_states = [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]
+                active_mask = np.isin(tb_disease.state, active_states)
+                age_active_mask = age_mask & active_mask
+                age_alive_mask = age_mask & people.alive
+                
+                stratified_values = []
+                for t in range(len(timevec)):
+                    if np.sum(age_alive_mask) > 0:
+                        prevalence = np.sum(age_active_mask) / np.sum(age_alive_mask)
+                    else:
+                        prevalence = 0.0
+                    stratified_values.append(prevalence)
+                return np.array(stratified_values)
+    
+    elif 'incidence' in metric_name.lower():
+        # Incidence metrics: new cases per time period in age group
+        if hasattr(tb_disease, 'ti_infected'):
+            stratified_values = []
+            for t in range(len(timevec)):
+                # Count new infections in this age group at this time
+                new_infections = np.sum((tb_disease.ti_infected == t) & age_mask)
+                stratified_values.append(new_infections)
+            return np.array(stratified_values)
+    
+    elif 'deaths' in metric_name.lower():
+        # Death metrics: deaths in age group
+        if hasattr(tb_disease, 'new_deaths'):
+            stratified_values = []
+            for t in range(len(timevec)):
+                # Count deaths in this age group at this time
+                deaths = np.sum((tb_disease.new_deaths == t) & age_mask)
+                stratified_values.append(deaths)
+            return np.array(stratified_values)
+    
+    elif 'latent' in metric_name.lower():
+        # Latent TB metrics
+        if hasattr(tb_disease, 'state') and tb_states_available:
+            # Define latent TB states
+            latent_states = [TBS.LATENT_SLOW, TBS.LATENT_FAST]
+            latent_mask = np.isin(tb_disease.state, latent_states)
+            age_latent_mask = age_mask & latent_mask
+            
+            stratified_values = []
+            for t in range(len(timevec)):
+                count = np.sum(age_latent_mask)
+                stratified_values.append(count)
+            return np.array(stratified_values)
+    
+    # For other metrics, return None (not supported for age stratification)
+    return None
 
 
 def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
