@@ -639,6 +639,66 @@ def compute_age_stratified_prevalence(sim, target_year=2018):
     return prevalence_by_age
 
 
+def compute_age_stratified_prevalence_time_series(sim):
+    """
+    Compute age-stratified TB prevalence time series from simulation results
+    
+    Args:
+        sim: Simulation object
+    
+    Returns:
+        pd.DataFrame: DataFrame with years as index and age groups as columns
+    """
+    
+    # Define age groups including children and adolescents
+    age_groups = [(0, 4), (5, 14), (15, 24), (25, 34), (35, 44), (45, 54), (55, 64), (65, 200)]
+    age_group_labels = ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+']
+    
+    # Get time vector
+    time_years = np.array([d.year for d in sim.results['timevec']])
+    
+    # Initialize DataFrame to store results
+    prevalence_df = pd.DataFrame(index=time_years, columns=age_group_labels)
+    
+    # For each time point, compute age-stratified prevalence
+    for t_idx, (time_point, year) in enumerate(zip(sim.results['timevec'], time_years)):
+        # Get people alive at this time point
+        people = sim.people
+        
+        # For simplicity, we'll use the current people state
+        # In a more sophisticated approach, we'd need to track historical states
+        alive_mask = people.alive
+        
+        # Get TB states
+        tb_states = sim.diseases.tb.state
+        active_tb_mask = np.isin(tb_states, [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB])
+        
+        # Get ages
+        ages = people.age[alive_mask]
+        active_tb_ages = people.age[alive_mask & active_tb_mask]
+        
+        # Compute prevalence for each age group
+        for i, (min_age, max_age) in enumerate(age_groups):
+            # Count people in age group
+            age_mask = (ages >= min_age) & (ages <= max_age)
+            total_in_age_group = np.sum(age_mask)
+            
+            # Count active TB cases in age group
+            age_tb_mask = (active_tb_ages >= min_age) & (active_tb_ages <= max_age)
+            tb_in_age_group = np.sum(age_tb_mask)
+            
+            # Calculate prevalence per 100,000
+            if total_in_age_group > 0:
+                prevalence = tb_in_age_group / total_in_age_group
+                prevalence_per_100k = prevalence * 100000
+            else:
+                prevalence_per_100k = 0
+            
+            prevalence_df.loc[year, age_group_labels[i]] = prevalence_per_100k
+    
+    return prevalence_df
+
+
 def plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
     import matplotlib.ticker as mtick
 
@@ -1894,6 +1954,10 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
     sim_grid = [[[None for _ in beta_vals] for _ in rel_sus_vals] for _ in tb_mortality_vals]
     results = {}
     total_runs = len(beta_vals) * len(rel_sus_vals) * len(tb_mortality_vals)
+    
+    # Create a list to store age-stratified prevalence data for all simulations
+    all_age_prevalence_data = []
+    
     for m, tb_mortality in enumerate(tb_mortality_vals):
         for i, rel_sus in enumerate(rel_sus_vals):
             for j, beta in enumerate(beta_vals):
@@ -1902,6 +1966,18 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
                 sim = run_sim(beta=beta, rel_sus_latentslow=rel_sus, tb_mortality=tb_mortality)
                 sim_grid[m][i][j] = sim
                 results[scen_key] = sim.results.flatten()
+                
+                # Compute age-stratified prevalence time series for this simulation
+                age_prevalence_df = compute_age_stratified_prevalence_time_series(sim)
+                
+                # Add parameter information to the DataFrame
+                age_prevalence_df['beta'] = beta
+                age_prevalence_df['rel_sus'] = rel_sus
+                age_prevalence_df['tb_mortality'] = tb_mortality
+                age_prevalence_df['scenario'] = scen_key
+                
+                # Store the data
+                all_age_prevalence_data.append(age_prevalence_df)
     # Use common_functions.plot_results to plot all scenario results
     # Note: This function plots various metrics with the following units/definitions:
     # - 'active': Active TB cases (count of people with active TB disease)
@@ -1929,6 +2005,27 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
     plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_hiv_tb_coinfection_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
+    
+    # Save age-stratified prevalence data as CSV files
+    print("💾 Saving age-stratified prevalence data as CSV files...")
+    
+    # Combine all age prevalence data into a single DataFrame
+    if all_age_prevalence_data:
+        combined_age_prevalence = pd.concat(all_age_prevalence_data, ignore_index=False)
+        
+        # Save combined data
+        combined_filename = f"age_stratified_prevalence_combined_{timestamp}.csv"
+        combined_age_prevalence.to_csv(get_output_path(combined_filename))
+        print(f"✅ Saved combined age-stratified prevalence data: {combined_filename}")
+        
+        # Also save individual scenario files
+        for i, age_prevalence_df in enumerate(all_age_prevalence_data):
+            scenario_name = age_prevalence_df['scenario'].iloc[0]
+            # Clean scenario name for filename
+            clean_scenario_name = scenario_name.replace('=', '_').replace('.', 'p').replace('e-', 'e')
+            individual_filename = f"age_stratified_prevalence_{clean_scenario_name}_{timestamp}.csv"
+            age_prevalence_df.to_csv(get_output_path(individual_filename))
+            print(f"✅ Saved individual scenario data: {individual_filename}")
 
 if __name__ == '__main__':
     # Setup for TB prevalence sweeps
