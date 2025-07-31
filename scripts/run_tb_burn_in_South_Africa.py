@@ -1795,6 +1795,118 @@ def plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_morta
     plt.show()
 
 
+def compute_annualized_tb_mortality_rate(sim):
+    """
+    Compute annualized TB mortality rate (per 100,000 population) over time.
+    
+    This function calculates the annualized TB mortality rate by:
+    1. Taking the difference in cumulative TB deaths between time T and T-365 days
+    2. Dividing by the population at time T
+    3. Multiplying by 100,000 to get rate per 100,000 population
+    
+    Returns the annualized TB mortality rate per 100,000 population.
+    """
+    time = sim.results['timevec']
+    tb_results = sim.results['tb']
+    
+    # Get population size over time
+    try:
+        n_alive = sim.results['n_alive']
+        # Handle both numpy arrays and pandas Series
+        if hasattr(n_alive, 'values'):
+            n_alive = n_alive.values
+    except KeyError:
+        n_alive = np.full(len(time), fill_value=np.count_nonzero(sim.people.alive))
+    
+    # Get cumulative TB deaths
+    if 'cum_deaths' in tb_results:
+        cum_deaths = tb_results['cum_deaths']
+        # Handle both numpy arrays and pandas Series
+        if hasattr(cum_deaths, 'values'):
+            cum_deaths = cum_deaths.values
+    else:
+        # Fallback: compute cumulative sum of new_deaths
+        if 'new_deaths' in tb_results:
+            new_deaths = tb_results['new_deaths']
+            # Handle both numpy arrays and pandas Series
+            if hasattr(new_deaths, 'values'):
+                new_deaths = new_deaths.values
+            cum_deaths = np.cumsum(new_deaths)
+        else:
+            raise ValueError('No new_deaths or cum_deaths in tb results')
+    
+    # Compute annualized mortality rate
+    mortality_rate = np.zeros_like(cum_deaths, dtype=float)
+    for t in range(len(time)):
+        t_date = time[t]
+        t_prev_date = t_date - datetime.timedelta(days=365)
+        t_prev = np.searchsorted(time, t_prev_date)
+        if t_prev == len(time) or time[t_prev] > t_prev_date:
+            t_prev = max(0, t_prev - 1)
+        
+        # Calculate difference in cumulative deaths over the year
+        deaths_diff = cum_deaths[t] - cum_deaths[t_prev]
+        pop = n_alive[t]
+        mortality_rate[t] = (deaths_diff / pop) * 1e5 if pop > 0 else 0
+    
+    return mortality_rate
+
+
+def plot_tb_mortality_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
+    """Plot annualized TB mortality rate (per 100,000) for all parameter combinations in a grid.
+    The mortality rate at time t is the difference in cumulative TB deaths between t and t-365 days, 
+    divided by the population at t, times 100,000.
+    """
+    import matplotlib.ticker as mtick
+    
+    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
+    ncols = len(beta_vals)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
+
+    for m, tb_mortality in enumerate(tb_mortality_vals):
+        for i, rel_sus in enumerate(rel_sus_vals):
+            for j, beta in enumerate(beta_vals):
+                sim = sim_grid[m][i][j]
+                time = np.array(sim.results['timevec'])
+                mortality_rate = compute_annualized_tb_mortality_rate(sim)
+
+                ax_idx = m * len(rel_sus_vals) + i
+                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
+                ax.plot(time, mortality_rate, color='red', label='Annual TB Mortality Rate', linewidth=2)
+                
+                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
+                ax.grid(True)
+                if ax_idx == nrows - 1:
+                    ax.set_xlabel('Year')
+                if j == 0:
+                    ax.set_ylabel('TB Mortality Rate (per 100,000)')
+                if m == 0 and i == 0 and j == 0:
+                    ax.legend(fontsize=7)
+                ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.0f'))
+
+    plt.tight_layout()
+    plt.suptitle('Annualized TB Mortality Rate (per 100,000)', fontsize=14, y=1.02)
+
+    # Set consistent x-axis ticks for all subplots
+    first_sim = sim_grid[0][0][0]
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
+    for ax_row in axs:
+        if isinstance(ax_row, np.ndarray):
+            for ax in ax_row:
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
+        else:
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+
+    filename = f"tb_mortality_rate_grid_{timestamp}.pdf"
+    plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
+    plt.show()
+
+
 def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=1000):  # 8000
     start_year = 1850  # 1750
     sim_pars = dict(
@@ -2005,6 +2117,7 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
     plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_hiv_tb_coinfection_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
+    plot_tb_mortality_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     
     # Save age-stratified prevalence data as CSV files
     print("💾 Saving age-stratified prevalence data as CSV files...")
