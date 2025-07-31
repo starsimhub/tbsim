@@ -77,6 +77,7 @@ import datetime
 import os
 import rdata
 import time
+import scripts.common_functions as cf
 
 import warnings
 warnings.filterwarnings("ignore", message='Missing constructor for R class "data.table".*')
@@ -101,8 +102,16 @@ def get_output_path(filename):
         'json': '../samples/json/',
         'md': '../samples/md/',
     }.get(ext, '../samples/')
+    
+    # Handle cases where __file__ is not defined (e.g., in Jupyter notebooks)
+    try:
+        script_dir = os.path.dirname(__file__)
+    except NameError:
+        # Fallback to current working directory
+        script_dir = os.getcwd()
+    
     # Ensure the directory exists
-    outdir = os.path.join(os.path.dirname(__file__), subdir)
+    outdir = os.path.join(script_dir, subdir)
     os.makedirs(outdir, exist_ok=True)
     return os.path.join(outdir, filename)
 
@@ -243,10 +252,6 @@ import common_functions as cf
 from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
 from tbsim.interventions.tb_diagnostic import TBDiagnostic
 from tbsim.interventions.tb_treatment import TBTreatment
-
-start_wallclock = time.time()
-start_datetime = datetime.datetime.now()
-print(f"Sweep started at {start_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 class AgeDependentTBProgression(ss.Intervention):
@@ -1907,6 +1912,119 @@ def plot_tb_mortality_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_
     plt.show()
 
 
+def compute_age_distribution_at_year(sim, target_year=2022):
+    """
+    Compute age distribution at a specific year
+    
+    Args:
+        sim: Simulation object
+        target_year: Year to compute age distribution for
+    
+    Returns:
+        dict: Age distribution data with 5-year bins
+    """
+    
+    # Find the time index closest to target year
+    time_years = np.array([d.year for d in sim.results['timevec']])
+    target_idx = np.argmin(np.abs(time_years - target_year))
+    
+    # Get people alive at target time
+    people = sim.people
+    alive_mask = people.alive
+    
+    # Get ages at target time
+    ages = people.age[alive_mask]
+    
+    # Define 5-year age bins: 0-4, 5-9, 10-14, 15-19, 20-24, 25-29, 30-34, 35-39, 40-44, 45-49, 50-54, 55-59, 60-64, 65-69, 70-74, 75-79, 80-84, 85-89, 90-94, 95+
+    age_bins = [(0, 4), (5, 9), (10, 14), (15, 19), (20, 24), (25, 29), (30, 34), (35, 39), (40, 44), (45, 49), (50, 54), (55, 59), (60, 64), (65, 69), (70, 74), (75, 79), (80, 84), (85, 89), (90, 94), (95, 200)]
+    age_bin_labels = ['0-4', '5-9', '10-14', '15-19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '85-89', '90-94', '95+']
+    
+    total_population = len(ages)
+    age_distribution = {}
+    
+    for i, (min_age, max_age) in enumerate(age_bins):
+        # Count people in age bin
+        age_mask = (ages >= min_age) & (ages <= max_age)
+        count_in_bin = np.sum(age_mask)
+        
+        # Calculate percentage
+        percentage = (count_in_bin / total_population) * 100 if total_population > 0 else 0
+        
+        age_distribution[age_bin_labels[i]] = {
+            'count': count_in_bin,
+            'percentage': percentage
+        }
+    
+    return age_distribution
+
+
+def plot_population_pyramid_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp, target_year=2022):
+    """
+    Plot population pyramids for each parameter combination showing age distribution at target year
+    
+    Args:
+        sim_grid: 3D grid of simulation results
+        beta_vals: Array of beta values
+        rel_sus_vals: Array of relative susceptibility values
+        tb_mortality_vals: Array of TB mortality values
+        timestamp: Timestamp for filename
+        target_year: Year to compute age distribution for (default: 2022)
+    """
+    
+    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
+    ncols = len(beta_vals)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
+    
+    # Define age bins and labels
+    age_bin_labels = ['0-4', '5-9', '10-14', '15-19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '85-89', '90-94', '95+']
+    
+    for m, tb_mortality in enumerate(tb_mortality_vals):
+        for i, rel_sus in enumerate(rel_sus_vals):
+            for j, beta in enumerate(beta_vals):
+                sim = sim_grid[m][i][j]
+                
+                # Compute age distribution
+                age_dist = compute_age_distribution_at_year(sim, target_year)
+                
+                # Extract percentages for plotting
+                percentages = [age_dist[label]['percentage'] for label in age_bin_labels]
+                
+                ax_idx = m * len(rel_sus_vals) + i
+                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
+                
+                # Create horizontal bar plot (population pyramid)
+                y_pos = np.arange(len(age_bin_labels))
+                bars = ax.barh(y_pos, percentages, color='skyblue', alpha=0.7)
+                
+                # Customize the plot
+                ax.set_yticks(y_pos)
+                ax.set_yticklabels(age_bin_labels)
+                ax.set_xlabel('Percentage of Population')
+                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
+                ax.grid(True, alpha=0.3)
+                
+                # Add percentage labels on bars
+                for bar, percentage in zip(bars, percentages):
+                    if percentage > 0.5:  # Only show label if percentage is significant
+                        ax.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height()/2, 
+                               f'{percentage:.1f}%', va='center', ha='left', fontsize=8)
+                
+                # Set consistent x-axis limits
+                ax.set_xlim(0, max(percentages) * 1.2)
+                
+                if ax_idx == nrows - 1:
+                    ax.set_xlabel('Percentage of Population')
+                if j == 0:
+                    ax.set_ylabel('Age Group')
+    
+    plt.tight_layout()
+    plt.suptitle(f'Population Age Distribution at {target_year}', fontsize=14, y=1.02)
+    
+    filename = f"population_pyramid_grid_{timestamp}.pdf"
+    plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
+    plt.show()
+
+
 def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=1000):  # 8000
     start_year = 1850  # 1750
     sim_pars = dict(
@@ -2056,7 +2174,6 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
     # This function performs a parameter sweep over beta and relative susceptibility values
     # For each parameter combination, it runs a TB simulation and generates plots showing:
     # - Active TB prevalence over time (blue line)
-    # - Latent TB prevalence over time (orange dashed line) 
     # - Target 1% prevalence threshold (red dotted line)
     # - 2018 South Africa data point (red dot)
     # Each subplot shows results for a specific (beta, rel_sus) parameter combination
@@ -2067,8 +2184,7 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
     results = {}
     total_runs = len(beta_vals) * len(rel_sus_vals) * len(tb_mortality_vals)
     
-    # Create a list to store age-stratified prevalence data for all simulations
-    all_age_prevalence_data = []
+
     
     for m, tb_mortality in enumerate(tb_mortality_vals):
         for i, rel_sus in enumerate(rel_sus_vals):
@@ -2079,17 +2195,7 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
                 sim_grid[m][i][j] = sim
                 results[scen_key] = sim.results.flatten()
                 
-                # Compute age-stratified prevalence time series for this simulation
-                age_prevalence_df = compute_age_stratified_prevalence_time_series(sim)
-                
-                # Add parameter information to the DataFrame
-                age_prevalence_df['beta'] = beta
-                age_prevalence_df['rel_sus'] = rel_sus
-                age_prevalence_df['tb_mortality'] = tb_mortality
-                age_prevalence_df['scenario'] = scen_key
-                
-                # Store the data
-                all_age_prevalence_data.append(age_prevalence_df)
+
     # Use common_functions.plot_results to plot all scenario results
     # Note: This function plots various metrics with the following units/definitions:
     # - 'active': Active TB cases (count of people with active TB disease)
@@ -2106,6 +2212,7 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
     cf.plot_results(results, dark=False)
     # Optionally, keep the original grid plots if desired
     plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
+    plot_population_pyramid_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp, target_year=2022)
     plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_health_seeking_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
@@ -2113,36 +2220,34 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
     plot_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_cumulative_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
+    
+
+    
     plot_annualized_infection_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_hiv_tb_coinfection_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
+    
+
+    
     plot_tb_mortality_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     
-    # Save age-stratified prevalence data as CSV files
-    print("💾 Saving age-stratified prevalence data as CSV files...")
+
     
-    # Combine all age prevalence data into a single DataFrame
-    if all_age_prevalence_data:
-        combined_age_prevalence = pd.concat(all_age_prevalence_data, ignore_index=False)
-        
-        # Save combined data
-        combined_filename = f"age_stratified_prevalence_combined_{timestamp}.csv"
-        combined_age_prevalence.to_csv(get_output_path(combined_filename))
-        print(f"✅ Saved combined age-stratified prevalence data: {combined_filename}")
-        
-        # Also save individual scenario files
-        for i, age_prevalence_df in enumerate(all_age_prevalence_data):
-            scenario_name = age_prevalence_df['scenario'].iloc[0]
-            # Clean scenario name for filename
-            clean_scenario_name = scenario_name.replace('=', '_').replace('.', 'p').replace('e-', 'e')
-            individual_filename = f"age_stratified_prevalence_{clean_scenario_name}_{timestamp}.csv"
-            age_prevalence_df.to_csv(get_output_path(individual_filename))
-            print(f"✅ Saved individual scenario data: {individual_filename}")
+
+
+    # Return the simulation grid for use by other functions
+    return sim_grid
+
 
 if __name__ == '__main__':
     # Setup for TB prevalence sweeps
     # This section configures the parameter ranges and executes the sweep analysis
+    
+    # Record start time
+    start_wallclock = time.time()
+    start_datetime = datetime.datetime.now()
+    print(f"Sweep started at {start_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Plot population demographics
     # Run sweep
@@ -2224,23 +2329,19 @@ def test_health_seeking_diagnostic_integration():
         print(f"  - Final treated: {tbtx['n_treated'].values[-1]}")
         print(f"  - Final treatment success: {tbtx['n_treatment_success'].values[-1]}")
         print(f"  - Final treatment failure: {tbtx['n_treatment_failure'].values[-1]}")
+        print(f"  - Cumulative treated: {tbtx['cum_treated'].values[-1]}")
         print(f"  - Cumulative treatment success: {tbtx['cum_treatment_success'].values[-1]}")
         print(f"  - Cumulative treatment failure: {tbtx['cum_treatment_failure'].values[-1]}")
     except KeyError:
         print("✗ Treatment results not found")
     
-    # Check people states
-    people = sim.people
-    print(f"✓ People states:")
-    print(f"  - People who sought care: {np.sum(people.sought_care)}")
-    print(f"  - People who were tested: {np.sum(people.tested)}")
-    print(f"  - People who were diagnosed: {np.sum(people.diagnosed)}")
-    print(f"  - People with treatment success: {np.sum(people.tb_treatment_success)}")
-    print(f"  - People with treatment failure: {np.sum(people.treatment_failure)}")
-    print(f"  - Mean care-seeking multiplier: {np.mean(people.care_seeking_multiplier):.3f}")
-    
-    print("Health-seeking, diagnostic, and treatment integration test completed.")
+    print("Health-seeking and diagnostic integration test completed.")
 
 
 # Uncomment the line below to run the health-seeking and diagnostic integration test
 # test_health_seeking_diagnostic_integration()
+
+
+
+
+
