@@ -23,7 +23,7 @@ def plot_results(flat_results=None, results=None, sim=None, age_bins=None, keywo
             }
             Each Result must have `timevec` and `values` attributes representing
             time series data for a given metric.
-            
+
         results (object, optional): A simulation results object (e.g., sim.results) that has a .flatten() method.
             If provided along with age_bins, will generate age-stratified series.
             
