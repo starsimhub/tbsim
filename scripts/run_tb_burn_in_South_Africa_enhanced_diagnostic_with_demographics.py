@@ -1796,6 +1796,231 @@ def plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_morta
     plt.show()
 
 
+def compute_annualized_tb_mortality_rate(sim):
+    """
+    Compute annualized TB mortality rate (per 100,000 population) over time.
+    
+    This function calculates the annualized TB mortality rate by:
+    1. Taking the difference in cumulative TB deaths between time T and T-365 days
+    2. Dividing by the population at time T
+    3. Multiplying by 100,000 to get rate per 100,000 population
+    
+    Returns the annualized TB mortality rate per 100,000 population.
+    """
+    time = sim.results['timevec']
+    tb_results = sim.results['tb']
+    
+    # Get population size over time
+    try:
+        n_alive = sim.results['n_alive']
+        # Handle both numpy arrays and pandas Series
+        if hasattr(n_alive, 'values'):
+            n_alive = n_alive.values
+    except KeyError:
+        n_alive = np.full(len(time), fill_value=np.count_nonzero(sim.people.alive))
+    
+    # Get cumulative TB deaths
+    if 'cum_deaths' in tb_results:
+        cum_deaths = tb_results['cum_deaths']
+        # Handle both numpy arrays and pandas Series
+        if hasattr(cum_deaths, 'values'):
+            cum_deaths = cum_deaths.values
+    else:
+        # Fallback: compute cumulative sum of new_deaths
+        if 'new_deaths' in tb_results:
+            new_deaths = tb_results['new_deaths']
+            # Handle both numpy arrays and pandas Series
+            if hasattr(new_deaths, 'values'):
+                new_deaths = new_deaths.values
+            cum_deaths = np.cumsum(new_deaths)
+        else:
+            raise ValueError('No new_deaths or cum_deaths in tb results')
+    
+    # Compute annualized mortality rate
+    mortality_rate = np.zeros_like(cum_deaths, dtype=float)
+    for t in range(len(time)):
+        t_date = time[t]
+        t_prev_date = t_date - datetime.timedelta(days=365)
+        t_prev = np.searchsorted(time, t_prev_date)
+        if t_prev == len(time) or time[t_prev] > t_prev_date:
+            t_prev = max(0, t_prev - 1)
+        
+        # Calculate difference in cumulative deaths over the year
+        deaths_diff = cum_deaths[t] - cum_deaths[t_prev]
+        pop = n_alive[t]
+        mortality_rate[t] = (deaths_diff / pop) * 1e5 if pop > 0 else 0
+    
+    return mortality_rate
+
+
+def plot_tb_mortality_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
+    """Plot annualized TB mortality rate (per 100,000) for all parameter combinations in a grid.
+    The mortality rate at time t is the difference in cumulative TB deaths between t and t-365 days, 
+    divided by the population at t, times 100,000.
+    """
+    import matplotlib.ticker as mtick
+    
+    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
+    ncols = len(beta_vals)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
+
+    for m, tb_mortality in enumerate(tb_mortality_vals):
+        for i, rel_sus in enumerate(rel_sus_vals):
+            for j, beta in enumerate(beta_vals):
+                sim = sim_grid[m][i][j]
+                time = np.array(sim.results['timevec'])
+                mortality_rate = compute_annualized_tb_mortality_rate(sim)
+
+                ax_idx = m * len(rel_sus_vals) + i
+                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
+                ax.plot(time, mortality_rate, color='red', label='Annual TB Mortality Rate', linewidth=2)
+                
+                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
+                ax.grid(True)
+                if ax_idx == nrows - 1:
+                    ax.set_xlabel('Year')
+                if j == 0:
+                    ax.set_ylabel('TB Mortality Rate (per 100,000)')
+                if m == 0 and i == 0 and j == 0:
+                    ax.legend(fontsize=7)
+                ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.0f'))
+
+    plt.tight_layout()
+    plt.suptitle('Annualized TB Mortality Rate (per 100,000)', fontsize=14, y=1.02)
+
+    # Set consistent x-axis ticks for all subplots
+    first_sim = sim_grid[0][0][0]
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
+    for ax_row in axs:
+        if isinstance(ax_row, np.ndarray):
+            for ax in ax_row:
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
+        else:
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+
+    filename = f"tb_mortality_rate_grid_{timestamp}.pdf"
+    plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
+    plt.show()
+
+
+def compute_age_distribution_at_year(sim, target_year=2022):
+    """
+    Compute age distribution at a specific year
+    
+    Args:
+        sim: Simulation object
+        target_year: Year to compute age distribution for
+    
+    Returns:
+        dict: Age distribution data with 5-year bins
+    """
+    
+    # Find the time index closest to target year
+    time_years = np.array([d.year for d in sim.results['timevec']])
+    target_idx = np.argmin(np.abs(time_years - target_year))
+    
+    # Get people alive at target time
+    people = sim.people
+    alive_mask = people.alive
+    
+    # Get ages at target time
+    ages = people.age[alive_mask]
+    
+    # Define 5-year age bins: 0-4, 5-9, 10-14, 15-19, 20-24, 25-29, 30-34, 35-39, 40-44, 45-49, 50-54, 55-59, 60-64, 65-69, 70-74, 75-79, 80-84, 85-89, 90-94, 95+
+    age_bins = [(0, 4), (5, 9), (10, 14), (15, 19), (20, 24), (25, 29), (30, 34), (35, 39), (40, 44), (45, 49), (50, 54), (55, 59), (60, 64), (65, 69), (70, 74), (75, 79), (80, 84), (85, 89), (90, 94), (95, 200)]
+    age_bin_labels = ['0-4', '5-9', '10-14', '15-19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '85-89', '90-94', '95+']
+    
+    total_population = len(ages)
+    age_distribution = {}
+    
+    for i, (min_age, max_age) in enumerate(age_bins):
+        # Count people in age bin
+        age_mask = (ages >= min_age) & (ages <= max_age)
+        count_in_bin = np.sum(age_mask)
+        
+        # Calculate percentage
+        percentage = (count_in_bin / total_population) * 100 if total_population > 0 else 0
+        
+        age_distribution[age_bin_labels[i]] = {
+            'count': count_in_bin,
+            'percentage': percentage
+        }
+    
+    return age_distribution
+
+
+def plot_population_pyramid_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp, target_year=2022):
+    """
+    Plot population pyramids for each parameter combination showing age distribution at target year
+    
+    Args:
+        sim_grid: 3D grid of simulation results
+        beta_vals: Array of beta values
+        rel_sus_vals: Array of relative susceptibility values
+        tb_mortality_vals: Array of TB mortality values
+        timestamp: Timestamp for filename
+        target_year: Year to compute age distribution for (default: 2022)
+    """
+    
+    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
+    ncols = len(beta_vals)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
+    
+    # Define age bins and labels
+    age_bin_labels = ['0-4', '5-9', '10-14', '15-19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '85-89', '90-94', '95+']
+    
+    for m, tb_mortality in enumerate(tb_mortality_vals):
+        for i, rel_sus in enumerate(rel_sus_vals):
+            for j, beta in enumerate(beta_vals):
+                sim = sim_grid[m][i][j]
+                
+                # Compute age distribution
+                age_dist = compute_age_distribution_at_year(sim, target_year)
+                
+                # Extract percentages for plotting
+                percentages = [age_dist[label]['percentage'] for label in age_bin_labels]
+                
+                ax_idx = m * len(rel_sus_vals) + i
+                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
+                
+                # Create horizontal bar plot (population pyramid)
+                y_pos = np.arange(len(age_bin_labels))
+                bars = ax.barh(y_pos, percentages, color='skyblue', alpha=0.7)
+                
+                # Customize the plot
+                ax.set_yticks(y_pos)
+                ax.set_yticklabels(age_bin_labels)
+                ax.set_xlabel('Percentage of Population')
+                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
+                ax.grid(True, alpha=0.3)
+                
+                # Add percentage labels on bars
+                for bar, percentage in zip(bars, percentages):
+                    if percentage > 0.5:  # Only show label if percentage is significant
+                        ax.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height()/2, 
+                               f'{percentage:.1f}%', va='center', ha='left', fontsize=8)
+                
+                # Set consistent x-axis limits
+                ax.set_xlim(0, max(percentages) * 1.2)
+                
+                if ax_idx == nrows - 1:
+                    ax.set_xlabel('Percentage of Population')
+                if j == 0:
+                    ax.set_ylabel('Age Group')
+    
+    plt.tight_layout()
+    plt.suptitle(f'Population Age Distribution at {target_year}', fontsize=14, y=1.02)
+    
+    filename = f"population_pyramid_grid_{timestamp}.pdf"
+    plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
+    plt.show()
+
+
 def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baseline', seed=0, years=200, n_agents=1000):  # 8000
     start_year = 1850  # 1750
     sim_pars = dict(
@@ -2186,6 +2411,8 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals, diagnostic_scenari
     plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_hiv_tb_coinfection_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
+    plot_population_pyramid_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp, target_year=2022)
+    plot_tb_mortality_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     
     # Save age-stratified prevalence data as CSV files
     print("💾 Saving age-stratified prevalence data as CSV files...")
