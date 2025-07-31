@@ -1,0 +1,46 @@
+site_name: tbsim Documentation
+site_description: Documentation for the tbsim library
+site_author: Your Name
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [../tbsim, ../]
+          options:
+            show_source: true
+            show_root_heading: true
+            docstring_style: google
+
+nav:
+  - Home: index.md
+  - API Reference:
+    - Overview: api/overview.md
+    - tbsim: api/tbsim.md
+    - analyzers: api/tbsim.analyzers.md
+    - tb: api/tbsim.tb.md
+  - Tutorials:
+    - Example Tutorial: tutorials/example_tutorial.md
+    - Tuberculosis Simulation: tutorials/tuberculosis_sim.md
+  - References: references/index.md
+
+docs_dir: docs
+site_dir: site 

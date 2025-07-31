@@ -1,0 +1,130 @@
+site_name: tbsim Documentation
+site_description: Documentation for the tbsim library
+site_author: Your Name
+site_url: https://your-domain.com/
+
+repo_name: tbdocs
+repo_url: https://github.com/your-username/tbdocs
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.details
+  - pymdownx.emoji
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.tasklist
+  - pymdownx.tilde
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [../tbsim, ../]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            show_signature_annotations: true
+            show_bases: true
+            show_submodules: true
+            heading_level: 1
+            members_order: source
+            docstring_style: google
+            preload_modules: []
+            filters: ["!^_"]
+            merge_init_into_class: true
+  - mkdocs-jupyter:
+      include_source: true
+      execute: false
+      theme: dark
+
+nav:
+  - Home: index.md
+  - API Reference:
+    - Overview: api/overview.md
+    - tbsim: api/tbsim.md
+    - analyzers: api/tbsim.analyzers.md
+    - tb: api/tbsim.tb.md
+    - config: api/tbsim.config.md
+    - networks: api/tbsim.networks.md
+    - version: api/tbsim.version.md
+    - wrappers: api/tbsim.wrappers.md
+    - comorbidities:
+      - Overview: api/tbsim.comorbidities.md
+      - HIV: api/tbsim.comorbidities.hiv.md
+      - Malnutrition: api/tbsim.comorbidities.malnutrition.md
+    - interventions:
+      - Overview: api/tbsim.interventions.md
+      - BCG: api/tbsim.interventions.bcg.md
+      - Beta: api/tbsim.interventions.beta.md
+      - Interventions: api/tbsim.interventions.interventions.md
+      - TPT: api/tbsim.interventions.tpt.md
+    - utils:
+      - Overview: api/tbsim.utils.md
+      - Demographics: api/tbsim.utils.demographics.md
+      - Plots: api/tbsim.utils.plots.md
+      - Probabilities: api/tbsim.utils.probabilities.md
+    - misc:
+      - Overview: api/tbsim.misc.md
+      - TB Terms: api/tbsim.misc.tbterms.md
+  - Tutorials:
+    - Example Tutorial: tutorials/example_tutorial.md
+    - Tuberculosis Simulation: tutorials/tuberculosis_sim.md
+    - TB Interventions: tutorials/tb_interventions_tutorial.md
+    - TB-HIV Scenarios: tutorials/run_tbhiv_scens.md
+    - TB-HIV Comorbidity: tutorials/tbhiv_comorbidity.md
+    - Comprehensive Analyzer Plots: tutorials/comprehensive_analyzer_plots_example.md
+  - References: references/index.md
+
+extra_css:
+  - css/theme-switch.css
+
+extra_javascript:
+  - js/theme-switch.js
+
+docs_dir: docs
+site_dir: site
+
+strict: false
+
+validation:
+  nav:
+    omitted_files: ignore
+    not_found: warn
+  absolute_links: warn 
