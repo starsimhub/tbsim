@@ -1,14 +1,16 @@
-# Tuberculosis Modeling using starsim (TBSim)
+# Tuberculosis Modeling using Starsim (TBsim)
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/starsimhub/tbsim/main?filepath=docs%2Ftutorials%2Ftb_interventions_tutorial.ipynb)
 
-This repository contains the implementation of a new Tuberculosis (TB) Model using the StarSim package. The model aims to simulate the dynamics of TB spread and treatment efficacy under various scenarios.
+**Warning! TBsim is still in the early stages of development. It is being shared solely for transparency and to facilitate collaborative development. It is not ready to be used for real research or policy questions.**
 
-** Try the tutorials online!** Click the Binder badge above to launch an interactive environment with all tutorials ready to run.
+This repository contains the implementation of a new Tuberculosis (TB) model using the Starsim package. The model aims to simulate the dynamics of TB spread and treatment efficacy under various scenarios.
+
+**Try the tutorials online!** Click the Binder badge above to launch an interactive environment with all tutorials ready to run.
 
 ## Introduction
 
-Tuberculosis is a major global health problem, and understanding its dynamics can help in developing better strategies for control and treatment. This project uses the StarSim package to simulate TB spread in a population, considering factors like transmission rates, treatment efficacy, and social dynamics.
+Tuberculosis is a major global health problem, and understanding its dynamics can help in developing better strategies for control and treatment. This project uses the Starsim package to simulate TB spread in a population, considering factors like transmission rates, treatment efficacy, and social dynamics.
 
 ## Features
 
@@ -39,7 +41,7 @@ Available tutorials:
 #### Prerequisites
 
 - Python 3.x
-- StarSim package
+- Starsim package
 - Other dependencies (listed in `requirements.txt`)
 
 ### Installation
@@ -77,11 +79,11 @@ The steps described below will allow you to use the latest unreleased features o
 - Usage examples are available in the **[scripts](https://github.com/starsimhub/tbsim/tree/main/scripts)** folder.
 
 ## Documentation: 
-_TBSim_ is based on Starsim, please refer to [Starsim documentation](https://docs.idmod.org/projects/starsim/en/latest/) for additional information.
+_TBsim_ is based on Starsim, please refer to [Starsim documentation](https://docs.idmod.org/projects/starsim/en/latest/) for additional information.
 
 ## Contributing
 
-Contributions to the TBSim project are welcome! Please read [CONTRIBUTING.md](https://github.com/starsimhub/starsim/blob/main/contributing.rst) for details on our code of conduct, and the process for submitting pull requests.
+Contributions to the TBsim project are welcome! Please read [CONTRIBUTING.md](https://github.com/starsimhub/starsim/blob/main/contributing.rst) for details on our code of conduct, and the process for submitting pull requests.
 
 ## Authors
 
