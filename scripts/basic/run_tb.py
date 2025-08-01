@@ -18,7 +18,7 @@ def build_tbsim(sim_pars=None):
     tb = mtb.TB(dict(
         unit = 'day',
         dt = 7,
-        beta = ss.RateProb(0.0025, unit='year')
+        beta = ss.rate_prob(0.0025, unit='year')
     ))
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     births = ss.Births(pars=dict(birth_rate=20))

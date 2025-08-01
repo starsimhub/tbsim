@@ -60,7 +60,7 @@ def make_births(pars = None):
     # Define births parameters
     if pars is None: 
         pars = dict(
-            birth_rate=15,  # Birth rate
+            birth_rate=20,  # Birth rate
             # Add any other default parameters here
         )
     return ss.Births(pars=pars)

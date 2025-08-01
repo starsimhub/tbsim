@@ -65,6 +65,51 @@ def test_campaign_apply():
     pass
 
 
+# Test for BetaByYear
+
+def test_beta_intervention_changes_beta():
+    import sciris as sc
+    # Set up a minimal simulation with a known beta
+    initial_beta = 0.01
+    x_beta = 0.5
+    intervention_year = 2005
+    stop_year = 2010
+    
+    tb_pars = dict(beta=initial_beta, init_prev=0.25)
+    sim_pars = dict(start=intervention_year-1, stop=stop_year, dt=1, unit='year', rand_seed=42)
+    
+    pop = ss.People(n_agents=100)
+    tb = mtb.TB(pars=tb_pars)
+    net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
+    
+    beta_intv = mtb.BetaByYear(pars={'years': [intervention_year], 'x_beta': x_beta})
+    
+    sim = ss.Sim(
+        people=pop,
+        networks=net,
+        diseases=tb,
+        interventions=[beta_intv],
+        pars=sim_pars,
+    )
+    
+    sim.init()
+    # Check beta before intervention
+    assert np.isclose(sim.diseases.tb.pars['beta'].v, initial_beta)
+    # Run up to just before the intervention year
+    while sim.t.now('year') < intervention_year:
+        sim.run_one_step()
+    # Should still be unchanged
+    assert np.isclose(sim.diseases.tb.pars['beta'].v, initial_beta)
+    # Step into the intervention year
+    sim.run_one_step()
+    # Beta should now be changed
+    expected_beta = initial_beta * x_beta
+    assert np.isclose(sim.diseases.tb.pars['beta'].v, expected_beta)
+    # Step again, beta should not change further
+    sim.run_one_step()
+    assert np.isclose(sim.diseases.tb.pars['beta'].v, expected_beta)
+
+
 if __name__ == '__main__':
     sim = ss.Sim(people=ss.People(n_agents=500), networks=ss.RandomNet(), diseases=mtb.TB(), pars=dict(start=1990, stop = 2021, dt=0.5))
     pytest.main()

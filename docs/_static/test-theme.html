@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme Switch Test</title>
+    <link rel="stylesheet" href="theme-switch.css" type="text/css" />
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            transition: background-color 0.3s, color 0.3s;
+            font-weight: 400;
+            line-height: 1.5;
+            letter-spacing: -0.01em;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+        }
+        code {
+            background-color: #f8fafc;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875em;
+        }
+        pre {
+            background-color: #f8fafc;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+            line-height: 1.6;
+            border: 1px solid #e2e8f0;
+        }
+        h1, h2, h3 {
+            font-weight: 600;
+            line-height: 1.25;
+            letter-spacing: 0.025em;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        a {
+            color: #2563eb;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        a:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Theme Switch Test Page</h1>
+        
+        <div class="theme-switch-wrapper" style="
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            display: flex; 
+            align-items: center; 
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 25px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(0,0,0,0.1);
+        ">
+            <span class="theme-switch-label" style="
+                margin-right: 10px; 
+                font-size: 18px; 
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 24px;
+                height: 24px;
+            "></span>
+            <label class="theme-switch">
+                <input type="checkbox" id="theme-switch">
+                <span class="slider"></span>
+            </label>
+        </div>
+        
+        <div class="test-section">
+            <h2>Test Content</h2>
+            <p>This is a test page to verify that the theme switch is working correctly with modern typography.</p>
+            <p>You should see a sun/moon icon with a toggle switch in the top-right corner.</p>
+        </div>
+        
+        <div class="test-section">
+            <h3>Code Example</h3>
+            <p>Here's some <code>inline code</code> to test styling with JetBrains Mono font.</p>
+            <pre><code>def hello_world():
+    print("Hello, World!")
+    return True
+
+# This is a comment
+class Example:
+    def __init__(self):
+        self.value = 42</code></pre>
+        </div>
+        
+        <div class="test-section">
+            <h3>Links</h3>
+            <p>Test <a href="#">link styling</a> in both themes with smooth transitions.</p>
+        </div>
+        
+        <div class="test-section">
+            <h3>Current Theme</h3>
+            <p>Current theme: <span id="current-theme">light</span></p>
+            <button onclick="toggleTheme()">Toggle Theme (JavaScript)</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>Typography Test</h3>
+            <p>This paragraph uses <strong>Inter font</strong> with modern typography settings. The font includes various weights and is optimized for screen readability.</p>
+            <p><em>Italic text</em> and <strong>bold text</strong> should display properly with the modern font stack.</p>
+        </div>
+    </div>
+    
+    <script src="theme-switch.js"></script>
+    <script>
+        // Update current theme display
+        function updateThemeDisplay() {
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            document.getElementById('current-theme').textContent = currentTheme;
+        }
+        
+        // Toggle theme programmatically
+        function toggleTheme() {
+            if (window.themeSwitch) {
+                window.themeSwitch.toggle();
+                updateThemeDisplay();
+            }
+        }
+        
+        // Listen for theme changes
+        document.addEventListener('themeChanged', function(e) {
+            updateThemeDisplay();
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateThemeDisplay();
+        });
+    </script>
+</body>
+</html> 

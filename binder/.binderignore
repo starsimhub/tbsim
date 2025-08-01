@@ -1,0 +1,12 @@
+# Exclude unnecessary files from Binder build
+.git/
+.gitignore
+.DS_Store
+*.pyc
+__pycache__/
+*.egg-info/
+venv/
+.vscode/
+*.log
+*.tmp
+*.bak 

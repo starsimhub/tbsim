@@ -16,6 +16,7 @@ class TBS(IntEnum):
     ACTIVE_SMNEG    = 4     # Active TB, smear negative
     ACTIVE_EXPTB    = 5     # Active TB, extra-pulmonary
     DEAD            = 8     # TB death
+    PROTECTED       = 100
 
 
 class TB(ss.Infection):
@@ -24,7 +25,7 @@ class TB(ss.Infection):
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),                            # Initial seed infections
-            beta = ss.beta(0.25),                                      # Infection probability
+            beta = ss.rate_prob(0.025, unit='month'),                                      # Infection probability
             p_latent_fast = ss.bernoulli(0.1),                         # Probability of latent fast as opposed to latent slow
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)            
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -44,7 +45,7 @@ class TB(ss.Infection):
             rel_trans_exptb     = 0.05,
             rel_trans_treatment = 0.5, # Multiplicative on smpos, smneg, or exptb rel_trans
 
-            rel_sus_latentslow = 0.5, # Relative susceptibility of reinfection for slow progressors
+            rel_sus_latentslow = 0.20, # Relative susceptibility of reinfection for slow progressors
             
             cxr_asymp_sens = 1.0, # Sensitivity of chest x-ray for screening asymptomatic cases
 
