@@ -5,7 +5,7 @@ import pandas as pd
 
 from enum import IntEnum
 
-__all__ = ['TB', 'TBS']
+__all__ = ['TB', 'TBS', 'TBbyAge']
 
 class TBS(IntEnum):
     NONE            = -1    # No TB
@@ -393,3 +393,141 @@ class TB(ss.Infection):
             plt.plot(self.results['timevec'], self.results[rkey], label=rkey.title())
         plt.legend()
         return fig
+
+class TBbyAge(TB):
+    """
+    TB model with age-specific progression rates.
+    Inherits from TB and overrides rate calculation methods.
+    """
+    
+    def __init__(self, pars=None, **kwargs):
+        # Extract age-specific parameters before calling parent
+        age_pars = {}
+        if pars is not None:
+            age_pars = {
+                'use_globals': pars.pop('use_globals', False),
+                'rate_overrides': pars.pop('rate_overrides', None)
+            }
+        
+        # Call parent constructor first
+        super().__init__(pars=pars, **kwargs)
+        
+        # Now add age-specific parameters to the pars dictionary
+        self.pars['use_globals'] = age_pars.get('use_globals', False)
+        self.pars['rate_overrides'] = age_pars.get('rate_overrides', None)
+        
+        # Import here to avoid circular imports
+        from tbsim.parametervalues import RatesByAge
+        
+        # Extract user-defined rate overrides
+        new_values = None
+        if self.pars['rate_overrides'] and not self.pars['use_globals']:
+            new_values = {key: value for key, value in self.pars['rate_overrides'].items() if key.startswith('rate_')}
+        
+        # Initialize age-specific rates - we'll do this when the sim is initialized
+        self.rba = None
+        self.rates_byage = None
+        self.age_cutoffs = None
+        
+        return
+
+    def init(self, sim):
+        """Initialize the age-specific rates when the simulation starts"""
+        super().init(sim)
+        
+        # Import here to avoid circular imports
+        from tbsim.parametervalues import RatesByAge
+        
+        # Extract user-defined rate overrides
+        new_values = None
+        if self.pars['rate_overrides'] and not self.pars['use_globals']:
+            new_values = {key: value for key, value in self.pars['rate_overrides'].items() if key.startswith('rate_')}
+        
+        # Initialize age-specific rates
+        self.rba = RatesByAge(sim.dt.base, sim.dt, new_values, self.pars['use_globals'])
+        self.rates_byage = self.rba.rates
+        self.age_cutoffs = self.rba.age_cutoffs
+        
+        return
+
+    @staticmethod
+    def p_latent_to_presym(self, sim, uids):
+        # Age-specific version of latent to pre-symptomatic progression
+        assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
+        rate = np.zeros(len(uids))
+        
+        ls_uids = np.isin(self.state[uids], [TBS.LATENT_SLOW])
+        age_indexes = np.digitize(self.sim.people.age[uids[ls_uids]], bins=self.age_cutoffs['rate_LS_to_presym']) - 1
+        rate[ls_uids] = self.rates_byage['rate_LS_to_presym'][age_indexes]
+        
+        lf_uids = np.isin(self.state[uids], [TBS.LATENT_FAST])
+        age_indexes = np.digitize(self.sim.people.age[uids[lf_uids]], bins=self.age_cutoffs['rate_LF_to_presym']) - 1
+        rate[lf_uids] = self.rates_byage['rate_LF_to_presym'][age_indexes]
+        
+        # Apply individual activation multipliers
+        rate *= self.rr_activation[uids]
+        prob = 1-np.exp(-rate)
+        return prob
+    
+    @staticmethod
+    def p_presym_to_clear(self, sim, uids):
+        # Age-specific version of pre-symptomatic to clearance
+        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
+        rate = np.zeros(len(uids))
+        mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
+        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_treatment_to_clear']) - 1
+        rate[mask] = self.rates_byage['rate_treatment_to_clear'][age_indexes]
+        prob = 1-np.exp(-rate)
+        return prob
+
+    @staticmethod
+    def p_presym_to_active(self, sim, uids):
+        # Age-specific version of pre-symptomatic to active
+        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "The p_presym_to_active function should only be called for agents in the pre symptomatic state, however some agents were in a different state."
+        rate = np.zeros(len(uids))
+        mask = np.isin(self.state[uids], [TBS.ACTIVE_PRESYMP])
+        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_presym_to_active']) - 1
+        rate[mask] = self.rates_byage['rate_presym_to_active'][age_indexes]
+        prob = 1-np.exp(-rate)
+        return prob
+
+    @staticmethod
+    def p_active_to_clear(self, sim, uids):
+        # Age-specific version of active to clearance
+        assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
+        rate = np.zeros(len(uids))
+
+        mask = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_active_to_clear']) - 1
+        rate[mask] = self.rates_byage['rate_active_to_clear'][age_indexes]
+        
+        on_treatment_uids = ss.uids(self.on_treatment[uids])
+        mask = np.isin(on_treatment_uids, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+        age_indexes = np.digitize(self.sim.people.age[uids[mask]], bins=self.age_cutoffs['rate_treatment_to_clear']) - 1
+        rate[mask] = self.rates_byage['rate_treatment_to_clear'][age_indexes]
+            
+        rate *= self.rr_clearance[uids]
+        prob = 1-np.exp(-rate)
+        return prob
+
+    @staticmethod
+    def p_active_to_death(self, sim, uids):
+        # Age-specific version of active to death
+        assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
+        rate = np.zeros(len(uids))
+        
+        smpos_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMPOS])
+        age_indexes = np.digitize(self.sim.people.age[uids[smpos_uids]], bins=self.age_cutoffs['rate_smpos_to_dead']) - 1
+        rate[smpos_uids] = self.rates_byage['rate_smpos_to_dead'][age_indexes]
+        
+        smneg_uids = np.isin(self.state[uids], [TBS.ACTIVE_SMNEG])
+        age_indexes = np.digitize(self.sim.people.age[uids[smneg_uids]], bins=self.age_cutoffs['rate_smneg_to_dead']) - 1
+        rate[smneg_uids] = self.rates_byage['rate_smneg_to_dead'][age_indexes]
+        
+        exptb_uids = np.isin(self.state[uids], [TBS.ACTIVE_EXPTB])
+        age_indexes = np.digitize(self.sim.people.age[uids[exptb_uids]], bins=self.age_cutoffs['rate_exptb_to_dead']) - 1
+        rate[exptb_uids] = self.rates_byage['rate_exptb_to_dead'][age_indexes]
+            
+        rate *= self.rr_death[uids]
+        prob = 1-np.exp(-rate)
+        return prob
