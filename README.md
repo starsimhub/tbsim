@@ -4,7 +4,7 @@
 
 **Warning! TBsim is still in the early stages of development. It is being shared solely for transparency and to facilitate collaborative development. It is not ready to be used for real research or policy questions.**
 
-This repository contains the implementation of a new Tuberculosis (TB) Mmdel using the Starsim package. The model aims to simulate the dynamics of TB spread and treatment efficacy under various scenarios.
+This repository contains the implementation of a new Tuberculosis (TB) model using the Starsim package. The model aims to simulate the dynamics of TB spread and treatment efficacy under various scenarios.
 
 **Try the tutorials online!** Click the Binder badge above to launch an interactive environment with all tutorials ready to run.
 
