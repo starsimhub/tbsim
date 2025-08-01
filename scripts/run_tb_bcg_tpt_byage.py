@@ -272,27 +272,118 @@ def get_scenarios():
         # },
     }
 
-def run_scenarios(plot=True, show_household_plot=False, household_plot_type='basic'):
-    """Run all scenarios and optionally plot results."""
+def run_scenarios(plot=True, show_household_plot=False, household_plot_type='basic', age_bins=None):
+    """Run all scenarios and optionally plot results with age stratification."""
     import tbsim.utils.plots as pl
     
     scenarios = get_scenarios()
     results = {}
+    simulations = {}  # Store simulation objects for age stratification
     
     for name, scenario in scenarios.items():
         print(f"\nRunning: {name}")
         sim = build_sim(scenario=scenario, show_household_plot=show_household_plot, household_plot_type=household_plot_type)
         sim.run()
         results[name] = sim.results.flatten()
+        simulations[name] = sim  # Store simulation object
     
     if plot:
+        # Traditional plotting (overall population)
+        print("\nGenerating traditional plots (overall population)...")
         pl.plot_combined(results, 
                         heightfold=2, outdir='results/interventions')
-                        
-                        # filter=mtb.FILTERS.important_metrics)
+        
+        # Age-stratified plotting if age_bins provided
+        if age_bins is not None:
+            print(f"\nGenerating age-stratified plots with age bins: {age_bins}")
+            
+            # Generate age-stratified results for each scenario
+            age_stratified_results = {}
+            
+            for name, sim in simulations.items():
+                print(f"  Processing age stratification for: {name}")
+                
+                # Generate age-stratified results
+                stratified = pl._generate_age_stratified_results(
+                    sim, sim.results.flatten(), age_bins
+                )
+                
+                # Add scenario prefix to age bin names
+                for age_bin, metrics in stratified.items():
+                    age_stratified_results[f"{name}_{age_bin}"] = metrics
+            
+            # Create age bin labels for display
+            age_labels = []
+            for i in range(len(age_bins) - 1):
+                if age_bins[i+1] == float('inf'):
+                    age_labels.append(f"{int(age_bins[i])}+")
+                else:
+                    age_labels.append(f"{int(age_bins[i])}-{int(age_bins[i+1])}")
+            
+            print(f"  Age groups: {age_labels}")
+            
+            # Plot 1: TB Prevalence by age group
+            print("  Plot 1: TB Prevalence by Age Group")
+            pl.plot_results(
+                flat_results=age_stratified_results,
+                keywords=['prevalence_active'],
+                n_cols=2,
+                dark=True,
+                cmap='viridis',
+                savefig=True,
+                outdir='results/interventions/age_stratified'
+            )
+            
+            # Plot 2: TB Incidence by age group
+            print("  Plot 2: TB Incidence by Age Group")
+            pl.plot_results(
+                flat_results=age_stratified_results,
+                keywords=['incidence_kpy'],
+                n_cols=2,
+                dark=True,
+                cmap='plasma',
+                savefig=True,
+                outdir='results/interventions/age_stratified'
+            )
+            
+            # Plot 3: Latent TB by age group
+            print("  Plot 3: Latent TB by Age Group")
+            pl.plot_results(
+                flat_results=age_stratified_results,
+                keywords=['n_latent_slow', 'n_latent_fast'],
+                n_cols=2,
+                dark=True,
+                cmap='Blues',
+                savefig=True,
+                outdir='results/interventions/age_stratified'
+            )
+            
+            # Plot 4: All metrics comparison by age
+            print("  Plot 4: All Metrics Comparison by Age")
+            pl.plot_results(
+                flat_results=age_stratified_results,
+                keywords=['prevalence_active', 'incidence_kpy', 'n_latent_slow', 'n_latent_fast'],
+                n_cols=2,
+                dark=False,
+                cmap='tab20',
+                savefig=True,
+                outdir='results/interventions/age_stratified'
+            )
+            
+            # Plot 5: Scenario comparison by age group
+            print("  Plot 5: Scenario Comparison by Age Group")
+            pl.plot_combined(
+                age_stratified_results,
+                heightfold=2,
+                outdir='results/interventions/age_stratified',
+                filter=['prevalence_active', 'incidence_kpy']
+            )
+            
+            print("✓ All age-stratified plots generated and saved to results/interventions/age_stratified/")
+        
         plt.show()
     
-    return results
+    return results, simulations
 
 
 def test_household_plots_only():
@@ -307,8 +398,125 @@ def test_household_plots_only():
     print("Check the 'results/household_plots' directory for saved figures.")
 
 
+def analyze_age_stratified_results(results, simulations, age_bins):
+    """
+    Analyze age-stratified results and provide summary statistics.
+    
+    Args:
+        results: Dictionary of scenario results
+        simulations: Dictionary of simulation objects
+        age_bins: List of age bin boundaries
+    """
+    import tbsim.utils.plots as pl
+    
+    print("\n" + "="*60)
+    print("AGE-STRATIFIED ANALYSIS SUMMARY")
+    print("="*60)
+    
+    # Create age bin labels
+    age_labels = []
+    for i in range(len(age_bins) - 1):
+        if age_bins[i+1] == float('inf'):
+            age_labels.append(f"{int(age_bins[i])}+")
+        else:
+            age_labels.append(f"{int(age_bins[i])}-{int(age_bins[i+1])}")
+    
+    print(f"Age groups analyzed: {age_labels}")
+    print()
+    
+    # Analyze each scenario
+    for scenario_name, sim in simulations.items():
+        print(f"Scenario: {scenario_name}")
+        print("-" * 40)
+        
+        # Get overall results
+        overall_results = results[scenario_name]
+        final_prevalence = overall_results['tb_prevalence_active'].values[-1]
+        final_incidence = overall_results['tb_incidence_kpy'].values[-1]
+        
+        print(f"Overall population (final year):")
+        print(f"  TB Prevalence: {final_prevalence:.4f}")
+        print(f"  TB Incidence: {final_incidence:.2f} per 1000 person-years")
+        print()
+        
+        # Get age-stratified results
+        stratified = pl._generate_age_stratified_results(
+            sim, sim.results.flatten(), age_bins
+        )
+        
+        print("Age-stratified results (final year):")
+        for age_bin in age_labels:
+            if age_bin in stratified:
+                metrics = stratified[age_bin]
+                if 'tb_prevalence_active' in metrics:
+                    prev = metrics['tb_prevalence_active'].values[-1]
+                    print(f"  Age {age_bin}: Prevalence = {prev:.4f}")
+        
+        print()
+    
+    # Compare scenarios
+    print("Scenario Comparison:")
+    print("-" * 40)
+    
+    baseline_name = 'Baseline'
+    if baseline_name in results:
+        baseline_prev = results[baseline_name]['tb_prevalence_active'].values[-1]
+        baseline_inc = results[baseline_name]['tb_incidence_kpy'].values[-1]
+        
+        for scenario_name, scenario_results in results.items():
+            if scenario_name != baseline_name:
+                scenario_prev = scenario_results['tb_prevalence_active'].values[-1]
+                scenario_inc = scenario_results['tb_incidence_kpy'].values[-1]
+                
+                prev_reduction = ((baseline_prev - scenario_prev) / baseline_prev) * 100
+                inc_reduction = ((baseline_inc - scenario_inc) / baseline_inc) * 100 if baseline_inc > 0 else 0
+                
+                print(f"{scenario_name} vs Baseline:")
+                print(f"  Prevalence reduction: {prev_reduction:+.1f}%")
+                print(f"  Incidence reduction: {inc_reduction:+.1f}%")
+                print()
+    
+    print("="*60)
+
+
 if __name__ == '__main__':
-    # Run all scenarios with household plot option
+    # Define age bins for analysis
+    age_bins = [0,5, 15, 200]  # 0-2, 2-5, 5-10, 10-15, 15+ years
+    
+    print("TB BCG TPT Interventions with Age-Stratified Analysis")
+    print("=" * 60)
+    print(f"Age bins: {age_bins}")
+    print("Age groups: 0-5, 10-15, 15+ years")
+    print()
+    
+    # Run all scenarios with household plot option and age stratification
     # Options for household_plot_type: 'basic', 'analysis', 'both', or None
     # Set show_household_plot=False to disable household plotting
-    results = run_scenarios(plot=True, show_household_plot=False, household_plot_type='analysis')
+    results, simulations = run_scenarios(
+        plot=True, 
+        show_household_plot=False, 
+        household_plot_type='analysis',
+        age_bins=age_bins
+    )
+    
+    # Analyze age-stratified results
+    analyze_age_stratified_results(results, simulations, age_bins)
+    
+    print("\n" + "="*60)
+    print("ANALYSIS COMPLETED")
+    print("="*60)
+    print("Generated plots:")
+    print("1. Traditional plots (overall population) -> results/interventions/")
+    print("2. Age-stratified plots -> results/interventions/age_stratified/")
+    print("   - TB Prevalence by Age Group")
+    print("   - TB Incidence by Age Group") 
+    print("   - Latent TB by Age Group")
+    print("   - All Metrics Comparison by Age")
+    print("   - Scenario Comparison by Age Group")
+    print()
+    print("Age-stratified analysis reveals intervention effectiveness across different age groups!")
+    print("Key insights:")
+    print("- Compare intervention effectiveness across age groups")
+    print("- Identify age-specific intervention impacts")
+    print("- Understand demographic patterns in TB transmission")
+    print("- Optimize intervention targeting by age")
