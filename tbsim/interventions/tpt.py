@@ -213,4 +213,3 @@ class TPTRegimes():
     cdc_3HR = ss.peryear(0.25)
     cdc_6H  = ss.peryear(0.5)
     cdc_9H  = ss.peryear(0.75)
-

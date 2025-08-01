@@ -632,5 +632,3 @@ class BCGProtection(ss.Intervention):
             'deaths_averted': unvaccinated_tb_deaths - vaccinated_tb_deaths,
             'cases_averted': unvaccinated_tb_cases - vaccinated_tb_cases,
         }
-
-

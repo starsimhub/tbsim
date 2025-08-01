@@ -317,4 +317,3 @@ class TB_Nutrition_Connector(ss.Connector):
         tb.rel_sus[uids] = self.pars.relsus_func(tb, mn, uids)
 
         return
-
