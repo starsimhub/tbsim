@@ -73,27 +73,6 @@ from tbsim.comorbidities.hiv.hiv import HIVState
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import datetime
-import os
-import rdata
-
-import warnings
-warnings.filterwarnings("ignore", message='Missing constructor for R class "data.table".*')
-
-
-def ensure_output_directories():
-    """
-    Ensure that the output directories exist for saving files.
-    Creates samples/pdf and samples/png directories if they don't exist.
-    """
-    # Create output directories
-    pdf_dir = "../../samples/pdf"
-    png_dir = "../../samples/png"
-    
-    os.makedirs(pdf_dir, exist_ok=True)
-    os.makedirs(png_dir, exist_ok=True)
-    
-    return pdf_dir, png_dir
 
 
 class GradualHIVIntervention(ss.Intervention):
@@ -211,15 +190,15 @@ import datetime
 import time
 import sys
 import os
-# Dynamically add the correct path to scripts for common_functions import
+# Dynamically add the correct path to scripts/hiv for shared_functions import
 try:
     current_dir = os.path.dirname(os.path.abspath(__file__))
 except NameError:
     # __file__ is not defined (e.g., in Jupyter), use cwd
     current_dir = os.getcwd()
-scripts_path = os.path.abspath(os.path.join(current_dir, '../../scripts'))
-if scripts_path not in sys.path:
-    sys.path.insert(0, scripts_path)
+hiv_utils_path = os.path.abspath(os.path.join(current_dir, '../../scripts/hiv'))
+if hiv_utils_path not in sys.path:
+    sys.path.insert(0, hiv_utils_path)
 # Also add the current directory to the path for local imports
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
@@ -227,12 +206,12 @@ if current_dir not in sys.path:
 parent_dir = os.path.abspath(os.path.join(current_dir, '..'))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
-import common_functions as cf
+import shared_functions as sf
 
 # Import health-seeking, diagnostic, and treatment interventions
-from tb_health_seeking import HealthSeekingBehavior
-from tb_diagnostic import TBDiagnostic
-from tb_treatment import TBTreatment
+from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
+from tbsim.interventions.tb_diagnostic import TBDiagnostic
+from tbsim.interventions.tb_treatment import TBTreatment
 
 start_wallclock = time.time()
 start_datetime = datetime.datetime.now()
@@ -552,10 +531,7 @@ def plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_v
             ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
             ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"total_population_grid_{timestamp}.pdf")
+    filename = f"total_population_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -659,17 +635,14 @@ def plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, 
             ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
             ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"hiv_metrics_grid_{timestamp}.pdf")
+    filename = f"hiv_metrics_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
 
 
-def plot_active_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
-    """Plot active TB prevalence for all parameter combinations with separate focus on active TB"""
+def plot_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
     import matplotlib.pyplot as plt
+    from mpl_toolkits.axes_grid1.inset_locator import inset_axes
     nrows = len(tb_mortality_vals) * len(rel_sus_vals)
     ncols = len(beta_vals)
     fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
@@ -680,185 +653,55 @@ def plot_active_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortali
                 sim = sim_grid[m][i][j]
                 time = sim.results['timevec']
                 active_prev = sim.results['tb']['prevalence_active']
+                latent_prev = compute_latent_prevalence(sim)
 
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(time, active_prev, label='Active TB Prevalence', color='blue', linewidth=2)
+                ax.plot(time, active_prev, label='Active TB Prevalence', color='blue')
+                ax.plot(time, latent_prev, linestyle='--', color='orange', label='Latent TB Prevalence')
                 ax.axhline(0.01, color='red', linestyle=':', linewidth=1, label='Target 1%')
 
-                # Plot the 2018 SA data point (real data)
+                sa_data_points = [
+                    (datetime.date(1990, 1, 1), 0.006),
+                    (datetime.date(2000, 1, 1), 0.008),
+                    (datetime.date(2010, 1, 1), 0.009),
+                    (datetime.date(2018, 1, 1), 0.00852),
+                ]
+                for sa_year, sa_prevalence in sa_data_points:
+                    ax.plot(sa_year, sa_prevalence, 'ro', markersize=4, alpha=0.7)
                 ax.plot(datetime.date(2018, 1, 1), 0.00852, 'ro', markersize=6, label='2018 SA data (0.852%)')
 
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
                 if ax_idx == nrows - 1:
                     ax.set_xlabel('Year')
                 if j == 0:
-                    ax.set_ylabel('Active TB Prevalence')
+                    ax.set_ylabel('Prevalence')
                 ax.grid(True)
+
+                inset = inset_axes(ax, width="40%", height="30%", loc='upper right')
+                inset.plot(time, active_prev, color='blue')
+                inset.plot(time, latent_prev, linestyle='--', color='orange')
+                inset.axhline(0.01, color='red', linestyle=':', linewidth=1)
+                for sa_year, sa_prevalence in sa_data_points:
+                    inset.plot(sa_year, sa_prevalence, 'ro')
+                inset.set_xlim(datetime.date(1980, 1, 1), time[-1])
+                inset.set_ylim(0, 0.010)
+                inset.set_xticks([
+                    datetime.date(1980, 1, 1),
+                    datetime.date(2000, 1, 1),
+                    datetime.date(2020, 1, 1)
+                ])
+                inset.set_xticklabels(['1980', '2000', '2020'], fontsize=8)
+                inset.tick_params(axis='y', labelsize=8)
+                inset.set_title('Zoom: 1980+', fontsize=8)
+                inset.grid(True)
 
                 if m == 0 and i == 0 and j == 0:
                     ax.legend(fontsize=6)
 
     plt.tight_layout()
-    plt.suptitle('Active TB Prevalence Sweep', fontsize=16, y=1.02)
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"active_tb_prevalence_sweep_{timestamp}.pdf")
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.show()
-
-
-def plot_latent_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
-    """Plot latent TB prevalence for all parameter combinations with separate focus on latent TB"""
-    import matplotlib.pyplot as plt
-    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
-    ncols = len(beta_vals)
-    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
-
-    for m, tb_mortality in enumerate(tb_mortality_vals):
-        for i, rel_sus in enumerate(rel_sus_vals):
-            for j, beta in enumerate(beta_vals):
-                sim = sim_grid[m][i][j]
-                time = sim.results['timevec']
-                latent_prev = compute_latent_prevalence(sim)
-
-                ax_idx = m * len(rel_sus_vals) + i
-                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(time, latent_prev, label='Latent TB Prevalence', color='orange', linewidth=2, linestyle='--')
-                ax.axhline(0.5, color='red', linestyle=':', linewidth=1, label='Target 50%')
-
-                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
-                if ax_idx == nrows - 1:
-                    ax.set_xlabel('Year')
-                if j == 0:
-                    ax.set_ylabel('Latent TB Prevalence')
-                ax.grid(True)
-
-                if m == 0 and i == 0 and j == 0:
-                    ax.legend(fontsize=6)
-
-    plt.tight_layout()
-    plt.suptitle('Latent TB Prevalence Sweep', fontsize=16, y=1.02)
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"latent_tb_prevalence_sweep_{timestamp}.pdf")
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.show()
-
-
-def plot_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
-    """Legacy function - now calls both separate active and latent TB plots"""
-    plot_active_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
-    plot_latent_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
-
-
-def compute_annualized_infection_rate(sim):
-    """
-    Compute annualized TB infection rate (annual risk of infection) over time.
-    
-    This function calculates the annualized infection rate using two methods:
-    1. Method 1: Sum new_infections over 365 days and divide by population
-    2. Method 2: Difference in n_infected between T and T-365 days, divided by population
-    
-    Returns the annualized infection rate as a percentage of the population.
-    """
-    time = sim.results['timevec']
-    tb_results = sim.results['tb']
-    
-    # Get population size over time
-    try:
-        n_alive = sim.results['n_alive']
-    except KeyError:
-        n_alive = np.full(len(time), fill_value=np.count_nonzero(sim.people.alive))
-    
-    # Method 1: Using new_infections (if available)
-    annual_rate_method1 = None
-    try:
-        # Check if new_infections is available
-        if 'new_infections' in tb_results:
-            new_infections = tb_results['new_infections'].values
-            annual_rate_method1 = np.zeros_like(time, dtype=float)
-            
-            # Calculate 365-day rolling sum of new infections
-            days_per_step = (time[1] - time[0]).days if len(time) > 1 else 1
-            steps_per_year = max(1, int(365 / days_per_step))
-            
-            for i in range(len(time)):
-                start_idx = max(0, i - steps_per_year + 1)
-                annual_infections = np.sum(new_infections[start_idx:i+1])
-                annual_rate_method1[i] = (annual_infections / n_alive[i]) * 100 if n_alive[i] > 0 else 0
-    except Exception as e:
-        print(f"Method 1 failed: {e}")
-    
-    # Method 2: Using difference in n_infected
-    annual_rate_method2 = np.zeros_like(time, dtype=float)
-    try:
-        # Get total infected count over time
-        n_infected = tb_results['n_latent_slow'].values + tb_results['n_latent_fast'].values + tb_results['n_active'].values
-        
-        # Calculate 365-day difference
-        days_per_step = (time[1] - time[0]).days if len(time) > 1 else 1
-        steps_per_year = max(1, int(365 / days_per_step))
-        
-        for i in range(len(time)):
-            if i >= steps_per_year:
-                # Calculate difference in infected count over the year
-                infection_diff = n_infected[i] - n_infected[i - steps_per_year]
-                annual_rate_method2[i] = (infection_diff / n_alive[i]) * 100 if n_alive[i] > 0 else 0
-            else:
-                # For early time points, use the current rate scaled to annual
-                annual_rate_method2[i] = (n_infected[i] / n_alive[i]) * 100 if n_alive[i] > 0 else 0
-    except Exception as e:
-        print(f"Method 2 failed: {e}")
-    
-    # Return the more robust method (Method 2) or Method 1 if Method 2 fails
-    if annual_rate_method2 is not None and not np.all(np.isnan(annual_rate_method2)):
-        return annual_rate_method2
-    elif annual_rate_method1 is not None and not np.all(np.isnan(annual_rate_method1)):
-        return annual_rate_method1
-    else:
-        print("Warning: Could not compute annualized infection rate")
-        return np.zeros_like(time, dtype=float)
-
-
-def plot_annualized_infection_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
-    """Plot annualized TB infection rate for all parameter combinations"""
-    import matplotlib.pyplot as plt
-    
-    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
-    ncols = len(beta_vals)
-    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
-
-    for m, tb_mortality in enumerate(tb_mortality_vals):
-        for i, rel_sus in enumerate(rel_sus_vals):
-            for j, beta in enumerate(beta_vals):
-                sim = sim_grid[m][i][j]
-                time = sim.results['timevec']
-                annual_rate = compute_annualized_infection_rate(sim)
-
-                ax_idx = m * len(rel_sus_vals) + i
-                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(time, annual_rate, label='Annual Infection Rate', color='purple', linewidth=2)
-                ax.axhline(2.0, color='red', linestyle=':', linewidth=1, label='2% Annual Risk')
-
-                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
-                if ax_idx == nrows - 1:
-                    ax.set_xlabel('Year')
-                if j == 0:
-                    ax.set_ylabel('Annual Infection Rate (%)')
-                ax.grid(True)
-
-                if m == 0 and i == 0 and j == 0:
-                    ax.legend(fontsize=6)
-
-    plt.tight_layout()
-    plt.suptitle('Annualized TB Infection Rate', fontsize=16, y=1.02)
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"annualized_infection_rate_grid_{timestamp}.pdf")
+    plt.suptitle('Refined TB Prevalence & Mortality Sweep with Inset Zooms and Latent Overlay', fontsize=16, y=1.02)
+    filename = f"tb_prevalence_sweep_with_data_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -928,10 +771,7 @@ def plot_health_seeking_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
             ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
             ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"health_seeking_grid_{timestamp}.pdf")
+    filename = f"health_seeking_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -999,10 +839,7 @@ def plot_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, t
             ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
             ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"diagnostic_grid_{timestamp}.pdf")
+    filename = f"diagnostic_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -1065,10 +902,7 @@ def plot_cumulative_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortal
             ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
             ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"cumulative_diagnostic_grid_{timestamp}.pdf")
+    filename = f"cumulative_diagnostic_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -1134,10 +968,7 @@ def plot_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, ti
             ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
             ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"treatment_grid_{timestamp}.pdf")
+    filename = f"treatment_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -1200,10 +1031,7 @@ def plot_cumulative_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortali
             ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
             ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"cumulative_treatment_grid_{timestamp}.pdf")
+    filename = f"cumulative_treatment_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -1294,10 +1122,7 @@ def plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
     plt.tight_layout()
     plt.suptitle('Age-Stratified TB Prevalence: Model vs South Africa 2018 Survey Data', fontsize=14, y=1.02)
 
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"age_prevalence_grid_{timestamp}.pdf")
+    filename = f"age_prevalence_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -1482,151 +1307,7 @@ def plot_hiv_tb_coinfection_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality
     plt.suptitle('HIV Coinfection Rates Among TB Cases by Symptom Status: Model vs South Africa 2018 Survey Data', 
                  fontsize=14, y=1.02)
 
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"hiv_tb_coinfection_grid_{timestamp}.pdf")
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.show()
-
-
-def plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
-    import matplotlib.ticker as mtick
-    import os
-    import pandas as pd
-    # --- Load real notification data (from extract_gtb_data.py logic) ---
-    try:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-    except NameError:
-        # __file__ is not defined (e.g., in Jupyter), use current working directory
-        base_dir = os.getcwd()
-    gtb_dir = os.path.join(base_dir, '../data/gtbreport2024/data/gtb')
-    snapshot_dir = os.path.join(gtb_dir, 'snapshot_2024-07-29')
-    other_dir = os.path.join(gtb_dir, 'other')
-    tb_rda_path = os.path.join(snapshot_dir, 'tb.rda')
-    pop_rda_path = os.path.join(other_dir, 'pop.rda')
-    # Helper to load RDA file and return as pandas DataFrame
-    def load_rda_df(rda_path):
-        import rdata
-        parsed = rdata.parser.parse_file(rda_path)
-        converted = rdata.conversion.convert(parsed)
-        for v in converted.values():
-            if isinstance(v, pd.DataFrame):
-                return v
-        raise ValueError(f"No DataFrame found in {rda_path}")
-    tb_df = load_rda_df(tb_rda_path)
-    pop_df = load_rda_df(pop_rda_path)
-    sa_code = 'ZAF'
-    tb_sa = tb_df[tb_df['iso3'] == sa_code]
-    pop_sa = pop_df[pop_df['iso3'] == sa_code]
-    notif_vars = [col for col in tb_sa.columns if 'new' in col and ('bact' in col or 'labconf' in col or 'notif' in col or 'pos' in col)]
-    notif_var = None
-    for v in ['new_bact_pos', 'new_labconf', 'new_notif', 'new_pos']:
-        if v in tb_sa.columns:
-            notif_var = v
-            break
-    if notif_var is None and notif_vars:
-        notif_var = notif_vars[0]
-    if notif_var is None:
-        raise ValueError('No notification variable found in TB data')
-    pop_col = None
-    for c in ['pop', 'e_pop_num', 'population']:
-        if c in pop_sa.columns:
-            pop_col = c
-            break
-    if pop_col is None:
-        raise ValueError('No population column found in population data')
-    merged = pd.merge(tb_sa[['year', notif_var]], pop_sa[['year', pop_col]], on='year', how='inner')
-    merged = merged.sort_values('year')
-    merged['notif_rate_per_100k'] = merged[notif_var] / merged[pop_col] * 1e5
-    real_years = merged['year'].values
-    real_rates = merged['notif_rate_per_100k'].values
-
-    # --- Plot model grid ---
-    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
-    ncols = len(beta_vals)
-    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
-
-    for m, tb_mortality in enumerate(tb_mortality_vals):
-        for i, rel_sus in enumerate(rel_sus_vals):
-            for j, beta in enumerate(beta_vals):
-                sim = sim_grid[m][i][j]
-                time = np.array(sim.results['timevec'])
-                tbdiag = sim.results['tbdiagnostic']
-                cum_test_positive = tbdiag['cum_test_positive'].values
-                n_alive = sim.results['n_alive']
-
-                # Compute annualized notification rate
-                notification_rate = np.zeros_like(cum_test_positive, dtype=float)
-                for t in range(len(time)):
-                    t_date = time[t]
-                    t_prev_date = t_date - datetime.timedelta(days=365)
-                    t_prev = np.searchsorted(time, t_prev_date)
-                    if t_prev == len(time) or time[t_prev] > t_prev_date:
-                        t_prev = max(0, t_prev - 1)
-                    notifications = cum_test_positive[t] - cum_test_positive[t_prev]
-                    pop = n_alive[t]
-                    notification_rate[t] = (notifications / pop) * 1e5 if pop > 0 else 0
-
-                # --- Compute annualized TB incidence rate ---
-                tb_results = sim.results['tb']
-                if 'cum_active' in tb_results:
-                    cum_incidence = tb_results['cum_active']
-                else:
-                    # Fallback: compute cumulative sum of new_active
-                    if 'new_active' in tb_results:
-                        cum_incidence = np.cumsum(tb_results['new_active'])
-                    else:
-                        raise ValueError('No new_active or cum_active in tb results')
-                incidence_rate = np.zeros_like(cum_incidence, dtype=float)
-                for t in range(len(time)):
-                    t_date = time[t]
-                    t_prev_date = t_date - datetime.timedelta(days=365)
-                    t_prev = np.searchsorted(time, t_prev_date)
-                    if t_prev == len(time) or time[t_prev] > t_prev_date:
-                        t_prev = max(0, t_prev - 1)
-                    new_cases = cum_incidence[t] - cum_incidence[t_prev]
-                    pop = n_alive[t]
-                    incidence_rate[t] = (new_cases / pop) * 1e5 if pop > 0 else 0
-
-                ax_idx = m * len(rel_sus_vals) + i
-                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(time, notification_rate, color='purple', label='Model Notification Rate')
-                ax.plot(time, incidence_rate, color='blue', label='Model Incidence Rate')
-                # Overlay real data
-                ax.plot([datetime.date(int(y), 1, 1) for y in real_years], real_rates, marker='o', color='red', label='SA Notification Data')
-                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
-                ax.grid(True)
-                if ax_idx == nrows - 1:
-                    ax.set_xlabel('Year')
-                if j == 0:
-                    ax.set_ylabel('Rate (per 100,000)')
-                if m == 0 and i == 0 and j == 0:
-                    ax.legend(fontsize=7)
-                ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.0f'))
-
-    plt.tight_layout()
-    plt.suptitle('Annualized TB Case Notification Rate (per 100,000)', fontsize=14, y=1.02)
-
-    # Set consistent x-axis ticks for all subplots
-    first_sim = sim_grid[0][0][0]
-    time_years = np.array([d.year for d in first_sim.results['timevec']])
-    min_year = time_years.min()
-    max_year = time_years.max()
-    xticks = np.arange(min_year, max_year + 1, 20)
-    for ax_row in axs:
-        if isinstance(ax_row, np.ndarray):
-            for ax in ax_row:
-                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
-        else:
-            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
-
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"case_notification_rate_grid_{timestamp}.pdf")
+    filename = f"hiv_tb_coinfection_grid_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -1696,21 +1377,21 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
         rate_exptb_to_dead=ss.perday(0.15 * tb_mortality),
         rate_smneg_to_dead=ss.perday(0.3 * tb_mortality),
     )
-    tb = cf.make_tb_comorbidity(tb_pars=tb_pars)
+    tb = sf.make_tb(tb_pars=tb_pars)
 
     # Add HIV for South Africa context (critical for TB dynamics)
     hiv_pars = dict(
         init_prev=ss.bernoulli(p=0.00),  # Start with no HIV, will be added via intervention
         init_onart=ss.bernoulli(p=0.00),
     )
-    hiv = cf.make_hiv_comorbidity(hiv_pars=hiv_pars)
+    hiv = sf.make_hiv(hiv_pars=hiv_pars)
 
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
 
     # Add TB-HIV connector to model coinfection effects with increased progression rates
     # Higher multipliers to get steeper TB prevalence increase from 1990 onwards
     # Increased by 50% from previous values
-    tb_hiv_connector = cf.make_tb_hiv_connector(pars=dict(
+    tb_hiv_connector = sf.make_tb_hiv_connector(pars=dict(
         acute_multiplier=4.5,    # Increased from 3.0 to 4.5 (50% higher)
         latent_multiplier=7.5,   # Increased from 5.0 to 7.5 (50% higher)
         aids_multiplier=12.0,    # Increased from 8.0 to 12.0 (50% higher)
@@ -1726,7 +1407,7 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
     # Add health-seeking behavior intervention (90-day average delay - slower for better burn-in)
     # Rate = 1/90 days = 0.011 per day
     health_seeking = HealthSeekingBehavior(pars=dict(
-        initial_care_seeking_rate=ss.perday(1/120),  # 90-day average delay for slower case detection
+        initial_care_seeking_rate=ss.perday(1/90),  # 90-day average delay for slower case detection
         start=ss.date(f'{start_year}-01-01'),
         stop=ss.date(f'{start_year + years}-01-01'),
         single_use=True,
@@ -1735,16 +1416,16 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
     # Add TB diagnostic intervention (60% sensitivity - less effective for better burn-in)
     tb_diagnostic = TBDiagnostic(pars=dict(
         coverage=ss.bernoulli(0.7, strict=False),  # 70% coverage - not everyone gets tested
-        sensitivity=0.50,  # 60% sensitivity - less effective case detection
+        sensitivity=0.60,  # 60% sensitivity - less effective case detection
         specificity=0.95,  # 95% specificity (standard)
         reset_flag=False,
-        care_seeking_multiplier=1.0,  # 2.0 to encourage retries for false negatives
+        care_seeking_multiplier=2.0,  # Encourage retries for false negatives
     ))
 
     # Add TB treatment intervention (70% success rate - less effective for better burn-in)
     tb_treatment = TBTreatment(pars=dict(
         treatment_success_rate=0.70,  # 70% treatment success rate - less effective treatment
-        reseek_multiplier=1.0,  # 2.0 to encourage retries for treatment failures
+        reseek_multiplier=2.0,  # Encourage retries for treatment failures
         reset_flags=True,  # Reset diagnostic flags after treatment failure
     ))
 
@@ -1788,7 +1469,7 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
                 sim = run_sim(beta=beta, rel_sus_latentslow=rel_sus, tb_mortality=tb_mortality)
                 sim_grid[m][i][j] = sim
                 results[scen_key] = sim.results.flatten()
-    # Use common_functions.plot_results to plot all scenario results
+    # Use shared_functions.plot_results to plot all scenario results
     # Note: This function plots various metrics with the following units/definitions:
     # - 'active': Active TB cases (count of people with active TB disease)
     # - 'latent': Latent TB cases (count of people with latent TB infection)
@@ -1801,21 +1482,18 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
     # - 'treated': People who started TB treatment (count)
     # - 'success': Successful TB treatment completions (count)
     # - 'failure': Failed TB treatment attempts (count)
-    cf.plot_results(results, dark=False)
-    
+    sf.plot_results(results, dark=False)
     # Optionally, keep the original grid plots if desired
     plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
+    plot_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_health_seeking_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_cumulative_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_cumulative_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
-    plot_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
-    plot_annualized_infection_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_hiv_tb_coinfection_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
-    plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
 
 if __name__ == '__main__':
     # Setup for TB prevalence sweeps
@@ -1824,9 +1502,9 @@ if __name__ == '__main__':
     # Plot population demographics
     # Run sweep
     # Reduced to 2 parameter combinations for faster runtime
-    beta_range = np.array([0.020, 0.030])  # Higher infectiousness range 0.025-0.035
-    rel_sus_range = np.array([0.30])  # Single value for reinfection susceptibility
-    tb_mortality_range = np.array([3e-4])  # Single value for TB mortality
+    beta_range = np.array([0.025, 0.035])  # Higher infectiousness range 0.025-0.035
+    rel_sus_range = np.array([0.15])  # Single value for reinfection susceptibility
+    tb_mortality_range = [3e-4]  # Single value for TB mortality
     refined_sweep(beta_range, rel_sus_range, tb_mortality_range)
 
     end_wallclock = time.time()
@@ -1921,307 +1599,3 @@ def test_health_seeking_diagnostic_integration():
 
 # Uncomment the line below to run the health-seeking and diagnostic integration test
 # test_health_seeking_diagnostic_integration()
-
-# Add comprehensive tracking variables to TB model
-def add_tb_tracking_variables():
-    """
-    Add comprehensive tracking variables to the TB model to verify all states and transitions.
-    This function modifies the TB class to add tracking for debugging and verification.
-    """
-    import tbsim as mtb
-    from tbsim import TBS
-    
-    # Store original methods
-    original_init = mtb.TB.__init__
-    original_step = mtb.TB.step
-    original_init_results = mtb.TB.init_results
-    original_update_results = mtb.TB.update_results
-    
-    def enhanced_init(self, pars=None, **kwargs):
-        # Call original init
-        original_init(self, pars, **kwargs)
-        
-        # Add tracking variables
-        self.define_states(
-            ss.State('ever_active_tb', default=False),      # Track if ever in active TB states
-            ss.State('ever_latent_tb', default=False),      # Track if ever in latent TB states
-            ss.State('ever_infected_tb', default=False),    # Track if ever infected
-            ss.State('ever_presymp_tb', default=False),     # Track if ever in presymptomatic
-            ss.State('ever_smpos_tb', default=False),       # Track if ever smear positive
-            ss.State('ever_smneg_tb', default=False),       # Track if ever smear negative
-            ss.State('ever_exptb_tb', default=False),       # Track if ever extra-pulmonary
-            ss.State('ever_dead_tb', default=False),        # Track if ever died from TB
-            ss.State('state_transition_count', default=0),  # Count state transitions
-        )
-        
-        # Add debug tracking
-        self.debug_transitions = []  # List to track all transitions
-        self.debug_step_counts = []  # List to track counts at each step
-        
-    def enhanced_step(self):
-        # Call original step
-        original_step(self)
-        
-        # Track state transitions
-        ti = self.ti
-        current_states = self.state.copy()
-        
-        # Update ever flags based on current states
-        active_mask = np.isin(current_states, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
-        latent_mask = np.isin(current_states, [TBS.LATENT_SLOW, TBS.LATENT_FAST])
-        infected_mask = np.isin(current_states, [TBS.LATENT_SLOW, TBS.LATENT_FAST, TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
-        
-        self.ever_active_tb[active_mask] = True
-        self.ever_latent_tb[latent_mask] = True
-        self.ever_infected_tb[infected_mask] = True
-        self.ever_presymp_tb[current_states == TBS.ACTIVE_PRESYMP] = True
-        self.ever_smpos_tb[current_states == TBS.ACTIVE_SMPOS] = True
-        self.ever_smneg_tb[current_states == TBS.ACTIVE_SMNEG] = True
-        self.ever_exptb_tb[current_states == TBS.ACTIVE_EXPTB] = True
-        self.ever_dead_tb[current_states == TBS.DEAD] = True
-        
-        # Count current states for debugging
-        debug_counts = {
-            'step': ti,
-            'none': np.sum(current_states == TBS.NONE),
-            'latent_slow': np.sum(current_states == TBS.LATENT_SLOW),
-            'latent_fast': np.sum(current_states == TBS.LATENT_FAST),
-            'presymp': np.sum(current_states == TBS.ACTIVE_PRESYMP),
-            'smpos': np.sum(current_states == TBS.ACTIVE_SMPOS),
-            'smneg': np.sum(current_states == TBS.ACTIVE_SMNEG),
-            'exptb': np.sum(current_states == TBS.ACTIVE_EXPTB),
-            'dead': np.sum(current_states == TBS.DEAD),
-            'ever_active': np.sum(self.ever_active_tb),
-            'ever_latent': np.sum(self.ever_latent_tb),
-            'ever_infected': np.sum(self.ever_infected_tb),
-            'alive': np.sum(self.sim.people.alive),
-        }
-        self.debug_step_counts.append(debug_counts)
-        
-        # # Print debug info every 100 steps or if active TB is detected
-        # if ti % 100 == 0 or debug_counts['smpos'] > 0 or debug_counts['smneg'] > 0 or debug_counts['exptb'] > 0:
-        #     print(f"Step {ti}: Active TB - SmPos: {debug_counts['smpos']}, SmNeg: {debug_counts['smneg']}, ExpTB: {debug_counts['exptb']}, Ever Active: {debug_counts['ever_active']}")
-    
-    def enhanced_init_results(self):
-        # Call original init_results
-        original_init_results(self)
-        
-        # Add tracking results
-        self.define_results(
-            ss.Result('ever_active_count', dtype=int, label='Ever Active TB Count'),
-            ss.Result('ever_latent_count', dtype=int, label='Ever Latent TB Count'),
-            ss.Result('ever_infected_count', dtype=int, label='Ever Infected TB Count'),
-            ss.Result('ever_presymp_count', dtype=int, label='Ever Presymptomatic Count'),
-            ss.Result('ever_smpos_count', dtype=int, label='Ever Smear Positive Count'),
-            ss.Result('ever_smneg_count', dtype=int, label='Ever Smear Negative Count'),
-            ss.Result('ever_exptb_count', dtype=int, label='Ever Extra-Pulmonary Count'),
-            ss.Result('ever_dead_count', dtype=int, label='Ever TB Death Count'),
-        )
-    
-    def enhanced_update_results(self):
-        # Call original update_results
-        original_update_results(self)
-        
-        # Update tracking results
-        ti = self.ti
-        self.results['ever_active_count'][ti] = np.sum(self.ever_active_tb)
-        self.results['ever_latent_count'][ti] = np.sum(self.ever_latent_tb)
-        self.results['ever_infected_count'][ti] = np.sum(self.ever_infected_tb)
-        self.results['ever_presymp_count'][ti] = np.sum(self.ever_presymp_tb)
-        self.results['ever_smpos_count'][ti] = np.sum(self.ever_smpos_tb)
-        self.results['ever_smneg_count'][ti] = np.sum(self.ever_smneg_tb)
-        self.results['ever_exptb_count'][ti] = np.sum(self.ever_exptb_tb)
-        self.results['ever_dead_count'][ti] = np.sum(self.ever_dead_tb)
-    
-    # Replace methods
-    mtb.TB.__init__ = enhanced_init
-    mtb.TB.step = enhanced_step
-    mtb.TB.init_results = enhanced_init_results
-    mtb.TB.update_results = enhanced_update_results
-    
-    print("✓ Added comprehensive TB tracking variables")
-
-# Call the function to add tracking variables
-add_tb_tracking_variables()
-
-def plot_detailed_tb_states(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
-    """Plot detailed breakdown of TB states to verify all transitions are working"""
-    import matplotlib.pyplot as plt
-    
-    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
-    ncols = len(beta_vals)
-    fig, axs = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows), sharex=True, sharey=True)
-
-    for m, tb_mortality in enumerate(tb_mortality_vals):
-        for i, rel_sus in enumerate(rel_sus_vals):
-            for j, beta in enumerate(beta_vals):
-                sim = sim_grid[m][i][j]
-                time = sim.results['timevec']
-                tb_results = sim.results['tb']
-                
-                # Get detailed state counts
-                ever_presymp = tb_results['ever_presymp_count'].values
-                ever_smpos = tb_results['ever_smpos_count'].values
-                ever_smneg = tb_results['ever_smneg_count'].values
-                ever_exptb = tb_results['ever_exptb_count'].values
-                ever_dead = tb_results['ever_dead_count'].values
-                
-                current_presymp = tb_results['n_active_presymp'].values
-                current_smpos = tb_results['n_active_smpos'].values
-                current_smneg = tb_results['n_active_smneg'].values
-                current_exptb = tb_results['n_active_exptb'].values
-
-                ax_idx = m * len(rel_sus_vals) + i
-                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                
-                # Plot ever counts for each active state type
-                ax.plot(time, ever_presymp, label='Ever Presymptomatic', color='purple', linewidth=2)
-                ax.plot(time, ever_smpos, label='Ever Smear Positive', color='red', linewidth=2)
-                ax.plot(time, ever_smneg, label='Ever Smear Negative', color='orange', linewidth=2)
-                ax.plot(time, ever_exptb, label='Ever Extra-Pulmonary', color='brown', linewidth=2)
-                ax.plot(time, ever_dead, label='Ever TB Death', color='black', linewidth=2)
-                
-                # Plot current counts
-                ax.plot(time, current_presymp, label='Current Presymptomatic', color='purple', linestyle='--', alpha=0.7)
-                ax.plot(time, current_smpos, label='Current Smear Positive', color='red', linestyle='--', alpha=0.7)
-                ax.plot(time, current_smneg, label='Current Smear Negative', color='orange', linestyle='--', alpha=0.7)
-                ax.plot(time, current_exptb, label='Current Extra-Pulmonary', color='brown', linestyle='--', alpha=0.7)
-                
-                # Add text annotations with final counts
-                final_ever_smpos = ever_smpos[-1] if len(ever_smpos) > 0 else 0
-                final_ever_smneg = ever_smneg[-1] if len(ever_smneg) > 0 else 0
-                final_ever_exptb = ever_exptb[-1] if len(ever_exptb) > 0 else 0
-                final_current_smpos = current_smpos[-1] if len(current_smpos) > 0 else 0
-                final_current_smneg = current_smneg[-1] if len(current_smneg) > 0 else 0
-                final_current_exptb = current_exptb[-1] if len(current_exptb) > 0 else 0
-                
-                ax.text(0.02, 0.98, f'Ever SmPos: {final_ever_smpos}, Current: {final_current_smpos}\nEver SmNeg: {final_ever_smneg}, Current: {final_current_smneg}\nEver ExpTB: {final_ever_exptb}, Current: {final_current_exptb}', 
-                       transform=ax.transAxes, verticalalignment='top', fontsize=8,
-                       bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-                
-                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
-                ax.grid(True, alpha=0.3)
-                if ax_idx == nrows - 1:
-                    ax.set_xlabel('Year')
-                if j == 0:
-                    ax.set_ylabel('Number of People')
-                if m == 0 and i == 0 and j == 0:
-                    ax.legend(fontsize=6)
-
-    plt.tight_layout()
-    plt.suptitle('Detailed TB State Analysis: Ever vs Current by State Type', fontsize=14, y=1.02)
-
-    # Set consistent x-axis ticks
-    first_sim = sim_grid[0][0][0]
-    time_years = np.array([d.year for d in first_sim.results['timevec']])
-    min_year = time_years.min()
-    max_year = time_years.max()
-    xticks = np.arange(min_year, max_year + 1, 20)
-    for ax_row in axs:
-        if isinstance(ax_row, np.ndarray):
-            for ax in ax_row:
-                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
-        else:
-            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
-
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"detailed_tb_states_{timestamp}.pdf")
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.show()
-
-
-def plot_tb_tracking_analysis(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
-    """Plot comprehensive TB tracking analysis to verify all states and transitions are working correctly"""
-    import matplotlib.pyplot as plt
-    
-    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
-    ncols = len(beta_vals)
-    fig, axs = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows), sharex=True, sharey=True)
-
-    for m, tb_mortality in enumerate(tb_mortality_vals):
-        for i, rel_sus in enumerate(rel_sus_vals):
-            for j, beta in enumerate(beta_vals):
-                sim = sim_grid[m][i][j]
-                time = sim.results['timevec']
-                tb_results = sim.results['tb']
-                
-                # Get tracking results
-                ever_active = tb_results['ever_active_count'].values
-                ever_latent = tb_results['ever_latent_count'].values
-                ever_infected = tb_results['ever_infected_count'].values
-                ever_presymp = tb_results['ever_presymp_count'].values
-                ever_smpos = tb_results['ever_smpos_count'].values
-                ever_smneg = tb_results['ever_smneg_count'].values
-                ever_exptb = tb_results['ever_exptb_count'].values
-                ever_dead = tb_results['ever_dead_count'].values
-                
-                # Get current state counts
-                current_active = tb_results['n_active'].values
-                current_latent_slow = tb_results['n_latent_slow'].values
-                current_latent_fast = tb_results['n_latent_fast'].values
-                current_presymp = tb_results['n_active_presymp'].values
-                current_smpos = tb_results['n_active_smpos'].values
-                current_smneg = tb_results['n_active_smneg'].values
-                current_exptb = tb_results['n_active_exptb'].values
-
-                ax_idx = m * len(rel_sus_vals) + i
-                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                
-                # Plot ever counts (cumulative)
-                ax.plot(time, ever_active, label='Ever Active TB', color='red', linewidth=2)
-                ax.plot(time, ever_latent, label='Ever Latent TB', color='orange', linewidth=2)
-                ax.plot(time, ever_infected, label='Ever Infected', color='blue', linewidth=2)
-                
-                # Plot current counts (prevalence)
-                ax.plot(time, current_active, label='Current Active TB', color='red', linestyle='--', alpha=0.7)
-                ax.plot(time, current_latent_slow + current_latent_fast, label='Current Latent TB', color='orange', linestyle='--', alpha=0.7)
-                
-                # Add text annotations with final counts
-                final_ever_active = ever_active[-1] if len(ever_active) > 0 else 0
-                final_ever_latent = ever_latent[-1] if len(ever_latent) > 0 else 0
-                final_ever_infected = ever_infected[-1] if len(ever_infected) > 0 else 0
-                final_current_active = current_active[-1] if len(current_active) > 0 else 0
-                
-                ax.text(0.02, 0.98, f'Final Ever Active: {final_ever_active}\nFinal Ever Latent: {final_ever_latent}\nFinal Ever Infected: {final_ever_infected}\nFinal Current Active: {final_current_active}', 
-                       transform=ax.transAxes, verticalalignment='top', fontsize=8,
-                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-                
-                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
-                ax.grid(True, alpha=0.3)
-                if ax_idx == nrows - 1:
-                    ax.set_xlabel('Year')
-                if j == 0:
-                    ax.set_ylabel('Number of People')
-                if m == 0 and i == 0 and j == 0:
-                    ax.legend(fontsize=6)
-
-    plt.tight_layout()
-    plt.suptitle('Comprehensive TB Tracking Analysis: Ever vs Current States', fontsize=14, y=1.02)
-
-    # Set consistent x-axis ticks
-    first_sim = sim_grid[0][0][0]
-    time_years = np.array([d.year for d in first_sim.results['timevec']])
-    min_year = time_years.min()
-    max_year = time_years.max()
-    xticks = np.arange(min_year, max_year + 1, 20)
-    for ax_row in axs:
-        if isinstance(ax_row, np.ndarray):
-            for ax in ax_row:
-                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
-        else:
-            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
-
-    # Ensure output directories exist
-    pdf_dir, _ = ensure_output_directories()
-    
-    filename = os.path.join(pdf_dir, f"tb_tracking_analysis_{timestamp}.pdf")
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.show()
-
-

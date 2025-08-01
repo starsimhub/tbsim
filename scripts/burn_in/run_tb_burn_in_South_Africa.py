@@ -77,7 +77,10 @@ import datetime
 import os
 import rdata
 import time
-import scripts.common_functions as cf
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import common_functions as cf
 
 import warnings
 warnings.filterwarnings("ignore", message='Missing constructor for R class "data.table".*')

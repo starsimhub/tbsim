@@ -57,6 +57,9 @@ def get_scenarios():
 
 
 if __name__ == '__main__':
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     import plots as pl
     results = {}
     scenarios = get_scenarios()

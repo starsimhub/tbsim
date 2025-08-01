@@ -10,6 +10,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import datetime
 import time
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tb_calibration_south_africa import (
     create_south_africa_data,
     run_calibration_simulation,

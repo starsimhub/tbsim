@@ -35,9 +35,9 @@ if parent_dir not in sys.path:
 import shared_functions as sf
 
 # Import health-seeking, diagnostic, and treatment interventions
-from tb_health_seeking import HealthSeekingBehavior
-from tb_diagnostic import TBDiagnostic
-from tb_treatment import TBTreatment
+from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
+from tbsim.interventions.tb_diagnostic import TBDiagnostic
+from tbsim.interventions.tb_treatment import TBTreatment
 
 
 def create_south_africa_data():
