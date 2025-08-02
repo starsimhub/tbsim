@@ -194,6 +194,14 @@ class TB(ss.Infection):
             self.susceptible[new_presymp_uids] = False # No longer susceptible regardless of the latent form
         self.results['new_active'][ti] = len(new_presymp_uids)
         self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_presymp_uids] >= 15)
+        
+        # Track new active cases by age group
+        if len(new_presymp_uids) > 0:
+            ages = self.sim.people.age[new_presymp_uids]
+            for i, (min_age, max_age) in enumerate(self.age_groups):
+                age_mask = (ages >= min_age) & (ages <= max_age)
+                age_group_count = np.sum(age_mask)
+                self.results[f'new_active_{self.age_group_labels[i]}'][ti] = age_group_count
 
         # Pre symp --> Active
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
@@ -310,6 +318,10 @@ class TB(ss.Infection):
         """ Initialize results """
         super().init_results()
         
+        # Define age groups for tracking
+        self.age_groups = [(0, 4), (5, 14), (15, 24), (25, 34), (35, 44), (45, 54), (55, 64), (65, 200)]
+        self.age_group_labels = ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+']
+        
         self.define_results(
             ss.Result('n_latent_slow',         dtype=int, label='Latent Slow'),
             ss.Result('n_latent_fast',         dtype=int, label='Latent Fast'),
@@ -339,6 +351,14 @@ class TB(ss.Infection):
             ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'),
             ss.Result('n_detectable_15+',      dtype=float, label='Sm+ plus SM- plus cxr_asymp_sens * pre-symptomatic'),  # Move to analyzer?
         )
+        
+        # Add age-stratified tracking results
+        for age_group in self.age_group_labels:
+            self.define_results(
+                ss.Result(f'new_active_{age_group}', dtype=int, label=f'New Active {age_group}'),
+                ss.Result(f'cum_active_{age_group}', dtype=int, label=f'Cumulative Active {age_group}'),
+            )
+        
         return
 
     def update_results(self):
@@ -381,6 +401,10 @@ class TB(ss.Infection):
         res['cum_deaths_15+'] = np.cumsum(res['new_deaths_15+'])
         res['cum_active']     = np.cumsum(res['new_active'])
         res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
+        
+        # Compute cumulative active cases by age group
+        for age_group in self.age_group_labels:
+            res[f'cum_active_{age_group}'] = np.cumsum(res[f'new_active_{age_group}'])
         
         return
 

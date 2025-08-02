@@ -2169,6 +2169,297 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
     return sim
 
 
+def compute_age_stratified_incidence(sim, target_year=2018):
+    """
+    Compute age-stratified TB incidence from simulation results
+    
+    Args:
+        sim: Simulation object
+        target_year: Year to compute incidence for
+    
+    Returns:
+        dict: Age-stratified incidence data
+    """
+    
+    # Find the time index closest to target year
+    timevec = sim.results['timevec']
+    if hasattr(timevec[0], 'year'):
+        # Handle datetime objects
+        time_years = np.array([d.year for d in timevec])
+    else:
+        # Handle numeric time values
+        time_years = np.array([int(t) for t in timevec])
+    target_idx = np.argmin(np.abs(time_years - target_year))
+    
+    # Get time vector and TB results
+    time = np.array(sim.results['timevec'])
+    tb_results = sim.results['tb']
+    
+    # Get people alive at target time
+    people = sim.people
+    alive_mask = people.alive
+    
+    # Get ages at target time
+    ages = people.age[alive_mask]
+    
+    # Define age groups including children and adolescents
+    age_groups = [(0, 4), (5, 14), (15, 24), (25, 34), (35, 44), (45, 54), (55, 64), (65, 200)]
+    age_group_labels = ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+']
+    
+    incidence_by_age = {}
+    
+    for i, (min_age, max_age) in enumerate(age_groups):
+        age_group = age_group_labels[i]
+        
+        # Count people in age group at target time
+        age_mask = (ages >= min_age) & (ages <= max_age)
+        pop_in_age_group = np.sum(age_mask)
+        
+        # Get cumulative active cases for this age group
+        if f'cum_active_{age_group}' in tb_results:
+            cum_incidence = tb_results[f'cum_active_{age_group}']
+        else:
+            # Fallback to overall cumulative active if age-stratified data not available
+            if 'cum_active' in tb_results:
+                cum_incidence = tb_results['cum_active']
+            else:
+                cum_incidence = np.cumsum(tb_results['new_active'])
+        
+        # Compute annualized incidence rate at target year
+        t_date = time[target_idx]
+        if hasattr(t_date, 'year'):
+            # Handle datetime objects
+            t_prev_date = t_date - datetime.timedelta(days=365)
+            t_prev = np.searchsorted(time, t_prev_date)
+            if t_prev == len(time) or time[t_prev] > t_prev_date:
+                t_prev = max(0, t_prev - 1)
+        else:
+            # Handle numeric time values (assume yearly time steps)
+            # Use a 5-year window to capture more cases
+            t_prev = max(0, target_idx - 5)
+        
+        new_cases = cum_incidence[target_idx] - cum_incidence[t_prev]
+        
+        # Calculate the time span for proper annualization
+        if hasattr(t_date, 'year'):
+            # For datetime objects, calculate actual days
+            time_span_years = (timevec[target_idx] - timevec[t_prev]).days / 365.0
+        else:
+            # For numeric time values, calculate years
+            time_span_years = timevec[target_idx] - timevec[t_prev]
+        
+        # Annualize the rate properly
+        if time_span_years > 0:
+            annualized_cases = new_cases / time_span_years
+            incidence_rate = (annualized_cases / pop_in_age_group) * 1e5 if pop_in_age_group > 0 else 0
+        else:
+            incidence_rate = 0
+        
+        incidence_by_age[age_group] = {
+            'incidence_rate': incidence_rate,
+            'incidence_per_100k': incidence_rate,
+            'new_cases': new_cases,
+            'population': pop_in_age_group
+        }
+    
+    return incidence_by_age
+
+
+def compute_age_stratified_incidence_time_series(sim):
+    """
+    Compute age-stratified TB incidence time series from simulation results
+    
+    Args:
+        sim: Simulation object
+    
+    Returns:
+        pd.DataFrame: DataFrame with years as index and age groups as columns
+    """
+    
+    # Define age groups including children and adolescents
+    age_groups = [(0, 4), (5, 14), (15, 24), (25, 34), (35, 44), (45, 54), (55, 64), (65, 200)]
+    age_group_labels = ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+']
+    
+    # Get time vector and TB results
+    time = np.array(sim.results['timevec'])
+    tb_results = sim.results['tb']
+    
+    # Initialize DataFrame to store results
+    if hasattr(time[0], 'year'):
+        # Handle datetime objects
+        time_years = np.array([d.year for d in time])
+    else:
+        # Handle numeric time values
+        time_years = np.array([int(t) for t in time])
+    incidence_df = pd.DataFrame(index=time_years, columns=age_group_labels)
+    
+    # For each time point, compute age-stratified incidence
+    for t_idx, (time_point, year) in enumerate(zip(time, time_years)):
+        # Get people alive at this time point
+        people = sim.people
+        
+        # For simplicity, we'll use the current people state
+        # In a more sophisticated approach, we'd need to track historical states
+        alive_mask = people.alive
+        ages = people.age[alive_mask]
+        
+        # Compute incidence for each age group
+        for i, (min_age, max_age) in enumerate(age_groups):
+            age_group = age_group_labels[i]
+            
+            # Count people in age group at this time point
+            age_mask = (ages >= min_age) & (ages <= max_age)
+            pop_in_age_group = np.sum(age_mask)
+            
+            # Get cumulative active cases for this age group
+            if f'cum_active_{age_group}' in tb_results:
+                cum_incidence = tb_results[f'cum_active_{age_group}']
+            else:
+                # Fallback to overall cumulative active if age-stratified data not available
+                if 'cum_active' in tb_results:
+                    cum_incidence = tb_results['cum_active']
+                else:
+                    cum_incidence = np.cumsum(tb_results['new_active'])
+            
+            # Compute annualized incidence rate
+            t_date = time_point
+            if hasattr(t_date, 'year'):
+                # Handle datetime objects
+                t_prev_date = t_date - datetime.timedelta(days=365)
+                t_prev = np.searchsorted(time, t_prev_date)
+                if t_prev == len(time) or time[t_prev] > t_prev_date:
+                    t_prev = max(0, t_prev - 1)
+            else:
+                # Handle numeric time values (assume yearly time steps)
+                # Use a 5-year window to capture more cases
+                t_prev = max(0, t_idx - 5)
+            
+            new_cases = cum_incidence[t_idx] - cum_incidence[t_prev]
+            
+            # Calculate the time span for proper annualization
+            if hasattr(t_date, 'year'):
+                # For datetime objects, calculate actual days
+                time_span_years = (time[t_idx] - time[t_prev]).days / 365.0
+            else:
+                # For numeric time values, calculate years
+                time_span_years = time[t_idx] - time[t_prev]
+            
+            # Annualize the rate properly
+            if time_span_years > 0:
+                annualized_cases = new_cases / time_span_years
+                incidence_rate = (annualized_cases / pop_in_age_group) * 1e5 if pop_in_age_group > 0 else 0
+            else:
+                incidence_rate = 0
+            
+            incidence_df.loc[year, age_group] = incidence_rate
+    
+    return incidence_df
+
+
+def plot_age_incidence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
+    """Plot age-stratified TB incidence for all parameter combinations
+    
+    This function creates a grid of plots showing age-stratified TB incidence rates
+    by age groups including children (0-4, 5-14) and adults (15+), normalized per 100,000 population.
+    The data is compared to available South Africa incidence data where available.
+    """
+    import matplotlib.ticker as mtick
+
+    # South Africa incidence data (per 100,000 population) - placeholder data
+    # Note: This would need to be replaced with actual South Africa incidence data by age group
+    sa_2018_data = {
+        '0-4': np.nan,      # No data available for children
+        '5-14': np.nan,     # No data available for children
+        '15-24': 432,       # Placeholder - replace with actual data
+        '25-34': 902,       # Placeholder - replace with actual data
+        '35-44': 1107,      # Placeholder - replace with actual data
+        '45-54': 1063,      # Placeholder - replace with actual data
+        '55-64': 845,       # Placeholder - replace with actual data
+        '65+': 1104         # Placeholder - replace with actual data
+    }
+    
+    # All age groups including children
+    all_age_groups = ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+']
+    
+    # Create extended data array with NaN for age groups without survey data
+    sa_2018_values = []
+    for group in all_age_groups:
+        if group in sa_2018_data:
+            sa_2018_values.append(sa_2018_data[group])
+        else:
+            sa_2018_values.append(np.nan)  # No data available for children
+
+    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
+    ncols = len(beta_vals)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
+
+    for m, tb_mortality in enumerate(tb_mortality_vals):
+        for i, rel_sus in enumerate(rel_sus_vals):
+            for j, beta in enumerate(beta_vals):
+                sim = sim_grid[m][i][j]
+                
+                # Compute age-stratified incidence for 2018
+                age_incidence = compute_age_stratified_incidence(sim, target_year=2018)
+                model_incidence = [age_incidence[group]['incidence_per_100k'] for group in all_age_groups]
+
+                ax_idx = m * len(rel_sus_vals) + i
+                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
+                
+                # Create bar plot
+                x_pos = np.arange(len(all_age_groups))
+                width = 0.35
+                
+                # Plot model results
+                bars1 = ax.bar(x_pos - width/2, model_incidence, width, 
+                              label='Model (2018)', alpha=0.8, color='blue')
+                
+                # Plot South Africa 2018 data (only for age groups with data)
+                valid_data_mask = ~np.isnan(sa_2018_values)
+                bars2 = ax.bar(x_pos[valid_data_mask] + width/2, 
+                              [sa_2018_values[i] for i in range(len(sa_2018_values)) if valid_data_mask[i]], 
+                              width, label='SA Data (2018)', alpha=0.8, color='red')
+                
+                # Add value labels on bars
+                for bar in bars1:
+                    height = bar.get_height()
+                    if height > 0:
+                        ax.text(bar.get_x() + bar.get_width()/2., height + 50,
+                               f'{height:.0f}', ha='center', va='bottom', fontsize=8)
+                
+                for bar in bars2:
+                    height = bar.get_height()
+                    if height > 0:
+                        ax.text(bar.get_x() + bar.get_width()/2., height + 50,
+                               f'{height:.0f}', ha='center', va='bottom', fontsize=8)
+                
+                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
+                ax.set_xlabel('Age Group')
+                ax.set_ylabel('TB Incidence (per 100,000)')
+                ax.set_xticks(x_pos)
+                ax.set_xticklabels(all_age_groups, rotation=45)
+                ax.grid(True, alpha=0.3)
+                
+                if m == 0 and i == 0 and j == 0:
+                    ax.legend(fontsize=6)
+                
+                # Add percentage differences (only for age groups with survey data)
+                for k, (model_val, data_val) in enumerate(zip(model_incidence, sa_2018_values)):
+                    if not np.isnan(data_val) and data_val > 0:
+                        pct_diff = ((model_val - data_val) / data_val) * 100
+                        ax.annotate(f'{pct_diff:.1f}%', 
+                                    xy=(k, max(model_val, data_val) + 100), 
+                                    xytext=(0, 5), 
+                                    textcoords='offset points',
+                                    ha='center', fontsize=7, color='darkgreen')
+
+    plt.tight_layout()
+    plt.suptitle('Age-Stratified TB Incidence: Model vs South Africa 2018 Data', fontsize=14, y=1.02)
+
+    filename = f"age_incidence_grid_{timestamp}.pdf"
+    plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
+    plt.show()
+
+
 def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
 
     # This function performs a parameter sweep over beta and relative susceptibility values
@@ -2225,6 +2516,7 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals):
     
     plot_annualized_infection_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
+    plot_age_incidence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_hiv_tb_coinfection_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     
@@ -2340,8 +2632,4 @@ def test_health_seeking_diagnostic_integration():
 
 # Uncomment the line below to run the health-seeking and diagnostic integration test
 # test_health_seeking_diagnostic_integration()
-
-
-
-
 
