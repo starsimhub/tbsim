@@ -1183,12 +1183,12 @@ def plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, 
                 hiv_prev_25plus = compute_hiv_prevalence_adults_25plus(sim)
                 hiv_prev_15to24 = compute_hiv_prevalence_adults_15to24(sim)
 
-                # Filter time series data based on configuration
+                # Filter time series data starting from 1980 for HIV plots since values are 0 before this time
                 filtered_time, filtered_hiv_prev_25plus = filter_time_series_data(
-                    time, hiv_prev_25plus, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
+                    time, hiv_prev_25plus, 1980, TIME_POINTS_PER_YEAR
                 )
                 _, filtered_hiv_prev_15to24 = filter_time_series_data(
-                    time, hiv_prev_15to24, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
+                    time, hiv_prev_15to24, 1980, TIME_POINTS_PER_YEAR
                 )
 
                 ax_idx = m * len(rel_sus_vals) + i
@@ -1227,20 +1227,36 @@ def plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, 
     plt.tight_layout()
     plt.suptitle('HIV Prevalence by Age Group: Model vs van Schalkwyk et al. 2021 Data (eThekwini, South Africa)', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
+    # Set consistent x-axis ticks for all subplots based on filtered data starting from 1980
     first_sim = sim_grid[0][0][0]
-    time_years = np.array([d.year for d in first_sim.results['timevec']])
-    min_year = time_years.min()
-    max_year = time_years.max()
-    xticks = np.arange(min_year, max_year + 1, 20)
-    for ax_row in axs:
-        if isinstance(ax_row, np.ndarray):
-            for ax in ax_row:
-                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
+    first_time = first_sim.results['timevec']
+    # Use 1980 as start year for HIV plots since values are 0 before this time
+    filtered_first_time, _ = filter_time_series_data(first_time, np.zeros_like(first_time), 1980, TIME_POINTS_PER_YEAR)
+    
+    if len(filtered_first_time) > 0:
+        time_years = np.array([d.year for d in filtered_first_time])
+        min_year = time_years.min()
+        max_year = time_years.max()
+        year_range = max_year - min_year
+        
+        # Adjust tick spacing based on year range
+        if year_range <= 50:
+            tick_spacing = 10
+        elif year_range <= 100:
+            tick_spacing = 20
         else:
-            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+            tick_spacing = 50
+            
+        xticks = np.arange(min_year, max_year + 1, tick_spacing)
+        
+        for ax_row in axs:
+            if isinstance(ax_row, np.ndarray):
+                for ax in ax_row:
+                    ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                    ax.set_xticklabels([str(year) for year in xticks], rotation=45)
+            else:
+                ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"hiv_metrics_grid_{timestamp}.pdf"
     plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
@@ -1608,20 +1624,35 @@ def plot_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, t
     plt.tight_layout()
     plt.suptitle('TB Diagnostic Testing Outcomes', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
+    # Set consistent x-axis ticks for all subplots based on filtered data
     first_sim = sim_grid[0][0][0]
-    time_years = np.array([d.year for d in first_sim.results['timevec']])
-    min_year = time_years.min()
-    max_year = time_years.max()
-    xticks = np.arange(min_year, max_year + 1, 20)
-    for ax_row in axs:
-        if isinstance(ax_row, np.ndarray):
-            for ax in ax_row:
-                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
+    first_time = first_sim.results['timevec']
+    filtered_first_time, _ = filter_time_series_data(first_time, np.zeros_like(first_time), PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
+    
+    if len(filtered_first_time) > 0:
+        time_years = np.array([d.year for d in filtered_first_time])
+        min_year = time_years.min()
+        max_year = time_years.max()
+        year_range = max_year - min_year
+        
+        # Adjust tick spacing based on year range
+        if year_range <= 50:
+            tick_spacing = 10
+        elif year_range <= 100:
+            tick_spacing = 20
         else:
-            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+            tick_spacing = 50
+            
+        xticks = np.arange(min_year, max_year + 1, tick_spacing)
+        
+        for ax_row in axs:
+            if isinstance(ax_row, np.ndarray):
+                for ax in ax_row:
+                    ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                    ax.set_xticklabels([str(year) for year in xticks], rotation=45)
+            else:
+                ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"diagnostic_grid_{timestamp}.pdf"
     plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
