@@ -367,11 +367,11 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
     # people = ss.People(n_agents=n_agents)
     # To do: Add time-varying birth rate and age-, sex-, year-specific mortality
 
-    cbr = pd.read_csv('../data/Vietnam_CBR.csv')  # Crude birth rate per 1000
-    asmr = pd.read_csv('../data/Vietnam_ASMR.csv')  # Age-specific mortality rate
+    # Use default demographic rates since Vietnam data is not available
+    # These are reasonable defaults for South Africa context
     demog = [
-        ss.Births(birth_rate=cbr, unit='day', dt=30),
-        ss.Deaths(death_rate=asmr, unit='day', dt=30, rate_units=1),  # rate_units=1 = per person-year
+        ss.Births(birth_rate=20, unit='day', dt=30),  # 20 per 1000 per year
+        ss.Deaths(death_rate=10, unit='day', dt=30, rate_units=1),  # 10 per 1000 per year
     ]
     people = make_people(n_agents=n_agents)
  

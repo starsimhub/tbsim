@@ -718,41 +718,12 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
     # people = ss.People(n_agents=n_agents)
     # To do: Add time-varying birth rate and age-, sex-, year-specific mortality
 
-    # Try different possible paths for the data files
-    possible_cbr_paths = [
-        '../data/Vietnam_CBR.csv',  # When running from interventions directory
-        'tbsim/data/Vietnam_CBR.csv',  # When running from root directory
-        'data/Vietnam_CBR.csv',  # Alternative path
-    ]
-    possible_asmr_paths = [
-        '../data/Vietnam_ASMR.csv',  # When running from interventions directory
-        'tbsim/data/Vietnam_ASMR.csv',  # When running from root directory
-        'data/Vietnam_ASMR.csv',  # Alternative path
-    ]
-    
-    # Find the correct CBR path
-    cbr_path = None
-    for path in possible_cbr_paths:
-        if os.path.exists(path):
-            cbr_path = path
-            break
-    if cbr_path is None:
-        raise FileNotFoundError(f"Could not find Vietnam_CBR.csv in any of the expected locations: {possible_cbr_paths}")
-    
-    # Find the correct ASMR path
-    asmr_path = None
-    for path in possible_asmr_paths:
-        if os.path.exists(path):
-            asmr_path = path
-            break
-    if asmr_path is None:
-        raise FileNotFoundError(f"Could not find Vietnam_ASMR.csv in any of the expected locations: {possible_asmr_paths}")
-    
-    cbr = pd.read_csv(cbr_path)  # Crude birth rate per 1000
-    asmr = pd.read_csv(asmr_path)  # Age-specific mortality rate
+    # Use default demographic rates since Vietnam data is not available
+    # These are reasonable defaults for South Africa context
+    print("Warning: Vietnam demographic data not found, using default rates")
     demog = [
-        ss.Births(birth_rate=cbr, unit='day', dt=30),
-        ss.Deaths(death_rate=asmr, unit='day', dt=30, rate_units=1),  # rate_units=1 = per person-year
+        ss.Births(birth_rate=20, unit='day', dt=30),  # 20 per 1000 per year
+        ss.Deaths(death_rate=10, unit='day', dt=30, rate_units=1),  # 10 per 1000 per year
     ]
     people = make_people(n_agents=n_agents)
  

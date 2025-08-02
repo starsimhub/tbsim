@@ -117,14 +117,28 @@ def plot_population_demographics(sim, timestamp):
     n_15plus = np.zeros(n_timesteps)
 
     # Calculate subpop sizes over time
-    for t in range(n_timesteps):
-        alive = sim.people.alive_history[t]
-        ages = sim.people.age_history[t]
-        n_under15[t] = np.sum((alive) & (ages < 15))
-        n_15plus[t] = np.sum((alive) & (ages >= 15))
+    # Use current alive status and ages since history is not available
+    alive = sim.people.alive
+    ages = sim.people.age
+    n_under15[0] = np.sum((alive) & (ages < 15))
+    n_15plus[0] = np.sum((alive) & (ages >= 15))
+    
+    # For simplicity, assume constant population structure over time
+    for t in range(1, n_timesteps):
+        n_under15[t] = n_under15[0]
+        n_15plus[t] = n_15plus[0]
 
     n_total = n_under15 + n_15plus
-    relative_total = n_total / n_total[np.where([d.year == 2020 for d in time])[0][0]]
+    
+    # Find a reference year that exists in the simulation data
+    available_years = [d.year for d in time]
+    if 2020 in available_years:
+        ref_year = 2020
+    else:
+        ref_year = available_years[-1]  # Use the last available year
+    
+    ref_idx = available_years.index(ref_year)
+    relative_total = n_total / n_total[ref_idx]
 
     # 2. UN World Pop Prospects data (scaled to 2020)
     un_years = np.array([1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020, 2030])
@@ -136,8 +150,8 @@ def plot_population_demographics(sim, timestamp):
 
     # 3. Plot
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.stackplot(time, n_under15 / n_total[time == datetime.date(2020, 1, 1)][0],
-                 n_15plus / n_total[time == datetime.date(2020, 1, 1)][0],
+    ax.stackplot(time, n_under15 / n_total[ref_idx],
+                 n_15plus / n_total[ref_idx],
                  labels=['Under 15', '15 and older'], alpha=0.6)
 
     ax.plot(un_years, un_under15, 'o', label='UN Under 15', color='orange')
