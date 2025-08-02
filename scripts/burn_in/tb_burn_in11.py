@@ -1319,49 +1319,66 @@ def plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_morta
     import rdata
     import pandas as pd
 
-    # --- Load real notification data (from extract_gtb_data.py logic) ---
+    # Initialize variables for real data
+    real_years = None
+    real_rates = None
+    
+    # Check if GTB data files exist
     base_dir = os.path.dirname(os.path.abspath(__file__))
     gtb_dir = os.path.join(base_dir, '../data/gtbreport2024/data/gtb')
     snapshot_dir = os.path.join(gtb_dir, 'snapshot_2024-07-29')
     other_dir = os.path.join(gtb_dir, 'other')
     tb_rda_path = os.path.join(snapshot_dir, 'tb.rda')
     pop_rda_path = os.path.join(other_dir, 'pop.rda')
-    # Helper to load RDA file and return as pandas DataFrame
-    def load_rda_df(rda_path):
-        import rdata
-        parsed = rdata.parser.parse_file(rda_path)
-        converted = rdata.conversion.convert(parsed)
-        for v in converted.values():
-            if isinstance(v, pd.DataFrame):
-                return v
-        raise ValueError(f"No DataFrame found in {rda_path}")
-    tb_df = load_rda_df(tb_rda_path)
-    pop_df = load_rda_df(pop_rda_path)
-    sa_code = 'ZAF'
-    tb_sa = tb_df[tb_df['iso3'] == sa_code]
-    pop_sa = pop_df[pop_df['iso3'] == sa_code]
-    notif_vars = [col for col in tb_sa.columns if 'new' in col and ('bact' in col or 'labconf' in col or 'notif' in col or 'pos' in col)]
-    notif_var = None
-    for v in ['new_bact_pos', 'new_labconf', 'new_notif', 'new_pos']:
-        if v in tb_sa.columns:
-            notif_var = v
-            break
-    if notif_var is None and notif_vars:
-        notif_var = notif_vars[0]
-    if notif_var is None:
-        raise ValueError('No notification variable found in TB data')
-    pop_col = None
-    for c in ['pop', 'e_pop_num', 'population']:
-        if c in pop_sa.columns:
-            pop_col = c
-            break
-    if pop_col is None:
-        raise ValueError('No population column found in population data')
-    merged = pd.merge(tb_sa[['year', notif_var]], pop_sa[['year', pop_col]], on='year', how='inner')
-    merged = merged.sort_values('year')
-    merged['notif_rate_per_100k'] = merged[notif_var] / merged[pop_col] * 1e5
-    real_years = merged['year'].values
-    real_rates = merged['notif_rate_per_100k'].values
+    
+    if os.path.exists(tb_rda_path) and os.path.exists(pop_rda_path):
+        try:
+            # Helper to load RDA file and return as pandas DataFrame
+            def load_rda_df(rda_path):
+                import rdata
+                parsed = rdata.parser.parse_file(rda_path)
+                converted = rdata.conversion.convert(parsed)
+                for v in converted.values():
+                    if isinstance(v, pd.DataFrame):
+                        return v
+                raise ValueError(f"No DataFrame found in {rda_path}")
+            
+            tb_df = load_rda_df(tb_rda_path)
+            pop_df = load_rda_df(pop_rda_path)
+            sa_code = 'ZAF'
+            tb_sa = tb_df[tb_df['iso3'] == sa_code]
+            pop_sa = pop_df[pop_df['iso3'] == sa_code]
+            notif_vars = [col for col in tb_sa.columns if 'new' in col and ('bact' in col or 'labconf' in col or 'notif' in col or 'pos' in col)]
+            notif_var = None
+            for v in ['new_bact_pos', 'new_labconf', 'new_notif', 'new_pos']:
+                if v in tb_sa.columns:
+                    notif_var = v
+                    break
+            if notif_var is None and notif_vars:
+                notif_var = notif_vars[0]
+            if notif_var is None:
+                raise ValueError('No notification variable found in TB data')
+            pop_col = None
+            for c in ['pop', 'e_pop_num', 'population']:
+                if c in pop_sa.columns:
+                    pop_col = c
+                    break
+            if pop_col is None:
+                raise ValueError('No population column found in population data')
+            merged = pd.merge(tb_sa[['year', notif_var]], pop_sa[['year', pop_col]], on='year', how='inner')
+            merged = merged.sort_values('year')
+            merged['notif_rate_per_100k'] = merged[notif_var] / merged[pop_col] * 1e5
+            real_years = merged['year'].values
+            real_rates = merged['notif_rate_per_100k'].values
+            print(f"Loaded real South Africa TB notification data: {len(real_years)} data points")
+        except Exception as e:
+            print(f"Warning: Could not load GTB data: {e}")
+            print("Proceeding without real data comparison")
+    else:
+        print(f"Warning: GTB data files not found at:")
+        print(f"  TB data: {tb_rda_path}")
+        print(f"  Population data: {pop_rda_path}")
+        print("Proceeding without real data comparison")
 
     # --- Plot model grid ---
     nrows = len(tb_mortality_vals) * len(rel_sus_vals)
@@ -1414,8 +1431,9 @@ def plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_morta
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
                 ax.plot(time, notification_rate, color='purple', label='Model Notification Rate')
                 ax.plot(time, incidence_rate, color='blue', label='Model Incidence Rate')
-                # Overlay real data
-                ax.plot([datetime.date(int(y), 1, 1) for y in real_years], real_rates, marker='o', color='red', label='SA Notification Data')
+                # Overlay real data if available
+                if real_years is not None and real_rates is not None:
+                    ax.plot([datetime.date(int(y), 1, 1) for y in real_years], real_rates, marker='o', color='red', label='SA Notification Data')
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
                 ax.grid(True)
                 if ax_idx == nrows - 1:
