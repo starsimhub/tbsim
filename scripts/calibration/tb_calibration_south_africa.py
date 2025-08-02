@@ -17,7 +17,7 @@ import datetime
 import time
 import sys
 import os
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+#from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 # Dynamically add the correct path to scripts/hiv for shared_functions import
 try:
@@ -165,8 +165,14 @@ def compute_case_notifications(sim, target_years=[2000, 2005, 2010, 2015, 2020])
         target_idx = np.argmin(np.abs(time_years - target_year))
         
         # Get diagnostic results for that year
-        tbdiag = sim.results['tbdiagnostic']
-        n_diagnosed = tbdiag['n_test_positive'].values[target_idx]
+        if 'tbdiagnostic' in sim.results:
+            tbdiag = sim.results['tbdiagnostic']
+            n_diagnosed = tbdiag['n_test_positive'].values[target_idx]
+        else:
+            # Fallback: estimate from active TB cases
+            tb_states = sim.diseases.tb.state
+            active_tb_mask = np.isin(tb_states, [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB])
+            n_diagnosed = np.sum(active_tb_mask) * 0.7  # Assume 70% detection rate
         
         # Get population size for rate calculation
         n_alive = sim.results['n_alive'][target_idx]
@@ -262,13 +268,19 @@ def plot_calibration_comparison(sim, sa_data, timestamp):
     ax3.grid(True, alpha=0.3)
     
     # 4. Diagnostic and treatment cascade
-    tbdiag = sim.results['tbdiagnostic']
-    tbtx = sim.results['tbtreatment']
-    
-    # Get cumulative values at the end
-    total_diagnosed = tbdiag['cum_test_positive'].values[-1]
-    total_treated = tbtx['cum_treatment_success'].values[-1]
-    total_failures = tbtx['cum_treatment_failure'].values[-1]
+    if 'tbdiagnostic' in sim.results and 'tbtreatment' in sim.results:
+        tbdiag = sim.results['tbdiagnostic']
+        tbtx = sim.results['tbtreatment']
+        
+        # Get cumulative values at the end
+        total_diagnosed = tbdiag['cum_test_positive'].values[-1]
+        total_treated = tbtx['cum_treatment_success'].values[-1]
+        total_failures = tbtx['cum_treatment_failure'].values[-1]
+    else:
+        # Fallback values if interventions not present
+        total_diagnosed = 0
+        total_treated = 0
+        total_failures = 0
     
     # Create cascade plot
     cascade_data = [total_diagnosed, total_treated, total_failures]
@@ -425,7 +437,7 @@ def create_calibration_report(sim, sa_data, timestamp):
             'beta': sim.diseases.tb.pars.beta,
             'rel_sus_latentslow': sim.diseases.tb.pars.rel_sus_latentslow,
             'tb_mortality': sim.diseases.tb.pars.rate_smpos_to_dead,
-            'hiv_prevalence': sim.results['hiv']['hiv_prevalence'][-1] if 'hiv' in sim.results else 0
+            'hiv_prevalence': sim.results['hiv']['hiv_prevalence'][-1] if 'hiv' in sim.results else 0.0
         }
     }
     
@@ -487,14 +499,14 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
     
     # Load demographic data
     possible_cbr_paths = [
-        '../data/Vietnam_CBR.csv',
-        'tbsim/data/Vietnam_CBR.csv',
-        'data/Vietnam_CBR.csv',
+        '../data/South_Africa_CBR.csv',
+        'tbsim/data/South_Africa_CBR.csv',
+        'data/South_Africa_CBR.csv',
     ]
     possible_asmr_paths = [
-        '../data/Vietnam_ASMR.csv',
-        'tbsim/data/Vietnam_ASMR.csv',
-        'data/Vietnam_ASMR.csv',
+        '../data/South_Africa_ASMR.csv',
+        'tbsim/data/South_Africa_ASMR.csv',
+        'data/South_Africa_ASMR.csv',
     ]
     
     cbr_path = None
@@ -503,7 +515,7 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
             cbr_path = path
             break
     if cbr_path is None:
-        raise FileNotFoundError(f"Could not find Vietnam_CBR.csv in any of the expected locations")
+        raise FileNotFoundError(f"Could not find South_Africa_CBR.csv in any of the expected locations")
     
     asmr_path = None
     for path in possible_asmr_paths:
@@ -511,7 +523,7 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
             asmr_path = path
             break
     if asmr_path is None:
-        raise FileNotFoundError(f"Could not find Vietnam_ASMR.csv in any of the expected locations")
+        raise FileNotFoundError(f"Could not find South_Africa_ASMR.csv in any of the expected locations")
     
     cbr = pd.read_csv(cbr_path)
     asmr = pd.read_csv(asmr_path)
