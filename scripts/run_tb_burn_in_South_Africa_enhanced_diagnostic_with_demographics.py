@@ -2711,7 +2711,7 @@ def plot_age_incidence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals
     plt.show()
 
 
-def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baseline', seed=0, years=200, n_agents=1000):  # 8000
+def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baseline', diagnostic_start_year=2025, seed=0, years=200, n_agents=1000):  # 8000
     start_year = 1850  # 1750
     sim_pars = dict(
         unit='day',
@@ -2820,12 +2820,14 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
     
     if diagnostic_scenario == 'baseline':
         # Baseline scenario: sputum-smear microscopy (current assumptions)
+        # Baseline starts from the beginning and continues throughout
         diagnostic_params = {
             'coverage': ss.bernoulli(0.7, strict=False),  # 70% coverage
             'use_oral_swab': False,
             'use_fujilam': False,
             'use_cadcxr': False,
             'care_seeking_multiplier': 1.0,
+            'start_year': start_year,  # Start from beginning of simulation
         }
     elif diagnostic_scenario == 'oral_swab':
         # Oral swab scenario: saliva-based test
@@ -2835,6 +2837,7 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
             'use_fujilam': False,
             'use_cadcxr': False,
             'care_seeking_multiplier': 1.0,
+            'start_year': diagnostic_start_year,  # Start from 2025
         }
     elif diagnostic_scenario == 'fujilam':
         # FujiLAM scenario: urine-based test
@@ -2844,6 +2847,7 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
             'use_fujilam': True,
             'use_cadcxr': False,
             'care_seeking_multiplier': 1.0,
+            'start_year': diagnostic_start_year,  # Start from 2025
         }
     elif diagnostic_scenario == 'cadcxr':
         # CAD CXR scenario: X-ray screening
@@ -2853,6 +2857,7 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
             'use_fujilam': False,
             'use_cadcxr': True,
             'care_seeking_multiplier': 1.0,
+            'start_year': diagnostic_start_year,  # Start from 2025
         }
     else:
         raise ValueError(f"Unknown diagnostic scenario: {diagnostic_scenario}")
@@ -3061,7 +3066,7 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals, diagnostic_scenari
             for j, beta in enumerate(beta_vals):
                 scen_key = f'beta={beta:.3f}_rel_sus={rel_sus:.2f}_mort={tb_mortality:.1e}'
                 print(f"▶️ Running simulation {scen_key} ({m},{i},{j})/{total_runs}")
-                sim = run_sim(beta=beta, rel_sus_latentslow=rel_sus, tb_mortality=tb_mortality, diagnostic_scenario=diagnostic_scenario)
+                sim = run_sim(beta=beta, rel_sus_latentslow=rel_sus, tb_mortality=tb_mortality, diagnostic_scenario=diagnostic_scenario, diagnostic_start_year=2025)
                 sim_grid[m][i][j] = sim
                 results[scen_key] = sim.results.flatten()
                 
@@ -3165,7 +3170,7 @@ def test_hiv_integration():
     print("Testing HIV integration...")
     
     # Run a simple simulation with HIV
-    sim = run_sim(beta=0.003, rel_sus_latentslow=0.05, tb_mortality=4e-4, years=50, n_agents=500)
+    sim = run_sim(beta=0.003, rel_sus_latentslow=0.05, tb_mortality=4e-4, diagnostic_start_year=2025, years=50, n_agents=500)
     
     # Debug HIV results
     debug_hiv_results(sim)
@@ -3190,7 +3195,7 @@ def test_health_seeking_diagnostic_integration():
     print("Testing health-seeking and diagnostic integration...")
     
     # Run a simple simulation with health-seeking and diagnostic
-    sim = run_sim(beta=0.003, rel_sus_latentslow=0.05, tb_mortality=4e-4, years=50, n_agents=500)
+    sim = run_sim(beta=0.003, rel_sus_latentslow=0.05, tb_mortality=4e-4, diagnostic_start_year=2025, years=50, n_agents=500)
     
     # Check if health-seeking results are available
     try:
