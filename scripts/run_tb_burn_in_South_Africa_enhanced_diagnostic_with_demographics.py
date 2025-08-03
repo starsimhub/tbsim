@@ -2895,9 +2895,18 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
     return sim
 
 
-def run_multiple_diagnostic_scenarios(beta_vals, rel_sus_vals, tb_mortality_vals):
+def run_multiple_diagnostic_scenarios(beta_vals, rel_sus_vals, tb_mortality_vals, 
+                                     plot_start_year=2000, plot_points_per_year=1):
     """
     Run the same parameter sweep for multiple diagnostic scenarios and create comparison plots.
+    
+    Args:
+        beta_vals: Array of beta values for the parameter sweep
+        rel_sus_vals: Array of relative susceptibility values for the parameter sweep
+        tb_mortality_vals: Array of TB mortality values for the parameter sweep
+        plot_start_year: Year to start plotting from (default: 2000)
+        plot_points_per_year: Number of time points per calendar year to include in plots
+                             (default: 1 for annual data)
     """
     diagnostic_scenarios = ['baseline', 'oral_swab', 'fujilam', 'cadcxr']
     scenario_results = {}
@@ -2913,21 +2922,36 @@ def run_multiple_diagnostic_scenarios(beta_vals, rel_sus_vals, tb_mortality_vals
             
 
     
-    # Create comparison plot
-    plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_vals, tb_mortality_vals)
+    # Create comparison plot with plot configuration options
+    plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_vals, tb_mortality_vals, 
+                                       start_year=plot_start_year, points_per_year=plot_points_per_year)
     
     return scenario_results
 
 
-def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_vals, tb_mortality_vals):
+def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_vals, tb_mortality_vals, 
+                                       start_year=None, points_per_year=None):
     """
-    Create comparison plots for different diagnostic scenarios.
+    Create comparison plots for different diagnostic scenarios with plot configuration options.
+    
+    Args:
+        scenario_results: Dictionary of simulation results for each diagnostic scenario
+        beta_vals: Array of beta values used in the sweep
+        rel_sus_vals: Array of relative susceptibility values used in the sweep
+        tb_mortality_vals: Array of TB mortality values used in the sweep
+        start_year: Year to start plotting from (None for all years, default: 2000)
+        points_per_year: Number of time points per calendar year to include
+                        (None for all time points, 1 for annual, 2 for semi-annual, etc.)
     """
+    # Set default start year if not provided
+    if start_year is None:
+        start_year = 2000
+    
     timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H%M")
     
     # Create a comprehensive comparison plot
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
-    fig.suptitle('Enhanced TB Diagnostic Scenarios Comparison', fontsize=16)
+    fig.suptitle(f'Enhanced TB Diagnostic Scenarios Comparison (from {start_year})', fontsize=16)
     
     # Colors for different scenarios
     colors = ['blue', 'red', 'green', 'orange']
@@ -2955,7 +2979,11 @@ def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_val
         if 'tb' in first_sim.results:
             tb_results = first_sim.results['tb']
             active_prev = tb_results['n_active'].values / len(first_sim.people) * 100
-            axes[0, 0].plot(tb_results['n_active'].timevec, active_prev, 
+            time_vec = tb_results['n_active'].timevec
+            
+            # Apply plot configuration filtering
+            filtered_time, filtered_data = filter_time_series_data(time_vec, active_prev, start_year, points_per_year)
+            axes[0, 0].plot(filtered_time, filtered_data, 
                            label=scenario_name, color=color, linewidth=2)
         
         # Plot 2: Latent TB prevalence comparison
@@ -2965,28 +2993,44 @@ def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_val
             latent_fast = tb_results['n_latent_fast'].values
             latent_total = latent_slow + latent_fast
             latent_prev = latent_total / len(first_sim.people) * 100
-            axes[0, 1].plot(tb_results['n_latent_slow'].timevec, latent_prev, 
+            time_vec = tb_results['n_latent_slow'].timevec
+            
+            # Apply plot configuration filtering
+            filtered_time, filtered_data = filter_time_series_data(time_vec, latent_prev, start_year, points_per_year)
+            axes[0, 1].plot(filtered_time, filtered_data, 
                            label=scenario_name, color=color, linewidth=2)
         
         # Plot 3: Diagnostic testing comparison
         if 'enhancedtbdiagnostic' in first_sim.results:
             diag_results = first_sim.results['enhancedtbdiagnostic']
-            axes[0, 2].plot(diag_results['cum_test_positive'].timevec, 
-                           diag_results['cum_test_positive'].values, 
+            time_vec = diag_results['cum_test_positive'].timevec
+            data = diag_results['cum_test_positive'].values
+            
+            # Apply plot configuration filtering
+            filtered_time, filtered_data = filter_time_series_data(time_vec, data, start_year, points_per_year)
+            axes[0, 2].plot(filtered_time, filtered_data, 
                            label=scenario_name, color=color, linewidth=2)
         
         # Plot 4: Treatment outcomes comparison
         if 'tbtreatment' in first_sim.results:
             tx_results = first_sim.results['tbtreatment']
-            axes[1, 0].plot(tx_results['cum_treatment_success'].timevec, 
-                           tx_results['cum_treatment_success'].values, 
+            time_vec = tx_results['cum_treatment_success'].timevec
+            data = tx_results['cum_treatment_success'].values
+            
+            # Apply plot configuration filtering
+            filtered_time, filtered_data = filter_time_series_data(time_vec, data, start_year, points_per_year)
+            axes[1, 0].plot(filtered_time, filtered_data, 
                            label=scenario_name, color=color, linewidth=2)
         
         # Plot 5: Health-seeking behavior comparison
         if 'healthseekingbehavior' in first_sim.results:
             hsb_results = first_sim.results['healthseekingbehavior']
-            axes[1, 1].plot(hsb_results['new_sought_care'].timevec, 
-                           hsb_results['new_sought_care'].values, 
+            time_vec = hsb_results['new_sought_care'].timevec
+            data = hsb_results['new_sought_care'].values
+            
+            # Apply plot configuration filtering
+            filtered_time, filtered_data = filter_time_series_data(time_vec, data, start_year, points_per_year)
+            axes[1, 1].plot(filtered_time, filtered_data, 
                            label=scenario_name, color=color, linewidth=2)
         
         # Plot 6: HIV-TB coinfection comparison
@@ -2994,7 +3038,11 @@ def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_val
         if len(hiv_tb_prev) > 0:
             # Get time vector from TB results
             tb_results = first_sim.results['tb']
-            axes[1, 2].plot(tb_results['n_active'].timevec, hiv_tb_prev, 
+            time_vec = tb_results['n_active'].timevec
+            
+            # Apply plot configuration filtering
+            filtered_time, filtered_data = filter_time_series_data(time_vec, hiv_tb_prev, start_year, points_per_year)
+            axes[1, 2].plot(filtered_time, filtered_data, 
                            label=scenario_name, color=color, linewidth=2)
     
     # Set labels and titles
@@ -3034,8 +3082,12 @@ def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_val
     
     plt.tight_layout()
     
-    # Save the comparison plot
-    output_path = get_output_path(f'enhanced_tb_diagnostic_scenarios_comparison_{timestamp}.pdf')
+    # Save the comparison plot with configuration info in filename
+    config_suffix = f"_from{start_year}"
+    if points_per_year is not None:
+        config_suffix += f"_pp{points_per_year}"
+    
+    output_path = get_output_path(f'enhanced_tb_diagnostic_scenarios_comparison{config_suffix}_{timestamp}.pdf')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Saved diagnostic scenario comparison plot to: {output_path}")
     
