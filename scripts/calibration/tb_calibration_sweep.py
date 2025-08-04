@@ -214,9 +214,9 @@ def run_calibration_sweep(beta_range, rel_sus_range, tb_mortality_range,
     return sweep_summary, results_df, best_sim, sa_data
 
 
-def plot_sweep_results(results_df, timestamp):
+def plot_violin_plots(results_df, timestamp):
     """
-    Create plots showing sweep results
+    Create focused violin plots showing score distributions for each parameter
     
     Args:
         results_df: DataFrame with sweep results
@@ -224,39 +224,272 @@ def plot_sweep_results(results_df, timestamp):
     """
     
     import matplotlib.pyplot as plt
+    import seaborn as sns
     
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 6))
     
-    # 1. Score distribution
+    # 1. Violin plot for Beta values
+    # Group by actual beta values
+    beta_groups = results_df.groupby('beta')['composite_score'].apply(list).reset_index()
+    violin_data = [group for group in beta_groups['composite_score']]
+    violin_labels = [f'{beta:.3f}' for beta in beta_groups['beta']]
+    
+    parts1 = ax1.violinplot(violin_data, positions=range(len(violin_data)))
+    ax1.set_xticks(range(len(violin_labels)))
+    ax1.set_xticklabels(violin_labels, rotation=45)
+    ax1.set_xlabel('Beta (Transmission Rate)')
+    ax1.set_ylabel('Composite Calibration Score')
+    ax1.set_title('Score Distribution by Beta Value')
+    ax1.grid(True, alpha=0.3)
+    
+    # Add mean points
+    means = [np.mean(data) for data in violin_data]
+    ax1.plot(range(len(means)), means, 'ro-', markersize=8, label='Mean Score')
+    ax1.legend()
+    
+    # 2. Violin plot for Relative Susceptibility values
+    rel_sus_groups = results_df.groupby('rel_sus_latentslow')['composite_score'].apply(list).reset_index()
+    violin_data = [group for group in rel_sus_groups['composite_score']]
+    violin_labels = [f'{rel_sus:.2f}' for rel_sus in rel_sus_groups['rel_sus_latentslow']]
+    
+    parts2 = ax2.violinplot(violin_data, positions=range(len(violin_data)))
+    ax2.set_xticks(range(len(violin_labels)))
+    ax2.set_xticklabels(violin_labels, rotation=45)
+    ax2.set_xlabel('Relative Susceptibility (Latent)')
+    ax2.set_ylabel('Composite Calibration Score')
+    ax2.set_title('Score Distribution by Relative Susceptibility Value')
+    ax2.grid(True, alpha=0.3)
+    
+    # Add mean points
+    means = [np.mean(data) for data in violin_data]
+    ax2.plot(range(len(means)), means, 'ro-', markersize=8, label='Mean Score')
+    ax2.legend()
+    
+    # 3. Violin plot for TB Mortality values
+    tb_mort_groups = results_df.groupby('tb_mortality')['composite_score'].apply(list).reset_index()
+    violin_data = [group for group in tb_mort_groups['composite_score']]
+    violin_labels = [f'{tb_mort:.1e}' for tb_mort in tb_mort_groups['tb_mortality']]
+    
+    parts3 = ax3.violinplot(violin_data, positions=range(len(violin_data)))
+    ax3.set_xticks(range(len(violin_labels)))
+    ax3.set_xticklabels(violin_labels, rotation=45)
+    ax3.set_xlabel('TB Mortality Rate')
+    ax3.set_ylabel('Composite Calibration Score')
+    ax3.set_title('Score Distribution by TB Mortality Value')
+    ax3.grid(True, alpha=0.3)
+    
+    # Add mean points
+    means = [np.mean(data) for data in violin_data]
+    ax3.plot(range(len(means)), means, 'ro-', markersize=8, label='Mean Score')
+    ax3.legend()
+    
+    plt.tight_layout()
+    plt.suptitle('TB Model Calibration: Violin Plots by Parameter Value', fontsize=16, y=1.02)
+    
+    filename = f"calibration_violin_plots_{timestamp}.pdf"
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    return fig
+
+
+def plot_sweep_results(results_df, timestamp):
+    """
+    Create plots showing sweep results including violin plots
+    
+    Args:
+        results_df: DataFrame with sweep results
+        timestamp: Timestamp for file naming
+    """
+    
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+    # Create a larger figure with more subplots
+    fig = plt.figure(figsize=(20, 16))
+    
+    # Create grid layout
+    gs = fig.add_gridspec(3, 4, hspace=0.3, wspace=0.3)
+    
+    # 1. Score distribution histogram
+    ax1 = fig.add_subplot(gs[0, 0])
     ax1.hist(results_df['composite_score'], bins=20, alpha=0.7, color='skyblue', edgecolor='black')
     ax1.set_xlabel('Composite Calibration Score')
     ax1.set_ylabel('Number of Simulations')
     ax1.set_title('Distribution of Calibration Scores')
     ax1.grid(True, alpha=0.3)
     
-    # 2. Beta vs Score
+    # 2. Beta vs Score scatter
+    ax2 = fig.add_subplot(gs[0, 1])
     ax2.scatter(results_df['beta'], results_df['composite_score'], alpha=0.6, s=30)
     ax2.set_xlabel('Beta (Transmission Rate)')
     ax2.set_ylabel('Composite Score')
     ax2.set_title('Beta vs Calibration Score')
     ax2.grid(True, alpha=0.3)
     
-    # 3. Rel Sus vs Score
+    # 3. Rel Sus vs Score scatter
+    ax3 = fig.add_subplot(gs[0, 2])
     ax3.scatter(results_df['rel_sus_latentslow'], results_df['composite_score'], alpha=0.6, s=30)
     ax3.set_xlabel('Relative Susceptibility (Latent)')
     ax3.set_ylabel('Composite Score')
     ax3.set_title('Relative Susceptibility vs Calibration Score')
     ax3.grid(True, alpha=0.3)
     
-    # 4. TB Mortality vs Score
+    # 4. TB Mortality vs Score scatter
+    ax4 = fig.add_subplot(gs[0, 3])
     ax4.scatter(results_df['tb_mortality'], results_df['composite_score'], alpha=0.6, s=30)
     ax4.set_xlabel('TB Mortality Rate')
     ax4.set_ylabel('Composite Score')
     ax4.set_title('TB Mortality vs Calibration Score')
     ax4.grid(True, alpha=0.3)
     
-    plt.tight_layout()
-    plt.suptitle('TB Model Calibration Parameter Sweep Results', fontsize=16, y=1.02)
+    # 5. Violin plot for Beta
+    ax5 = fig.add_subplot(gs[1, 0])
+    # Create categorical bins for beta values
+    beta_bins = pd.cut(results_df['beta'], bins=5, labels=False)
+    violin_data = []
+    violin_labels = []
+    for i in range(5):
+        mask = beta_bins == i
+        if mask.any():
+            violin_data.append(results_df.loc[mask, 'composite_score'].values)
+            beta_range = results_df.loc[mask, 'beta']
+            violin_labels.append(f'{beta_range.min():.3f}-{beta_range.max():.3f}')
+    
+    if violin_data:
+        parts = ax5.violinplot(violin_data, positions=range(len(violin_data)))
+        ax5.set_xticks(range(len(violin_labels)))
+        ax5.set_xticklabels(violin_labels, rotation=45)
+        ax5.set_xlabel('Beta Range')
+        ax5.set_ylabel('Composite Score')
+        ax5.set_title('Score Distribution by Beta Range')
+        ax5.grid(True, alpha=0.3)
+    
+    # 6. Violin plot for Relative Susceptibility
+    ax6 = fig.add_subplot(gs[1, 1])
+    rel_sus_bins = pd.cut(results_df['rel_sus_latentslow'], bins=5, labels=False)
+    violin_data = []
+    violin_labels = []
+    for i in range(5):
+        mask = rel_sus_bins == i
+        if mask.any():
+            violin_data.append(results_df.loc[mask, 'composite_score'].values)
+            rel_sus_range = results_df.loc[mask, 'rel_sus_latentslow']
+            violin_labels.append(f'{rel_sus_range.min():.2f}-{rel_sus_range.max():.2f}')
+    
+    if violin_data:
+        parts = ax6.violinplot(violin_data, positions=range(len(violin_data)))
+        ax6.set_xticks(range(len(violin_labels)))
+        ax6.set_xticklabels(violin_labels, rotation=45)
+        ax6.set_xlabel('Rel Sus Range')
+        ax6.set_ylabel('Composite Score')
+        ax6.set_title('Score Distribution by Rel Sus Range')
+        ax6.grid(True, alpha=0.3)
+    
+    # 7. Violin plot for TB Mortality
+    ax7 = fig.add_subplot(gs[1, 2])
+    tb_mort_bins = pd.cut(results_df['tb_mortality'], bins=5, labels=False)
+    violin_data = []
+    violin_labels = []
+    for i in range(5):
+        mask = tb_mort_bins == i
+        if mask.any():
+            violin_data.append(results_df.loc[mask, 'composite_score'].values)
+            tb_mort_range = results_df.loc[mask, 'tb_mortality']
+            violin_labels.append(f'{tb_mort_range.min():.1e}-{tb_mort_range.max():.1e}')
+    
+    if violin_data:
+        parts = ax7.violinplot(violin_data, positions=range(len(violin_data)))
+        ax7.set_xticks(range(len(violin_labels)))
+        ax7.set_xticklabels(violin_labels, rotation=45)
+        ax7.set_xlabel('TB Mortality Range')
+        ax7.set_ylabel('Composite Score')
+        ax7.set_title('Score Distribution by TB Mortality Range')
+        ax7.grid(True, alpha=0.3)
+    
+    # 8. 3D scatter plot (Beta vs Rel Sus vs Score)
+    ax8 = fig.add_subplot(gs[1, 3], projection='3d')
+    scatter = ax8.scatter(results_df['beta'], results_df['rel_sus_latentslow'], 
+                         results_df['composite_score'], 
+                         c=results_df['composite_score'], cmap='viridis', alpha=0.6)
+    ax8.set_xlabel('Beta')
+    ax8.set_ylabel('Rel Sus')
+    ax8.set_zlabel('Composite Score')
+    ax8.set_title('3D: Beta vs Rel Sus vs Score')
+    plt.colorbar(scatter, ax=ax8, label='Composite Score')
+    
+    # 9. Heatmap of parameter interactions
+    ax9 = fig.add_subplot(gs[2, 0])
+    # Create correlation matrix for parameters and score
+    corr_data = results_df[['beta', 'rel_sus_latentslow', 'tb_mortality', 'composite_score']].corr()
+    im = ax9.imshow(corr_data, cmap='RdBu_r', vmin=-1, vmax=1)
+    ax9.set_xticks(range(len(corr_data.columns)))
+    ax9.set_yticks(range(len(corr_data.columns)))
+    ax9.set_xticklabels(corr_data.columns, rotation=45)
+    ax9.set_yticklabels(corr_data.columns)
+    ax9.set_title('Parameter Correlations')
+    
+    # Add correlation values to heatmap
+    for i in range(len(corr_data.columns)):
+        for j in range(len(corr_data.columns)):
+            text = ax9.text(j, i, f'{corr_data.iloc[i, j]:.2f}',
+                           ha="center", va="center", color="black", fontsize=8)
+    
+    # 10. Box plots for each parameter
+    ax10 = fig.add_subplot(gs[2, 1])
+    # Create discrete categories for each parameter
+    results_df['beta_cat'] = pd.cut(results_df['beta'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
+    results_df['rel_sus_cat'] = pd.cut(results_df['rel_sus_latentslow'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
+    results_df['tb_mort_cat'] = pd.cut(results_df['tb_mortality'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
+    
+    # Box plot for beta categories
+    box_data = [results_df[results_df['beta_cat'] == cat]['composite_score'].values 
+                for cat in ['Very Low', 'Low', 'Medium', 'High', 'Very High'] 
+                if len(results_df[results_df['beta_cat'] == cat]) > 0]
+    box_labels = [cat for cat in ['Very Low', 'Low', 'Medium', 'High', 'Very High'] 
+                  if len(results_df[results_df['beta_cat'] == cat]) > 0]
+    
+    if box_data:
+        bp = ax10.boxplot(box_data, tick_labels=box_labels)
+        ax10.set_xlabel('Beta Categories')
+        ax10.set_ylabel('Composite Score')
+        ax10.set_title('Score Distribution by Beta Categories')
+        ax10.tick_params(axis='x', rotation=45)
+        ax10.grid(True, alpha=0.3)
+    
+    # 11. Box plots for relative susceptibility
+    ax11 = fig.add_subplot(gs[2, 2])
+    box_data = [results_df[results_df['rel_sus_cat'] == cat]['composite_score'].values 
+                for cat in ['Very Low', 'Low', 'Medium', 'High', 'Very High'] 
+                if len(results_df[results_df['rel_sus_cat'] == cat]) > 0]
+    box_labels = [cat for cat in ['Very Low', 'Low', 'Medium', 'High', 'Very High'] 
+                  if len(results_df[results_df['rel_sus_cat'] == cat]) > 0]
+    
+    if box_data:
+        bp = ax11.boxplot(box_data, tick_labels=box_labels)
+        ax11.set_xlabel('Rel Sus Categories')
+        ax11.set_ylabel('Composite Score')
+        ax11.set_title('Score Distribution by Rel Sus Categories')
+        ax11.tick_params(axis='x', rotation=45)
+        ax11.grid(True, alpha=0.3)
+    
+    # 12. Box plots for TB mortality
+    ax12 = fig.add_subplot(gs[2, 3])
+    box_data = [results_df[results_df['tb_mort_cat'] == cat]['composite_score'].values 
+                for cat in ['Very Low', 'Low', 'Medium', 'High', 'Very High'] 
+                if len(results_df[results_df['tb_mort_cat'] == cat]) > 0]
+    box_labels = [cat for cat in ['Very Low', 'Low', 'Medium', 'High', 'Very High'] 
+                  if len(results_df[results_df['tb_mort_cat'] == cat]) > 0]
+    
+    if box_data:
+        bp = ax12.boxplot(box_data, tick_labels=box_labels)
+        ax12.set_xlabel('TB Mortality Categories')
+        ax12.set_ylabel('Composite Score')
+        ax12.set_title('Score Distribution by TB Mortality Categories')
+        ax12.tick_params(axis='x', rotation=45)
+        ax12.grid(True, alpha=0.3)
+    
+    plt.suptitle('TB Model Calibration Parameter Sweep Results', fontsize=20, y=0.98)
     
     filename = f"calibration_sweep_results_{timestamp}.pdf"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -300,6 +533,7 @@ def main():
     
     # Create plots
     plot_sweep_results(results_df, timestamp)
+    plot_violin_plots(results_df, timestamp)
     
     # Create detailed report for best simulation
     if best_sim is not None:
