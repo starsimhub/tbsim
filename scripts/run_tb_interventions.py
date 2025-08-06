@@ -26,7 +26,7 @@ DEFAULT_TBPARS = dict(
 
 # Simple age distribution
 age_data = pd.DataFrame({
-    'age': [0, 2, 4, 10, 15, 20, 30, 40, 50, 60, 70, 80],
+    'age': [1, 2, 4, 10, 15, 20, 30, 40, 50, 60, 70, 80],
     'value': [20, 10, 25, 15, 10, 5, 4, 3, 2, 1, 1, 1]  # Skewed toward younger ages
 })
 
@@ -185,7 +185,7 @@ def get_scenarios():
 
 def run_scenarios(plot=True):
     """Run all scenarios and optionally plot results."""
-    import tbsim.utils.plots as pl
+    import tbsim.plotting.plots as pl
     
     scenarios = get_scenarios()
     results = {}
@@ -198,7 +198,7 @@ def run_scenarios(plot=True):
     
     if plot:
         pl.plot_combined(results, 
-                        heightfold=2, outdir='results/interventions')
+                        heightfold=1.2, outdir='results/interventions')
                         
                         # filter=mtb.FILTERS.important_metrics)
         plt.show()
