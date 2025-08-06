@@ -3,14 +3,15 @@ import starsim as ss
 import sciris as sc
 import numpy as np
 import shared_functions as sf
-
+import tbsim.utils as utils
 
 def build_tbhiv_sim(include_intv=False, include_cnn=False, hiv_pars=None, hiv_intv_pars=None, Demgs=False) -> ss.Sim:
     """Construct a TB-HIV simulation with optional interventions."""
     
     sim_pars = dict(
         dt=ss.days(7),   # Simulation's Time unit and time-step size.
-        start=ss.date('1980-01-01'),  stop=ss.date('2030-12-31'), # Simulation's start and stop dates
+        start=ss.date('1980-01-01'),  
+        stop=ss.date('2030-12-31'), # Simulation's start and stop dates
         verbose=0,          # Verbosity level   
     )
 
@@ -27,8 +28,8 @@ def build_tbhiv_sim(include_intv=False, include_cnn=False, hiv_pars=None, hiv_in
                 latent_multiplier    = 2.5,
                 aids_multiplier      = 2.9,
                 )
-    connector = sf.make_tb_hiv_connector(pars=cnn_pars) if include_cnn else None
-    interventions = sf.make_hiv_interventions(include=include_intv, pars=hiv_intv_pars) if include_intv else None
+    connector = utils.make_tb_hiv_connector(pars=cnn_pars) if include_cnn else None
+    interventions = utils.make_hiv_interventions(include=include_intv, pars=hiv_intv_pars) if include_intv else None
     
     return ss.Sim(
         people=people,
@@ -81,9 +82,9 @@ def main():
         sim.run()
         results[name] = sim.results.flatten()
 
-    # sf.plot_results(results)
-    # sf.plot_results_1(results)
-    sf.plot_results(results, dark=True, cmap='viridis' )
+    # utils.plot_results(results)
+    # utils.plot_results_1(results)
+    utils.plot_results(results, dark=True, cmap='viridis' )
 
 if __name__ == '__main__':
     main()
