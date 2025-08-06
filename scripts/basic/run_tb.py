@@ -5,10 +5,9 @@ import matplotlib.pyplot as plt
 
 def build_tbsim(sim_pars=None):
     spars = dict(
-        unit = 'day',
-        dt = 7, 
-        start = sc.date('1940-01-01'),      
-        stop = sc.date('2010-12-31'), 
+        dt = ss.days(7), 
+        start = ss.date('1940-01-01'),      
+        stop = ss.date('2010-12-31'), 
         rand_seed = 1,
     )
     if sim_pars is not None:
@@ -16,9 +15,8 @@ def build_tbsim(sim_pars=None):
 
     pop = ss.People(n_agents=1000)
     tb = mtb.TB(dict(
-        unit = 'day',
-        dt = 7,
-        beta = ss.rate_prob(0.0025, unit='year')
+        dt = ss.days(7),
+        beta = ss.peryear(0.0025)
     ))
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     births = ss.Births(pars=dict(birth_rate=20))

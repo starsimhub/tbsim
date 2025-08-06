@@ -18,7 +18,7 @@ def make_tb():
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
     tb_pars = dict(
-        beta=ss.beta(0.20, unit='year'),
+        beta=ss.prob(0.20, ),
         init_prev=0.05,
         rate_LS_to_presym=ss.perday(3e-5),
         rate_LF_to_presym=ss.perday(6e-3),
@@ -40,8 +40,7 @@ def make_tb():
     # for the simulation parameters
     sim_pars = dict(
         # default simulation parameters
-        unit='day',
-        dt=30,
+        dt=ss.days(30),
         start=ss.date('1100-01-01'), stop=ss.date('2018-12-31')
         )
 

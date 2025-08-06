@@ -9,7 +9,7 @@ def build_tbhiv_sim(include_intv=False, include_cnn=False, hiv_pars=None, hiv_in
     """Construct a TB-HIV simulation with optional interventions."""
     
     sim_pars = dict(
-        unit='day', dt=7,   # Simulation's Time unit and time-step size.
+        dt=ss.days(7),   # Simulation's Time unit and time-step size.
         start=ss.date('1980-01-01'),  stop=ss.date('2030-12-31'), # Simulation's start and stop dates
         verbose=0,          # Verbosity level   
     )
@@ -65,9 +65,8 @@ def get_scenarios():
                 percent_on_ART=0.30,
                 start=ss.date('1981-05-01'),
                 stop=ss.date('2030-12-31'),
-                dt=7,
-                unit='day',
-            )
+                dt=ss.days(7),
+                )
         ),
     }
 

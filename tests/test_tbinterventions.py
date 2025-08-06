@@ -19,8 +19,8 @@ def test_ACF():
     acf = mtb.ActiveCaseFinding()
     graph = nx.fast_gnp_random_graph(n=ppl.n_uids, p=1, seed=None, directed=False)
     net = ss.StaticNet(graph=graph, seed=True)
-    tb = mtb.TB(beta=ss.beta(0.2))
-    sim = ss.Sim(unit='day', dt=7, start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'), people=ppl, diseases=tb, interventions=acf, networks=net)
+    tb = mtb.TB(beta=ss.prob(0.2))
+    sim = ss.Sim(dt=ss.days(), dt=ss.days(7), start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'), people=ppl, diseases=tb, interventions=acf, networks=net)
     sim.run()
     return
 
@@ -39,7 +39,7 @@ def test_campaign():
     )
 
     tb = mtb.TB()
-    sim = ss.Sim(unit='day', dt=7, start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'), n_agents=1000, diseases=tb, interventions=campaign)
+    sim = ss.Sim(dt=ss.days(), dt=ss.days(7), start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'), n_agents=1000, diseases=tb, interventions=campaign)
     sim.run()
     return
 
@@ -76,7 +76,7 @@ def test_beta_intervention_changes_beta():
     stop_year = 2010
     
     tb_pars = dict(beta=initial_beta, init_prev=0.25)
-    sim_pars = dict(start=intervention_year-1, stop=stop_year, dt=1, unit='year', rand_seed=42)
+    sim_pars = dict(start=intervention_year-1, stop=stop_year, dt=ss.days(1), rand_seed=42)
     
     pop = ss.People(n_agents=100)
     tb = mtb.TB(pars=tb_pars)
@@ -111,5 +111,5 @@ def test_beta_intervention_changes_beta():
 
 
 if __name__ == '__main__':
-    sim = ss.Sim(people=ss.People(n_agents=500), networks=ss.RandomNet(), diseases=mtb.TB(), pars=dict(start=1990, stop = 2021, dt=0.5))
+    sim = ss.Sim(people=ss.People(n_agents=500), networks=ss.RandomNet(), diseases=mtb.TB(), pars=dict(start=1990, stop = 2021, dt=ss.days(0).5))
     pytest.main()

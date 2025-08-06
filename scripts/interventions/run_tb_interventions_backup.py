@@ -7,18 +7,16 @@ import pprint as pp
 
 # Default simulation parameters
 DEFAULT_SPARS = dict(
-    unit='day',
-    dt=7,
+    dt=ss.days(7),
     start=sc.date('1965-01-01'),
     stop=sc.date('2035-12-31'),
     rand_seed=123,
     verbose =0,
 )
 DEFAULT_TBPARS = dict(
-        beta = ss.beta(0.1),
+        beta = ss.prob(0.1),
         init_prev = ss.bernoulli(p=0.25),
-        unit = 'day',
-        dt=7,      
+        dt=ss.days(7),      
         start=sc.date('1975-02-01'),
         stop=sc.date('2030-12-31'),
     )

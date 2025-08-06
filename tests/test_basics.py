@@ -3,9 +3,9 @@ import numpy as np
 import starsim as ss
 import tbsim as mtb
 
-def make_tb_simplified(agents=20, start=2000, stop=2020, dt=7/365):
+def make_tb_simplified(agents=20, start=2000, stop=2020, dt=ss.days(7)/365):
     pop = ss.People(n_agents=agents)
-    tb = mtb.TB(pars={'beta': ss.beta(0.01), 'init_prev': 0.25})
+    tb = mtb.TB(pars={'beta': ss.prob(0.01), 'init_prev': 0.25})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))]
     sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start, stop=stop), demographics=dems)

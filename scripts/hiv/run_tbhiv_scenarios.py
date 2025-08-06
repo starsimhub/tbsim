@@ -10,8 +10,7 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
 
     # --- Simulation Parameters ---
     default_simpars = dict(
-        unit='day',
-        dt=7,
+        dt=ss.days(7),
         start=ss.date('1980-01-01'),
         stop=ss.date('2035-12-31'),
         rand_seed=123,
@@ -26,7 +25,7 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
 
     # --- TB Model ---
     pars = dict(
-        beta=ss.beta(0.1),
+        beta=ss.peryear(0.1),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
     )
@@ -71,7 +70,7 @@ def run_scenarios():
             mode='both',
             prevalence=0.10,
             percent_on_ART=0.10,
-            minimum_age=15,
+            min_age=15,
             max_age=49,
             start=ss.date('1990-01-01'),
             stop=ss.date('2000-12-31'),
@@ -80,7 +79,7 @@ def run_scenarios():
             mode='both',
             prevalence=0.20,
             percent_on_ART=0.40,
-            minimum_age=20,
+            min_age=20,
             max_age=60,
             start=ss.date('2000-01-01'),
             stop=ss.date('2010-12-31'),

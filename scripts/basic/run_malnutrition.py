@@ -14,7 +14,7 @@ def make_malnutrition():
     
     # -------- simulation -------
     sim_pars = dict(
-        dt=7/365,
+        dt=ss.days(7)/365,
         start=1990,
         stop=2020,  # we dont use dur, as duration gets calculated internally.
     )

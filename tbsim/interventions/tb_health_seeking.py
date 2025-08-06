@@ -150,7 +150,7 @@ if __name__ == '__main__':
             mtb.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.1)})  # For new code with initial care-seeking rate
         ],
         networks=ss.RandomNet({'n_contacts': ss.poisson(lam=2), 'dur': 0}),
-        pars=dict(start=2000, stop=2020, dt=1),
+        pars=dict(start=2000, stop=2020, dt=ss.days(1)),
     )
     sim.run()
 

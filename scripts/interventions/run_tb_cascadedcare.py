@@ -7,8 +7,7 @@ import numpy as np
 
 def build_sim(spars=None, scenario=None, **kwargs):
     spars = dict(
-        unit = 'day',
-        dt = 7, 
+        dt=ss.days(7), 
         start = sc.date('1965-01-01'),      
         stop = sc.date('2035-12-31'), 
         rand_seed = 123,

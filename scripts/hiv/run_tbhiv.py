@@ -11,14 +11,12 @@ def build_tbhiv_sim(Intvs=True, tb=True, includehiv = True, Demgs= True, simpars
 
     # --- Simulation Parameters ---
     default_simpars = dict(
-        unit='day',
-        dt=7,
+        dt=ss.days(7),
         start=ss.date('1980-01-01'),
         stop=ss.date('2035-12-31'),
         rand_seed=123,
     )
-    extra_states = [ss.Arr(name="CustomField", dtype=str, default="Any Value"),]
-    people = ss.People(n_agents=1000, extra_states=extra_states)
+    people = ss.People(n_agents=1000)
     
     
 
@@ -38,7 +36,7 @@ def build_tbhiv_sim(Intvs=True, tb=True, includehiv = True, Demgs= True, simpars
     sim = ss.Sim(
         people=people,
         diseases=[sf.make_tb(include=tb), hiv],
-        interventions=sf.make_interventions(include=Intvs),
+        interventions=sf.make_hiv_interventions(include=Intvs),
         # demographics=demographics,
         networks=network,
         connectors=sf.make_tb_hiv_connector(include=tb),

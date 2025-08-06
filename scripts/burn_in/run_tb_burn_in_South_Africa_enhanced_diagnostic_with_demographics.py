@@ -2024,8 +2024,7 @@ def plot_population_pyramid_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality
 def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baseline', seed=0, years=200, n_agents=1000):  # 8000
     start_year = 1850  # 1750
     sim_pars = dict(
-        unit='day',
-        dt=30,
+        dt=ss.days(30),
         start=ss.date(f'{start_year}-01-01'),
         stop=ss.date(f'{start_year + years}-01-01'),
         rand_seed=seed,
@@ -2071,13 +2070,13 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
     cbr = pd.read_csv(cbr_path)  # Crude birth rate per 1000
     asmr = pd.read_csv(asmr_path)  # Age-specific mortality rate
     demog = [
-        ss.Births(birth_rate=cbr, unit='day', dt=30),
-        ss.Deaths(death_rate=asmr, unit='day', dt=30, rate_units=1),  # rate_units=1 = per person-year
+        ss.Births(birth_rate=cbr, dt=ss.days(30)),
+        ss.Deaths(death_rate=asmr, dt=ss.days(30), rate_units=1),  # rate_units=1 = per person-year
     ]
     people = make_people(n_agents=n_agents)
  
     tb_pars = dict(
-        beta=ss.rate_prob(beta, unit='day'),  # ss.beta(beta),
+        beta=ss.per(beta, ),  # ss.prob(beta),
         init_prev=ss.bernoulli(p=0.10),  # Higher initial prevalence for South Africa context
         rel_sus_latentslow=rel_sus_latentslow,
         p_latent_fast=ss.bernoulli(p=0.1),  # Base fast progressor fraction (will be overridden by age-specific intervention)

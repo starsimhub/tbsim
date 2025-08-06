@@ -29,7 +29,7 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     # ------- TB disease --------
     # Disease parameters
     tb_pars = dict(
-        beta = 0.01, 
+        beta = ss.peryear(0.01), 
         init_prev = 0.25,
         )
     # Initialize
@@ -63,13 +63,13 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     # -------- simulation -------
     # define simulation parameters
     sim_pars = dict(
-        dt = 7/365,
-        start = 1980,
-        stop = 2020,
+        dt=ss.days(7),
+        start = ss.date('1980-01-01'),
+        stop = ss.date('2020-12-31'),
         )
     # initialize the simulation
     sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
-    sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
+    sim.pars.verbose = 0.1 # Print status every 10% of simulation
     sim.run()
 
     df = pd.DataFrame( {

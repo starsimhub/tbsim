@@ -8,8 +8,7 @@ def build_tbsim(sim_pars=None):
         start = sc.date('2013-01-01'),      
         stop = sc.date('2016-12-31'), 
         rand_seed=123,
-        unit='day',
-        dt=7,
+        dt=ss.days(7),
     )
     if sim_pars is not None:
         sim_params.update(sim_pars)
@@ -17,11 +16,10 @@ def build_tbsim(sim_pars=None):
     pop = ss.People(n_agents=1000)
 
     tb_params = dict(
-        beta=ss.rate_prob(0.0025),
+        beta=ss.per(0.0025),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
-        unit='day'
-    )
+        )
     tb = mtb.TB(tb_params)
     
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))

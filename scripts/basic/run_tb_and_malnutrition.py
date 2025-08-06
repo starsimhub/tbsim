@@ -13,7 +13,7 @@ def make_tb_nut():
     # ------- TB disease --------
     # Disease parameters
     tb_pars = dict(
-        beta = 0.01, 
+        beta = ss.peryear(0.01), 
         init_prev = 0.25,
         )
     # Initialize
@@ -45,27 +45,27 @@ def make_tb_nut():
     # -------- simulation -------
     # define simulation parameters
     sim_pars = dict(
-        dt = 7/365,
-        start = 1990,
-        stop = 2010,
+        dt=ss.days(7),
+        start = ss.date('1990-01-01'),
+        stop = ss.date('2010-12-31'),
         )
     # initialize the simulation
     sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
-    sim.pars.verbose = sim.pars.dt / 5 # Print status every 5 years instead of every 10 steps
+    sim.pars.verbose = 0.1 # Print status every 10% of simulation
 
     return sim
 
 
-def make_tb_nut_02(agents=1000, start=1980, stop=2020, dt=7/365):
+def make_tb_nut_02(agents=1000, start=1980, stop=2020, dt=ss.days(7)):
     pop = ss.People(n_agents=agents, extra_states=[ss.FloatArr('SES', default=ss.bernoulli(p=0.3))])
-    tb = mtb.TB({'beta': 0.01, 'init_prev': 0.25})
+    tb = mtb.TB({'beta': ss.peryear(0.01), 'init_prev': 0.25})
     nut = mtb.Malnutrition({})
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
     dems = [ss.Pregnancy(pars={'fertility_rate': 15}), ss.Deaths(pars={'death_rate': 10})]
     cn = mtb.TB_Nutrition_Connector({})
-    sim_pars = {'dt': dt, 'start': start, 'stop' : stop}
+    sim_pars = {'dt': dt, 'start': ss.date(f'{start}-01-01'), 'stop': ss.date(f'{stop}-12-31')}
     sim = ss.Sim(people=pop, networks=net, diseases=[tb, nut], pars=sim_pars, demographics=dems, connectors=cn)
-    sim.pars.verbose = sim.pars.dt / 5
+    sim.pars.verbose = 0.1
     return sim
 
 if __name__ == '__main__':  

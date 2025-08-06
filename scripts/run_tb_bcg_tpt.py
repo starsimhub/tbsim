@@ -8,8 +8,7 @@ import numpy as np
 
 # Simple default parameters
 DEFAULT_SPARS = dict(
-    unit='day',
-    dt=7,
+    dt=ss.days(7),
     start=sc.date('1975-01-01'),
     stop=sc.date('2030-12-31'),
     rand_seed=123,
@@ -17,10 +16,9 @@ DEFAULT_SPARS = dict(
 )
 
 DEFAULT_TBPARS = dict(
-    beta=ss.rate_prob(0.0025),
+    beta=ss.per(0.0025),
     init_prev=ss.bernoulli(p=0.25),
-    unit='day',
-    dt=7,      
+    dt=ss.days(7),      
     start=sc.date('1975-02-01'),
     stop=sc.date('2030-12-31'),
 )

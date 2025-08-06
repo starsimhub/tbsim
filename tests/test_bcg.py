@@ -44,9 +44,9 @@ def dummy_uids(arr):
     # Patch for ss.uids
     return np.array(arr, dtype=int)
 
-def make_sim(agents=20, start=sc.date('2000-01-01'), stop=sc.date('2020-12-31'), dt=7/365):
+def make_sim(agents=20, start=sc.date('2000-01-01'), stop=sc.date('2020-12-31'), dt=ss.days(7)/365):
     pop = ss.People(n_agents=agents)
-    tb = mtb.TB(pars={'beta': ss.beta(0.01), 'init_prev': 0.25})
+    tb = mtb.TB(pars={'beta': ss.prob(0.01), 'init_prev': 0.25})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     pars=dict(dt=dt, start=start, stop=stop)
     return pop, tb, net, pars

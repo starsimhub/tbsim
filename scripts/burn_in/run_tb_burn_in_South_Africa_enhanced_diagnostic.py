@@ -95,7 +95,7 @@ def run_enhanced_diagnostic_scenario(scenario_name, diagnostic_params,
         diseases=diseases,
         interventions=interventions,
         networks=network,
-        pars=dict(start=1850, stop=1850+years, dt=1/12),  # Monthly timesteps
+        pars=dict(start=1850, stop=1850+years, dt=ss.days(1)/12),  # Monthly timesteps
     )
     
     # Run simulation

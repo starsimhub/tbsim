@@ -337,7 +337,7 @@ if __name__ == '__main__':
             }),
         ],
         networks=ss.RandomNet({'n_contacts': ss.poisson(lam=2), 'dur': 0}),
-        pars=dict(start=2000, stop=2010, dt=1/12),
+        pars=dict(start=2000, stop=2010, dt=ss.days(1)/12),
     )
     sim.run()
 
