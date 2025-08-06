@@ -30,17 +30,17 @@ warnings.filterwarnings('ignore')
 
 # Import tbsim utilities
 import tbsim as mtb
-from tbsim.utils import (
-    CalibrationPlotter, 
+from tbsim.calibration import (
     CalibrationData, 
     CalibrationTarget,
     compute_age_stratified_prevalence,
     compute_case_notifications,
     calculate_calibration_score,
     create_south_africa_data,
-    run_generalized_simulation
+    run_calibration_simulation_suite
 )
-from tbsim.utils.simulation_utils import SimulationConfig, DiseaseConfig, InterventionConfig
+from tbsim.plotting import CalibrationPlotter
+from tbsim.calibration import SimulationConfig, DiseaseConfig, InterventionConfig
 
 
 class BetaBehaviorComparison:
@@ -161,7 +161,7 @@ class BetaBehaviorComparison:
                     )
                     
                     # Run simulation
-                    sim = run_generalized_simulation(
+                    sim = run_calibration_simulation_suite(
                         country_name=self.calibration_data.country,
                         disease_config=disease_config,
                         intervention_config=intervention_config,
