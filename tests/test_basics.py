@@ -5,16 +5,16 @@ import tbsim as mtb
 
 def make_tb_simplified(agents=20, start=2000, stop=2020, dt=ss.days(7)/365):
     pop = ss.People(n_agents=agents)
-    tb = mtb.TB(pars={'beta': ss.prob(0.01), 'init_prev': 0.25})
+    tb = mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))]
     sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start, stop=stop), demographics=dems)
-    sim.pars.verbose = sim.pars.dt / 5
+    sim.pars.verbose = 0.1
     return sim
 
 def test_initial_states():
     tb = mtb.TB()
-    print(tb.states)
+    print(tb.state)
     assert isinstance(tb.susceptible, ss.BoolArr)
     assert isinstance(tb.infected, ss.BoolArr)
     assert isinstance(tb.rel_sus, ss.FloatArr)
@@ -33,13 +33,13 @@ def test_initial_states():
 def test_tb_initialization():
     tb = mtb.TB()
     assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_presym_to_active'], ss.rate)
-    assert isinstance(tb.pars['rate_active_to_clear'], ss.rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.rate)
+    assert isinstance(tb.pars['rate_LS_to_presym'], ss.Rate)
+    assert isinstance(tb.pars['rate_LF_to_presym'], ss.Rate)
+    assert isinstance(tb.pars['rate_presym_to_active'], ss.Rate)
+    assert isinstance(tb.pars['rate_active_to_clear'], ss.Rate)
+    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.Rate)
+    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.Rate)
+    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.Rate)
     assert isinstance(tb.pars['rel_trans_presymp'], float)
     assert isinstance(tb.pars['rel_trans_smpos'], float)
     assert isinstance(tb.pars['rel_trans_smneg'], float)
@@ -50,12 +50,12 @@ def test_default_parameters():
     tb = mtb.TB()
     print(tb)
     assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.rate)
-    # assert isinstance(tb.pars['rate_active_to_cure'], ss.rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.rate)
+    assert isinstance(tb.pars['rate_LS_to_presym'], ss.Rate)
+    assert isinstance(tb.pars['rate_LF_to_presym'], ss.Rate)
+    # assert isinstance(tb.pars['rate_active_to_cure'], ss.Rate)
+    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.Rate)
+    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.Rate)
+    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.Rate)
     assert isinstance(tb.pars['rel_trans_smpos'], float)
 
 def test_tb_infectious():
