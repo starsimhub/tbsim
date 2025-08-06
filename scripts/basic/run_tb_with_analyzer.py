@@ -20,7 +20,8 @@ def build_tbsim(sim_pars=None):
     pop = ss.People(n_agents=1000)
 
     tb_params = dict(
-        beta=ss.peryear(0.0025),
+        dt=ss.days(7),
+        beta=ss.probpermonth(0.025),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
         )
