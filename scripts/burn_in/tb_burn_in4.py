@@ -72,7 +72,7 @@ def run_sim(beta, rel_sus_latentslow, seed=0, years=300, n_agents=8000):
     people = ss.People(n_agents=n_agents)
 
     tb_pars = dict(
-        beta=ss.prob(beta),
+        beta=ss.probpermonth(beta),
         init_prev=ss.bernoulli(p=0.01),
         rel_sus_latentslow=rel_sus_latentslow,
     )
