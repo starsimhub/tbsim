@@ -32,7 +32,7 @@ if current_dir not in sys.path:
 parent_dir = os.path.abspath(os.path.join(current_dir, '..'))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
-import shared_functions as sf
+from tbsim.simulation.factory import make_tb, make_hiv, make_tb_hiv_connector, make_hiv_interventions
 
 # Import health-seeking, diagnostic, and treatment interventions
 from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
@@ -500,11 +500,13 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
     # Load demographic data
     possible_cbr_paths = [
         '../data/South_Africa_CBR.csv',
+        '../../tbsim/data/South_Africa_CBR.csv',
         'tbsim/data/South_Africa_CBR.csv',
         'data/South_Africa_CBR.csv',
     ]
     possible_asmr_paths = [
         '../data/South_Africa_ASMR.csv',
+        '../../tbsim/data/South_Africa_ASMR.csv',
         'tbsim/data/South_Africa_ASMR.csv',
         'data/South_Africa_ASMR.csv',
     ]
@@ -547,23 +549,23 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
         rate_exptb_to_dead=ss.perday(0.15 * tb_mortality),
         rate_smneg_to_dead=ss.perday(0.3 * tb_mortality),
     )
-    tb = sf.make_tb(tb_pars=tb_pars)
+    tb = make_tb(tb_pars=tb_pars)
     
     # HIV parameters
     hiv_pars = dict(
         init_prev=ss.bernoulli(p=0.00),
         init_onart=ss.bernoulli(p=0.00),
     )
-    hiv = sf.make_hiv(hiv_pars=hiv_pars)
+    hiv = make_hiv(hiv_pars=hiv_pars)
     
     # Network
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
     
     # TB-HIV connector
-    tb_hiv_connector = sf.make_tb_hiv_connector()
+    tb_hiv_connector = make_tb_hiv_connector()
     
     # HIV intervention
-    hiv_intervention = sf.make_hiv_interventions(pars=dict(
+    hiv_intervention = make_hiv_interventions(pars=dict(
         mode='both',
         prevalence=0.20,
         percent_on_ART=0.50,
