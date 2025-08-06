@@ -1,6 +1,9 @@
 from os.path import dirname, join as joinpath
 DATADIR = joinpath(dirname(__file__), 'data')
 
+# Import version information
+from .version import __version__, __versiondate__, __license__
+
 from .tb import TB, TBS
 from .comorbidities.malnutrition.malnutrition import Malnutrition
 from .comorbidities.hiv.hiv import HIV
@@ -22,6 +25,6 @@ from .interventions.beta import BetaByYear
 from .interventions.tpt import *
 from .interventions.bcg import *
 from .networks import HouseholdNet, HouseholdNetGeneric
-from .utils.plots import *
+from .plotting.plots import *
 from .wrappers import Agents
 from .misc.tbterms import TBTerms, TermsExport

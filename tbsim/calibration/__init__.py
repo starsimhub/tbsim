@@ -1,14 +1,11 @@
 """
-TB simulation utilities module.
+TBsim Calibration Module
 
-This module provides utility functions and classes for TB simulation analysis,
-including plotting, demographics, probabilities, and calibration tools.
+This module provides core calibration features for TB modeling including
+data structures, functions, plotting, and simulation capabilities.
 """
 
-from .plots import plot_results, plot_combined, CalibrationPlotter
-from .demographics import *
-from .probabilities import *
-from .calibration_utils import (
+from .functions import (
     compute_age_stratified_prevalence,
     compute_case_notifications,
     calculate_calibration_score,
@@ -20,8 +17,9 @@ from .calibration_utils import (
     CalibrationTarget,
     CalibrationData
 )
-from .simulation_utils import (
-    run_generalized_simulation,
+
+from .simulation import (
+    run_calibration_simulation_suite,
     run_calibration_simulation,
     create_demographics,
     create_tb_disease,
@@ -32,24 +30,9 @@ from .simulation_utils import (
     DiseaseConfig,
     InterventionConfig
 )
-from .factory_utils import (
-    make_hiv_interventions,
-    make_hiv,
-    make_tb,
-    make_tb_hiv_connector,
-    make_demographics as make_basic_demographics,
-    make_interventions,
-    create_simulation_components
-)
-
 
 __all__ = [
-    # Plotting
-    'plot_results',
-    'plot_combined', 
-    'CalibrationPlotter',
-    
-    # Calibration utilities
+    # Calibration functions
     'compute_age_stratified_prevalence',
     'compute_case_notifications',
     'calculate_calibration_score',
@@ -61,8 +44,8 @@ __all__ = [
     'CalibrationTarget',
     'CalibrationData',
     
-    # Simulation utilities
-    'run_generalized_simulation',
+    # Simulation functions
+    'run_calibration_simulation_suite',
     'run_calibration_simulation',
     'create_demographics',
     'create_tb_disease',
@@ -72,14 +55,4 @@ __all__ = [
     'SimulationConfig',
     'DiseaseConfig',
     'InterventionConfig',
-    
-    # Factory utilities
-    'make_hiv_interventions',
-    'make_hiv',
-    'make_tb',
-    'make_tb_hiv_connector',
-    'make_basic_demographics',
-    'make_interventions',
-    'create_simulation_components',
-    
-]
+] 
