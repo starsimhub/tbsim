@@ -1632,7 +1632,7 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
     people = make_people(n_agents=n_agents)
  
     tb_pars = dict(
-        beta=ss.per(beta, ),  # ss.prob(beta),
+        beta=ss.probpermonth(beta),  # ss.prob(beta),
         init_prev=ss.bernoulli(p=0.10),  # Higher initial prevalence for South Africa context
         rel_sus_latentslow=rel_sus_latentslow,
         # South Africa-specific adjustments

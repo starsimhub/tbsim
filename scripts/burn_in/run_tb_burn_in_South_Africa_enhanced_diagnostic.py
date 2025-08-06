@@ -49,7 +49,7 @@ def run_enhanced_diagnostic_scenario(scenario_name, diagnostic_params,
     # Create TB disease with parameters
     tb_params = {
         'init_prev': ss.bernoulli(0.25),
-        'beta': beta,
+        'beta': ss.probpermonth(beta),
         'rel_sus_latentslow': rel_sus_latentslow,
         'rate_smpos_to_dead': ss.perday(tb_mortality),
         'rate_exptb_to_dead': ss.perday(0.15 * tb_mortality),
@@ -95,7 +95,7 @@ def run_enhanced_diagnostic_scenario(scenario_name, diagnostic_params,
         diseases=diseases,
         interventions=interventions,
         networks=network,
-        pars=dict(start=1850, stop=1850+years, dt=ss.days(1)/12),  # Monthly timesteps
+        pars=dict(start=ss.date(f'{1850}-01-01'), stop=ss.date(f'{1850+years}-01-01'), dt=ss.days(1)/12),  # Monthly timesteps
     )
     
     # Run simulation
