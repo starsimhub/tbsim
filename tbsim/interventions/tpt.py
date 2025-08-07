@@ -96,8 +96,8 @@ class TPTInitiation(ss.Intervention):
         if not hasattr(tb, 'protected_from_tb'):
             tb.define_states(
                 ss.BoolArr('protected_from_tb', default=False),
-                ss.Arr('tpt_treatment_until', default=None),
-                ss.Arr('tpt_protection_until', default=None),
+                ss.Arr('tpt_treatment_until', dtype=ss.date),
+                ss.Arr('tpt_protection_until', dtype=ss.date),
             )
 
         # --- Remove protection if expired ---
