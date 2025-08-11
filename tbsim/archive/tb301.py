@@ -25,7 +25,7 @@ class TB(ss.Infection):
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),                            # Initial seed infections
-            beta = ss.permonth(0.025),                                       # Infection probability
+            beta = ss.permonth(0.025),                                      # Infection probability
             p_latent_fast = ss.bernoulli(0.1),                         # Probability of latent fast as opposed to latent slow
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)            
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -67,7 +67,7 @@ class TB(ss.Infection):
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
             ss.BoolArr('on_treatment', default=False),
-            ss.BoolArr('ever_infected', default=False),            # Flag for ever infected
+            ss.BoolArr('ever_infected', default=False),           # Flag for ever infected
 
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
@@ -89,73 +89,46 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
 
-        # Get the base rates as float values
-        base_rate_slow = float(self.pars.rate_LS_to_presym)
-        base_rate_fast = float(self.pars.rate_LF_to_presym)
-        
-        x = np.full(len(uids), fill_value=base_rate_slow)
-        x[self.state[uids] == TBS.LATENT_FAST] = base_rate_fast
-        
-        # Apply risk ratio but ensure it's non-negative
-        rr_values = np.maximum(self.rr_activation[uids], 0)
-        x *= rr_values
+        # Use the new v3.0.1 time system - convert rates to probabilities
+        prob = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym.to_prob())
+        prob[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym.to_prob()
+        prob *= self.rr_activation[uids]
 
-        prob = 1-np.exp(-x)
         return prob
 
     @staticmethod
     def p_presym_to_clear(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
-        x = np.zeros(len(uids))
-        x[self.on_treatment[uids]] = float(self.pars.rate_treatment_to_clear)
-        prob = 1-np.exp(-x)
+        prob = np.zeros(len(uids))
+        prob[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear.to_prob()
         return prob
 
     @staticmethod
     def p_presym_to_active(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
-        x = np.full(len(uids), fill_value=float(self.pars.rate_presym_to_active))
-        prob = 1-np.exp(-x)
+        prob = np.full(len(uids), fill_value=self.pars.rate_presym_to_active.to_prob())
         return prob
 
     @staticmethod
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        
-        # Get the base rates as float values
-        base_rate_clear = float(self.pars.rate_active_to_clear)
-        base_rate_treatment = float(self.pars.rate_treatment_to_clear)
-        
-        x = np.full(len(uids), fill_value=base_rate_clear)
-        x[self.on_treatment[uids]] = base_rate_treatment # Those on treatment have a different clearance rate
-        
-        # Apply risk ratio but ensure it's non-negative
-        rr_values = np.maximum(self.rr_clearance[uids], 0)
-        x *= rr_values
+        prob = np.full(len(uids), fill_value=self.pars.rate_active_to_clear.to_prob())
+        prob[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear.to_prob() # Those on treatment have a different clearance rate
+        prob *= self.rr_clearance[uids]
 
-        prob = 1-np.exp(-x)
         return prob
 
     @staticmethod
     def p_active_to_death(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        
-        # Get the base rates as float values
-        base_rate_exptb = float(self.pars.rate_exptb_to_dead)
-        base_rate_smpos = float(self.pars.rate_smpos_to_dead)
-        base_rate_smneg = float(self.pars.rate_smneg_to_dead)
-        
-        x = np.full(len(uids), fill_value=base_rate_exptb)
-        x[self.state[uids] == TBS.ACTIVE_SMPOS] = base_rate_smpos
-        x[self.state[uids] == TBS.ACTIVE_SMNEG] = base_rate_smneg
+        prob = np.full(len(uids), fill_value=self.pars.rate_exptb_to_dead.to_prob())
+        prob[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead.to_prob()
+        prob[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead.to_prob()
 
-        # Apply risk ratio but ensure it's non-negative
-        rr_values = np.maximum(self.rr_death[uids], 0)
-        x *= rr_values
+        prob *= self.rr_death[uids]
 
-        prob = 1-np.exp(-x)
         return prob
 
     @property
@@ -164,7 +137,6 @@ class TB(ss.Infection):
         Infectious if in any of the active states
         """
         return (self.on_treatment) | (self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)
-
 
     def set_prognoses(self, uids, from_uids=None, sources=None):
         # Handle the sources parameter for v3.0.1 compatibility
@@ -292,12 +264,6 @@ class TB(ss.Infection):
         self.rr_activation[uids] = 1
         self.rr_clearance[uids] = 1
         self.rr_death[uids] = 1
-        
-        # Ensure relative rates are never negative (safety check)
-        # This prevents issues when interventions modify these values
-        self.rr_activation[uids] = np.maximum(self.rr_activation[uids], 0)
-        self.rr_clearance[uids] = np.maximum(self.rr_clearance[uids], 0)
-        self.rr_death[uids] = np.maximum(self.rr_death[uids], 0)
 
         return
 

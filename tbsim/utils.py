@@ -1,7 +1,7 @@
 import numpy as np
 import starsim as ss
 
-__alkl__ = ['Agents']
+__all__ = ['Agents']
 
 class Agents:
     """

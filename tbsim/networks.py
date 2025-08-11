@@ -73,14 +73,14 @@ class HouseholdNet(ss.Network):
         super().init_pre(sim)
         for hh in self.hhs:        # For each household
             self.add_hh(hh)
-            p1s, p2s = hh.edges()  # Get all their contacts
+        #     p1s, p2s = hh.edges()  # Get all their contacts
 
-            self.edges.p1 = np.concatenate([self.edges.p1, p1s])
-            self.edges.p2 = np.concatenate([self.edges.p2, p2s])
-            self.edges.beta = np.concatenate([self.edges.beta, np.ones_like(p1s)])
+        #     self.edges.p1 = np.concatenate([self.edges.p1, p1s])
+        #     self.edges.p2 = np.concatenate([self.edges.p2, p2s])
+        #     self.edges.beta = np.concatenate([self.edges.beta, np.ones_like(p1s)])
 
-        self.edges.p1 = ss.uids(self.edges.p1)
-        self.edges.p2 = ss.uids(self.edges.p2)
+        # self.edges.p1 = ss.uids(self.edges.p1)
+        # self.edges.p2 = ss.uids(self.edges.p2)
 
         return
     def step(self): 
