@@ -87,83 +87,167 @@ class TB(ss.Infection):
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
-        assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
-
+        # Filter to only include UIDs that are actually in latent states
+        state_array = np.array(self.state[uids])
+        latent_mask = np.isin(state_array, [TBS.LATENT_FAST, TBS.LATENT_SLOW])
+        
+        if not latent_mask.any():
+            # If no UIDs are in latent states, return zero probabilities
+            return np.zeros(len(uids))
+        
+        # Only process UIDs that are in latent states
+        latent_uids = uids[latent_mask]
+        
         # Get the base rates as float values
         base_rate_slow = float(self.pars.rate_LS_to_presym)
         base_rate_fast = float(self.pars.rate_LF_to_presym)
         
-        x = np.full(len(uids), fill_value=base_rate_slow)
-        x[self.state[uids] == TBS.LATENT_FAST] = base_rate_fast
+        x = np.full(len(latent_uids), fill_value=base_rate_slow)
+        x[state_array[latent_mask] == TBS.LATENT_FAST] = base_rate_fast
         
         # Apply risk ratio but ensure it's non-negative
-        rr_values = np.maximum(self.rr_activation[uids], 0)
+        rr_values = np.maximum(self.rr_activation[latent_uids], 0)
         x *= rr_values
 
         prob = 1-np.exp(-x)
-        return prob
+        
+        # Create result array for all UIDs, with zeros for non-latent UIDs
+        result = np.zeros(len(uids))
+        result[latent_mask] = prob
+        
+        return result
 
     @staticmethod
     def p_presym_to_clear(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
-        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
-        x = np.zeros(len(uids))
-        x[self.on_treatment[uids]] = float(self.pars.rate_treatment_to_clear)
+        # Filter to only include UIDs that are actually in pre-symptomatic state
+        state_array = np.array(self.state[uids])
+        presymp_mask = state_array == TBS.ACTIVE_PRESYMP
+        
+        if not presymp_mask.any():
+            # If no UIDs are in pre-symptomatic state, return zero probabilities
+            return np.zeros(len(uids))
+        
+        # Only process UIDs that are in pre-symptomatic state
+        presymp_uids = uids[presymp_mask]
+        
+        x = np.zeros(len(presymp_uids))
+        x[np.array(self.on_treatment[presymp_uids])] = float(self.pars.rate_treatment_to_clear)
         prob = 1-np.exp(-x)
-        return prob
+        
+        # Create result array for all UIDs, with zeros for non-presymptomatic UIDs
+        result = np.zeros(len(uids))
+        result[presymp_mask] = prob
+        
+        return result
 
     @staticmethod
     def p_presym_to_active(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
-        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
-        x = np.full(len(uids), fill_value=float(self.pars.rate_presym_to_active))
+        # Filter to only include UIDs that are actually in pre-symptomatic state
+        state_array = np.array(self.state[uids])
+        presymp_mask = state_array == TBS.ACTIVE_PRESYMP
+        
+        if not presymp_mask.any():
+            # If no UIDs are in pre-symptomatic state, return zero probabilities
+            return np.zeros(len(uids))
+        
+        # Only process UIDs that are in pre-symptomatic state
+        presymp_uids = uids[presymp_mask]
+        
+        x = np.full(len(presymp_uids), fill_value=float(self.pars.rate_presym_to_active))
         prob = 1-np.exp(-x)
-        return prob
+        
+        # Create result array for all UIDs, with zeros for non-presymptomatic UIDs
+        result = np.zeros(len(uids))
+        result[presymp_mask] = prob
+        
+        return result
 
     @staticmethod
     def p_active_to_clear(self, sim, uids):
-        assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
+        # Filter to only include UIDs that are actually in active states
+        state_array = np.array(self.state[uids])
+        active_mask = np.isin(state_array, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+        
+        if not active_mask.any():
+            # If no UIDs are in active states, return zero probabilities
+            return np.zeros(len(uids))
+        
+        # Only process UIDs that are in active states
+        active_uids = uids[active_mask]
         
         # Get the base rates as float values
         base_rate_clear = float(self.pars.rate_active_to_clear)
         base_rate_treatment = float(self.pars.rate_treatment_to_clear)
         
-        x = np.full(len(uids), fill_value=base_rate_clear)
-        x[self.on_treatment[uids]] = base_rate_treatment # Those on treatment have a different clearance rate
+        x = np.full(len(active_uids), fill_value=base_rate_clear)
+        x[np.array(self.on_treatment[active_uids])] = base_rate_treatment # Those on treatment have a different clearance rate
         
         # Apply risk ratio but ensure it's non-negative
-        rr_values = np.maximum(self.rr_clearance[uids], 0)
+        rr_values = np.maximum(self.rr_clearance[active_uids], 0)
         x *= rr_values
 
         prob = 1-np.exp(-x)
-        return prob
+        
+        # Create result array for all UIDs, with zeros for non-active UIDs
+        result = np.zeros(len(uids))
+        result[active_mask] = prob
+        
+        return result
 
     @staticmethod
     def p_active_to_death(self, sim, uids):
-        assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
+        # Filter to only include UIDs that are actually in active states
+        state_array = np.array(self.state[uids])
+        active_mask = np.isin(state_array, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+        
+        if not active_mask.any():
+            # If no UIDs are in active states, return zero probabilities
+            return np.zeros(len(uids))
+        
+        # Only process UIDs that are in active states
+        active_uids = uids[active_mask]
         
         # Get the base rates as float values
         base_rate_exptb = float(self.pars.rate_exptb_to_dead)
         base_rate_smpos = float(self.pars.rate_smpos_to_dead)
         base_rate_smneg = float(self.pars.rate_smneg_to_dead)
         
-        x = np.full(len(uids), fill_value=base_rate_exptb)
-        x[self.state[uids] == TBS.ACTIVE_SMPOS] = base_rate_smpos
-        x[self.state[uids] == TBS.ACTIVE_SMNEG] = base_rate_smneg
+        x = np.full(len(active_uids), fill_value=base_rate_exptb)
+        x[state_array[active_mask] == TBS.ACTIVE_SMPOS] = base_rate_smpos
+        x[state_array[active_mask] == TBS.ACTIVE_SMNEG] = base_rate_smneg
 
         # Apply risk ratio but ensure it's non-negative
-        rr_values = np.maximum(self.rr_death[uids], 0)
+        rr_values = np.maximum(self.rr_death[active_uids], 0)
         x *= rr_values
 
         prob = 1-np.exp(-x)
-        return prob
+        
+        # Create result array for all UIDs, with zeros for non-active UIDs
+        result = np.zeros(len(uids))
+        result[active_mask] = prob
+        
+        return result
 
     @property
     def infectious(self):
         """
         Infectious if in any of the active states
         """
-        return (self.on_treatment) | (self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)
+        # Convert state comparisons to numpy arrays to avoid Starsim array compatibility issues
+        state_array = np.array(self.state)
+        presymp_infectious = state_array == TBS.ACTIVE_PRESYMP
+        smpos_infectious = state_array == TBS.ACTIVE_SMPOS
+        smneg_infectious = state_array == TBS.ACTIVE_SMNEG
+        exptb_infectious = state_array == TBS.ACTIVE_EXPTB
+        
+        # Combine all infectious states
+        infectious_states = presymp_infectious | smpos_infectious | smneg_infectious | exptb_infectious
+        
+        # Add treatment status
+        on_treatment_array = np.array(self.on_treatment)
+        return infectious_states | on_treatment_array
 
 
     def set_prognoses(self, uids, from_uids=None, sources=None):
@@ -216,7 +300,10 @@ class TB(ss.Infection):
         ti = self.ti
 
         # Latent --> active pre-symptomatic
-        latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
+        # Handle both Starsim arrays and numpy arrays
+        state_array = np.array(self.state)
+        latent_mask = ((state_array == TBS.LATENT_SLOW) | (state_array == TBS.LATENT_FAST))
+        latent_uids = ss.uids(np.where(latent_mask)[0])
         new_presymp_uids = self.p_latent_to_presym.filter(latent_uids)
         if len(new_presymp_uids):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
@@ -227,7 +314,8 @@ class TB(ss.Infection):
         self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_presymp_uids] >= 15)
 
         # Pre symp --> Active
-        presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
+        presym_mask = state_array == TBS.ACTIVE_PRESYMP
+        presym_uids = ss.uids(np.where(presym_mask)[0])
         new_clear_presymp_uids = ss.uids()
         if len(presym_uids):
             # Pre symp --> Clear
@@ -241,7 +329,8 @@ class TB(ss.Infection):
                 self.ti_active[new_active_uids] = ti
 
         # Active --> Susceptible via natural recovery or as accelerated by treatment (clear)
-        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids
+        active_mask = ((state_array == TBS.ACTIVE_SMPOS) | (state_array == TBS.ACTIVE_SMNEG) | (state_array == TBS.ACTIVE_EXPTB))
+        active_uids = ss.uids(np.where(active_mask)[0])
         new_clear_active_uids = self.p_active_to_clear.filter(active_uids)
         new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
@@ -256,7 +345,8 @@ class TB(ss.Infection):
             self.on_treatment[new_clear_uids] = False
 
         # Active --> Death
-        active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
+        active_mask = ((state_array == TBS.ACTIVE_SMPOS) | (state_array == TBS.ACTIVE_SMNEG) | (state_array == TBS.ACTIVE_EXPTB)) # Recompute after clear
+        active_uids = ss.uids(np.where(active_mask)[0])
         new_death_uids = self.p_active_to_death.filter(active_uids)
         if len(new_death_uids):
             self.sim.people.request_death(new_death_uids)
@@ -281,7 +371,7 @@ class TB(ss.Infection):
 
         # Transmission heterogeneity
         uids = self.infectious
-        self.rel_trans[uids] *= self.reltrans_het[uids]
+        self.rel_trans[uids] *= ss.uids(self.reltrans_het[uids])    
 
         # Treatment can reduce transmissibility
         uids = self.on_treatment

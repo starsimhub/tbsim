@@ -26,12 +26,11 @@ def make_pop(pars = None, n_agents=500):
     if pars is None: 
         pars = dict(
             n_agents=n_agents,  # Number of agents in the population
-            age_date=load_age_data('default'),  # Load age data from a CSV file or use default data
         )
         
     pop = ss.People(
         n_agents = n_agents,
-        age_data = load_age_data,
+        age_data = load_age_data('default'),  # Pass the actual data, not the function
     )
     return pop
 
