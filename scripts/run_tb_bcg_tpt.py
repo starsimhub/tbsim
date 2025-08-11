@@ -8,21 +8,19 @@ import numpy as np
 
 # Simple default parameters
 DEFAULT_SPARS = dict(
-    unit='day',
-    dt=7,
-    start=sc.date('1975-01-01'),
-    stop=sc.date('2030-12-31'),
+    dt=ss.days(7),
+    start=ss.date('1975-01-01'),
+    stop=ss.date('2030-12-31'),
     rand_seed=123,
     verbose=0,
 )
 
 DEFAULT_TBPARS = dict(
-    beta=ss.rate_prob(0.0025),
+    beta=ss.peryear(0.0025),  # Standardized transmission rate from Abu-Raddad model
     init_prev=ss.bernoulli(p=0.25),
-    unit='day',
-    dt=7,      
-    start=sc.date('1975-02-01'),
-    stop=sc.date('2030-12-31'),
+    dt=ss.days(7),      
+    start=ss.date('1975-02-01'),
+    stop=ss.date('2030-12-31'),
 )
 
 # Simple age distribution

@@ -18,7 +18,7 @@ def build_tbsim(sim_pars=None):
     pop = ss.People(n_agents=1000)
     tb = mtb.TB(dict(
         dt = ss.days(7),
-        beta = ss.peryear(0.0025)  # Changed from ss.rate_prob() to ss.peryear()
+        beta = ss.peryear(0.0025)  # Standardized transmission rate from Abu-Raddad model
     ))
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     births = ss.Births(pars=dict(birth_rate=20))

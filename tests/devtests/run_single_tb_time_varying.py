@@ -121,7 +121,7 @@ def make_tb():
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
     tb_pars = dict(
-        beta=ss.beta(1e-2), #ss.beta(1.0e-3),
+        beta=ss.peryear(0.0025),  # Standardized transmission rate from Abu-Raddad model
         init_prev=0.05,
         rate_LS_to_presym=ss.perday(3e-6), # needs to be 10x slow
         rate_LF_to_presym=ss.perday(6e-3),

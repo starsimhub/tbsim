@@ -159,7 +159,7 @@ def run_sim(beta, rel_sus_latentslow, seed=0, years=300, n_agents=8000):
     people = make_people(n_agents=n_agents)
  
     tb_pars = dict(
-        beta=ss.beta(beta),
+        beta=ss.peryear(0.0025),  # Standardized transmission rate from Abu-Raddad model
         init_prev=ss.bernoulli(p=0.10),  # Higher initial prevalence for South Africa context
         rel_sus_latentslow=rel_sus_latentslow,
         # South Africa-specific adjustments

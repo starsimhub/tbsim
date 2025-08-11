@@ -1,6 +1,5 @@
 import tbsim as mtb
 import starsim as ss
-import sciris as sc 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as stats
@@ -9,11 +8,10 @@ TBS = mtb.TBS
 
 def build_tbsim(sim_pars=None):
     sim_params = dict(
-        start = sc.date('2013-01-01'),      
-        stop = sc.date('2016-12-31'), 
+        start = ss.date('2013-01-01'),      
+        stop = ss.date('2016-12-31'), 
         rand_seed=123,
-        unit='day',
-        dt=7,
+        dt=ss.days(7),
     )
     if sim_pars is not None:
         sim_params.update(sim_pars)
@@ -21,10 +19,9 @@ def build_tbsim(sim_pars=None):
     pop = ss.People(n_agents=1000)
 
     tb_params = dict(
-        beta=ss.rate_prob(0.0025),
+        beta=ss.peryear(0.0025),  # Standardized transmission rate from Abu-Raddad model
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
-        unit='day'
     )
     tb = mtb.TB(tb_params)
     
@@ -32,11 +29,10 @@ def build_tbsim(sim_pars=None):
 
     dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=1.0, scenario_name='run_TB_Dwell_analyzer') # ANALYZER
 
+    # Updated Sim constructor to use modules parameter for v3.0.1
     sim = ss.Sim(
         people=pop,
-        networks=net,
-        diseases=tb,
-        # demographics=[deaths, births],
+        modules=[net, tb],  # All modules in a single list
         pars=sim_params,
         analyzers=dwell_analyzer,
     )
@@ -46,7 +42,17 @@ def build_tbsim(sim_pars=None):
 
 
 def calculate_expected_distributions(start, stop):
-    duration_days = (stop - start).days
+    # Convert Starsim dates to datetime for calculation
+    if hasattr(start, 'date'):
+        start_date = start.date()
+    else:
+        start_date = start
+    if hasattr(stop, 'date'):
+        stop_date = stop.date()
+    else:
+        stop_date = stop
+    
+    duration_days = (stop_date - start_date).days
     min_value = 150  # Minimum dwell time for all states
     max_value = duration_days  # Maximum dwell time is the total duration of the simulation
 

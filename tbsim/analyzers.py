@@ -1243,7 +1243,7 @@ class DwtPlotter:
         fig.suptitle(f'State Transitions by Dwell Time Bins {subtitle}', fontsize=16)
 
         for ax, state in zip(axes, states):
-            state_data = df[df['state_name'] == state]
+            state_data = df[df['state_name'] == state].copy()  # Create a copy to avoid SettingWithCopyWarning
 
             # Automatically define the number of bins and bin size based on the data
             max_dwell_time = state_data['dwell_time'].max()
@@ -1327,7 +1327,7 @@ class DwtPlotter:
         - Professional styling
         """
         if self.__data_error__():  return
-        df = self.data
+        df = self.data.copy()  # Create a copy to avoid SettingWithCopyWarning
         if states is not None: 
             df = df[df['going_to_state'].isin(states)]
             df = df[df['state_name'].isin(states)]
@@ -1436,7 +1436,7 @@ class DwtPlotter:
         """
         if self.__data_error__():  
             return
-        df = self.data
+        df = self.data.copy()  # Create a copy to avoid SettingWithCopyWarning
         if states is not None: 
             df = df[df['state_name'].isin(states)]
         
@@ -2221,7 +2221,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             self.unit = self.sim.pars.unit
         agent_ids = self.sim.people.auids.copy()
         population = len(agent_ids)
-        new_logs = pd.DataFrame({
+        self.__latest_sts_df__ = pd.DataFrame({
             'agent_id': agent_ids,
             'last_state': np.full(population, -1.0),
             'last_state_time': np.zeros(population)
@@ -2467,13 +2467,16 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         self.data['state_name'] = self.data.apply(lambda row: f"{row['state']}.{row['state_name']}", axis=1 )        
         self.data['state_name'] = self.data['state_name'].replace('None', 'Susceptible')
         # self.data['compartment'] = 'tbd'
-        if self.adjust_to_unit:
-            self.data['dwell_time_raw'] = self.data['dwell_time']   # Save the original recorded values for comparison or later use
-            if isinstance(self.unit, (float, int)):
-                self.data['dwell_time'] = self.data['dwell_time'] * self.unit   
-            elif isinstance(self.unit, str):
-                self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / ss.rate(self.unit))
-                # self.data['dwell_time'] = self.data['dwell_time'].apply(lambda x: eval(f"{x} {self.unit}"))
+        # if self.adjust_to_unit:
+        #     self.data['dwell_time_raw'] = self.data['dwell_time']   # Save the original recorded values for comparison or later use
+        #     if isinstance(self.unit, (float, int)):
+        #         self.data['dwell_time'] = self.data['dwell_time'] * self.unit   
+        #     elif isinstance(self.unit, str):
+        #         # v2 to v3 migration: ss.rate() -> ss.freq() or ss.per()
+        #         # self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / ss.rate(self.unit))
+            
+        #         self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / ss.per(self.unit))
+        #         # self.data['dwell_time'] = self.data['dwell_time'].apply(lambda x: eval(f"{x} {self.unit}"))
         self.file_path = self.__save_to_file__()
         return
 

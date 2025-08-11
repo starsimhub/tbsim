@@ -525,7 +525,7 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
     
     # TB parameters
     tb_pars = dict(
-        beta=ss.rate_prob(beta, unit='day'),
+        beta=ss.peryear(0.0025),  # Standardized transmission rate from Abu-Raddad model
         init_prev=ss.bernoulli(p=0.10),
         rel_sus_latentslow=rel_sus_latentslow,
         rate_LS_to_presym=ss.perday(5e-5),

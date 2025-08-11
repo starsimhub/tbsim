@@ -7,20 +7,18 @@ import pprint as pp
 
 # Default simulation parameters
 DEFAULT_SPARS = dict(
-    unit='day',
-    dt=7,
-    start=sc.date('1965-01-01'),
-    stop=sc.date('2035-12-31'),
+    dt=ss.days(7),
+    start=ss.date('1965-01-01'),
+    stop=ss.date('2035-12-31'),
     rand_seed=123,
     verbose =0,
 )
 DEFAULT_TBPARS = dict(
-        beta = ss.beta(0.1),
+        beta=ss.peryear(0.0025),  # Standardized transmission rate from Abu-Raddad model
         init_prev = ss.bernoulli(p=0.25),
-        unit = 'day',
-        dt=7,      
-        start=sc.date('1975-02-01'),
-        stop=sc.date('2030-12-31'),
+        dt=ss.days(7),      
+        start=ss.date('1975-02-01'),
+        stop=ss.date('2030-12-31'),
     )
 
 def build_sim(scenario=None, spars=None):
@@ -116,13 +114,13 @@ def get_scenarios():
     return {
         'Baseline': {
             'name': 'BASELINE',
-            'tbpars': dict(start=sc.date('1975-02-07'), 
-                stop=sc.date('2030-12-31')),
+            'tbpars': dict(start=ss.date('1975-02-07'), 
+                stop=ss.date('2030-12-31')),
         },
         'BCG': {
             'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1975-02-15'), 
-                           stop=sc.date('2030-12-31')),
+            'tbpars': dict(start=ss.date('1975-02-15'), 
+                           stop=ss.date('2030-12-31')),
             'bcgintervention': dict(
                 coverage=0.90,
             ),
@@ -135,7 +133,7 @@ def get_scenarios():
                 max_age=25,
                 hiv_status_threshold=True,
                 p_3HP=0.8,
-                start=sc.date('1970-01-01'),
+                start=ss.date('1970-01-01'),
             ),
         },
     }

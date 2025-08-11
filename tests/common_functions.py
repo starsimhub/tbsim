@@ -11,7 +11,7 @@ def make_tb(pars = None):
     # Define simulation parameters
     if pars is None: 
         pars = dict(
-            beta = ss.rate_prob(0.1),
+            beta=ss.peryear(0.0025),  # Standardized transmission rate from Abu-Raddad model
             init_prev = ss.bernoulli(p=0.25),
             unit = 'day'
         )

@@ -19,7 +19,7 @@ def test_ACF():
     acf = mtb.ActiveCaseFinding()
     graph = nx.fast_gnp_random_graph(n=ppl.n_uids, p=1, seed=None, directed=False)
     net = ss.StaticNet(graph=graph, seed=True)
-    tb = mtb.TB(beta=ss.beta(0.2))
+    tb = mtb.TB(beta=ss.peryear(0.0025))  # Standardized transmission rate
     sim = ss.Sim(unit='day', dt=7, start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'), people=ppl, diseases=tb, interventions=acf, networks=net)
     sim.run()
     return

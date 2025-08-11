@@ -1633,7 +1633,7 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, seed=0, years=200, n_agents=
     people = make_people(n_agents=n_agents)
  
     tb_pars = dict(
-        beta=ss.rate_prob(beta, unit='day'),  # ss.beta(beta),
+        beta=ss.peryear(0.0025),  # Standardized transmission rate from Abu-Raddad model
         init_prev=ss.bernoulli(p=0.10),  # Higher initial prevalence for South Africa context
         rel_sus_latentslow=rel_sus_latentslow,
         # South Africa-specific adjustments
