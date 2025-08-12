@@ -14,7 +14,7 @@ def make_malnutrition():
     
     # -------- simulation -------
     sim_pars = dict(
-        dt=7/365,
+        dt=ss.days(7),
         start=1990,
         stop=2020,  # we dont use dur, as duration gets calculated internally.
     )
@@ -33,6 +33,6 @@ if __name__ == '__main__':
     # Make Malnutrition simulation
     sim_n = make_malnutrition()
     sim_n.run()
-    sim_n.diseases['malnutrition'].plot()
+    mtb.plot_single(sim_n.results.flatten())
     plt.show()
     

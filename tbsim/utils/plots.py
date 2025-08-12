@@ -7,6 +7,9 @@ import starsim as ss
 import datetime
 import sys
 
+def plot_single(results):
+    results = {'single sim': results}
+    plot_combined(results)
 
 def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
                  dark=True, cmap='tab20', heightfold=2, 
