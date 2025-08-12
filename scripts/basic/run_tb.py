@@ -42,8 +42,8 @@ if __name__ == '__main__':
     sim.run()
     print(sim.pars)
     results = sim.results.flatten()
-    results = {'basic': results}
-    mtb.plot_combined(results, dark=True, n_cols=3, filter=mtb.FILTERS.important_metrics)
+    # results = {'basic': results}
+    mtb.plot_single(results, dark=True, n_cols=3, filter=mtb.FILTERS.important_metrics)
 
     
     
