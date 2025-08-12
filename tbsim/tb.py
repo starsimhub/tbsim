@@ -92,7 +92,7 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         rate *= self.rr_activation[uids]
-        y = np.array([r.rate for r in rate])
+        y = np.array([r.rate for r in rate]) * self.dt.days
         prob = 1-np.exp(-y)
         return prob
 
@@ -101,7 +101,8 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.zeros(len(uids))
-        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear
+        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear * self.dt.days
+        
         prob = 1-np.exp(-rate)
         return prob
 
@@ -111,7 +112,7 @@ class TB(ss.Infection):
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
         # prob = 1-np.exp(-rate)
-        y = np.array([r.rate for r in rate])
+        y = np.array([r.rate for r in rate]) * self.dt.days
         prob = 1-np.exp(-y)
         return prob
 
@@ -121,9 +122,8 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
         rate *= self.rr_clearance[uids]
-
         # prob = 1-np.exp(-rate)
-        y = np.array([r.rate for r in rate])
+        y = np.array([r.rate for r in rate]) * self.dt.days
         prob = 1-np.exp(-y)
         return prob
 
@@ -133,11 +133,9 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_exptb_to_dead)
         rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
-
         rate *= self.rr_death[uids]
-
         # prob = 1-np.exp(-rate)
-        y = np.array([r.rate for r in rate])
+        y = np.array([r.rate for r in rate]) * self.dt.days
         prob = 1-np.exp(-y)
         return prob
 
