@@ -63,7 +63,7 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
     # -------- simulation -------
     # define simulation parameters
     sim_pars = dict(
-        dt = 7/365,
+        dt = ss.days(7),
         start = 1980,
         stop = 2020,
         )

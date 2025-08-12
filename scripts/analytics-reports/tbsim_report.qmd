@@ -37,8 +37,8 @@ We initialize the **TBSim** simulation with default parameters.
 TBS = mtb.TBS
 def make_tb(sim_pars=None):
     sim_params = dict(
-        start=sc.date('1940-01-01'),
-        stop=sc.date('2025-12-31'),
+        start=ss.date('1940-01-01'),
+        stop=ss.date('2025-12-31'),
         rand_seed=123,
         unit='days',
         dt=30,

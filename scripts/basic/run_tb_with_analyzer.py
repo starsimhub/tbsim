@@ -9,22 +9,19 @@ TBS = mtb.TBS
 
 def build_tbsim(sim_pars=None):
     sim_params = dict(
-        start = sc.date('2013-01-01'),      
-        stop = sc.date('2016-12-31'), 
-        rand_seed=123,
-        unit='day',
-        dt=7,
+        start = ss.date('2013-01-01'),      
+        stop = ss.date('2016-12-31'), 
+        rand_seed=0,
+        dt=ss.days(1),
     )
     if sim_pars is not None:
         sim_params.update(sim_pars)
-
     pop = ss.People(n_agents=1000)
 
     tb_params = dict(
-        beta=ss.rate_prob(0.0025),
+        beta=ss.peryear(0.025),
         init_prev=ss.bernoulli(p=0.25),
-        rel_sus_latentslow=0.1,
-        unit='day'
+        dt=ss.days(1)
     )
     tb = mtb.TB(tb_params)
     
@@ -82,10 +79,10 @@ if __name__ == '__main__':
     # # Extract the analyzer
     ana : mtb.DwtAnalyzer = sim_tb.analyzers[0] #shortcut to the dwell time analyzer
     ana.graph_state_transitions()
-    ana.sankey_agents_by_age_subplots(bins = [0,5,200])
+    # ana.sankey_agents_by_age_subplots(bins = [0,5,200])
 
 
-    # Sample using directly from the generated file(s)
+    # # Sample using directly from the generated file(s)
     file = ana.file_path        # (uses the file from the analyzer)
     plotter = mtb.DwtPlotter(file_path=file)
     plotter.histogram_with_kde()

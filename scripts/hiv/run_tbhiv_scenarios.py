@@ -10,7 +10,7 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
 
     # --- Simulation Parameters ---
     default_simpars = dict(
-        unit='day',
+        
         dt=7,
         start=ss.date('1980-01-01'),
         stop=ss.date('2035-12-31'),

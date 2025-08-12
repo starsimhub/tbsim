@@ -19,8 +19,8 @@ def example_single_intervention():
         'name': 'My BCG Scenario',
         'bcgintervention': {
             'coverage': 0.8,
-            'start': sc.date('1980-01-01'),
-            'stop': sc.date('2020-12-31'),
+            'start': ss.date('1980-01-01'),
+            'stop': ss.date('2020-12-31'),
             'age_range': (1, 5),
         }
     }
@@ -39,14 +39,14 @@ def example_multiple_interventions():
         'bcgintervention': [
             {
                 'coverage': 0.9,
-                'start': sc.date('1980-01-01'),
-                'stop': sc.date('2020-12-31'),
+                'start': ss.date('1980-01-01'),
+                'stop': ss.date('2020-12-31'),
                 'age_range': (0, 2),
             },
             {
                 'coverage': 0.3,
-                'start': sc.date('1985-01-01'),
-                'stop': sc.date('2015-12-31'),
+                'start': ss.date('1985-01-01'),
+                'stop': ss.date('2015-12-31'),
                 'age_range': (15, 25),
             }
         ]
@@ -65,15 +65,15 @@ def example_combined_interventions():
         'name': 'Combined Scenario',
         'bcgintervention': {
             'coverage': 0.8,
-            'start': sc.date('1980-01-01'),
-            'stop': sc.date('2020-12-31'),
+            'start': ss.date('1980-01-01'),
+            'stop': ss.date('2020-12-31'),
             'age_range': (1, 5),
         },
         'tptintervention': {
             'p_tpt': ss.bernoulli(0.7),
             'max_age': 50,
             'hiv_status_threshold': True,
-            'start': sc.date('1990-01-01'),
+            'start': ss.date('1990-01-01'),
         }
     }
     
@@ -90,20 +90,20 @@ def example_custom_scenario():
     my_scenario = {
         'name': 'My Custom Scenario',
         'tbpars': {
-            'start': sc.date('1980-01-01'),
-            'stop': sc.date('2030-12-31'),
+            'start': ss.date('1980-01-01'),
+            'stop': ss.date('2030-12-31'),
         },
         'bcgintervention': [
             {
                 'coverage': 0.95,
-                'start': sc.date('1980-01-01'),
-                'stop': sc.date('2025-12-31'),
+                'start': ss.date('1980-01-01'),
+                'stop': ss.date('2025-12-31'),
                 'age_range': (0, 1),
             },
             {
                 'coverage': 0.4,
-                'start': sc.date('1985-01-01'),
-                'stop': sc.date('2015-12-31'),
+                'start': ss.date('1985-01-01'),
+                'stop': ss.date('2015-12-31'),
                 'age_range': (10, 20),
             }
         ],
@@ -111,7 +111,7 @@ def example_custom_scenario():
             'p_tpt': ss.bernoulli(0.8),
             'max_age': 45,
             'hiv_status_threshold': True,
-            'start': sc.date('1995-01-01'),
+            'start': ss.date('1995-01-01'),
         }
     }
     

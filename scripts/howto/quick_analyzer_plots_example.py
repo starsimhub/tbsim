@@ -5,10 +5,10 @@ import sciris as sc
 def build_tbsim(sim_pars=None):
     """Build a TB simulation with dwell time analyzer"""
     sim_params = dict(
-        start = sc.date('2013-01-01'),      
-        stop = sc.date('2016-12-31'), 
+        start = ss.date('2013-01-01'),      
+        stop = ss.date('2016-12-31'), 
         rand_seed=123,
-        unit='day',
+        
         dt=7,
     )
     if sim_pars is not None:
@@ -17,10 +17,10 @@ def build_tbsim(sim_pars=None):
     pop = ss.People(n_agents=1000)
 
     tb_params = dict(
-        beta=ss.rate_prob(0.0025),
+        beta=ss.peryear(0.0025),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
-        unit='day'
+        
     )
     tb = mtb.TB(tb_params)
     

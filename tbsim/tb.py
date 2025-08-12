@@ -25,7 +25,7 @@ class TB(ss.Infection):
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),                            # Initial seed infections
-            beta = ss.rate_prob(0.025, unit='month'),                                      # Infection probability
+            beta = ss.peryear(0.025),                                      # Infection probability
             p_latent_fast = ss.bernoulli(0.1),                         # Probability of latent fast as opposed to latent slow
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)            
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -66,8 +66,8 @@ class TB(ss.Infection):
             ss.FloatArr('rr_activation', default=1.0),          # Multiplier on the latent-to-presymp rate
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
-            ss.State('on_treatment', default=False),
-            ss.State('ever_infected', default=False),           # Flag for ever infected
+            ss.BoolState('on_treatment', default=False),
+            ss.BoolState('ever_infected', default=False),           # Flag for ever infected
 
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
@@ -83,7 +83,7 @@ class TB(ss.Infection):
         self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
 
         return
-
+    
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
@@ -92,8 +92,8 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         rate *= self.rr_activation[uids]
-
-        prob = 1-np.exp(-rate)
+        y = np.array([r.rate for r in rate])
+        prob = 1-np.exp(-y)
         return prob
 
     @staticmethod
@@ -110,7 +110,9 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
-        prob = 1-np.exp(-rate)
+        # prob = 1-np.exp(-rate)
+        y = np.array([r.rate for r in rate])
+        prob = 1-np.exp(-y)
         return prob
 
     @staticmethod
@@ -120,7 +122,9 @@ class TB(ss.Infection):
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
         rate *= self.rr_clearance[uids]
 
-        prob = 1-np.exp(-rate)
+        # prob = 1-np.exp(-rate)
+        y = np.array([r.rate for r in rate])
+        prob = 1-np.exp(-y)
         return prob
 
     @staticmethod
@@ -132,7 +136,9 @@ class TB(ss.Infection):
 
         rate *= self.rr_death[uids]
 
-        prob = 1-np.exp(-rate)
+        # prob = 1-np.exp(-rate)
+        y = np.array([r.rate for r in rate])
+        prob = 1-np.exp(-y)
         return prob
 
     @property
@@ -142,7 +148,7 @@ class TB(ss.Infection):
         """
         return (self.on_treatment) | (self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)
 
-    def set_prognoses(self, uids, from_uids=None):
+    def set_prognoses(self, uids, from_uids=None, sources=None):
         super().set_prognoses(uids, from_uids)
 
         p = self.pars

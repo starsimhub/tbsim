@@ -21,8 +21,8 @@ python simple_example.py
 scenario = {
     'bcgintervention': {
         'coverage': 0.8,
-        'start': sc.date('1980-01-01'),
-        'stop': sc.date('2020-12-31'),
+        'start': ss.date('1980-01-01'),
+        'stop': ss.date('2020-12-31'),
         'age_range': [0, 5],
     }
 }
@@ -34,14 +34,14 @@ scenario = {
     'bcgintervention': [
         {
             'coverage': 0.9,
-            'start': sc.date('1980-01-01'),
-            'stop': sc.date('2020-12-31'),
+            'start': ss.date('1980-01-01'),
+            'stop': ss.date('2020-12-31'),
             'age_range': (0, 2),
         },
         {
             'coverage': 0.3,
-            'start': sc.date('1985-01-01'),
-            'stop': sc.date('2015-12-31'),
+            'start': ss.date('1985-01-01'),
+            'stop': ss.date('2015-12-31'),
             'age_range': (15, 25),
         }
     ]
@@ -53,15 +53,15 @@ scenario = {
 scenario = {
     'bcgintervention': {
         'coverage': 0.8,
-        'start': sc.date('1980-01-01'),
-        'stop': sc.date('2020-12-31'),
+        'start': ss.date('1980-01-01'),
+        'stop': ss.date('2020-12-31'),
         'age_range': [0, 5],
     },
     'tptintervention': {
         'p_tpt': ss.bernoulli(0.7),
         'max_age': 50,
         'hiv_status_threshold': True,
-        'start': sc.date('1990-01-01'),
+        'start': ss.date('1990-01-01'),
     }
 }
 ```

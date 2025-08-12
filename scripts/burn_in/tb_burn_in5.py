@@ -138,7 +138,7 @@ def plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, timestamp):
 def run_sim(beta, rel_sus_latentslow, seed=0, years=300, n_agents=8000):
     start_year = 1750
     sim_pars = dict(
-        unit='day',
+        
         dt=30,
         start=ss.date(f'{start_year}-01-01'),
         stop=ss.date(f'{start_year + years}-01-01'),
@@ -153,8 +153,8 @@ def run_sim(beta, rel_sus_latentslow, seed=0, years=300, n_agents=8000):
     cbr = pd.read_csv('../data/Vietnam_CBR.csv')  # Crude birth rate per 1000
     asmr = pd.read_csv('../data/Vietnam_ASMR.csv')  # Age-specific mortality rate
     demog = [
-        ss.Births(birth_rate=cbr, unit='day', dt=30),
-        ss.Deaths(death_rate=asmr, unit='day', dt=30, rate_units=1),  # rate_units=1 = per person-year
+        ss.Births(birth_rate=cbr,  dt=30),
+        ss.Deaths(death_rate=asmr,  dt=30, rate_units=1),  # rate_units=1 = per person-year
     ]
     people = make_people(n_agents=n_agents)
  

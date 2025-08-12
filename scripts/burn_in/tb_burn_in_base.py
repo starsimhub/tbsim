@@ -62,7 +62,7 @@ print(f"Sweep started at {start_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
 def run_sim(beta, rel_sus_latentslow, seed=0, years=300, n_agents=8000):
     start_year = 1750
     sim_pars = dict(
-        unit='day',
+        
         dt=30,
         start=ss.date(f'{start_year}-01-01'),
         stop=ss.date(f'{start_year + years}-01-01'),

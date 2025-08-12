@@ -107,8 +107,8 @@ class BCGProtection(ss.Intervention):
            
         self.define_pars(
             coverage=ss.bernoulli(p=pars.get('coverage', 0.5)),  # Default 50% coverage
-            start=sc.date('1900-01-01'),
-            stop=sc.date('2100-12-31'),
+            start=ss.date('1900-01-01'),
+            stop=ss.date('2100-12-31'),
             efficacy= 0.8,  # Default 80% efficacy
             immunity_period=ss.years(10),  # Default 10 years
             age_range=[0, 5],

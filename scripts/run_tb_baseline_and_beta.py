@@ -6,21 +6,21 @@ import pandas as pd
 
 # Simple default parameters
 DEFAULT_SPARS = dict(
-    unit='day',
+    
     dt=7,
-    start=sc.date('1975-01-01'),
-    stop=sc.date('2030-12-31'),
+    start=ss.date('1975-01-01'),
+    stop=ss.date('2030-12-31'),
     rand_seed=123,
     verbose=0,
 )
 
 DEFAULT_TBPARS = dict(
-    beta=ss.rate_prob(0.0025),
+    beta=ss.peryear(0.0025),
     init_prev=ss.bernoulli(p=0.25),
-    unit='day',
+    
     dt=7,      
-    start=sc.date('1975-02-01'),
-    stop=sc.date('2030-12-31'),
+    start=ss.date('1975-02-01'),
+    stop=ss.date('2030-12-31'),
 )
 
 # Simple age distribution
@@ -60,11 +60,11 @@ def get_scenarios():
     return {
         'Baseline': {
             'name': 'No interventions',
-            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
         },
         'Baseline and BetaByYear': {
             'name': 'BetaByYear intervention',
-            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
             'betabyyear': dict(years=[1990, 2000], x_beta=[0.5, 1.4])
         },
     }

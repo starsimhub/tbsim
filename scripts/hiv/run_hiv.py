@@ -13,7 +13,7 @@ def sim_setup( n_agents=10_000,
         ) -> ss.Sim:
 
     sim_pars = dict(
-        unit='day',
+        
         dt=7,
         start=ss.date('1980-01-01'),
         stop=ss.date('2035-12-31'),

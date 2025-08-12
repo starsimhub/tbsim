@@ -40,7 +40,7 @@ def make_tb():
     # for the simulation parameters
     sim_pars = dict(
         # default simulation parameters
-        unit='day',
+        
         dt=30,
         start=ss.date('1100-01-01'), stop=ss.date('2018-12-31')
         )
