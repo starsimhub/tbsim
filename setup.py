@@ -54,5 +54,6 @@ setup(
         'tqdm',
         'networkx',
         'plotly',
+        'rdata',
     ],
 )
