@@ -76,55 +76,197 @@ class TB(ss.Infection):
             ss.FloatArr('reltrans_het', default=1.0),           # Individual-level heterogeneity on infectiousness, acts in addition to stage-based rates
         )
 
-        self.p_latent_to_presym = ss.bernoulli(p=self.p_latent_to_presym)
-        self.p_presym_to_clear = ss.bernoulli(p=self.p_presym_to_clear)
-        self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
-        self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
-        self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
+        self.p_latent_to_presym_dist = ss.bernoulli(p=self.p_latent_to_presym)
+        self.p_presym_to_clear_dist = ss.bernoulli(p=self.p_presym_to_clear)
+        self.p_presym_to_active_dist = ss.bernoulli(p=self.p_presym_to_active)
+        self.p_active_to_clear_dist = ss.bernoulli(p=self.p_active_to_clear)
+        self.p_active_to_death_dist = ss.bernoulli(p=self.p_active_to_death)
 
         return
     
-    @staticmethod
     def p_latent_to_presym(self, sim, uids):
-        # Could be more complex function of time in state, but exponential for now
-        assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
-        prob = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym.to_prob(self.dt, scale=self.rr_activation[uids]))
-        fast = self.state[uids] == TBS.LATENT_FAST
-        if fast.any():
-            prob[fast] = self.pars.rate_LF_to_presym.to_prob(self.dt, scale=self.rr_activation[uids[fast]])
-        return prob
-
-    @staticmethod
-    def p_presym_to_clear(self, sim, uids):
-        # Could be more complex function of time in state, but exponential for now
-        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
+        """
+        Calculate the probability of progression from latent TB infection to pre-symptomatic active disease.
+        
+        This method models the critical transition where latent TB infection becomes active but not yet
+        symptomatic. The progression rate differs significantly between fast and slow progressors:
+        - Fast progressors (typically 10% of infections) progress rapidly to active disease
+        - Slow progressors (90% of infections) have much lower progression rates and may remain
+          latent for years or decades
+        
+        The progression probability is influenced by individual risk factors (rr_activation) which
+        can represent factors like age, immune status, or comorbidities.
+        """
+        if len(uids) == 0:
+            return np.array([])
+            
+        # Validate that all agents are in valid latent states
+        valid_states = [TBS.LATENT_FAST, TBS.LATENT_SLOW]
+        invalid_states = ~np.isin(self.state[uids], valid_states)
+        if invalid_states.any():
+            invalid_uids = uids[invalid_states]
+            invalid_state_values = self.state[invalid_uids]
+            raise ValueError(f"Agents {invalid_uids} are not in valid latent states. "
+                           f"Expected {valid_states}, got {invalid_state_values}")
+        
+        # Initialize probability array
         prob = np.zeros(len(uids))
-        if self.on_treatment[uids].any():
-            prob[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear.to_prob(self.dt)
+        
+        # Calculate probabilities for each latent state type
+        slow_mask = self.state[uids] == TBS.LATENT_SLOW
+        fast_mask = self.state[uids] == TBS.LATENT_FAST
+        
+        # Apply slow progression rate to slow progressors
+        if slow_mask.any():
+            slow_uids = uids[slow_mask]
+            prob[slow_mask] = self.pars.rate_LS_to_presym.to_prob(
+                self.dt, scale=self.rr_activation[slow_uids]
+            )
+        
+        # Apply fast progression rate to fast progressors
+        if fast_mask.any():
+            fast_uids = uids[fast_mask]
+            prob[fast_mask] = self.pars.rate_LF_to_presym.to_prob(
+                self.dt, scale=self.rr_activation[fast_uids]
+            )
+        
         return prob
 
-    @staticmethod
+    def p_presym_to_clear(self, sim, uids):
+        """
+        Calculate the probability of spontaneous clearance from pre-symptomatic TB without treatment.
+        
+        This method models the natural resolution of TB infection during the pre-symptomatic phase,
+        where the immune system successfully controls the infection before symptoms develop. This
+        represents the body's natural defense mechanisms against TB, which can occur in individuals
+        with strong immune responses.
+        
+        Note that this clearance rate is typically very low, as most pre-symptomatic cases will
+        progress to symptomatic disease rather than clear spontaneously.
+        """
+        if len(uids) == 0:
+            return np.array([])
+            
+        # Validate that all agents are in pre-symptomatic state
+        invalid_states = self.state[uids] != TBS.ACTIVE_PRESYMP
+        if invalid_states.any():
+            invalid_uids = uids[invalid_states]
+            invalid_state_values = self.state[invalid_uids]
+            raise ValueError(f"Agents {invalid_uids} are not in pre-symptomatic state. "
+                           f"Expected {TBS.ACTIVE_PRESYMP}, got {invalid_state_values}")
+        
+        prob = np.zeros(len(uids))
+        on_treatment_mask = self.on_treatment[uids]
+        
+        if on_treatment_mask.any():
+            treated_uids = uids[on_treatment_mask]
+            prob[on_treatment_mask] = self.pars.rate_treatment_to_clear.to_prob(self.dt)
+        
+        return prob
+
     def p_presym_to_active(self, sim, uids):
-        # Could be more complex function of time in state, but exponential for now
-        assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
+        """
+        Calculate the probability of progression from pre-symptomatic to symptomatic active TB.
+        
+        This method models the development of clinical symptoms in individuals with active TB infection.
+        During the pre-symptomatic phase, the infection is active and potentially infectious but the
+        individual has not yet developed noticeable symptoms. This transition represents the onset of
+        clinical disease, which typically occurs within weeks to months after the infection becomes active.
+        
+        The progression to symptomatic disease is a key event in TB natural history, as it often
+        triggers health-seeking behavior and diagnosis.
+        """
+        if len(uids) == 0:
+            return np.array([])
+            
+        # Validate that all agents are in pre-symptomatic state
+        invalid_states = self.state[uids] != TBS.ACTIVE_PRESYMP
+        if invalid_states.any():
+            invalid_uids = uids[invalid_states]
+            invalid_state_values = self.state[invalid_uids]
+            raise ValueError(f"Agents {invalid_uids} are not in pre-symptomatic state. "
+                           f"Expected {TBS.ACTIVE_PRESYMP}, got {invalid_state_values}")
+        
         return self.pars.rate_presym_to_active.to_prob(self.dt)
 
-    @staticmethod
     def p_active_to_clear(self, sim, uids):
-        assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        prob = np.full(len(uids), fill_value=self.pars.rate_active_to_clear.to_prob(self.dt, scale=self.rr_clearance[uids]))
-        on_treatment = self.on_treatment[uids]
-        if on_treatment.any():
-            prob[on_treatment] = self.pars.rate_treatment_to_clear.to_prob(self.dt, scale=self.rr_clearance[uids[on_treatment]]) # Those on treatment have a different clearance rate
+        """
+        Calculate the probability of TB clearance (cure) from active symptomatic disease.
+        
+        This method models both natural recovery and treatment-mediated cure from active TB disease.
+        Natural clearance represents spontaneous resolution of the infection, which is rare but can
+        occur in individuals with strong immune responses. Treatment-mediated clearance represents
+        successful completion of anti-TB therapy, which is the primary mechanism for TB cure.
+        
+        The clearance probability is influenced by individual factors (rr_clearance) which can represent
+        treatment adherence, drug resistance, or underlying health conditions that affect treatment
+        effectiveness.
+        """
+        if len(uids) == 0:
+            return np.array([])
+            
+        # Validate that all agents are in valid active states
+        valid_states = [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]
+        invalid_states = ~np.isin(self.state[uids], valid_states)
+        if invalid_states.any():
+            invalid_uids = uids[invalid_states]
+            invalid_state_values = self.state[invalid_uids]
+            raise ValueError(f"Agents {invalid_uids} are not in valid active TB states. "
+                           f"Expected {valid_states}, got {invalid_state_values}")
+        
+        # Initialize with natural clearance rate
+        prob = self.pars.rate_active_to_clear.to_prob(self.dt, scale=self.rr_clearance[uids])
+        
+        # Override with treatment rate for those on treatment
+        on_treatment_mask = self.on_treatment[uids]
+        if on_treatment_mask.any():
+            treated_uids = uids[on_treatment_mask]
+            prob[on_treatment_mask] = self.pars.rate_treatment_to_clear.to_prob(
+                self.dt, scale=self.rr_clearance[treated_uids]
+            )
+        
         return prob
 
-    @staticmethod
     def p_active_to_death(self, sim, uids):
-        assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
+        """
+        Calculate the probability of TB-related death from active symptomatic disease.
+        
+        This method models TB mortality, which varies significantly by disease form and severity.
+        Smear-positive pulmonary TB has the highest mortality rate due to high bacterial burden and
+        severe lung damage. Smear-negative pulmonary TB has moderate mortality, while extra-pulmonary
+        TB mortality depends on the specific site of infection and accessibility to treatment.
+        
+        The death probability is influenced by individual risk factors (rr_death) which can represent
+        age, immune status, comorbidities, or delays in diagnosis and treatment.
+        """
+        if len(uids) == 0:
+            return np.array([])
+            
+        # Validate that all agents are in valid active states
+        valid_states = [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]
+        invalid_states = ~np.isin(self.state[uids], valid_states)
+        if invalid_states.any():
+            invalid_uids = uids[invalid_states]
+            invalid_state_values = self.state[invalid_uids]
+            raise ValueError(f"Agents {invalid_uids} are not in valid active TB states. "
+                           f"Expected {valid_states}, got {invalid_state_values}")
+        
+        # Initialize probability array
         prob = np.zeros(len(uids))
-        for state, rate in zip([TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB], [self.pars.rate_smpos_to_dead, self.pars.rate_smneg_to_dead, self.pars.rate_exptb_to_dead]):
-            inds = self.state[uids] == state
-            prob[inds] = rate.to_prob(self.dt, scale=self.rr_death[uids[inds]])
+        
+        # Calculate death probabilities for each active state type
+        state_rate_pairs = [
+            (TBS.ACTIVE_SMPOS, self.pars.rate_smpos_to_dead),
+            (TBS.ACTIVE_SMNEG, self.pars.rate_smneg_to_dead),
+            (TBS.ACTIVE_EXPTB, self.pars.rate_exptb_to_dead)
+        ]
+        
+        for state, rate in state_rate_pairs:
+            state_mask = self.state[uids] == state
+            if state_mask.any():
+                state_uids = uids[state_mask]
+                prob[state_mask] = rate.to_prob(self.dt, scale=self.rr_death[state_uids])
+        
         return prob
 
     @property
@@ -179,7 +321,7 @@ class TB(ss.Infection):
 
         # Latent --> active pre-symptomatic
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
-        new_presymp_uids = self.p_latent_to_presym.filter(latent_uids)
+        new_presymp_uids = self.p_latent_to_presym_dist.filter(latent_uids)
         if len(new_presymp_uids):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_cur[new_presymp_uids] = ti
@@ -193,9 +335,9 @@ class TB(ss.Infection):
         new_clear_presymp_uids = ss.uids()
         if len(presym_uids):
             # Pre symp --> Clear
-            new_clear_presymp_uids = self.p_presym_to_clear.filter(presym_uids)
+            new_clear_presymp_uids = self.p_presym_to_clear_dist.filter(presym_uids)
 
-            new_active_uids = self.p_presym_to_active.filter(presym_uids)
+            new_active_uids = self.p_presym_to_active_dist.filter(presym_uids)
             if len(new_active_uids):
                 active_state = self.active_tb_state[new_active_uids] 
                 self.state[new_active_uids] = active_state
@@ -204,7 +346,7 @@ class TB(ss.Infection):
 
         # Active --> Susceptible via natural recovery or as accelerated by treatment (clear)
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids
-        new_clear_active_uids = self.p_active_to_clear.filter(active_uids)
+        new_clear_active_uids = self.p_active_to_clear_dist.filter(active_uids)
         new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
             # Set state and reset timers
@@ -219,7 +361,7 @@ class TB(ss.Infection):
 
         # Active --> Death
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
-        new_death_uids = self.p_active_to_death.filter(active_uids)
+        new_death_uids = self.p_active_to_death_dist.filter(active_uids)
         if len(new_death_uids):
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
