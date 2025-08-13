@@ -121,10 +121,10 @@ class TB(ss.Infection):
     @staticmethod
     def p_active_to_death(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        prob = np.full(len(uids), fill_value=self.pars.rate_exptb_to_dead.to_prob(self.dt))
-        prob[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead.to_prob(self.dt)
-        prob[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead.to_prob(self.dt)
-        prob *= self.rr_death[uids]
+        prob = np.zeros(len(uids))
+        for state, rate in zip([TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB], [self.pars.rate_smpos_to_dead, self.pars.rate_smneg_to_dead, self.pars.rate_exptb_to_dead]):
+            inds = self.state[uids] == state
+            prob[inds] = rate.to_prob(self.dt, scale=self.rr_death[uids[inds]])
         return prob
 
     @property
