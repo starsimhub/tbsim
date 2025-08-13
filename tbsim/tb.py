@@ -88,55 +88,43 @@ class TB(ss.Infection):
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
-
-        rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
-        rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
-        rate *= self.rr_activation[uids]
-        y = np.array([r.rate for r in rate]) * self.dt.days
-        prob = 1-np.exp(-y)
+        prob = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym.to_prob(self.dt, scale=self.rr_activation[uids]))
+        fast = self.state[uids] == TBS.LATENT_FAST
+        if fast.any():
+            prob[fast] = self.pars.rate_LF_to_presym.to_prob(self.dt, scale=self.rr_activation[uids[fast]])
         return prob
 
     @staticmethod
     def p_presym_to_clear(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
-        rate = np.zeros(len(uids))
-        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear * self.dt.days
-        
-        prob = 1-np.exp(-rate)
+        prob = np.zeros(len(uids))
+        if self.on_treatment[uids].any():
+            prob[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear.to_prob(self.dt)
         return prob
 
     @staticmethod
     def p_presym_to_active(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
-        rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
-        # prob = 1-np.exp(-rate)
-        y = np.array([r.rate for r in rate]) * self.dt.days
-        prob = 1-np.exp(-y)
-        return prob
+        return self.pars.rate_presym_to_active.to_prob(self.dt)
 
     @staticmethod
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
-        rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
-        rate *= self.rr_clearance[uids]
-        # prob = 1-np.exp(-rate)
-        y = np.array([r.rate for r in rate]) * self.dt.days
-        prob = 1-np.exp(-y)
+        prob = np.full(len(uids), fill_value=self.pars.rate_active_to_clear.to_prob(self.dt, scale=self.rr_clearance[uids]))
+        on_treatment = self.on_treatment[uids]
+        if on_treatment.any():
+            prob[on_treatment] = self.pars.rate_treatment_to_clear.to_prob(self.dt, scale=self.rr_clearance[uids[on_treatment]]) # Those on treatment have a different clearance rate
         return prob
 
     @staticmethod
     def p_active_to_death(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        rate = np.full(len(uids), fill_value=self.pars.rate_exptb_to_dead)
-        rate[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead
-        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
-        rate *= self.rr_death[uids]
-        # prob = 1-np.exp(-rate)
-        y = np.array([r.rate for r in rate]) * self.dt.days
-        prob = 1-np.exp(-y)
+        prob = np.full(len(uids), fill_value=self.pars.rate_exptb_to_dead.to_prob(self.dt))
+        prob[self.state[uids] == TBS.ACTIVE_SMPOS] = self.pars.rate_smpos_to_dead.to_prob(self.dt)
+        prob[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead.to_prob(self.dt)
+        prob *= self.rr_death[uids]
         return prob
 
     @property
