@@ -48,8 +48,8 @@ def make_tb_hiv_connector(include:bool=True, pars=None):
 # - - - - - -  MAKE DEMOGRAPHICS - - - - - -
 def make_demographics(include:bool=False):
     if not include: return None
-    return [ss.Births(pars=dict(birth_rate=8.4)),
-            ss.Deaths(pars=dict(death_rate=8.4)),]
+    return [ss.Births(pars=dict(birth_rate=ss.peryear(30))),
+            ss.Deaths(pars=dict(death_rate=ss.peryear(10))),]
 
 
 def plot_results( flat_results, keywords=None, exclude=('15',), n_cols=5,

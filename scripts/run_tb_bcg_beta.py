@@ -9,18 +9,18 @@ import numpy as np
 # Simple default parameters
 DEFAULT_SPARS = dict(
     dt=ss.days(7),
-    start=sc.date('1975-01-01'),
-    stop=sc.date('2030-12-31'),
+    start=ss.date('1975-01-01'),
+    stop=ss.date('2030-12-31'),
     rand_seed=123,
     verbose=0,
 )
 
 DEFAULT_TBPARS = dict(
-    beta=ss.per(0.0025),
+    beta=ss.probpermonth(0.0025),
     init_prev=ss.bernoulli(p=0.25),
     dt=ss.days(7),      
-    start=sc.date('1975-02-01'),
-    stop=sc.date('2030-12-31'),
+    start=ss.date('1975-02-01'),
+    stop=ss.date('2030-12-31'),
 )
 
 # Simple age distribution
@@ -127,7 +127,6 @@ def build_sim(scenario=None, spars=None):
     
     networks = [
         ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
-        mtb.HouseholdNet(),
         mtb.HouseholdNetGeneric(hhs=households, pars={'add_newborns': True})
     ]
     
@@ -160,53 +159,53 @@ def get_scenarios():
     """
     
     return {
-        'Baseline': {
-            'name': 'No interventions',
-            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-        },
-        'TPT with Household Network': {
-            'name': 'TPT intervention with optimized household network',
-            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-            'tptintervention': dict(
-                p_tpt=0.8,
-                age_range=[0, 100],
-                hiv_status_threshold=False,
-                tpt_treatment_duration=ss.peryear(0.25),  # 3 months
-                tpt_protection_duration=ss.peryear(2.0),  # 2 years
-                start=sc.date('1980-01-01'),
-                stop=sc.date('2020-12-31'),
-            ),
-        },
+        # 'Baseline': {
+        #     'name': 'No interventions',
+        #     'tbpars': dict(start=ss.date('1990-01-01'), stop=ss.date('2025-12-31')),
+        # },
+        # 'TPT with Household Network': {
+        #     'name': 'TPT intervention with optimized household network',
+        #     'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
+        #     'tptintervention': dict(
+        #         p_tpt=0.8,
+        #         age_range=[0, 100],
+        #         hiv_status_threshold=False,
+        #         tpt_treatment_duration=ss.peryear(0.25),  # 3 months
+        #         tpt_protection_duration=ss.peryear(2.0),  # 2 years
+        #         start=ss.date('1980-01-01'),
+        #         stop=ss.date('2020-12-31'),
+        #     ),
+        # },
         # 'Baseline and BetaByYear': {
         #     'name': 'No interventions',
-        #     'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+        #     'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
         #     'betabyyear':dict(years=[1990, 2000], x_beta=[0.5, 1.4])
         # },
         'Single BCG': {
             'name': 'Single BCG intervention',
-            'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+            'tbpars': dict(start=ss.date('1990-01-01'), stop=ss.date('2025-12-31')),
             'bcgintervention': dict(
                 coverage=0.8,
-                start=sc.date('1980-01-01'),
-                stop=sc.date('2020-12-31'),
+                start=ss.date('1980-01-01'),
+                stop=ss.date('2020-12-31'),
                 age_range=[1, 5],
             ),
         },
         
         # 'Multiple BCG': {
         #     'name': 'Multiple BCG interventions',
-        #     'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
+        #     'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
         #     'bcgintervention': [
         #         dict(
         #             coverage=0.9,
-        #             start=sc.date('1980-01-01'),
-        #             stop=sc.date('2020-12-31'),
+        #             start=ss.date('1980-01-01'),
+        #             stop=ss.date('2020-12-31'),
         #             age_range=[0, 2],           # For children
         #         ),
         #         dict(
         #             coverage=0.3,
-        #             start=sc.date('1985-01-01'),
-        #             stop=sc.date('2015-12-31'),
+        #             start=ss.date('1985-01-01'),
+        #             stop=ss.date('2015-12-31'),
         #             age_range=[25, 40],         # For adults
         #         ),
         #     ],

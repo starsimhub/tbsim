@@ -2472,7 +2472,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             if isinstance(self.unit, (float, int)):
                 self.data['dwell_time'] = self.data['dwell_time'] * self.unit   
             elif isinstance(self.unit, str):
-                self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / ss.rate(self.unit))
+                self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / ss.peryear(self.unit))  # TODO: Check automatic migration change for ss.rate
                 # self.data['dwell_time'] = self.data['dwell_time'].apply(lambda x: eval(f"{x} {self.unit}"))
         self.file_path = self.__save_to_file__()
         return

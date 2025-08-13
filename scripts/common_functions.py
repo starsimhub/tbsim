@@ -1,4 +1,5 @@
 import starsim as ss 
+import starsim_examples as sse
 import sciris as sc
 import tbsim as mtb 
 import numpy as np 
@@ -95,7 +96,7 @@ def make_hiv(pars = None):
         pars = dict(
             # Add any default parameters here
         )
-    return ss.HIV(pars=pars)  # Placeholder for the actual HIV class
+    return mtb.HIV(pars=pars)  # Placeholder for the actual HIV class
 
 def make_cnn(pars = None):
     """

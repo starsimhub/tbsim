@@ -20,11 +20,10 @@ def build_tbsim(sim_pars=None):
     pop = ss.People(n_agents=1000)
 
     tb_params = dict(
-        dt=ss.days(7),
-        beta=ss.probpermonth(0.025),
+        beta=ss.permonth(0.0025),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
-        )
+    )
     tb = mtb.TB(tb_params)
     
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
@@ -45,17 +44,7 @@ def build_tbsim(sim_pars=None):
 
 
 def calculate_expected_distributions(start, stop):
-    # Convert Starsim dates to datetime for calculation
-    if hasattr(start, 'date'):
-        start_date = start.date()
-    else:
-        start_date = start
-    if hasattr(stop, 'date'):
-        stop_date = stop.date()
-    else:
-        stop_date = stop
-    
-    duration_days = (stop_date - start_date).days
+    duration_days = (stop - start).days
     min_value = 150  # Minimum dwell time for all states
     max_value = duration_days  # Maximum dwell time is the total duration of the simulation
 
@@ -90,23 +79,11 @@ if __name__ == '__main__':
 
     # # Extract the analyzer
     ana : mtb.DwtAnalyzer = sim_tb.analyzers[0] #shortcut to the dwell time analyzer
-    
-    try:
-        ana.graph_state_transitions()
-    except Exception as e:
-        print(f"Warning: Could not generate state transitions graph: {e}")
-    
-    try:
-        ana.sankey_agents_by_age_subplots(bins = [0,5,200])
-    except Exception as e:
-        print(f"Warning: Could not generate Sankey diagram: {e}")
+    ana.graph_state_transitions()
+    ana.sankey_agents_by_age_subplots(bins = [0,5,200])
+
 
     # Sample using directly from the generated file(s)
     file = ana.file_path        # (uses the file from the analyzer)
     plotter = mtb.DwtPlotter(file_path=file)
-    
-    try:
-        plotter.histogram_with_kde()
-    except Exception as e:
-        print(f"Warning: Could not generate histogram with KDE: {e}")
-        print("This is likely due to insufficient data for KDE plotting.")
+    plotter.histogram_with_kde()

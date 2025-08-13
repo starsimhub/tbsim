@@ -36,8 +36,11 @@ class TBTreatment(ss.Intervention):
 
         # Select individuals diagnosed with TB and alive
         diagnosed = ppl.diagnosed & ppl.alive
-        active_tb = np.isin(tb.state, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
-        uids = (diagnosed & active_tb).uids
+        active_tb = np.isin(tb.state, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]) & ppl.alive
+        
+        # Combine the boolean masks directly
+        eligible = diagnosed & active_tb
+        uids = eligible.uids if hasattr(eligible, 'uids') else np.where(eligible)[0]
 
         if len(uids) == 0:
             return

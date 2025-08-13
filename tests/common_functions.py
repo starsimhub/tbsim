@@ -1,4 +1,5 @@
 import starsim as ss 
+import starsim_examples as sse
 import tbsim as mtb 
 import numpy as np 
 import pandas as pd
@@ -91,7 +92,7 @@ def make_hiv(pars = None):
         pars = dict(
             # Add any default parameters here
         )
-    return ss.HIV(pars=pars)  # Placeholder for the actual HIV class
+    return sse.HIV(pars=pars)  # Placeholder for the actual HIV class
 
 def make_cnn(pars = None):
     """
@@ -123,4 +124,3 @@ def load_age_data(source='default', file_path=''):
     else:
         raise ValueError("Invalid source. Use 'default' or 'json'.")
     return age_data
-
