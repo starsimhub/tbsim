@@ -1243,7 +1243,7 @@ class DwtPlotter:
         fig.suptitle(f'State Transitions by Dwell Time Bins {subtitle}', fontsize=16)
 
         for ax, state in zip(axes, states):
-            state_data = df[df['state_name'] == state]
+            state_data = df[df['state_name'] == state].copy()
 
             # Automatically define the number of bins and bin size based on the data
             max_dwell_time = state_data['dwell_time'].max()
@@ -1254,11 +1254,25 @@ class DwtPlotter:
             state_data['dwell_time_bin'] = pd.cut(
             state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True,
             )
+            
+            # Check if we have enough data points for KDE
+            # KDE requires at least 2 unique values per group
+            has_enough_data = True
+            
+            # Check each group defined by 'going_to_state'
+            for group_name, group_data in state_data.groupby('going_to_state'):
+                if group_data['dwell_time'].nunique() < 2:
+                    has_enough_data = False
+                    break
+            
+            # Only use KDE if we have enough data points
+            kde_param = has_enough_data
+            
             sns.histplot(data=state_data, 
                  x='dwell_time', 
                  bins=bins,
                  hue='going_to_state', 
-                 kde=True, 
+                 kde=kde_param, 
                  palette='tab10',
                  multiple='stack',
                  legend=True,

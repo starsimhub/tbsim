@@ -90,23 +90,9 @@ if __name__ == '__main__':
 
     # # Extract the analyzer
     ana : mtb.DwtAnalyzer = sim_tb.analyzers[0] #shortcut to the dwell time analyzer
-    
-    try:
-        ana.graph_state_transitions()
-    except Exception as e:
-        print(f"Warning: Could not generate state transitions graph: {e}")
-    
-    try:
-        ana.sankey_agents_by_age_subplots(bins = [0,5,200])
-    except Exception as e:
-        print(f"Warning: Could not generate Sankey diagram: {e}")
-
+    ana.graph_state_transitions()
+    ana.sankey_agents_by_age_subplots(bins = [0,5,200])
     # Sample using directly from the generated file(s)
     file = ana.file_path        # (uses the file from the analyzer)
     plotter = mtb.DwtPlotter(file_path=file)
-    
-    try:
-        plotter.histogram_with_kde()
-    except Exception as e:
-        print(f"Warning: Could not generate histogram with KDE: {e}")
-        print("This is likely due to insufficient data for KDE plotting.")
+    plotter.histogram_with_kde()

@@ -90,8 +90,8 @@ class TB(ss.Infection):
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
 
         # Get base rates converted to probabilities for the current time step
-        ls_rate = self.pars.rate_LS_to_presym.to_prob(sim.dt)
-        lf_rate = self.pars.rate_LF_to_presym.to_prob(sim.dt)
+        ls_rate = self.pars.rate_LS_to_presym.to_prob(self.dt)
+        lf_rate = self.pars.rate_LF_to_presym.to_prob(self.dt)
         
         rate = np.full(len(uids), fill_value=ls_rate)
         rate[self.state[uids] == TBS.LATENT_FAST] = lf_rate
@@ -105,7 +105,7 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.zeros(len(uids))
-        treatment_rate = self.pars.rate_treatment_to_clear.to_prob(sim.dt)
+        treatment_rate = self.pars.rate_treatment_to_clear.to_prob(self.dt)
         rate[self.on_treatment[uids]] = treatment_rate
         prob = 1-np.exp(-rate)
         return prob
@@ -114,15 +114,15 @@ class TB(ss.Infection):
     def p_presym_to_active(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
-        rate = self.pars.rate_presym_to_active.to_prob(sim.dt)
+        rate = self.pars.rate_presym_to_active.to_prob(self.dt)
         prob = 1-np.exp(-rate)
         return prob
 
     @staticmethod
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        base_rate = self.pars.rate_active_to_clear.to_prob(sim.dt)
-        treatment_rate = self.pars.rate_treatment_to_clear.to_prob(sim.dt)
+        base_rate = self.pars.rate_active_to_clear.to_prob(self.dt)
+        treatment_rate = self.pars.rate_treatment_to_clear.to_prob(self.dt)
         
         rate = np.full(len(uids), fill_value=base_rate)
         rate[self.on_treatment[uids]] = treatment_rate # Those on treatment have a different clearance rate
@@ -134,9 +134,9 @@ class TB(ss.Infection):
     @staticmethod
     def p_active_to_death(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        exptb_rate = self.pars.rate_exptb_to_dead.to_prob(sim.dt)
-        smpos_rate = self.pars.rate_smpos_to_dead.to_prob(sim.dt)
-        smneg_rate = self.pars.rate_smneg_to_dead.to_prob(sim.dt)
+        exptb_rate = self.pars.rate_exptb_to_dead.to_prob(self.dt)
+        smpos_rate = self.pars.rate_smpos_to_dead.to_prob(self.dt)
+        smneg_rate = self.pars.rate_smneg_to_dead.to_prob(self.dt)
         
         rate = np.full(len(uids), fill_value=exptb_rate)
         rate[self.state[uids] == TBS.ACTIVE_SMPOS] = smpos_rate
