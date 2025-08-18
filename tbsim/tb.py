@@ -90,19 +90,17 @@ class TB(ss.Infection):
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
         
         unit = self.pars.rate_LS_to_presym.unit
-        ls_rate_val = self.pars.rate_LS_to_presym.rate
-        
+        ls_rate_val = self.pars.rate_LS_to_presym.rate      # 3e-5 per day
         # Ensure LF rate is in the same units as LS rate
-        lf_rate_val = ss.per(self.pars.rate_LF_to_presym, unit).rate
-        ratevals = np.full(len(uids), ls_rate_val)      # Initialize with slow rate for all 'uids'
-        fast = self.state[uids] == TBS.LATENT_FAST  # Identify 'uids' that are within latent fast state
-        ratevals[fast] = lf_rate_val                # Overwrite with fast rate where applicable
-        
+        lf_rate_val = ss.per(self.pars.rate_LF_to_presym, unit).rate # 6e-3 per day
+        ratevals_arr = np.full(len(uids), ls_rate_val)      # Initialize with slow rate for all 'uids'
+        fast_arr = self.state[uids] == TBS.LATENT_FAST      # Identify 'uids' that are within latent fast state
+        ratevals_arr[fast_arr] = lf_rate_val                # Overwrite with fast rate where applicable
         # Apply relative risk to the numeric rates BEFORE creating TimePar
-        ratevals *= self.rr_activation[uids]
+        ratevals_arr *= self.rr_activation[uids]            # Default = 1.0 for all uids
         
         # Construct a Starsim rate object so we can use to_prob() correctly
-        rate = ss.per(ratevals, unit=unit)
+        rate = ss.per(ratevals_arr, unit=unit)
         prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
         return prob
 
