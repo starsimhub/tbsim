@@ -25,7 +25,7 @@ class TB(ss.Infection):
 
         self.define_pars(
             init_prev = ss.bernoulli(0.01),                            # Initial seed infections
-            beta = ss.permonth(0.025),                                      # Infection probability
+            beta = ss.peryear(0.025),                                  # Infection probability
             p_latent_fast = ss.bernoulli(0.1),                         # Probability of latent fast as opposed to latent slow
             rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)            
             rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
@@ -88,63 +88,101 @@ class TB(ss.Infection):
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
-
-        # Get base rates converted to probabilities for the current time step
-        ls_rate = self.pars.rate_LS_to_presym.to_prob(self.dt)
-        lf_rate = self.pars.rate_LF_to_presym.to_prob(self.dt)
         
-        rate = np.full(len(uids), fill_value=ls_rate)
-        rate[self.state[uids] == TBS.LATENT_FAST] = lf_rate
-        rate *= self.rr_activation[uids]
-
-        prob = 1-np.exp(-rate)
+        unit = self.pars.rate_LS_to_presym.unit
+        ls_rate_val = self.pars.rate_LS_to_presym.rate
+        
+        # Ensure LF rate is in the same units as LS rate
+        lf_rate_val = ss.per(self.pars.rate_LF_to_presym, unit).rate
+        ratevals = np.full(len(uids), ls_rate_val)      # Initialize with slow rate for all 'uids'
+        fast = self.state[uids] == TBS.LATENT_FAST  # Identify 'uids' that are within latent fast state
+        ratevals[fast] = lf_rate_val                # Overwrite with fast rate where applicable
+        
+        # Apply relative risk to the numeric rates BEFORE creating TimePar
+        ratevals *= self.rr_activation[uids]
+        
+        # Construct a Starsim rate object so we can use to_prob() correctly
+        rate = ss.per(ratevals, unit=unit)
+        prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
         return prob
 
     @staticmethod
     def p_presym_to_clear(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
-        rate = np.zeros(len(uids))
-        treatment_rate = self.pars.rate_treatment_to_clear.to_prob(self.dt)
-        rate[self.on_treatment[uids]] = treatment_rate
-        prob = 1-np.exp(-rate)
+        
+        # Get the base rate and unit
+        base_rate = self.pars.rate_treatment_to_clear.rate
+        unit = self.pars.rate_treatment_to_clear.unit
+        
+        # Create rate array - zero for those not on treatment, treatment rate for those on treatment
+        ratevals = np.zeros(len(uids))
+        ratevals[self.on_treatment[uids]] = base_rate
+        
+        # Convert to Starsim rate object and apply to_prob()
+        rate = ss.per(ratevals, unit=unit)
+        prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
         return prob
 
     @staticmethod
     def p_presym_to_active(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
-        rate = self.pars.rate_presym_to_active.to_prob(self.dt)
-        prob = 1-np.exp(-rate)
+        
+        # Get the rate and unit
+        rate_val = self.pars.rate_presym_to_active.rate
+        unit = self.pars.rate_presym_to_active.unit
+        
+        # Create rate array with the same rate for all individuals
+        ratevals = np.full(len(uids), rate_val)
+        
+        # Convert to Starsim rate object and apply to_prob()
+        rate = ss.per(ratevals, unit=unit)
+        prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
         return prob
 
     @staticmethod
     def p_active_to_clear(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        base_rate = self.pars.rate_active_to_clear.to_prob(self.dt)
-        treatment_rate = self.pars.rate_treatment_to_clear.to_prob(self.dt)
         
-        rate = np.full(len(uids), fill_value=base_rate)
-        rate[self.on_treatment[uids]] = treatment_rate # Those on treatment have a different clearance rate
-        rate *= self.rr_clearance[uids]
-
-        prob = 1-np.exp(-rate)
+        # Get the base rates and unit
+        base_rate_val = self.pars.rate_active_to_clear.rate
+        treatment_rate_val = self.pars.rate_treatment_to_clear.rate
+        unit = self.pars.rate_active_to_clear.unit
+        
+        # Create rate array with base rate for all individuals
+        ratevals = np.full(len(uids), base_rate_val)
+        ratevals[self.on_treatment[uids]] = treatment_rate_val  # Those on treatment have a different clearance rate
+        
+        # Apply relative risk to the numeric rates BEFORE creating Starsim rate object
+        ratevals *= self.rr_clearance[uids]
+        
+        # Convert to Starsim rate object and apply to_prob()
+        rate = ss.per(ratevals, unit=unit)
+        prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
         return prob
 
     @staticmethod
     def p_active_to_death(self, sim, uids):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
-        exptb_rate = self.pars.rate_exptb_to_dead.to_prob(self.dt)
-        smpos_rate = self.pars.rate_smpos_to_dead.to_prob(self.dt)
-        smneg_rate = self.pars.rate_smneg_to_dead.to_prob(self.dt)
         
-        rate = np.full(len(uids), fill_value=exptb_rate)
-        rate[self.state[uids] == TBS.ACTIVE_SMPOS] = smpos_rate
-        rate[self.state[uids] == TBS.ACTIVE_SMNEG] = smneg_rate
-
-        rate *= self.rr_death[uids]
-
-        prob = 1-np.exp(-rate)
+        # Get the death rates and unit
+        exptb_rate_val = self.pars.rate_exptb_to_dead.rate
+        smpos_rate_val = self.pars.rate_smpos_to_dead.rate
+        smneg_rate_val = self.pars.rate_smneg_to_dead.rate
+        unit = self.pars.rate_exptb_to_dead.unit
+        
+        # Create rate array with extra-pulmonary rate as default
+        ratevals = np.full(len(uids), exptb_rate_val)
+        ratevals[self.state[uids] == TBS.ACTIVE_SMPOS] = smpos_rate_val
+        ratevals[self.state[uids] == TBS.ACTIVE_SMNEG] = smneg_rate_val
+        
+        # Apply relative risk to the numeric rates BEFORE creating Starsim rate object
+        ratevals *= self.rr_death[uids]
+        
+        # Convert to Starsim rate object and apply to_prob()
+        rate = ss.per(ratevals, unit=unit)
+        prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
         return prob
 
     @property

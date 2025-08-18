@@ -1,4 +1,5 @@
 import starsim as ss 
+import starsim_examples as sse
 import sciris as sc
 import tbsim as mtb 
 import numpy as np 
@@ -15,7 +16,7 @@ def make_tb(pars = None):
     # Define simulation parameters
     if pars is None: 
         pars = dict(
-            beta = ss.prob(0.1),
+            beta = ss.peryear(0.0025),
             init_prev = ss.bernoulli(p=0.25)
         )
     return mtb.TB(pars=pars)
@@ -49,7 +50,7 @@ def make_net(pars = None):
             dur=0,  # Duration of contacts
             # Add any other default parameters here
         )
-    return ss.RandomNet(pars=pars)
+    return sse.RandomNet(pars=pars)
 
 
 def make_births(pars = None):
@@ -95,7 +96,7 @@ def make_hiv(pars = None):
         pars = dict(
             # Add any default parameters here
         )
-    return ss.HIV(pars=pars)  # Placeholder for the actual HIV class
+    return sse.HIV(pars=pars)  # Placeholder for the actual HIV class
 
 def make_cnn(pars = None):
     """
@@ -204,7 +205,7 @@ def make_tb_comorbidity(include:bool=True, tb_pars=None):
         return None
     if tb_pars is None:
         pars = dict(
-            beta=ss.prob(0.1),
+            beta=ss.peryear(0.0025),
             init_prev=ss.bernoulli(p=0.25),
             rel_sus_latentslow=0.1,
         )

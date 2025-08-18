@@ -9,7 +9,7 @@ TBS = mtb.TBS
 
 def build_tbsim(sim_pars=None):
     sim_params = dict(
-        start = ss.date('2013-01-01'),      
+        start = ss.date('2000-01-01'),      
         stop = ss.date('2016-12-31'), 
         rand_seed=123,
         dt=ss.days(7),
@@ -21,7 +21,7 @@ def build_tbsim(sim_pars=None):
 
     tb_params = dict(
         dt=ss.days(7),
-        beta=ss.probpermonth(0.025),
+        beta=ss.peryear(0.025),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
         )
@@ -35,7 +35,7 @@ def build_tbsim(sim_pars=None):
         people=pop,
         networks=net,
         diseases=tb,
-        # demographics=[deaths, births],
+        #demographics=[ss.Deaths(pars=dict(death_rate=10)), ss.Births(pars=dict(birth_rate=10))],
         pars=sim_params,
         analyzers=dwell_analyzer,
     )
