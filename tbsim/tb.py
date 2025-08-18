@@ -23,20 +23,29 @@ class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
 
+        # Define parameters with improved distribution patterns
         self.define_pars(
-            init_prev = ss.bernoulli(0.01),                            # Initial seed infections
-            beta = ss.peryear(0.025),                                  # Infection probability
-            p_latent_fast = ss.bernoulli(0.1),                         # Probability of latent fast as opposed to latent slow
-            rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)            
-            rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
-            rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
-            rate_active_to_clear    = ss.perday(2.4e-4),               # Active infection to natural clearance (per day)
-            rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
-            rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
-            rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = ss.peryear(6),                # 2 months is the duration treatment implies 6 per year
+            # Initial conditions
+            init_prev = ss.bernoulli(0.01, name='init_prev'),                            # Initial seed infections
+            beta = ss.peryear(0.025, name='beta'),                                  # Infection probability
+            p_latent_fast = ss.bernoulli(0.1, name='p_latent_fast'),                         # Probability of latent fast as opposed to latent slow
+            
+            # Transition rates with proper naming and units
+            rate_LS_to_presym       = ss.perday(3e-5, name='rate_LS_to_presym'),                 # Latent Slow to Active Pre-Symptomatic (per day)            
+            rate_LF_to_presym       = ss.perday(6e-3, name='rate_LF_to_presym'),                 # Latent Fast to Active Pre-Symptomatic (per day)
+            rate_presym_to_active   = ss.perday(3e-2, name='rate_presym_to_active'),                 # Pre-symptomatic to symptomatic (per day)
+            rate_active_to_clear    = ss.perday(2.4e-4, name='rate_active_to_clear'),               # Active infection to natural clearance (per day)
+            rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4, name='rate_exptb_to_dead'),        # Extra-Pulmonary TB to Dead (per day)
+            rate_smpos_to_dead      = ss.perday(4.5e-4, name='rate_smpos_to_dead'),               # Smear Positive Pulmonary TB to Dead (per day)
+            rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4, name='rate_smneg_to_dead'),         # Smear Negative Pulmonary TB to Dead (per day)
+            rate_treatment_to_clear = ss.peryear(6, name='rate_treatment_to_clear'),                # 2 months is the duration treatment implies 6 per year
 
-            active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
+            # State distribution with proper naming
+            active_state = ss.choice(
+                a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], 
+                p=[0.1, 0.65, 0.25], 
+                name='active_state'
+            ),
 
             # Relative transmissibility of each state
             rel_trans_presymp   = 0.1, # 0.0274
@@ -49,7 +58,8 @@ class TB(ss.Infection):
             
             cxr_asymp_sens = 1.0, # Sensitivity of chest x-ray for screening asymptomatic cases
 
-            reltrans_het = ss.constant(v=1.0),
+            # Individual heterogeneity with proper distribution
+            reltrans_het = ss.normal(loc=1.0, scale=0.2, name='reltrans_het'),
         )
         self.update_pars(pars, **kwargs) 
 
@@ -76,16 +86,18 @@ class TB(ss.Infection):
             ss.FloatArr('reltrans_het', default=1.0),           # Individual-level heterogeneity on infectiousness, acts in addition to stage-based rates
         )
 
-        self.p_latent_to_presym = ss.bernoulli(p=self.p_latent_to_presym)
-        self.p_presym_to_clear = ss.bernoulli(p=self.p_presym_to_clear)
-        self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
-        self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
-        self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
+        # Create transition probability distributions with proper naming and state management
+        self.transition_dists = ss.Dists()
+        self.transition_dists.p_latent_to_presym = ss.bernoulli(name='p_latent_to_presym')
+        self.transition_dists.p_presym_to_clear = ss.bernoulli(name='p_presym_to_clear')
+        self.transition_dists.p_presym_to_active = ss.bernoulli(name='p_presym_to_active')
+        self.transition_dists.p_active_to_clear = ss.bernoulli(name='p_active_to_clear')
+        self.transition_dists.p_active_to_death = ss.bernoulli(name='p_active_to_death')
 
         return
 
-    @staticmethod
     def p_latent_to_presym(self, sim, uids):
+        """Calculate probability of transition from latent to pre-symptomatic TB"""
         # Could be more complex function of time in state, but exponential for now
         assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
         
@@ -99,13 +111,14 @@ class TB(ss.Infection):
         # Apply relative risk to the numeric rates BEFORE creating TimePar
         ratevals_arr *= self.rr_activation[uids]            # Default = 1.0 for all uids
         
-        # Construct a Starsim rate object so we can use to_prob() correctly
-        rate = ss.per(ratevals_arr, unit=unit)
-        prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
-        return prob
+        # Update the distribution parameters dynamically
+        self.transition_dists.p_latent_to_presym.set(p=ratevals_arr)
+        
+        # Return the probability distribution for filtering
+        return self.transition_dists.p_latent_to_presym
 
-    @staticmethod
     def p_presym_to_clear(self, sim, uids):
+        """Calculate probability of transition from pre-symptomatic to clear (recovery)"""
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         
@@ -117,13 +130,14 @@ class TB(ss.Infection):
         ratevals_arr = np.zeros(len(uids))
         ratevals_arr[self.on_treatment[uids]] = base_rate
         
-        # Convert to Starsim rate object and apply to_prob()
-        rate = ss.per(ratevals_arr, unit=unit)
-        prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
-        return prob
+        # Update the distribution parameters dynamically
+        self.transition_dists.p_presym_to_clear.set(p=ratevals_arr)
+        
+        # Return the probability distribution for filtering
+        return self.transition_dists.p_presym_to_clear
 
-    @staticmethod
     def p_presym_to_active(self, sim, uids):
+        """Calculate probability of transition from pre-symptomatic to active TB"""
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         
@@ -134,13 +148,14 @@ class TB(ss.Infection):
         # Create rate array with the same rate for all individuals
         ratevals_arr = np.full(len(uids), rate_val)
         
-        # Convert to Starsim rate object and apply to_prob()
-        rate = ss.per(ratevals_arr, unit=unit)
-        prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
-        return prob
+        # Update the distribution parameters dynamically
+        self.transition_dists.p_presym_to_active.set(p=ratevals_arr)
+        
+        # Return the probability distribution for filtering
+        return self.transition_dists.p_presym_to_active
 
-    @staticmethod
     def p_active_to_clear(self, sim, uids):
+        """Calculate probability of transition from active TB to clear (recovery)"""
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         
         # Get the base rates and unit
@@ -155,13 +170,14 @@ class TB(ss.Infection):
         # Apply relative risk to the numeric rates BEFORE creating Starsim rate object
         ratevals_arr *= self.rr_clearance[uids]
         
-        # Convert to Starsim rate object and apply to_prob()
-        rate = ss.per(ratevals_arr, unit=unit)
-        prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
-        return prob
+        # Update the distribution parameters dynamically
+        self.transition_dists.p_active_to_clear.set(p=ratevals_arr)
+        
+        # Return the probability distribution for filtering
+        return self.transition_dists.p_active_to_clear
 
-    @staticmethod
     def p_active_to_death(self, sim, uids):
+        """Calculate probability of transition from active TB to death"""
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         
         # Get the death rates and unit
@@ -178,10 +194,23 @@ class TB(ss.Infection):
         # Apply relative risk to the numeric rates BEFORE creating Starsim rate object
         ratevals_arr *= self.rr_death[uids]
         
-        # Convert to Starsim rate object and apply to_prob()
-        rate = ss.per(ratevals_arr, unit=unit)
-        prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
-        return prob
+        # Update the distribution parameters dynamically
+        self.transition_dists.p_active_to_death.set(p=ratevals_arr)
+        
+        # Return the probability distribution for filtering
+        return self.transition_dists.p_active_to_death
+
+    def init(self, sim):
+        """Initialize the TB module with proper distribution management"""
+        super().init(sim)
+        
+        # Initialize all distributions in the transition_dists collection
+        self.transition_dists.init(sim=sim, module=self)
+        
+        # Initialize individual heterogeneity distribution
+        self.pars.reltrans_het.init(sim=sim, module=self)
+        
+        return
 
     @property
     def infectious(self):
@@ -313,6 +342,36 @@ class TB(ss.Infection):
 
         return
 
+    def create_time_varying_distributions(self):
+        """Demonstrate advanced distribution features with time-varying parameters"""
+        # Example of time-varying transmission rates
+        self.time_varying_beta = ss.bernoulli(
+            p=lambda self, sim, uids: np.interp(
+                sim.year, 
+                [1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010], 
+                [0.02, 0.025, 0.03, 0.035, 0.04, 0.035, 0.03, 0.025]
+            ),
+            name='time_varying_beta'
+        )
+        
+        # Example of age-dependent transition rates
+        self.age_dependent_activation = ss.bernoulli(
+            p=lambda self, sim, uids: np.where(
+                self.sim.people.age[uids] < 15,
+                0.5 * self.pars.rate_LS_to_presym.rate,  # Lower rate for children
+                self.pars.rate_LS_to_presym.rate  # Normal rate for adults
+            ),
+            name='age_dependent_activation'
+        )
+        
+        # Example of multi-random distribution for pairwise transmission
+        self.pairwise_transmission = ss.multi_random(
+            names=['source', 'target'],
+            name='pairwise_transmission'
+        )
+        
+        return
+
     def start_treatment(self, uids):
         """ Start treatment for active TB """
         if len(uids) == 0:
@@ -342,6 +401,38 @@ class TB(ss.Infection):
 
         # Return the number of individuals who started treatment
         return len(tx_uids)
+
+    def manage_distribution_states(self):
+        """Demonstrate advanced distribution state management"""
+        # Get current state of all distributions
+        current_states = {}
+        for name, dist in self.transition_dists.items():
+            current_states[name] = dist.get_state()
+        
+        # Example of jumping distributions to a specific time
+        if hasattr(self, 'sim') and self.sim is not None:
+            self.transition_dists.jump(to=self.sim.ti)
+        
+        # Example of resetting distributions
+        # self.transition_dists.reset()
+        
+        return current_states
+
+    def demonstrate_distribution_scaling(self):
+        """Demonstrate distribution scaling capabilities"""
+        # Example of scaling a distribution by time
+        scaled_rate = self.pars.rate_LS_to_presym * 2  # Double the rate
+        scaled_prob = scaled_rate.to_prob()  # Convert to probability
+        
+        # Example of checking scale types
+        scale_type = ss.distributions.scale_types.check_predraw(self.pars.rate_LS_to_presym)
+        
+        return {
+            'original_rate': self.pars.rate_LS_to_presym,
+            'scaled_rate': scaled_rate,
+            'scaled_prob': scaled_prob,
+            'scale_type': scale_type
+        }
 
     def step_die(self, uids):
         if len(uids) == 0:
