@@ -114,11 +114,11 @@ class TB(ss.Infection):
         unit = self.pars.rate_treatment_to_clear.unit
         
         # Create rate array - zero for those not on treatment, treatment rate for those on treatment
-        ratevals = np.zeros(len(uids))
-        ratevals[self.on_treatment[uids]] = base_rate
+        ratevals_arr = np.zeros(len(uids))
+        ratevals_arr[self.on_treatment[uids]] = base_rate
         
         # Convert to Starsim rate object and apply to_prob()
-        rate = ss.per(ratevals, unit=unit)
+        rate = ss.per(ratevals_arr, unit=unit)
         prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
         return prob
 
@@ -132,10 +132,10 @@ class TB(ss.Infection):
         unit = self.pars.rate_presym_to_active.unit
         
         # Create rate array with the same rate for all individuals
-        ratevals = np.full(len(uids), rate_val)
+        ratevals_arr = np.full(len(uids), rate_val)
         
         # Convert to Starsim rate object and apply to_prob()
-        rate = ss.per(ratevals, unit=unit)
+        rate = ss.per(ratevals_arr, unit=unit)
         prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
         return prob
 
@@ -149,14 +149,14 @@ class TB(ss.Infection):
         unit = self.pars.rate_active_to_clear.unit
         
         # Create rate array with base rate for all individuals
-        ratevals = np.full(len(uids), base_rate_val)
-        ratevals[self.on_treatment[uids]] = treatment_rate_val  # Those on treatment have a different clearance rate
+        ratevals_arr = np.full(len(uids), base_rate_val)
+        ratevals_arr[self.on_treatment[uids]] = treatment_rate_val  # Those on treatment have a different clearance rate
         
         # Apply relative risk to the numeric rates BEFORE creating Starsim rate object
-        ratevals *= self.rr_clearance[uids]
+        ratevals_arr *= self.rr_clearance[uids]
         
         # Convert to Starsim rate object and apply to_prob()
-        rate = ss.per(ratevals, unit=unit)
+        rate = ss.per(ratevals_arr, unit=unit)
         prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
         return prob
 
@@ -165,21 +165,21 @@ class TB(ss.Infection):
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all()
         
         # Get the death rates and unit
-        exptb_rate_val = self.pars.rate_exptb_to_dead.rate
         smpos_rate_val = self.pars.rate_smpos_to_dead.rate
         smneg_rate_val = self.pars.rate_smneg_to_dead.rate
+        exptb_rate_val = self.pars.rate_exptb_to_dead.rate
         unit = self.pars.rate_exptb_to_dead.unit
         
         # Create rate array with extra-pulmonary rate as default
-        ratevals = np.full(len(uids), exptb_rate_val)
-        ratevals[self.state[uids] == TBS.ACTIVE_SMPOS] = smpos_rate_val
-        ratevals[self.state[uids] == TBS.ACTIVE_SMNEG] = smneg_rate_val
+        ratevals_arr = np.full(len(uids), exptb_rate_val)
+        ratevals_arr[self.state[uids] == TBS.ACTIVE_SMPOS] = smpos_rate_val
+        ratevals_arr[self.state[uids] == TBS.ACTIVE_SMNEG] = smneg_rate_val
         
         # Apply relative risk to the numeric rates BEFORE creating Starsim rate object
-        ratevals *= self.rr_death[uids]
+        ratevals_arr *= self.rr_death[uids]
         
         # Convert to Starsim rate object and apply to_prob()
-        rate = ss.per(ratevals, unit=unit)
+        rate = ss.per(ratevals_arr, unit=unit)
         prob = rate.to_prob()  # Do not use sim.dt; module dt is used internally
         return prob
 
