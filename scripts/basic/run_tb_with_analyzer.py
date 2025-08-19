@@ -35,7 +35,7 @@ def build_tbsim(sim_pars=None):
         people=pop,
         networks=net,
         diseases=tb,
-        #demographics=[ss.Deaths(pars=dict(death_rate=10)), ss.Births(pars=dict(birth_rate=10))],
+        demographics=[ss.Deaths(pars=dict(death_rate=10)), ss.Births(pars=dict(birth_rate=10))],
         pars=sim_params,
         analyzers=dwell_analyzer,
     )
