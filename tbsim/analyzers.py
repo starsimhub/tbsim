@@ -2232,7 +2232,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         # Initialize the latest state dataframe
         # NOTE: This module assumes the default state is '-1'
         if self.unit is None:
-            self.unit = self.sim.pars.unit
+            # In Starsim v3, unit parameter has been removed, use default of 1.0 (years)
+            self.unit = 1.0
         agent_ids = self.sim.people.auids.copy()
         population = len(agent_ids)
         new_logs = pd.DataFrame({
@@ -2486,7 +2487,19 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             if isinstance(self.unit, (float, int)):
                 self.data['dwell_time'] = self.data['dwell_time'] * self.unit   
             elif isinstance(self.unit, str):
-                self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / ss.rate(self.unit))
+                # Convert time unit string to appropriate Starsim v3 time unit
+                if self.unit.lower() in ['day', 'days']:
+                    unit_rate = ss.day
+                elif self.unit.lower() in ['week', 'weeks']:
+                    unit_rate = ss.week
+                elif self.unit.lower() in ['month', 'months']:
+                    unit_rate = ss.month
+                elif self.unit.lower() in ['year', 'years']:
+                    unit_rate = ss.year
+                else:
+                    # Default to years if unit is not recognized
+                    unit_rate = ss.year
+                self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / unit_rate)
                 # self.data['dwell_time'] = self.data['dwell_time'].apply(lambda x: eval(f"{x} {self.unit}"))
         self.file_path = self.__save_to_file__()
         return
