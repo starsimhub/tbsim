@@ -27,18 +27,18 @@ class TB(ss.Infection):
         self.define_pars(
             # Initial conditions
             init_prev = ss.bernoulli(0.01, name='init_prev'),                            # Initial seed infections
-            beta = ss.peryear(0.025, name='beta'),                                  # Infection probability
+            beta = ss.peryear(0.025),                                  # Infection probability
             p_latent_fast = ss.bernoulli(0.1, name='p_latent_fast'),                         # Probability of latent fast as opposed to latent slow
             
             # Transition rates with proper naming and units
-            rate_LS_to_presym       = ss.perday(3e-5, name='rate_LS_to_presym'),                 # Latent Slow to Active Pre-Symptomatic (per day)            
-            rate_LF_to_presym       = ss.perday(6e-3, name='rate_LF_to_presym'),                 # Latent Fast to Active Pre-Symptomatic (per day)
-            rate_presym_to_active   = ss.perday(3e-2, name='rate_presym_to_active'),                 # Pre-symptomatic to symptomatic (per day)
-            rate_active_to_clear    = ss.perday(2.4e-4, name='rate_active_to_clear'),               # Active infection to natural clearance (per day)
-            rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4, name='rate_exptb_to_dead'),        # Extra-Pulmonary TB to Dead (per day)
-            rate_smpos_to_dead      = ss.perday(4.5e-4, name='rate_smpos_to_dead'),               # Smear Positive Pulmonary TB to Dead (per day)
-            rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4, name='rate_smneg_to_dead'),         # Smear Negative Pulmonary TB to Dead (per day)
-            rate_treatment_to_clear = ss.peryear(6, name='rate_treatment_to_clear'),                # 2 months is the duration treatment implies 6 per year
+            rate_LS_to_presym       = ss.perday(3e-5),                 # Latent Slow to Active Pre-Symptomatic (per day)            
+            rate_LF_to_presym       = ss.perday(6e-3),                 # Latent Fast to Active Pre-Symptomatic (per day)
+            rate_presym_to_active   = ss.perday(3e-2),                 # Pre-symptomatic to symptomatic (per day)
+            rate_active_to_clear    = ss.perday(2.4e-4),               # Active infection to natural clearance (per day)
+            rate_exptb_to_dead      = ss.perday(0.15 * 4.5e-4),        # Extra-Pulmonary TB to Dead (per day)
+            rate_smpos_to_dead      = ss.perday(4.5e-4),               # Smear Positive Pulmonary TB to Dead (per day)
+            rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
+            rate_treatment_to_clear = ss.peryear(6),                # 2 months is the duration treatment implies 6 per year
 
             # State distribution with proper naming
             active_state = ss.choice(
@@ -264,7 +264,11 @@ class TB(ss.Infection):
 
         # Latent --> active pre-symptomatic
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
-        new_presymp_uids = self.p_latent_to_presym.filter(latent_uids)
+        if len(latent_uids):
+            dist = self.p_latent_to_presym(self.sim, latent_uids)
+            new_presymp_uids = dist.filter(latent_uids)
+        else:
+            new_presymp_uids = ss.uids()
         if len(new_presymp_uids):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_cur[new_presymp_uids] = ti
@@ -278,9 +282,11 @@ class TB(ss.Infection):
         new_clear_presymp_uids = ss.uids()
         if len(presym_uids):
             # Pre symp --> Clear
-            new_clear_presymp_uids = self.p_presym_to_clear.filter(presym_uids)
+            dist_clear = self.p_presym_to_clear(self.sim, presym_uids)
+            new_clear_presymp_uids = dist_clear.filter(presym_uids)
 
-            new_active_uids = self.p_presym_to_active.filter(presym_uids)
+            dist_active = self.p_presym_to_active(self.sim, presym_uids)
+            new_active_uids = dist_active.filter(presym_uids)
             if len(new_active_uids):
                 active_state = self.active_tb_state[new_active_uids] 
                 self.state[new_active_uids] = active_state
@@ -289,7 +295,11 @@ class TB(ss.Infection):
 
         # Active --> Susceptible via natural recovery or as accelerated by treatment (clear)
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids
-        new_clear_active_uids = self.p_active_to_clear.filter(active_uids)
+        if len(active_uids):
+            dist_clear = self.p_active_to_clear(self.sim, active_uids)
+            new_clear_active_uids = dist_clear.filter(active_uids)
+        else:
+            new_clear_active_uids = ss.uids()
         new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
             # Set state and reset timers
@@ -304,7 +314,11 @@ class TB(ss.Infection):
 
         # Active --> Death
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
-        new_death_uids = self.p_active_to_death.filter(active_uids)
+        if len(active_uids):
+            dist_death = self.p_active_to_death(self.sim, active_uids)
+            new_death_uids = dist_death.filter(active_uids)
+        else:
+            new_death_uids = ss.uids()
         if len(new_death_uids):
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
