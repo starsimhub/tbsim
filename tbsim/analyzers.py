@@ -1302,7 +1302,7 @@ class DwtPlotter:
         dwell times and agent counts for each transition.
         
         Mathematical Model:
-            For each transition (state_i → state_j):
+            For each transition (state_i → state_j): 
             - Calculate statistics: mean_ij, mode_ij, count_ij
             - Create edge: node_i → node_j
             - Annotate edge: "Mean: mean_ij, Mode: mode_ij, Agents: count_ij"
@@ -1375,10 +1375,15 @@ class DwtPlotter:
             G.add_edge(from_state, to_state,
                 label=f"Mean: {mean_dwell}\nMo: {mode_dwell}\nAgents: {num_agents}")
 
-        pos = nx.spring_layout(G, seed=42)  # Fixed layout for consistency
-        colors =plt.colormaps.get_cmap(colormap) 
-        node_colors = [colors(i) for i in range(len(G.nodes))]
-        edge_colors = [node_colors[list(G.nodes).index(edge[0])] for edge in G.edges]
+        # Choose layout based on parameter
+        if layout is not None:
+            pos = self.__select_graph_pos__(G, layout, seed=42)
+        else:
+            pos = nx.spring_layout(G, seed=42)  # Default spring layout
+        # Enhanced color handling
+        colors = plt.colormaps.get_cmap(colormap)
+        node_colors = [colors(i / max(1, len(G.nodes) - 1)) for i in range(len(G.nodes))]
+        edge_colors = [colors(i / max(1, len(G.edges) - 1)) for i in range(len(G.edges))]
         edge_labels = nx.get_edge_attributes(G, 'label')
 
         nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, edgecolors= "lightgray", alpha=0.9)
@@ -1489,13 +1494,16 @@ class DwtPlotter:
                 label=f"{fs_id},  μ:{mean_dwell},  Mo: {mode_dwell}\nAgents:{num_agents}",
                 weight=edge_thickness)
 
-        # Choose layout
-        pos = nx.spring_layout(G, seed=graphseed)  
+        # Choose layout based on parameter
+        if layout is not None:
+            pos = self.__select_graph_pos__(G, layout, seed=graphseed)
+        else:
+            pos = nx.spring_layout(G, seed=graphseed)  # Default spring layout  
 
-        # Color nodes and edges
-        colors = plt.get_cmap(colormap)
-        node_colors = [colors(i / max(1, len(G.nodes))) for i in range(len(G.nodes))]
-        edge_colors = [node_colors[list(G.nodes).index(edge[0])] for edge in G.edges]
+        # Enhanced color handling
+        colors = plt.colormaps.get_cmap(colormap)
+        node_colors = [colors(i / max(1, len(G.nodes) - 1)) for i in range(len(G.nodes))]
+        edge_colors = [colors(i / max(1, len(G.edges) - 1)) for i in range(len(G.edges))]
 
         # Get edge attributes
         edge_labels = nx.get_edge_attributes(G, 'label')
@@ -1512,6 +1520,233 @@ class DwtPlotter:
         # Display the graph
         plt.title(f"State Transition Graph - By Agents Count: {subtitle}", color='white')
         plt.annotate(text='DwtPlotter.graph_state_transitions_curved()', xy=(0.5, -0.2), xycoords='axes fraction', ha='center', fontsize=12)
+        plt.tight_layout()
+        plt.show()
+        
+        return
+
+    def graph_state_transitions_enhanced(self, states=None, subtitle="", layout=None, colormap='viridis', 
+                                       onlymodel=True, graphseed=42, figsize=(16, 12), 
+                                       node_size_scale=1000, edge_width_scale=8, font_size=10):
+        """
+        Create an enhanced network graph visualization of state transitions with improved styling.
+        
+        This enhanced version provides:
+        - Better color schemes and visual hierarchy
+        - Clearer edge annotations with better formatting
+        - Improved node sizing based on transition importance
+        - Enhanced readability with better fonts and spacing
+        - Professional styling suitable for publications
+        
+        Mathematical Model:
+            For each transition (state_i → state_j):
+            - Calculate statistics: mean_ij, mode_ij, count_ij
+            - Node importance: importance_i = Σ(count_ij for all j) + Σ(count_ji for all i)
+            - Node size: size_i = node_size_scale * (importance_i / max_importance)
+            - Edge thickness: thickness_ij = edge_width_scale * (count_ij / max_count)
+            - Color intensity: intensity_ij = count_ij / max_count
+            
+        Args:
+            states (list, optional): Specific states to include. If None, includes all states
+            subtitle (str): Additional subtitle for the plot
+            layout (int, optional): Layout algorithm (0-9). Default uses spring layout
+            colormap (str): Matplotlib colormap name. Default 'viridis'
+            onlymodel (bool): If True, exclude certain non-model states
+            graphseed (int): Random seed for layout consistency. Default 42
+            figsize (tuple): Figure size (width, height). Default (16, 12)
+            node_size_scale (int): Scaling factor for node sizes. Default 1000
+            edge_width_scale (int): Scaling factor for edge widths. Default 8
+            font_size (int): Base font size. Default 10
+                           
+        Returns:
+            None: Displays matplotlib network graph
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Create enhanced state transition network
+        plotter.graph_state_transitions_enhanced(
+            subtitle="Enhanced TB State Transitions",
+            colormap='plasma',
+            figsize=(18, 14),
+            node_size_scale=1200,
+            edge_width_scale=10
+        )
+        ```
+        
+        Features:
+        - Enhanced directed graph visualization
+        - Professional statistical annotations on edges
+        - Node size proportional to transition importance
+        - Edge thickness proportional to agent count
+        - Color-coded nodes and edges with improved schemes
+        - Publication-ready styling
+        - Better spacing and typography
+        """
+        if self.__data_error__():  
+            return
+            
+        df = self.data
+        if states is not None: 
+            df = df[df['going_to_state'].isin(states)]
+            df = df[df['state_name'].isin(states)]
+        
+        if onlymodel: 
+            df = df[~df['going_to_state_id'].isin([-3.0, -2.0])]
+
+        # Compute transition statistics
+        transitions = df.groupby(['state_name', 'going_to_state'])['dwell_time']
+        
+        stats_df = transitions.agg([
+            'mean',
+            lambda x: stats.mode(x, keepdims=True).mode[0] if len(x) > 0 else np.nan,
+            'count'
+        ]).reset_index()
+        
+        stats_df.columns = ['state_name', 'going_to_state', 'mean', 'mode', 'count']
+        
+        # Create directed graph
+        G = nx.DiGraph()
+        
+        # Calculate node importance (total transitions in + out)
+        node_importance = {}
+        for _, row in stats_df.iterrows():
+            from_state = row['state_name']
+            to_state = row['going_to_state']
+            count = row['count']
+            
+            # Add to importance calculations
+            node_importance[from_state] = node_importance.get(from_state, 0) + count
+            node_importance[to_state] = node_importance.get(to_state, 0) + count
+            
+            # Add edge to graph
+            G.add_edge(from_state, to_state, weight=count)
+        
+        # Find scaling factors
+        max_importance = max(node_importance.values()) if node_importance else 1
+        max_count = stats_df['count'].max() if not stats_df['count'].isna().all() else 1
+        
+        # Set up the figure with enhanced styling
+        plt.figure(figsize=figsize, facecolor='white')
+        
+        # Choose layout
+        if layout is not None:
+            pos = self.__select_graph_pos__(G, layout, seed=graphseed)
+        else:
+            pos = nx.spring_layout(G, seed=graphseed, k=3, iterations=50)
+        
+        # Enhanced color scheme
+        colors = plt.colormaps.get_cmap(colormap)
+        node_colors = [colors(i / max(1, len(G.nodes) - 1)) for i in range(len(G.nodes))]
+        
+        # Calculate node sizes based on importance
+        node_sizes = [node_size_scale * (node_importance.get(node, 0) / max_importance) for node in G.nodes]
+        node_sizes = [max(size, 300) for size in node_sizes]  # Minimum size
+        
+        # Calculate edge widths based on agent count
+        edge_weights = [edge_width_scale * (G[u][v]['weight'] / max_count) for u, v in G.edges]
+        edge_weights = [max(weight, 0.5) for weight in edge_weights]  # Minimum width
+        
+        # Edge colors based on transition intensity
+        edge_colors = []
+        for u, v in G.edges:
+            intensity = G[u][v]['weight'] / max_count
+            edge_colors.append(colors(intensity))
+        
+        # Draw nodes with enhanced styling
+        nx.draw_networkx_nodes(
+            G, pos, 
+            node_size=node_sizes,
+            node_color=node_colors,
+            edgecolors='black',
+            linewidths=2,
+            alpha=0.9
+        )
+        
+        # Draw edges with enhanced styling
+        nx.draw_networkx_edges(
+            G, pos,
+            width=edge_weights,
+            edge_color=edge_colors,
+            alpha=0.8,
+            arrowstyle='-|>',
+            arrowsize=25,
+            connectionstyle='arc3,rad=0.1',
+            min_source_margin=15,
+            min_target_margin=15
+        )
+        
+        # Enhanced node labels
+        nx.draw_networkx_labels(
+            G, pos,
+            font_size=font_size,
+            font_color='black',
+            font_weight='bold',
+            bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.8, edgecolor='gray')
+        )
+        
+        # Enhanced edge labels with better formatting
+        edge_labels = {}
+        for _, row in stats_df.iterrows():
+            from_state = row['state_name']
+            to_state = row['going_to_state']
+            mean_dwell = row['mean']
+            mode_dwell = row['mode']
+            num_agents = row['count']
+            
+            # Format the label with better spacing and alignment
+            if pd.isna(mean_dwell) or pd.isna(mode_dwell):
+                label = f"Agents: {num_agents}"
+            else:
+                label = f"μ: {mean_dwell:.1f}\nMo: {mode_dwell:.1f}\nN: {num_agents}"
+            
+            edge_labels[(from_state, to_state)] = label
+        
+        # Draw edge labels with enhanced styling
+        nx.draw_networkx_edge_labels(
+            G, pos,
+            edge_labels=edge_labels,
+            font_size=font_size-2,
+            font_color='darkblue',
+            font_weight='bold',
+            bbox=dict(boxstyle="round,pad=0.2", facecolor='lightblue', alpha=0.7, edgecolor='blue')
+        )
+        
+        # Enhanced title and annotations
+        plt.title(
+            f"Enhanced State Transition Network\n{subtitle}",
+            fontsize=font_size+4,
+            fontweight='bold',
+            pad=20,
+            color='darkblue'
+        )
+        
+        # Add informative subtitle
+        total_transitions = stats_df['count'].sum()
+        unique_states = len(G.nodes)
+        plt.figtext(
+            0.5, 0.02,
+            f'Total Transitions: {total_transitions} | States: {unique_states} | '
+            f'Node size ∝ transition importance | Edge thickness ∝ agent count',
+            ha='center',
+            fontsize=font_size-1,
+            style='italic',
+            color='gray'
+        )
+        
+        # Add method attribution
+        plt.figtext(
+            0.5, -0.02,
+            'DwtPlotter.graph_state_transitions_enhanced()',
+            ha='center',
+            fontsize=font_size-2,
+            style='italic',
+            color='lightgray'
+        )
+        
+        # Remove axes for cleaner look
+        plt.axis('off')
         plt.tight_layout()
         plt.show()
         
@@ -1842,7 +2077,7 @@ class DwtPlotter:
         return df_cleaned
 
     @staticmethod
-    def __select_graph_pos__(G, layout, seed=42):
+    def __select_graph_pos__(G, layout=4, seed=42):
         """
         Select graph layout algorithm for network visualizations.
         
@@ -2645,6 +2880,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             if p_value < 0.05:
                 print(f"WARNING: Dwell times for state {state} deviate significantly from expectations.")
         return
+
+
 
 class Utils:
     """
