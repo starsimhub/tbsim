@@ -17,10 +17,7 @@ def build_tbhiv_sim(Intvs=True, tb=True, includehiv = True, Demgs= True, simpars
         rand_seed=123,
     )
     people = ss.People(n_agents=1000)
-    
-    
 
-  
     # --- HIV Disease Model ---
     hiv_pars = dict(
         init_prev=ss.bernoulli(p=0.00),     # 10% of the population is infected (in case not using intervention)
@@ -30,7 +27,6 @@ def build_tbhiv_sim(Intvs=True, tb=True, includehiv = True, Demgs= True, simpars
 
     # --- Network ---
     network = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
-
 
     # --- Assemble Simulation ---
     sim = ss.Sim(
@@ -47,10 +43,6 @@ def build_tbhiv_sim(Intvs=True, tb=True, includehiv = True, Demgs= True, simpars
 
 
 if __name__ == '__main__':
-
-    
-
-
     args = []
     args.append(dict(Intvs=False,Demgs=False))
     args.append(dict(Intvs=True,Demgs=False))

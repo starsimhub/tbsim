@@ -25,7 +25,7 @@ def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
 
     # --- TB Model ---
     pars = dict(
-        beta=ss.peryear(0.1),
+        beta=ss.peryear(0.025),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
     )

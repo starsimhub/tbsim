@@ -3,7 +3,7 @@ import starsim as ss
 import sciris as sc
 import numpy as np
 import shared_functions as sf
-import tbsim.utils as utils
+import shared_functions as utils
 
 def build_tbhiv_sim(include_intv=False, include_cnn=False, hiv_pars=None, hiv_intv_pars=None, Demgs=False) -> ss.Sim:
     """Construct a TB-HIV simulation with optional interventions."""

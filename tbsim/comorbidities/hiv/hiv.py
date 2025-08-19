@@ -143,7 +143,7 @@ class HIV(ss.Disease):
 
        
         # HIV → LATENT:
-        acute_to_latent = self.pars.acute_to_latent
+        acute_to_latent = self.pars.acute_to_latent.to_prob()  # Convert to probability for Starsim 3.0
         hiv_ids = uids[current == HIVState.ACUTE]
         art_multiplier = np.where(self.on_ART[hiv_ids], art_factor, 1.0) # Apply ART factor
         effective_p = acute_to_latent*art_multiplier
@@ -151,7 +151,7 @@ class HIV(ss.Disease):
         self.state[hiv_ids[rand_vals < effective_p]] = HIVState.LATENT
         
         # LATENT → AIDS:
-        latent_to_aids = self.pars.latent_to_aids
+        latent_to_aids = self.pars.latent_to_aids.to_prob()  # Convert to probability for Starsim 3.0
         latent_ids = uids[current == HIVState.LATENT]
         art_multiplier = np.where(self.on_ART[latent_ids], art_factor, 1.0)  # Apply ART factor
         effective_p = latent_to_aids*art_multiplier
