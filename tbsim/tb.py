@@ -17,7 +17,54 @@ class TBS(IntEnum):
     ACTIVE_EXPTB    = 5     # Active TB, extra-pulmonary
     DEAD            = 8     # TB death
     PROTECTED       = 100
-
+    
+    # region Convenience methods for all states
+  
+    @staticmethod
+    def all():
+        """
+        Get all TB states including special states.
+        
+        Returns:
+            numpy.ndarray: All TB states including NONE, LATENT_SLOW, LATENT_FAST, 
+                          ACTIVE_PRESYMP, ACTIVE_SMPOS, ACTIVE_SMNEG, ACTIVE_EXPTB, 
+                          DEAD, and PROTECTED.
+        """
+        return np.array([TBS.NONE, TBS.LATENT_SLOW, TBS.LATENT_FAST, TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB, TBS.DEAD, TBS.PROTECTED])
+    
+    @staticmethod
+    def all_active():
+        """
+        Get all active TB states.
+        
+        Returns:
+            numpy.ndarray: Active TB states including ACTIVE_PRESYMP, ACTIVE_SMPOS, 
+                          ACTIVE_SMNEG, and ACTIVE_EXPTB.
+        """
+        return np.array([TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+    
+    @staticmethod
+    def all_latent():
+        """
+        Get all latent TB states.
+        
+        Returns:
+            numpy.ndarray: Latent TB states including LATENT_SLOW and LATENT_FAST.
+        """
+        return np.array([TBS.LATENT_SLOW, TBS.LATENT_FAST])
+    
+    @staticmethod
+    def all_infected():
+        """
+        Get all states that represent TB infection (excluding NONE, DEAD, and PROTECTED).
+        
+        Returns:
+            numpy.ndarray: TB infection states including LATENT_SLOW, LATENT_FAST, 
+                          ACTIVE_PRESYMP, ACTIVE_SMPOS, ACTIVE_SMNEG, and ACTIVE_EXPTB.
+        """
+        return np.array([TBS.LATENT_SLOW, TBS.LATENT_FAST, TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+    # endregion
+    
 
 class TB(ss.Infection):
     def __init__(self, pars=None, **kwargs):
@@ -36,7 +83,7 @@ class TB(ss.Infection):
             rate_smneg_to_dead      = ss.perday(0.3 * 4.5e-4),         # Smear Negative Pulmonary TB to Dead (per day)
             rate_treatment_to_clear = ss.peryear(6),                # 2 months is the duration treatment implies 6 per year
 
-            active_state = ss.choice(a=[TBS.ACTIVE_EXPTB, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG], p=[0.1, 0.65, 0.25]),
+            active_state = ss.choice(a=TBS.all_active(), p=[0.1, 0.1, 0.60, 0.20]),
 
             # Relative transmissibility of each state
             rel_trans_presymp   = 0.1, # 0.0274
@@ -87,7 +134,7 @@ class TB(ss.Infection):
     @staticmethod
     def p_latent_to_presym(self, sim, uids):
         # Could be more complex function of time in state, but exponential for now
-        assert np.isin(self.state[uids], [TBS.LATENT_FAST, TBS.LATENT_SLOW]).all()
+        assert np.isin(self.state[uids], TBS.all_latent()).all()
         
         unit = self.pars.rate_LS_to_presym.unit
         ls_rate_val = self.pars.rate_LS_to_presym.rate      # 3e-5 per day
@@ -408,7 +455,7 @@ class TB(ss.Infection):
         res['n_active_smneg_15+'][ti] = np.count_nonzero((self.sim.people.age>=15) & (self.state == TBS.ACTIVE_SMNEG))
         res.n_active_exptb[ti]      = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
         res['n_active_exptb_15+'][ti] = np.count_nonzero((self.sim.people.age>=15) & (self.state == TBS.ACTIVE_EXPTB))
-        res.n_active[ti]            = np.count_nonzero(np.isin(self.state, [TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]))
+        res.n_active[ti]            = np.count_nonzero(np.isin(self.state, TBS.all_active()))
         res.n_infectious[ti]        = np.count_nonzero(self.infectious)
         res['n_infectious_15+'][ti] = np.count_nonzero(self.infectious & (self.sim.people.age>=15))
 
@@ -441,3 +488,4 @@ class TB(ss.Infection):
             plt.plot(self.results['timevec'], self.results[rkey], label=rkey.title())
         plt.legend()
         return fig
+
