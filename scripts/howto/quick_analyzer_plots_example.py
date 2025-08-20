@@ -1,12 +1,13 @@
 import tbsim as mtb
 import starsim as ss
+import starsim_examples as sse
 import sciris as sc 
 
 def build_tbsim(sim_pars=None):
     """Build a TB simulation with dwell time analyzer"""
     sim_params = dict(
-        start = sc.date('2013-01-01'),      
-        stop = sc.date('2016-12-31'), 
+        start = ss.date('2013-01-01'),      
+        stop = ss.date('2016-12-31'), 
         rand_seed=123,
         dt=ss.days(7),
     )
@@ -22,9 +23,9 @@ def build_tbsim(sim_pars=None):
         )
     tb = mtb.TB(tb_params)
     
-    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    net = sse.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
 
-    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=1.0, scenario_name='quick_plots_example')
+    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True  # TODO: Check if adjust_to_unit is still needed in v3, dt=1.0, scenario_name='quick_plots_example')
 
     sim = ss.Sim(
         people=pop,
