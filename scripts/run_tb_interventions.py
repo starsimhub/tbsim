@@ -145,11 +145,11 @@ def get_scenarios():
             'name': 'No interventions',
             'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
         },
-        # 'Baseline and BetaByYear': {
-        #     'name': 'No interventions',
-        #     'tbpars': dict(start=sc.date('1975-01-01'), stop=sc.date('2030-12-31')),
-        #     'betabyyear':dict(years=[1990, 2000], x_beta=[0.5, 1.4])
-        # },
+        'Baseline and BetaByYear': {
+            'name': 'No interventions',
+            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
+            'betabyyear':dict(years=[1990, 2000], x_beta=[0.5, 1.4])
+        },
         'Single BCG': {
             'name': 'Single BCG intervention',
             'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),

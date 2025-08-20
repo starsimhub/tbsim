@@ -107,15 +107,15 @@ class BCGProtection(ss.Intervention):
            
         self.define_pars(
             coverage=ss.bernoulli(p=pars.get('coverage', 0.5)),  # Default 50% coverage
-            start=sc.date('1900-01-01'),
-            stop=sc.date('2100-12-31'),
-            efficacy= 0.8,  # Default 80% efficacy
+            start=ss.date('1900-01-01'),
+            stop=ss.date('2100-12-31'),
+            efficacy=0.8,  # Default 80% efficacy
             immunity_period=ss.years(10),  # Default 10 years
             age_range=[0, 5],
             # Default modifiers
-            activation_modifier= ss.uniform(0.5, 0.65),  # Reduces activation risk
+            activation_modifier=ss.uniform(0.5, 0.65),  # Reduces activation risk
             clearance_modifier=ss.uniform(1.3, 1.5),    # Increases clearance
-            death_modifier=ss.uniform(0.05, 0.15),          # Reduces death risk
+            death_modifier=ss.uniform(0.05, 0.15),      # Reduces death risk
         )
         self.update_pars(pars)
         self.min_age = self.pars.age_range[0]
@@ -126,7 +126,7 @@ class BCGProtection(ss.Intervention):
         self.define_states(
             ss.BoolArr('is_bcg_vaccinated', default=False),
             ss.FloatArr('ti_bcg_vaccinated'),
-            ss.Arr('ti_bcg_protection_expires'),
+            ss.FloatArr('ti_bcg_protection_expires'),
             ss.FloatArr('age_at_vaccination'),
             ss.FloatArr('bcg_activation_modifier_applied'),
             ss.FloatArr('bcg_clearance_modifier_applied'),
@@ -213,13 +213,17 @@ class BCGProtection(ss.Intervention):
         else:
             now_date = now
             
+        # Convert start and stop dates to datetime.date for comparison
+        start_date = self.pars.start.date() if hasattr(self.pars.start, 'date') else self.pars.start
+        stop_date = self.pars.stop.date() if hasattr(self.pars.stop, 'date') else self.pars.stop
+            
         # Debug temporal eligibility
         if self.ti % 5 == 0:  # Every 5 timesteps
-            logger.info(f"Temporal Eligibility Check - timestep {self.ti}: now_date={now_date}, start={self.pars.start}, stop={self.pars.stop}, within_window={self.pars.start <= now_date <= self.pars.stop}")
+            logger.info(f"Temporal Eligibility Check - timestep {self.ti}: now_date={now_date}, start={start_date}, stop={stop_date}, within_window={start_date <= now_date <= stop_date}")
             
-        if now_date < self.pars.start or now_date > self.pars.stop:
+        if now_date < start_date or now_date > stop_date:
             if self.ti % 10 == 0:  # Log less frequently for skipped timesteps
-                logger.info(f"BCG intervention skipped - outside time window: {now_date} not in [{self.pars.start}, {self.pars.stop}]")
+                logger.info(f"BCG intervention skipped - outside time window: {now_date} not in [{start_date}, {stop_date}]")
             return
         
         current_time = self.ti  # Current timestep
@@ -274,6 +278,15 @@ class BCGProtection(ss.Intervention):
         """
         current_time = self.sim.ti
         self._maintain_ongoing_protection(current_time)
+        
+    def begin_step(self):
+        """
+        Called at the very start of each simulation timestep, before any disease model steps.
+        Ensures that BCG protection effects are applied to all currently protected individuals
+        before the TB model uses the risk modifiers.
+        """
+        current_time = self.sim.ti
+        self._maintain_ongoing_protection(current_time)
 
     def _apply_protection_effects(self, protected_uids):
         """
@@ -287,8 +300,8 @@ class BCGProtection(ss.Intervention):
             
         tb = self.sim.diseases.tb
         tb.state[protected_uids] = TBS.PROTECTED      # TB Protected status - 100 -> BCG
-        # Check if modifiers have already been applied to avoid multiple applications
         
+        # Check if modifiers have already been applied to avoid multiple applications
         already_protected = ~np.isnan(self.bcg_activation_modifier_applied[protected_uids])
         if np.any(already_protected):
             logger.warning(f"BCG protection effects already applied to {np.sum(already_protected)} individuals. Skipping re-application.")
@@ -419,6 +432,10 @@ class BCGProtection(ss.Intervention):
         - Intervention timing metrics (average age at vaccination, protection immunity_period)
         - TB impact metrics (cases and deaths averted)
         """
+        # Check if results are already initialized to prevent duplicate definitions
+        if hasattr(self, 'results') and len(self.results) > 0:
+            return
+            
         self.define_results(
             # Basic vaccination metrics
             ss.Result('n_vaccinated', dtype=int),           # Total vaccinated individuals

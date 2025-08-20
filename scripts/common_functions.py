@@ -1,5 +1,4 @@
 import starsim as ss 
-import starsim_examples as sse
 import sciris as sc
 import tbsim as mtb 
 import numpy as np 
@@ -50,7 +49,7 @@ def make_net(pars = None):
             dur=0,  # Duration of contacts
             # Add any other default parameters here
         )
-    return sse.RandomNet(pars=pars)
+    return ss.RandomNet(pars=pars)
 
 
 def make_births(pars = None):
@@ -96,7 +95,7 @@ def make_hiv(pars = None):
         pars = dict(
             # Add any default parameters here
         )
-    return sse.HIV(pars=pars)  # Placeholder for the actual HIV class
+    return ss.HIV(pars=pars)  # Placeholder for the actual HIV class
 
 def make_cnn(pars = None):
     """

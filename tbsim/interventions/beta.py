@@ -92,6 +92,7 @@ class BetaByYear(ss.Intervention):
             if (year >= target_year) and (year < target_year + self.t.dt_year):
                 #print(f"NEW BETA: At year:{year}, Value:{x_beta}")
                 self.sim.diseases.tb.pars['beta'] *= x_beta
+                print(f"At year:{year}, Modified BetaValue:{x_beta}")
                 # Always remove the year and x_beta after application
                 self.pars.years.pop(0)
                 self._x_beta_list.pop(0)
