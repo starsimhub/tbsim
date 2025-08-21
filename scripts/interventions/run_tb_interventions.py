@@ -178,7 +178,7 @@ def run_scenarios(plot=True):
     import sys
     import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    import plots as pl
+    import tbsim.utils.plots as pl
 
     results = {}
     for name, scenario in get_scenarios().items():

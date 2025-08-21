@@ -3,11 +3,12 @@ import tbsim as mtb
 import starsim as ss
 import matplotlib.pyplot as plt
 import sciris as sc
+import numpy as np
 
 import os, sys
 scripts_dir = os.path.join(os.getcwd(), '..', '..', 'scripts')
 sys.path.append(scripts_dir)
-from plots import plot_results
+import tbsim.utils.plots as pl
 
 # Create and run the sim
 sim = ss.Sim(
@@ -18,7 +19,7 @@ sim = ss.Sim(
         mtb.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.1)})  # For new code with initial care-seeking rate
     ],
     networks=ss.RandomNet({'n_contacts': ss.poisson(lam=2), 'dur': 0}),
-    pars=dict(start=2000, stop=2020, dt=ss.days(1)),
+    pars=dict(start=ss.date(2000), stop=ss.date(2020), dt=ss.months(6)),
 )
 sim.run()
 
@@ -26,15 +27,16 @@ sim.run()
 flat_results = {'TB + HSB': sim.results.flatten()}
 
 # Plot all matching metrics (you can adjust keywords below)
-plot_results(
+pl.plot_results(
     flat_results,
     keywords=['active', 'sought', 'eligible', 'incidence'],
     exclude=(),
     n_cols=2,
+    cmap='viridis',
     dark=False,
-    cmap='tab10',
-    heightfold=3,
-    style='default'
+    heightfold=2,
+    style='default',
+    title='TB + Health-Seeking Behavior'
 )
 
 # Custom plot for new_sought_care + optional cumulative view

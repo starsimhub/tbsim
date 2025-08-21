@@ -44,7 +44,7 @@ def dummy_uids(arr):
     # Patch for ss.uids
     return np.array(arr, dtype=int)
 
-def make_sim(agents=20, start=sc.date('2000-01-01'), stop=sc.date('2020-12-31'), dt=ss.days(7)/365):
+def make_sim(agents=20, start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'), dt=ss.days(7)/365):
     pop = ss.People(n_agents=agents)
     tb = mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
@@ -84,8 +84,8 @@ def test_bcg_intervention_default_values():
     else:
         assert bcg.pars.coverage == 0.5, "Default coverage should be 0.5"
     assert bcg.pars.efficacy == 0.8, "Default efficacy should be 0.8"
-    assert bcg.pars.start == sc.date('1900-01-01'), "Default start year should be 1900-01-01 with type sc.date"
-    assert bcg.pars.stop == sc.date('2100-12-31'), "Default stop year should be 2100-12-31 with type sc.date"
+    assert bcg.pars.start == ss.date('1900-01-01'), "Default start year should be 1900-01-01 with type ss.date"
+    assert bcg.pars.stop == ss.date('2100-12-31'), "Default stop year should be 2100-12-31 with type ss.date"
     # Check that immunity_period is approximately 10 years (in timesteps)
     assert abs(bcg.pars.immunity_period.values - 521.43) < 1.0, "Default immunity_period should be approximately 10 years"
     assert bcg.pars.age_range == [0, 5], "Default age range should be [0, 5]"
@@ -101,8 +101,8 @@ def test_bcg_intervention_custom_values():
     itv = mtb.BCGProtection(pars={
         'coverage': 0.75,
         'efficacy': 0.9,
-        'start': sc.date('2000-01-01'),
-        'stop': sc.date('2015-01-01'),
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2015-01-01'),
         'immunity_period': 15,
         'age_range': (1, 10)
     })
@@ -117,8 +117,8 @@ def test_bcg_intervention_custom_values():
     else:
         assert bcg.pars.coverage == 0.75, "Custom coverage should be 0.75"
     assert bcg.pars.efficacy == 0.9, "Custom efficacy should be 0.9"
-    assert bcg.pars.start == sc.date('2000-01-01'), "Custom start year should be 2000-01-01 with type sc.date"
-    assert bcg.pars.stop == sc.date('2015-01-01'), "Custom stop year should be 2015-01-01 with type sc.date"
+    assert bcg.pars.start == ss.date('2000-01-01'), "Custom start year should be 2000-01-01 with type ss.date"
+    assert bcg.pars.stop == ss.date('2015-01-01'), "Custom stop year should be 2015-01-01 with type ss.date"
     # Check that immunity_period is approximately 15 years (in timesteps)
     assert abs(bcg.pars.immunity_period.values - 782.14) < 1.0, "Custom immunity_period should be approximately 15 years"
     assert bcg.pars.age_range == (1, 10), "Custom age range should be (1, 10)"

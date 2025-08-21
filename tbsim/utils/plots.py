@@ -10,7 +10,7 @@ import sys
 
 def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
                  dark=True, cmap='tab20', heightfold=2, 
-                 style='default', savefig=True, outdir=None, metric_filter=None):
+                 style='default', savefig=True, outdir=None, metric_filter=None, title=''):
     """
     Visualize simulation outputs from multiple scenarios in a structured grid layout.
 
@@ -135,13 +135,13 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
                 ax.plot(r.timevec, r.values, lw=0.8, label=scen, color=palette(j))
         ax.set_title(metric, fontsize=10, color='white' if dark else 'black')
         vmax = max(flat.get(metric, r).values)
-        if vmax < 1.001:
+        if vmax < 1.010:
             ax.set_ylim(0, max(0.5, vmax))
             ax.set_ylabel('%', color='white' if dark else 'black')
         else:
             ax.set_ylabel('Value', color='white' if dark else 'black')
         ax.set_xlabel('Time', color='white' if dark else 'black')
-        ax.tick_params(axis='both', colors='white' if dark else 'black')
+        ax.tick_params(axis='both', colors='white' if dark else 'black', labelsize=6)
         # Set consistent X-axis range for all plots
         ax.set_xlim(all_x_min, all_x_max)
 
@@ -153,6 +153,9 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
     # remove unused axes
     for ax in axs[len(metrics):]:
         fig.delaxes(ax)
+
+    if title:
+        fig.suptitle(title, fontsize=12, color='white' if dark else 'black')
 
     plt.tight_layout(pad=2.0)
 
@@ -168,7 +171,7 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
                  style='default', savefig=True, outdir=None, plot_type='line',
                  marker_styles=None, alpha=0.85, grid_alpha=0.4, title_fontsize=10, legend_fontsize=6, 
                  line_width=0.3, marker_size=2, markeredgewidth=0.2, grid_linewidth=0.5, 
-                 spine_linewidth=0.5, label_fontsize=6, tick_fontsize=6, filter=None):
+                 spine_linewidth=0.5, label_fontsize=6, tick_fontsize=6, filter=None, title=''):
     """
     Visualize simulation outputs from multiple scenarios in a structured grid layout.
 
@@ -203,7 +206,7 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
         grid_linewidth (float, optional): Grid line width. Default is 0.5.
         spine_linewidth (float, optional): Axis spine line width. Default is 0.5.
         label_fontsize (int, optional): Font size for axis labels. Default is 9.
-        tick_fontsize (int, optional): Font size for axis tick labels. Default is 7.
+        tick_fontsize (int, optional): Font size for axis tick labels. Default is 5.
     
     Returns:
         None: The figure is displayed and also saved as a PNG with a timestamped filename.
@@ -349,6 +352,9 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
     # remove unused axes
     for ax in axs[len(metrics):]:
         fig.delaxes(ax)
+
+    if title:
+        fig.suptitle(title, fontsize=12, color='white' if dark else 'black')
 
     plt.tight_layout(pad=2.0)
 

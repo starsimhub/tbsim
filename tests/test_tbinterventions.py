@@ -20,7 +20,7 @@ def test_ACF():
     graph = nx.fast_gnp_random_graph(n=ppl.n_uids, p=1, seed=None, directed=False)
     net = ss.StaticNet(graph=graph, seed=True)
     tb = mtb.TB(beta=ss.peryear(0.2))
-    sim = ss.Sim(dt=ss.days(7), start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'), people=ppl, diseases=tb, interventions=acf, networks=net)
+    sim = ss.Sim(dt=ss.days(7), start=ss.date('2013-01-01'), stop=ss.date('2016-12-31'), people=ppl, diseases=tb, interventions=acf, networks=net)
     sim.run()
     return
 
@@ -39,7 +39,7 @@ def test_campaign():
     )
 
     tb = mtb.TB()
-    sim = ss.Sim(dt=ss.days(7), start=sc.date('2013-01-01'), stop=sc.date('2016-12-31'), n_agents=1000, diseases=tb, interventions=campaign)
+    sim = ss.Sim(dt=ss.days(7), start=ss.date('2013-01-01'), stop=ss.date('2016-12-31'), n_agents=1000, diseases=tb, interventions=campaign)
     sim.run()
     return
 
