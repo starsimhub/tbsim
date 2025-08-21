@@ -61,6 +61,7 @@ class HealthSeekingBehavior(ss.Intervention):
 
     def init_results(self):
         """Define metrics to track over time."""
+        super().init_results()
         self.define_results(
             ss.Result('n_sought_care', dtype=int),
             ss.Result('n_eligible', dtype=int),

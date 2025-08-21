@@ -19,7 +19,7 @@ def get_extrastates():
         ss.BoolState('received_tpt', default=False),
         ss.BoolState('tb_treatment_success', default=False),
         ss.BoolState('tested', default=False),
-        ss.BoolState('test_result', default=np.nan),
+        ss.BoolState('test_result', default=False),
         ss.BoolState('diagnosed', default=False),
         ss.BoolState('on_tpt', default=True),
         ss.BoolState('tb_smear', default=False),
