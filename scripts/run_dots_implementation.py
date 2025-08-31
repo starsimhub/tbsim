@@ -168,8 +168,8 @@ def plot_comparison_results(results_dict, results_dir=None):
     # Plot 1: Total treatments comparison
     bars1 = ax1.bar(scenarios, treated_counts, color=colors, alpha=0.8, edgecolor='black', linewidth=1)
     ax1.set_ylabel('Total Number of Treatments', fontsize=12, fontweight='bold')
-    ax1.set_title('Total Treatments by Strategy\n(Program scale and reach)', fontsize=14, fontweight='bold', pad=20)
-    ax1.grid(True, alpha=0.3, axis='y')
+    ax1.set_title('Total Treatments by Strategy\n(Program scale and reach)', fontsize=12, fontweight='bold', pad=20)
+    ax1.grid(True, alpha=0.4, axis='y')
     ax1.set_facecolor('#f8f9fa')
     
     # Add value labels on bars
@@ -190,11 +190,11 @@ def plot_comparison_results(results_dict, results_dir=None):
     ax2.set_xlabel('Treatment Strategy', fontsize=12, fontweight='bold')
     ax2.set_ylabel('Number of Treatments', fontsize=12, fontweight='bold')
     ax2.set_title('Treatment Outcomes by Strategy\n(Success vs failure breakdown)', 
-                  fontsize=14, fontweight='bold', pad=20)
+                  fontsize=12, fontweight='bold', pad=20)
     ax2.set_xticks(x)
     ax2.set_xticklabels(scenarios)
     ax2.legend()
-    ax2.grid(True, alpha=0.3, axis='y')
+    # ax2.grid(True, alpha=0.4, axis='y')
     ax2.set_facecolor('#f8f9fa')
     
     # Add value labels on bars
@@ -211,9 +211,9 @@ def plot_comparison_results(results_dict, results_dir=None):
     bars4 = ax3.bar(scenarios, success_rates, color=colors, alpha=0.8, edgecolor='black', linewidth=1)
     ax3.set_ylabel('Success Rate', fontsize=12, fontweight='bold')
     ax3.set_title('Treatment Success Rate by Strategy\n(Program effectiveness)', 
-                  fontsize=14, fontweight='bold', pad=20)
+                  fontsize=12, fontweight='bold', pad=20)
     ax3.set_ylim(0, 1.1)
-    ax3.grid(True, alpha=0.3, axis='y')
+    ax3.grid(True, alpha=0.4, axis='y')
     ax3.set_facecolor('#f8f9fa')
     
     # Add percentage labels on bars
@@ -227,8 +227,8 @@ def plot_comparison_results(results_dict, results_dir=None):
     bars5 = ax4.bar(scenarios, efficiency, color=colors, alpha=0.8, edgecolor='black', linewidth=1)
     ax4.set_ylabel('Efficiency (Successes/Treatment)', fontsize=12, fontweight='bold')
     ax4.set_title('Treatment Efficiency by Strategy\n(Higher values indicate better resource utilization)', 
-                  fontsize=14, fontweight='bold', pad=20)
-    ax4.grid(True, alpha=0.3, axis='y')
+                  fontsize=12, fontweight='bold', pad=20)
+    ax4.grid(True, alpha=0.4, axis='y')
     ax4.set_facecolor('#f8f9fa')
     
     # Add efficiency labels on bars
@@ -294,8 +294,8 @@ def plot_results(sim, results, results_dir=None):
     ax1.set_xlabel('Simulation Time (Years)', fontsize=12, fontweight='bold')
     ax1.set_ylabel('Number of Individuals', fontsize=12, fontweight='bold')
     ax1.set_title('Daily TB Treatment Outcomes\n(New treatments, successes, and failures)', 
-                  fontsize=14, fontweight='bold', pad=20)
-    ax1.legend(loc='upper left', framealpha=0.9)
+                  fontsize=12, fontweight='bold', pad=20)
+    ax1.legend(loc='upper right', framealpha=0.9)
     ax1.grid(True, alpha=0.3)
     ax1.set_facecolor('#f8f9fa')
     
@@ -322,7 +322,7 @@ def plot_results(sim, results, results_dir=None):
     ax2.set_xlabel('Simulation Time (Years)', fontsize=12, fontweight='bold')
     ax2.set_ylabel('Cumulative Number of Treatments', fontsize=12, fontweight='bold')
     ax2.set_title('Cumulative Treatment Outcomes\n(Shows treatment program scale and effectiveness)', 
-                  fontsize=14, fontweight='bold', pad=20)
+                  fontsize=12, fontweight='bold', pad=20)
     ax2.legend(loc='upper left', framealpha=0.9)
     ax2.grid(True, alpha=0.3)
     ax2.set_facecolor('#f8f9fa')
@@ -346,7 +346,7 @@ def plot_results(sim, results, results_dir=None):
     ax3.set_xlabel('Simulation Time (Years)', fontsize=12, fontweight='bold')
     ax3.set_ylabel('Number of Active TB Cases', fontsize=12, fontweight='bold')
     ax3.set_title('Active TB Prevalence Over Time\n(Impact of treatment on disease burden)', 
-                  fontsize=14, fontweight='bold', pad=20)
+                  fontsize=12, fontweight='bold', pad=20)
     ax3.legend(loc='upper right', framealpha=0.9)
     ax3.grid(True, alpha=0.3)
     ax3.set_facecolor('#f8f9fa')
@@ -380,7 +380,7 @@ def plot_results(sim, results, results_dir=None):
     ax4.set_xlabel('Simulation Time (Years)', fontsize=12, fontweight='bold')
     ax4.set_ylabel('Treatment Success Rate', fontsize=12, fontweight='bold')
     ax4.set_title('Treatment Success Rate Over Time\n(Program effectiveness and consistency)', 
-                  fontsize=14, fontweight='bold', pad=20)
+                  fontsize=12, fontweight='bold', pad=20)
     ax4.legend(loc='lower right', framealpha=0.9)
     ax4.grid(True, alpha=0.3)
     ax4.set_facecolor('#f8f9fa')
@@ -410,11 +410,11 @@ def create_summary_dashboard(sim, results, comparison_results, results_dir=None)
     
     # Set up the figure
     fig = plt.figure(figsize=(20, 12))
-    gs = fig.add_gridspec(3, 4, hspace=0.3, wspace=0.3)
+    gs = fig.add_gridspec(3, 4, hspace=0.4, wspace=0.3)
     
     # Main title
-    fig.suptitle('TBsim DOTS Implementation - Comprehensive Analysis Dashboard', 
-                 fontsize=18, fontweight='bold', y=0.90)
+    fig.suptitle('TBSim DOTS Implementation - Comprehensive Analysis Dashboard', 
+                 fontsize=12, fontweight='bold', y=0.90)
     
     # Key metrics panel (top left)
     ax_metrics = fig.add_subplot(gs[0, 0])
@@ -452,21 +452,21 @@ def create_summary_dashboard(sim, results, comparison_results, results_dir=None)
     """
     
     ax_metrics.text(0.05, 0.95, metrics_text, transform=ax_metrics.transAxes, 
-                    fontsize=11, verticalalignment='top', fontfamily='monospace',
+                    fontsize=10, verticalalignment='top', fontfamily='monospace',
                     bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.9))
     
     # Strategy comparison (top right)
-    ax_comp = fig.add_subplot(gs[0, 1:3])
+    ax_comp = fig.add_subplot(gs[0, 2:4])
     scenarios = list(comparison_results.keys())
     success_rates = [comparison_results[s]['success_rate'] for s in scenarios]
     colors = ['#2E86AB', '#A23B72', '#F18F01']
     
     bars = ax_comp.bar(scenarios, success_rates, color=colors, alpha=0.8, edgecolor='black')
-    ax_comp.set_ylabel('Success Rate', fontsize=12, fontweight='bold')
+    ax_comp.set_ylabel('Success Rate', fontsize=10, fontweight='bold')
     ax_comp.set_title('Treatment Strategy Comparison\n(Success rates across different drug types)', 
-                      fontsize=14, fontweight='bold')
+                      fontsize=12, fontweight='bold')
     ax_comp.set_ylim(0, 1.1)
-    ax_comp.grid(True, alpha=0.3, axis='y')
+    ax_comp.grid(True, alpha=0.4, axis='y')
     
     # Add percentage labels
     for bar, rate in zip(bars, success_rates):
@@ -485,10 +485,10 @@ def create_summary_dashboard(sim, results, comparison_results, results_dir=None)
     ax_timeline.plot(timevec, results['n_treatment_failure'].values, label='Failed', 
                     color='#dc3545', linewidth=2, alpha=0.8)
     
-    ax_timeline.set_xlabel('Time (Years)', fontsize=12, fontweight='bold')
-    ax_timeline.set_ylabel('Number of Treatments', fontsize=12, fontweight='bold')
+    ax_timeline.set_xlabel('Time (Years)', fontsize=10, fontweight='bold')
+    ax_timeline.set_ylabel('Number of Treatments', fontsize=10, fontweight='bold')
     ax_timeline.set_title('Treatment Timeline\n(Daily treatment outcomes over simulation period)', 
-                          fontsize=14, fontweight='bold')
+                          fontsize=12, fontweight='bold')
     ax_timeline.legend()
     ax_timeline.grid(True, alpha=0.3)
     
@@ -496,10 +496,10 @@ def create_summary_dashboard(sim, results, comparison_results, results_dir=None)
     ax_prev = fig.add_subplot(gs[1, 2:])
     ax_prev.plot(tb_results['n_active'].timevec, tb_results['n_active'].values, 
                 color='#fd7e14', linewidth=2)
-    ax_prev.set_xlabel('Time (Years)', fontsize=12, fontweight='bold')
-    ax_prev.set_ylabel('Active TB Cases', fontsize=12, fontweight='bold')
+    ax_prev.set_xlabel('Time (Years)', fontsize=10, fontweight='bold')
+    ax_prev.set_ylabel('Active TB Cases', fontsize=10, fontweight='bold')
     ax_prev.set_title('TB Prevalence Over Time\n(Impact of treatment on disease burden)', 
-                      fontsize=14, fontweight='bold')
+                      fontsize=12, fontweight='bold')
     ax_prev.grid(True, alpha=0.3)
     
     # Efficiency analysis (bottom left)
@@ -511,8 +511,8 @@ def create_summary_dashboard(sim, results, comparison_results, results_dir=None)
     bars_eff = ax_eff.bar(scenarios, efficiency, color=colors, alpha=0.8, edgecolor='black')
     ax_eff.set_ylabel('Efficiency (Success/Treatment)', fontsize=12, fontweight='bold')
     ax_eff.set_title('Treatment Efficiency\n(Resource utilization effectiveness)', 
-                     fontsize=14, fontweight='bold')
-    ax_eff.grid(True, alpha=0.3, axis='y')
+                     fontsize=12, fontweight='bold')
+    ax_eff.grid(True, alpha=0.4, axis='y')
     
     # Add efficiency labels
     for bar, eff in zip(bars_eff, efficiency):
@@ -537,10 +537,10 @@ def create_summary_dashboard(sim, results, comparison_results, results_dir=None)
     ax_success.axhline(y=success_rate, color='red', linestyle='--', alpha=0.7, 
                        label=f'Overall: {success_rate:.1%}')
     
-    ax_success.set_xlabel('Time (Years)', fontsize=12, fontweight='bold')
-    ax_success.set_ylabel('Success Rate', fontsize=12, fontweight='bold')
+    ax_success.set_xlabel('Time (Years)', fontsize=10, fontweight='bold')
+    ax_success.set_ylabel('Success Rate', fontsize=10, fontweight='bold')
     ax_success.set_title('Success Rate Over Time\n(Program consistency and trends)', 
-                         fontsize=14, fontweight='bold')
+                         fontsize=12, fontweight='bold')
     ax_success.legend()
     ax_success.grid(True, alpha=0.3)
     ax_success.set_ylim(0, 1.05)
@@ -577,13 +577,14 @@ def create_summary_dashboard(sim, results, comparison_results, results_dir=None)
                 bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.9))
     
     plt.tight_layout()
-    plt.subplots_adjust(top=0.88, bottom=0.08, hspace=0.4, wspace=0.3)
+    plt.subplots_adjust(top=0.85, bottom=0.05, hspace=0.4, wspace=0.3)
     
     # Save the figure
     if results_dir:
         filename = os.path.join(results_dir, 'dots_summary_dashboard.png')
     else:
         filename = 'dots_summary_dashboard.png'
+    
     plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
     print(f"Saved summary dashboard: {filename}")
     plt.show()
