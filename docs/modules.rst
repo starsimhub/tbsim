@@ -15,6 +15,7 @@ tbsim API Reference
    api/tbsim.interventions.beta
    api/tbsim.interventions.interventions
    api/tbsim.interventions.tpt
+   api/tbsim.interventions.enhanced_tb_treatment
    api/tbsim.misc
    api/tbsim.misc.tbterms
    api/tbsim.networks
