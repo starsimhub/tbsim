@@ -14,8 +14,8 @@ This is a sample tutorial for using tbsim.
       spars = dict(
          unit = 'day',
          dt = 7, 
-         start = sc.date('1940-01-01'),      
-         stop = sc.date('2010-12-31'), 
+         start = ss.date('1940-01-01'),      
+         stop = ss.date('2010-12-31'), 
          rand_seed = 1,
       )
       if sim_pars is not None:
