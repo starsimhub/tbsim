@@ -45,6 +45,11 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Install Quarto
+        uses: quarto-dev/quarto-actions/install@v2
+        with:
+          version: '1.4.0'
+
       - name: Install pandoc
         run: |
           sudo apt-get update
@@ -58,19 +63,28 @@ jobs:
       - name: Install documentation dependencies
         working-directory: ./docs
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements-quarto.txt
           pip freeze
 
       - name: Verify Binder configuration
         run: python .github/scripts/verify_binder.py
 
-      - name: Build documentation
+      - name: Build documentation with Quarto
         working-directory: ./docs
-        run: make html
+        run: |
+          quarto render --to html
+          quarto check
 
       - name: Verify build output
         working-directory: ./docs
-        run: python ../.github/scripts/verify_build.py
+        run: |
+          if [ -f "_site/index.html" ]; then
+            echo "Documentation built successfully!"
+            ls -la _site/
+          else
+            echo "Documentation build failed!"
+            exit 1
+          fi
 
       - name: Test tutorial functionality
         run: |
@@ -81,7 +95,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: documentation
-          path: docs/_build/html/
+          path: docs/_site/
           retention-days: 30
 
   deploy:
@@ -96,19 +110,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: documentation
-          path: docs/_build/html/
+          path: docs/_site/
 
       - name: Verify downloaded artifacts
         run: |
           echo "=== Verifying downloaded artifacts ==="
-          ls -la docs/_build/html/
-          if [ -f "docs/_build/html/index.html" ]; then
+          ls -la docs/_site/
+          if [ -f "docs/_site/index.html" ]; then
             echo "     index.html found in downloaded artifacts!"
-            ls -la docs/_build/html/index.html
+            ls -la docs/_site/index.html
           else
             echo "     index.html not found in downloaded artifacts!"
             echo "Available files:"
-            ls -la docs/_build/html/
+            ls -la docs/_site/
             exit 1
           fi
 
@@ -118,7 +132,7 @@ jobs:
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/_build/html/
+          path: docs/_site/
 
       - name: Deploy to GitHub Pages
         id: deployment
@@ -143,11 +157,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: documentation
-          path: docs/_build/html/
+          path: docs/_site/
 
       - name: Upload preview artifacts
         uses: actions/upload-artifact@v4
         with:
           name: documentation-preview
-          path: docs/_build/html/
+          path: docs/_site/
           retention-days: 7

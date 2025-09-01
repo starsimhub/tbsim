@@ -1,0 +1,155 @@
+/*-- scss:defaults --*/
+
+// Colors
+$blue: #2980B9;
+$red: #E74C3C;
+$orange: #F39C12;
+$yellow: #F1C40F;
+$green: #27AE60;
+$teal: #16A085;
+$cyan: #3498DB;
+$black: #2C3E50;
+$white: #FFFFFF;
+$gray: #95A5A6;
+$gray-dark: #34495E;
+$gray-100: #F8F9FA;
+$gray-200: #E9ECEF;
+$gray-300: #DEE2E6;
+$gray-400: #CED4DA;
+$gray-500: #ADB5BD;
+$gray-600: #6C757D;
+$gray-700: #495057;
+$gray-800: #343A40;
+$gray-900: #212529;
+
+// Base document colors
+$body-bg: $white;
+$body-color: $gray-900;
+$link-color: $blue;
+
+// Navigation element colors
+$footer-bg: $gray-100;
+$navbar-bg: $white;
+$sidebar-bg: $gray-100;
+
+// Code blocks
+$code-block-bg-alpha: -.9;
+
+// Bootstrap popovers
+$popover-bg: $white;
+
+// Bootstrap inputs
+$input-bg: $white;
+$dropdown-bg: $body-bg;
+$dropdown-color: $body-color;
+$dropdown-link-color: $body-color;
+$dropdown-link-hover-bg: $gray-200;
+$dropdown-link-hover-color: $gray-900;
+
+$border-color: $gray-300;
+
+$mono-background-color: rgba(0,0,0,0);
+$code-color: $blue;
+$nav-tabs-link-active-color: $body-color;
+$toc-inactive-border: $gray-300;
+$input-text-background-color: $white;
+$input-group-addon-bg: $gray-200;
+$pagination-disabled-bg: $gray-200;
+
+$text-muted: $gray-600;
+
+/*-- scss:rules --*/
+
+/* Light theme specific overrides */
+.navbar {
+  background-color: $navbar-bg !important;
+  border-bottom: 1px solid $gray-300;
+}
+
+.sidebar {
+  background-color: $sidebar-bg !important;
+  border-right: 1px solid $gray-300;
+}
+
+.footer {
+  background-color: $footer-bg !important;
+  border-top: 1px solid $gray-300;
+}
+
+/* Code blocks */
+.sourceCode {
+  background-color: $gray-100 !important;
+  border: 1px solid $gray-300;
+}
+
+/* Callout boxes */
+.callout-note {
+  background-color: #EBF3FD !important;
+  border-left-color: $blue !important;
+}
+
+.callout-warning {
+  background-color: #FEF9E7 !important;
+  border-left-color: $orange !important;
+}
+
+.callout-tip {
+  background-color: #E8F5E8 !important;
+  border-left-color: $green !important;
+}
+
+.callout-caution {
+  background-color: #FDF2F2 !important;
+  border-left-color: $red !important;
+}
+
+/* Tables */
+.quarto-table {
+  background-color: $white !important;
+  border: 1px solid $gray-300;
+}
+
+/* Links */
+a {
+  color: $blue !important;
+}
+
+a:hover {
+  color: darken($blue, 10%) !important;
+}
+
+/* Force light theme overrides */
+body {
+  background-color: $body-bg !important;
+  color: $body-color !important;
+}
+
+.quarto-title-block .quarto-title {
+  color: $blue !important;
+}
+
+/* Ensure proper contrast */
+.text-muted {
+  color: $gray-600 !important;
+}
+
+/* Sidebar navigation */
+.sidebar .sidebar-item a {
+  color: $gray-700 !important;
+}
+
+.sidebar .sidebar-item a:hover {
+  background-color: $gray-200 !important;
+  color: $blue !important;
+}
+
+/* Code highlighting */
+.highlight {
+  background-color: $gray-100 !important;
+}
+
+/* Blockquotes */
+blockquote {
+  background-color: $gray-100 !important;
+  border-left-color: $blue !important;
+}

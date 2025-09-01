@@ -1,0 +1,93 @@
+---
+title: "TBSim"
+subtitle: "Tuberculosis Simulation Framework"
+description: "A comprehensive framework for modeling tuberculosis transmission and interventions using agent-based simulation"
+---
+
+::: {.callout-note}
+## Welcome to TBSim
+
+TBSim is a powerful framework for modeling tuberculosis transmission and interventions using agent-based simulation. Built on top of the Starsim framework, TBSim provides specialized tools for TB modeling while maintaining compatibility with the broader Starsim ecosystem.
+:::
+
+## What is TBSim?
+
+TBSim is an agent-based modeling framework designed specifically for simulating tuberculosis transmission and interventions. It extends the [Starsim framework](https://docs.starsim.org/) with TB-specific functionality while maintaining full compatibility with the broader Starsim ecosystem.
+
+### Key Features
+
+- **TB-Specific Modeling**: Specialized modules for tuberculosis transmission, progression, and treatment
+- **Co-morbidity Support**: Integrated modeling of TB with HIV, malnutrition, and other conditions
+- **Intervention Analysis**: Comprehensive tools for evaluating TB interventions and policies
+- **Calibration Tools**: Built-in calibration methods for fitting models to epidemiological data
+- **Visualization**: Advanced plotting and analysis capabilities
+- **Extensibility**: Easy to extend with custom modules and interventions
+
+### Quick Start
+
+```python
+import tbsim as tb
+import starsim as ss
+
+# Create a simple TB simulation
+sim = tb.TBSim(
+    n_agents=1000,
+    duration=365,
+    diseases=[tb.TB()],
+    demographics=[ss.Births(), ss.Deaths()]
+)
+
+# Run the simulation
+sim.run()
+
+# Analyze results
+sim.plot()
+```
+
+## Getting Started
+
+- **[Tutorials](tutorials.qmd)**: Step-by-step guides for common TB modeling tasks
+- **[User Guide](user_guide.qmd)**: Comprehensive documentation of TBSim features
+- **[API Reference](api/index.qmd)**: Detailed API documentation
+- **[Examples](tutorials/tuberculosis_sim.qmd)**: Ready-to-run example simulations
+
+## Installation
+
+```bash
+pip install tbsim
+```
+
+For development installation:
+
+```bash
+git clone https://github.com/your-org/tbsim.git
+cd tbsim
+pip install -e .
+```
+
+## Citation
+
+If you use TBSim in your research, please cite:
+
+```bibtex
+@software{tbsim2024,
+  title={TBSim: Tuberculosis Simulation Framework},
+  author={TBSim Contributors},
+  year={2024},
+  url={https://github.com/your-org/tbsim}
+}
+```
+
+## Contributing
+
+We welcome contributions! Please see our [contributing guide](contributing.qmd) for details on how to get involved.
+
+## Support
+
+- **Documentation**: [docs.tbsim.org](https://docs.tbsim.org)
+- **GitHub Issues**: [github.com/your-org/tbsim/issues](https://github.com/your-org/tbsim/issues)
+- **Email**: [info@tbsim.org](mailto:info@tbsim.org)
+
+## License
+
+TBSim is released under the MIT License. See the [LICENSE](https://github.com/your-org/tbsim/blob/main/LICENSE) file for details.
