@@ -1,5 +1,5 @@
 # Quarto documentation requirements
-quarto>=1.4.0
+# Note: Quarto is installed via GitHub Actions, not via pip
 jupyter>=1.0.0
 nbformat>=5.0.0
 ipykernel>=6.0.0

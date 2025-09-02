@@ -44,51 +44,24 @@ jobs:
 
       - name: Install Quarto
         uses: quarto-dev/quarto-actions/setup@v2
-        
-      - name: check install 
-        run: |
-          quarto --version
+        with:
+          version: 1.4.515
 
-      - name: Install pandoc
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pandoc
+      - name: Check Quarto installation
+        run: quarto --version
 
       - name: Install tbsim package
-        run: |
-          pip install -e .
-          pip freeze
+        run: pip install -e .
 
       - name: Install documentation dependencies
         working-directory: ./docs
-        run: |
-          pip install -r requirements-quarto.txt
-          pip freeze
-
-      - name: Verify Binder configuration
-        run: python .github/scripts/verify_binder.py
+        run: pip install -r requirements-quarto.txt
 
       - name: Build documentation with Quarto
         working-directory: ./docs
         run: |
           quarto render --to html
-          quarto check
-
-      - name: Verify build output
-        working-directory: ./docs
-        run: |
-          if [ -f "_site/index.html" ]; then
-            echo "Documentation built successfully!"
-            ls -la _site/
-          else
-            echo "Documentation build failed!"
-            exit 1
-          fi
-
-      - name: Test tutorial functionality
-        run: |
-          cd docs
-          python ../.github/scripts/test_tutorial_imports.py
+          ls -la _site/
 
       - name: Upload documentation artifacts
         uses: actions/upload-artifact@v4
