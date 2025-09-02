@@ -42,7 +42,10 @@ jobs:
   
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
-  
+        
+      - name: Upgrade Quarto
+        run: quarto upgrade
+        
       - name: Install Quarto extensions
         working-directory: ./docs
         run: |
