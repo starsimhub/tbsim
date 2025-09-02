@@ -51,4 +51,6 @@ jobs:
         working-directory: ./docs
         run: |
           chmod +x ./publish
+          chmod +x ./build_docs.py
+          chmod +x ./post_publishing.py
           ./publish
