@@ -49,4 +49,6 @@ jobs:
   
       - name: Custom Quarto publish
         working-directory: ./docs
-        run: ./publish
+        run: |
+          chmod +x ./publish
+          ./publish
