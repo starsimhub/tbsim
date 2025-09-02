@@ -67,7 +67,7 @@ jobs:
   
       - name: Generate interlinks database
         working-directory: ./docs
-        run: quarto interlinks --generate
+        run: python generate_interlinks.py
   
       - name: Setup Python kernel for notebooks
         working-directory: ./docs
