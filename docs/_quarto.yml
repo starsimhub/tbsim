@@ -118,8 +118,8 @@ format:
     toc-depth: 3
     highlight-style: github
 
-# Note: interlinks filter removed for compatibility
-# You can add it back later when the extension is properly installed
+filters:
+  - interlinks
 
 quartodoc:
   package: tbsim
@@ -143,11 +143,12 @@ quartodoc:
 
 jupyter: python3
 execute:
-  enabled: false
+  enabled: true
   daemon: true
-  cache: true
+  cache: false
   freeze: false
   error: false
   echo: true
   warning: true
-  kernel: python3
+  kernel: tbsim-docs
+  timeout: 300

@@ -43,14 +43,57 @@ jobs:
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
   
-      - name: Install Quarto interlinks
-        working-directory: ./docs
-        run: quarto add machow/quartodoc --no-prompt
-  
-      - name: Custom Quarto publish
+      - name: Install Quarto extensions
         working-directory: ./docs
         run: |
-          chmod +x ./publish
-          chmod +x ./build_docs.py
-          chmod +x ./post_publishing.py
-          ./publish
+          quarto add machow/quartodoc --no-prompt
+          quarto add quarto-ext/lightbox --no-prompt
+          quarto add quarto-ext/icon --no-prompt
+  
+      - name: Install Python dependencies
+        working-directory: ./docs
+        run: |
+          pip install -r requirements-quarto.txt
+          pip install jupyter nbformat ipykernel
+  
+      - name: Clean existing build
+        working-directory: ./docs
+        run: |
+          rm -rf _site
+          rm -rf _build
+          rm -rf .quarto/cache
+          rm -rf .quarto/tmp
+          rm -rf .quarto/logs
+          find . -name "*.pyc" -delete
+          find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+  
+      - name: Generate interlinks database
+        working-directory: ./docs
+        run: quarto interlinks --generate
+  
+      - name: Setup Python kernel for notebooks
+        working-directory: ./docs
+        run: |
+          python -m ipykernel install --user --name tbsim-docs --display-name "TBSim Documentation"
+          python -c "import tbsim; print('TBSim imported successfully')"
+  
+      - name: Build documentation
+        working-directory: ./docs
+        run: |
+          quarto render --no-cache || {
+            echo "Build failed, attempting to build without notebook execution..."
+            quarto render --no-cache --execute-dir: false
+          }
+  
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+  
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './docs/_site'
+  
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+  
