@@ -67,25 +67,6 @@ diagnostic testing, and treatment outcomes.
 
 """
 
-# =============================================================================
-# PLOT CONFIGURATION OPTIONS
-# =============================================================================
-# Set the start year for all plots (None to show all years from simulation start)
-PLOT_START_YEAR = 2000  # Change to None to show all years, or set to specific year like 2000
-
-# Set the number of time points per calendar year to plot
-# Options: 1 (January 1st only), 2 (January 1st and July 1st), 4 (quarterly), 12 (monthly), etc.
-# Set to None to plot all time steps
-TIME_POINTS_PER_YEAR = 1  # 1 = annual (January 1st), 2 = semi-annual, 12 = monthly, etc.
-
-# Examples:
-# - PLOT_START_YEAR = None, TIME_POINTS_PER_YEAR = None: Show all data from simulation start
-# - PLOT_START_YEAR = 2000, TIME_POINTS_PER_YEAR = 1: Show annual data from 2000 onwards
-# - PLOT_START_YEAR = 1990, TIME_POINTS_PER_YEAR = 2: Show semi-annual data from 1990 onwards
-# - PLOT_START_YEAR = 1980, TIME_POINTS_PER_YEAR = 12: Show monthly data from 1980 onwards
-
-# =============================================================================
-
 import starsim as ss
 import tbsim as mtb
 from tbsim.comorbidities.hiv.hiv import HIVState
@@ -125,161 +106,6 @@ def get_output_path(filename):
     outdir = os.path.join(os.path.dirname(__file__), subdir)
     os.makedirs(outdir, exist_ok=True)
     return os.path.join(outdir, filename)
-
-
-def filter_time_series_data(time, data, start_year=None, points_per_year=None):
-    """
-    Filter time series data based on start year and sampling frequency.
-    
-    Args:
-        time: Array of datetime objects or pandas Timestamps representing time points
-        data: Array of data values corresponding to time points
-        start_year: Year to start plotting from (None for all years)
-        points_per_year: Number of time points per calendar year to include
-                        (None for all time points, 1 for annual, 2 for semi-annual, etc.)
-    
-    Returns:
-        tuple: (filtered_time, filtered_data) - arrays with same length
-    """
-    if start_year is None and points_per_year is None:
-        return time, data
-    
-    # Convert to numpy arrays if they aren't already
-    time = np.array(time)
-    data = np.array(data)
-    
-    # Helper function to convert time objects to datetime.date for comparison
-    def to_date(t):
-        """Convert time object to datetime.date for comparison"""
-        try:
-            # Handle NotImplemented and other problematic objects
-            if t is NotImplemented or t is None:
-                return datetime.date(2000, 1, 1)
-            
-            # Handle pandas Timestamps
-            if hasattr(t, 'date') and callable(getattr(t, 'date', None)):
-                try:
-                    return t.date()
-                except:
-                    pass
-            
-            # Handle datetime objects
-            if hasattr(t, 'year') and hasattr(t, 'month') and hasattr(t, 'day'):
-                try:
-                    return datetime.date(t.year, t.month, t.day)
-                except:
-                    pass
-            
-            # Handle datetime.date objects
-            if isinstance(t, datetime.date):
-                return t
-            
-            # Try pandas Timestamp conversion
-            try:
-                import pandas as pd
-                if isinstance(t, pd.Timestamp):
-                    return t.date()
-            except ImportError:
-                pass
-            
-            # Try string conversion
-            try:
-                if isinstance(t, str):
-                    return datetime.datetime.strptime(t, '%Y-%m-%d').date()
-            except:
-                pass
-            
-            # Last resort: try to convert to string and parse
-            try:
-                return datetime.datetime.strptime(str(t), '%Y-%m-%d').date()
-            except:
-                pass
-            
-            # If all else fails, return a default date
-            print(f"Warning: Could not convert time object {t} (type: {type(t)}) to date. Using default date.")
-            return datetime.date(2000, 1, 1)
-            
-        except Exception as e:
-            # If all else fails, return a default date
-            print(f"Warning: Exception converting time object {t} (type: {type(t)}) to date: {e}. Using default date.")
-            return datetime.date(2000, 1, 1)
-    
-    # Helper function to calculate days between two time objects
-    def days_between(t1, t2):
-        """Calculate days between two time objects"""
-        try:
-            # Convert both to datetime.date objects for comparison
-            date1 = to_date(t1)
-            date2 = to_date(t2)
-            return abs((date1 - date2).days)
-        except Exception as e:
-            # If conversion fails, try direct subtraction
-            try:
-                return abs((t1 - t2).days)
-            except:
-                # Last resort: return a large number to avoid selection
-                print(f"Warning: Could not calculate days between {t1} and {t2}. Using large default value.")
-                return 36500  # 100 years
-    
-    # Filter by start year if specified
-    if start_year is not None:
-        start_date = datetime.date(start_year, 1, 1)
-        mask = []
-        for t in time:
-            try:
-                converted_date = to_date(t)
-                mask.append(converted_date >= start_date)
-            except Exception as e:
-                print(f"Warning: Error processing time object {t} (type: {type(t)}): {e}")
-                mask.append(False)  # Exclude problematic time objects
-        mask = np.array(mask)
-        time = time[mask]
-        data = data[mask]
-    
-    # Filter by sampling frequency if specified
-    if points_per_year is not None and len(time) > 0:
-        # Calculate target dates for each year
-        years = np.array([t.year for t in time])
-        unique_years = np.unique(years)
-        
-        # For each year, find the closest time points to target dates
-        selected_indices = []
-        
-        for year in unique_years:
-            year_mask = years == year
-            year_times = time[year_mask]
-            year_indices = np.where(year_mask)[0]
-            
-            if points_per_year == 1:
-                # January 1st only
-                target_date = datetime.date(year, 1, 1)
-                try:
-                    distances = [days_between(t, target_date) for t in year_times]
-                    closest_idx = np.argmin(distances)
-                    selected_indices.append(year_indices[closest_idx])
-                except Exception as e:
-                    print(f"Warning: Error finding closest time to {target_date} in year {year}: {e}")
-                    # Skip this year if there's an error
-            else:
-                # Multiple points per year
-                for i in range(points_per_year):
-                    month = 1 + (i * 12) // points_per_year
-                    day = 1
-                    target_date = datetime.date(year, month, day)
-                    try:
-                        distances = [days_between(t, target_date) for t in year_times]
-                        closest_idx = np.argmin(distances)
-                        selected_indices.append(year_indices[closest_idx])
-                    except Exception as e:
-                        print(f"Warning: Error finding closest time to {target_date} in year {year}: {e}")
-                        # Skip this target date if there's an error
-        
-        # Sort indices to maintain chronological order
-        selected_indices = sorted(selected_indices)
-        time = time[selected_indices]
-        data = data[selected_indices]
-    
-    return time, data
 
 class GradualHIVIntervention(ss.Intervention):
     """
@@ -874,193 +700,6 @@ def compute_age_stratified_prevalence_time_series(sim):
     return prevalence_df
 
 
-def compute_age_stratified_incidence(sim, target_year=2018):
-    """
-    Compute age-stratified TB incidence from simulation results
-    
-    Args:
-        sim: Simulation object
-        target_year: Year to compute incidence for
-    
-    Returns:
-        dict: Age-stratified incidence data
-    """
-    
-    # Find the time index closest to target year
-    timevec = sim.results['timevec']
-    if hasattr(timevec[0], 'year'):
-        # Handle datetime objects
-        time_years = np.array([d.year for d in timevec])
-    else:
-        # Handle numeric time values
-        time_years = np.array([int(t) for t in timevec])
-    target_idx = np.argmin(np.abs(time_years - target_year))
-    
-    # Get time vector and TB results
-    time = np.array(sim.results['timevec'])
-    tb_results = sim.results['tb']
-    
-    # Get people alive at target time
-    people = sim.people
-    alive_mask = people.alive
-    
-    # Get ages at target time
-    ages = people.age[alive_mask]
-    
-    # Define age groups including children and adolescents
-    age_groups = [(0, 4), (5, 14), (15, 24), (25, 34), (35, 44), (45, 54), (55, 64), (65, 200)]
-    age_group_labels = ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+']
-    
-    incidence_by_age = {}
-    
-    for i, (min_age, max_age) in enumerate(age_groups):
-        age_group = age_group_labels[i]
-        
-        # Count people in age group at target time
-        age_mask = (ages >= min_age) & (ages <= max_age)
-        pop_in_age_group = np.sum(age_mask)
-        
-        # Get cumulative active cases for this age group
-        if f'cum_active_{age_group}' in tb_results:
-            cum_incidence = tb_results[f'cum_active_{age_group}']
-        else:
-            # Fallback to overall cumulative active if age-stratified data not available
-            if 'cum_active' in tb_results:
-                cum_incidence = tb_results['cum_active']
-            else:
-                cum_incidence = np.cumsum(tb_results['new_active'])
-        
-        # Compute annualized incidence rate at target year
-        t_date = time[target_idx]
-        if hasattr(t_date, 'year'):
-            # Handle datetime objects
-            t_prev_date = t_date - datetime.timedelta(days=365)
-            t_prev = np.searchsorted(time, t_prev_date)
-            if t_prev == len(time) or time[t_prev] > t_prev_date:
-                t_prev = max(0, t_prev - 1)
-        else:
-            # Handle numeric time values (assume yearly time steps)
-            # Use a 5-year window to capture more cases
-            t_prev = max(0, target_idx - 5)
-        
-        new_cases = cum_incidence[target_idx] - cum_incidence[t_prev]
-        
-        # Calculate the time span for proper annualization
-        if hasattr(t_date, 'year'):
-            # For datetime objects, calculate actual days
-            time_span_years = (timevec[target_idx] - timevec[t_prev]).days / 365.0
-        else:
-            # For numeric time values, calculate years
-            time_span_years = timevec[target_idx] - timevec[t_prev]
-        
-        # Annualize the rate properly
-        if time_span_years > 0:
-            annualized_cases = new_cases / time_span_years
-            incidence_rate = (annualized_cases / pop_in_age_group) * 1e5 if pop_in_age_group > 0 else 0
-        else:
-            incidence_rate = 0
-        
-        incidence_by_age[age_group] = {
-            'incidence_rate': incidence_rate,
-            'incidence_per_100k': incidence_rate,
-            'new_cases': new_cases,
-            'population': pop_in_age_group
-        }
-    
-    return incidence_by_age
-
-
-def compute_age_stratified_incidence_time_series(sim):
-    """
-    Compute age-stratified TB incidence time series from simulation results
-    
-    Args:
-        sim: Simulation object
-    
-    Returns:
-        pd.DataFrame: DataFrame with years as index and age groups as columns
-    """
-    
-    # Define age groups including children and adolescents
-    age_groups = [(0, 4), (5, 14), (15, 24), (25, 34), (35, 44), (45, 54), (55, 64), (65, 200)]
-    age_group_labels = ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+']
-    
-    # Get time vector and TB results
-    time = np.array(sim.results['timevec'])
-    tb_results = sim.results['tb']
-    
-    # Initialize DataFrame to store results
-    if hasattr(time[0], 'year'):
-        # Handle datetime objects
-        time_years = np.array([d.year for d in time])
-    else:
-        # Handle numeric time values
-        time_years = np.array([int(t) for t in time])
-    incidence_df = pd.DataFrame(index=time_years, columns=age_group_labels)
-    
-    # For each time point, compute age-stratified incidence
-    for t_idx, (time_point, year) in enumerate(zip(time, time_years)):
-        # Get people alive at this time point
-        people = sim.people
-        
-        # For simplicity, we'll use the current people state
-        # In a more sophisticated approach, we'd need to track historical states
-        alive_mask = people.alive
-        ages = people.age[alive_mask]
-        
-        # Compute incidence for each age group
-        for i, (min_age, max_age) in enumerate(age_groups):
-            age_group = age_group_labels[i]
-            
-            # Count people in age group at this time point
-            age_mask = (ages >= min_age) & (ages <= max_age)
-            pop_in_age_group = np.sum(age_mask)
-            
-            # Get cumulative active cases for this age group
-            if f'cum_active_{age_group}' in tb_results:
-                cum_incidence = tb_results[f'cum_active_{age_group}']
-            else:
-                # Fallback to overall cumulative active if age-stratified data not available
-                if 'cum_active' in tb_results:
-                    cum_incidence = tb_results['cum_active']
-                else:
-                    cum_incidence = np.cumsum(tb_results['new_active'])
-            
-            # Compute annualized incidence rate
-            t_date = time_point
-            if hasattr(t_date, 'year'):
-                # Handle datetime objects
-                t_prev_date = t_date - datetime.timedelta(days=365)
-                t_prev = np.searchsorted(time, t_prev_date)
-                if t_prev == len(time) or time[t_prev] > t_prev_date:
-                    t_prev = max(0, t_prev - 1)
-            else:
-                # Handle numeric time values (assume yearly time steps)
-                # Use a 5-year window to capture more cases
-                t_prev = max(0, t_idx - 5)
-            
-            new_cases = cum_incidence[t_idx] - cum_incidence[t_prev]
-            
-            # Calculate the time span for proper annualization
-            if hasattr(t_date, 'year'):
-                # For datetime objects, calculate actual days
-                time_span_years = (time[t_idx] - time[t_prev]).days / 365.0
-            else:
-                # For numeric time values, calculate years
-                time_span_years = time[t_idx] - time[t_prev]
-            
-            # Annualize the rate properly
-            if time_span_years > 0:
-                annualized_cases = new_cases / time_span_years
-                incidence_rate = (annualized_cases / pop_in_age_group) * 1e5 if pop_in_age_group > 0 else 0
-            else:
-                incidence_rate = 0
-            
-            incidence_df.loc[year, age_group] = incidence_rate
-    
-    return incidence_df
-
-
 def plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
     import matplotlib.ticker as mtick
 
@@ -1075,14 +714,9 @@ def plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_v
                 time = sim.results['timevec']  # Use datetime objects directly
                 n_alive = sim.results['n_alive']
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_n_alive = filter_time_series_data(
-                    time, n_alive, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
-                )
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(filtered_time, filtered_n_alive, color='blue', label='Total Population')
+                ax.plot(time, n_alive, color='blue', label='Total Population')
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
                 ax.grid(True)
                 if ax_idx == nrows - 1:
@@ -1095,32 +729,12 @@ def plot_total_population_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_v
     plt.tight_layout()
     plt.suptitle('Simulated Total Population', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots based on filtered data
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
-    first_time = first_sim.results['timevec']
-    first_n_alive = first_sim.results['n_alive']
-    filtered_first_time, _ = filter_time_series_data(first_time, first_n_alive, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-    
-    if len(filtered_first_time) > 0:
-        time_years = np.array([d.year for d in filtered_first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        # Adjust tick spacing based on the range
-        year_range = max_year - min_year
-        if year_range <= 20:
-            tick_spacing = 5
-        elif year_range <= 50:
-            tick_spacing = 10
-        else:
-            tick_spacing = 20
-        xticks = np.arange(min_year, max_year + 1, tick_spacing)
-    else:
-        # Fallback to original logic if no filtered data
-        time_years = np.array([d.year for d in first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        xticks = np.arange(min_year, max_year + 1, 20)
-    
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
     for ax_row in axs:
         if isinstance(ax_row, np.ndarray):
             for ax in ax_row:
@@ -1183,19 +797,11 @@ def plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, 
                 hiv_prev_25plus = compute_hiv_prevalence_adults_25plus(sim)
                 hiv_prev_15to24 = compute_hiv_prevalence_adults_15to24(sim)
 
-                # Filter time series data starting from 1980 for HIV plots since values are 0 before this time
-                filtered_time, filtered_hiv_prev_25plus = filter_time_series_data(
-                    time, hiv_prev_25plus, 1980, TIME_POINTS_PER_YEAR
-                )
-                _, filtered_hiv_prev_15to24 = filter_time_series_data(
-                    time, hiv_prev_15to24, 1980, TIME_POINTS_PER_YEAR
-                )
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
                 
                 # Plot HIV prevalence for adults 25+
-                ax.plot(filtered_time, filtered_hiv_prev_25plus, label='Model HIV Prevalence (25+)', color='blue', linewidth=2)
+                ax.plot(time, hiv_prev_25plus, label='Model HIV Prevalence (25+)', color='blue', linewidth=2)
                 
                 # Plot estimated data points for 25+
                 for year, prev in estimated_data_25plus:
@@ -1206,7 +812,7 @@ def plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, 
                     ax.plot(datetime.date(year, 1, 1), prev, 'ro', markersize=4, alpha=0.8, label='Survey Data (25+)' if year == 2005 else "")
                 
                 # Plot HIV prevalence for adults 15-24
-                ax.plot(filtered_time, filtered_hiv_prev_15to24, label='Model HIV Prevalence (15-24)', color='orange', linewidth=2, linestyle='--')
+                ax.plot(time, hiv_prev_15to24, label='Model HIV Prevalence (15-24)', color='orange', linewidth=2, linestyle='--')
                 
                 # Plot estimated data points for 15-24
                 for year, prev in estimated_data_15to24:
@@ -1227,36 +833,20 @@ def plot_hiv_metrics_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, 
     plt.tight_layout()
     plt.suptitle('HIV Prevalence by Age Group: Model vs van Schalkwyk et al. 2021 Data (eThekwini, South Africa)', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots based on filtered data starting from 1980
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
-    first_time = first_sim.results['timevec']
-    # Use 1980 as start year for HIV plots since values are 0 before this time
-    filtered_first_time, _ = filter_time_series_data(first_time, np.zeros_like(first_time), 1980, TIME_POINTS_PER_YEAR)
-    
-    if len(filtered_first_time) > 0:
-        time_years = np.array([d.year for d in filtered_first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        year_range = max_year - min_year
-        
-        # Adjust tick spacing based on year range
-        if year_range <= 50:
-            tick_spacing = 10
-        elif year_range <= 100:
-            tick_spacing = 20
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
+    for ax_row in axs:
+        if isinstance(ax_row, np.ndarray):
+            for ax in ax_row:
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            tick_spacing = 50
-            
-        xticks = np.arange(min_year, max_year + 1, tick_spacing)
-        
-        for ax_row in axs:
-            if isinstance(ax_row, np.ndarray):
-                for ax in ax_row:
-                    ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                    ax.set_xticklabels([str(year) for year in xticks], rotation=45)
-            else:
-                ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"hiv_metrics_grid_{timestamp}.pdf"
     plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
@@ -1277,14 +867,9 @@ def plot_active_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortali
                 time = sim.results['timevec']
                 active_prev = sim.results['tb']['prevalence_active']
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_active_prev = filter_time_series_data(
-                    time, active_prev, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
-                )
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(filtered_time, filtered_active_prev, label='Active TB Prevalence', color='blue', linewidth=2)
+                ax.plot(time, active_prev, label='Active TB Prevalence', color='blue', linewidth=2)
                 ax.axhline(0.01, color='red', linestyle=':', linewidth=1, label='Target 1%')
 
                 # Plot the 2018 SA data point (real data)
@@ -1321,14 +906,9 @@ def plot_latent_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortali
                 time = sim.results['timevec']
                 latent_prev = compute_latent_prevalence(sim)
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_latent_prev = filter_time_series_data(
-                    time, latent_prev, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
-                )
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(filtered_time, filtered_latent_prev, label='Latent TB Prevalence', color='orange', linewidth=2, linestyle='--')
+                ax.plot(time, latent_prev, label='Latent TB Prevalence', color='orange', linewidth=2, linestyle='--')
                 ax.axhline(0.5, color='red', linestyle=':', linewidth=1, label='Target 50%')
 
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
@@ -1438,14 +1018,9 @@ def plot_annualized_infection_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mo
                 time = sim.results['timevec']
                 annual_rate = compute_annualized_infection_rate(sim)
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_annual_rate = filter_time_series_data(
-                    time, annual_rate, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
-                )
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(filtered_time, filtered_annual_rate, label='Annual Infection Rate', color='purple', linewidth=2)
+                ax.plot(time, annual_rate, label='Annual Infection Rate', color='purple', linewidth=2)
                 ax.axhline(2.0, color='red', linestyle=':', linewidth=1, label='2% Annual Risk')
 
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
@@ -1491,28 +1066,17 @@ def plot_health_seeking_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
                 n_sought = hsb['n_sought_care'].values
                 n_eligible = hsb['n_eligible'].values
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_new_sought = filter_time_series_data(
-                    time, new_sought, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
-                )
-                _, filtered_n_sought = filter_time_series_data(
-                    time, n_sought, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
-                )
-                _, filtered_n_eligible = filter_time_series_data(
-                    time, n_eligible, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
-                )
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
                 
                 # Plot new people seeking care each step
-                ax.plot(filtered_time, filtered_new_sought, label='New Sought Care', color='green', linewidth=2)
+                ax.plot(time, new_sought, label='New Sought Care', color='green', linewidth=2)
                 
                 # Plot cumulative people who sought care
-                ax.plot(filtered_time, filtered_n_sought, label='Cumulative Sought Care', color='blue', linestyle='--')
+                ax.plot(time, n_sought, label='Cumulative Sought Care', color='blue', linestyle='--')
                 
                 # Plot eligible population
-                ax.plot(filtered_time, filtered_n_eligible, label='Eligible (Active TB)', color='red', linestyle=':')
+                ax.plot(time, n_eligible, label='Eligible (Active TB)', color='red', linestyle=':')
                 
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
                 ax.grid(True)
@@ -1526,31 +1090,12 @@ def plot_health_seeking_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_val
     plt.tight_layout()
     plt.suptitle('Health-Seeking Behavior Over Time', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots based on filtered data
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
-    first_time = first_sim.results['timevec']
-    first_new_sought = first_sim.results['healthseekingbehavior']['new_sought_care'].values
-    filtered_first_time, _ = filter_time_series_data(first_time, first_new_sought, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-    
-    if len(filtered_first_time) > 0:
-        time_years = np.array([d.year for d in filtered_first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        # Adjust tick spacing based on the range
-        year_range = max_year - min_year
-        if year_range <= 20:
-            tick_spacing = 5
-        elif year_range <= 50:
-            tick_spacing = 10
-        else:
-            tick_spacing = 20
-        xticks = np.arange(min_year, max_year + 1, tick_spacing)
-    else:
-        # Fallback to original logic if no filtered data
-        time_years = np.array([d.year for d in first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        xticks = np.arange(min_year, max_year + 1, 20)
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
     for ax_row in axs:
         if isinstance(ax_row, np.ndarray):
             for ax in ax_row:
@@ -1593,24 +1138,13 @@ def plot_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, t
                 cum_test_positive = tbdiag['cum_test_positive'].values
                 cum_test_negative = tbdiag['cum_test_negative'].values
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_n_tested = filter_time_series_data(
-                    time, n_tested, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
-                )
-                _, filtered_n_test_positive = filter_time_series_data(
-                    time, n_test_positive, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
-                )
-                _, filtered_n_test_negative = filter_time_series_data(
-                    time, n_test_negative, PLOT_START_YEAR, TIME_POINTS_PER_YEAR
-                )
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
                 
                 # Plot incident testing results
-                ax.plot(filtered_time, filtered_n_tested, label='Tested', color='blue', marker='o', markersize=2)
-                ax.plot(filtered_time, filtered_n_test_positive, label='Tested Positive', color='green', linestyle='--')
-                ax.plot(filtered_time, filtered_n_test_negative, label='Tested Negative', color='red', linestyle=':')
+                ax.plot(time, n_tested, label='Tested', color='blue', marker='o', markersize=2)
+                ax.plot(time, n_test_positive, label='Tested Positive', color='green', linestyle='--')
+                ax.plot(time, n_test_negative, label='Tested Negative', color='red', linestyle=':')
                 
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
                 ax.grid(True)
@@ -1624,35 +1158,20 @@ def plot_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, t
     plt.tight_layout()
     plt.suptitle('TB Diagnostic Testing Outcomes', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots based on filtered data
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
-    first_time = first_sim.results['timevec']
-    filtered_first_time, _ = filter_time_series_data(first_time, np.zeros_like(first_time), PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-    
-    if len(filtered_first_time) > 0:
-        time_years = np.array([d.year for d in filtered_first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        year_range = max_year - min_year
-        
-        # Adjust tick spacing based on year range
-        if year_range <= 50:
-            tick_spacing = 10
-        elif year_range <= 100:
-            tick_spacing = 20
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
+    for ax_row in axs:
+        if isinstance(ax_row, np.ndarray):
+            for ax in ax_row:
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            tick_spacing = 50
-            
-        xticks = np.arange(min_year, max_year + 1, tick_spacing)
-        
-        for ax_row in axs:
-            if isinstance(ax_row, np.ndarray):
-                for ax in ax_row:
-                    ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                    ax.set_xticklabels([str(year) for year in xticks], rotation=45)
-            else:
-                ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"diagnostic_grid_{timestamp}.pdf"
     plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
@@ -1683,18 +1202,12 @@ def plot_cumulative_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortal
                 cum_test_positive = tbdiag['cum_test_positive'].values
                 cum_test_negative = tbdiag['cum_test_negative'].values
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_cum_test_positive = filter_time_series_data(
-                    time, cum_test_positive, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-                filtered_time, filtered_cum_test_negative = filter_time_series_data(
-                    time, cum_test_negative, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
                 
                 # Plot cumulative testing results
-                ax.plot(filtered_time, filtered_cum_test_positive, label='Cumulative Positives', color='green', linestyle='--')
-                ax.plot(filtered_time, filtered_cum_test_negative, label='Cumulative Negatives', color='red', linestyle=':')
+                ax.plot(time, cum_test_positive, label='Cumulative Positives', color='green', linestyle='--')
+                ax.plot(time, cum_test_negative, label='Cumulative Negatives', color='red', linestyle=':')
                 
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
                 ax.grid(True)
@@ -1708,35 +1221,20 @@ def plot_cumulative_diagnostic_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortal
     plt.tight_layout()
     plt.suptitle('Cumulative TB Diagnostic Results', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots based on filtered data
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
-    first_time = first_sim.results['timevec']
-    filtered_first_time, _ = filter_time_series_data(first_time, np.zeros_like(first_time), PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-    
-    if len(filtered_first_time) > 0:
-        time_years = np.array([d.year for d in filtered_first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        year_range = max_year - min_year
-        
-        # Adjust tick spacing based on year range
-        if year_range <= 50:
-            tick_spacing = 10
-        elif year_range <= 100:
-            tick_spacing = 20
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
+    for ax_row in axs:
+        if isinstance(ax_row, np.ndarray):
+            for ax in ax_row:
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            tick_spacing = 50
-            
-        xticks = np.arange(min_year, max_year + 1, tick_spacing)
-        
-        for ax_row in axs:
-            if isinstance(ax_row, np.ndarray):
-                for ax in ax_row:
-                    ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                    ax.set_xticklabels([str(year) for year in xticks], rotation=45)
-            else:
-                ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"cumulative_diagnostic_grid_{timestamp}.pdf"
     plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
@@ -1769,21 +1267,13 @@ def plot_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, ti
                 n_treatment_success = tbtx['n_treatment_success'].values
                 n_treatment_failure = tbtx['n_treatment_failure'].values
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_n_treated = filter_time_series_data(
-                    time, n_treated, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-                filtered_time, filtered_n_treatment_success = filter_time_series_data(
-                    time, n_treatment_success, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-                filtered_time, filtered_n_treatment_failure = filter_time_series_data(
-                    time, n_treatment_failure, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
                 
                 # Plot treatment outcomes
-                ax.plot(filtered_time, filtered_n_treated, label='Treated', color='blue', marker='o', markersize=2)
-                ax.plot(filtered_time, filtered_n_treatment_success, label='Successes', color='green', linestyle='--')
-                ax.plot(filtered_time, filtered_n_treatment_failure, label='Failures', color='red', linestyle=':')
+                ax.plot(time, n_treated, label='Treated', color='blue', marker='o', markersize=2)
+                ax.plot(time, n_treatment_success, label='Successes', color='green', linestyle='--')
+                ax.plot(time, n_treatment_failure, label='Failures', color='red', linestyle=':')
                 
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
                 ax.grid(True)
@@ -1797,35 +1287,20 @@ def plot_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, ti
     plt.tight_layout()
     plt.suptitle('TB Treatment Outcomes', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots based on filtered data
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
-    first_time = first_sim.results['timevec']
-    filtered_first_time, _ = filter_time_series_data(first_time, np.zeros_like(first_time), PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-    
-    if len(filtered_first_time) > 0:
-        time_years = np.array([d.year for d in filtered_first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        year_range = max_year - min_year
-        
-        # Adjust tick spacing based on year range
-        if year_range <= 50:
-            tick_spacing = 10
-        elif year_range <= 100:
-            tick_spacing = 20
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
+    for ax_row in axs:
+        if isinstance(ax_row, np.ndarray):
+            for ax in ax_row:
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            tick_spacing = 50
-            
-        xticks = np.arange(min_year, max_year + 1, tick_spacing)
-        
-        for ax_row in axs:
-            if isinstance(ax_row, np.ndarray):
-                for ax in ax_row:
-                    ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                    ax.set_xticklabels([str(year) for year in xticks], rotation=45)
-            else:
-                ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"treatment_grid_{timestamp}.pdf"
     plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
@@ -1856,18 +1331,12 @@ def plot_cumulative_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortali
                 cum_treatment_success = tbtx['cum_treatment_success'].values
                 cum_treatment_failure = tbtx['cum_treatment_failure'].values
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_cum_treatment_success = filter_time_series_data(
-                    time, cum_treatment_success, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-                filtered_time, filtered_cum_treatment_failure = filter_time_series_data(
-                    time, cum_treatment_failure, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
                 
                 # Plot cumulative treatment outcomes
-                ax.plot(filtered_time, filtered_cum_treatment_success, label='Cumulative Successes', color='green', linestyle='--')
-                ax.plot(filtered_time, filtered_cum_treatment_failure, label='Cumulative Failures', color='red', linestyle=':')
+                ax.plot(time, cum_treatment_success, label='Cumulative Successes', color='green', linestyle='--')
+                ax.plot(time, cum_treatment_failure, label='Cumulative Failures', color='red', linestyle=':')
                 
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
                 ax.grid(True)
@@ -1881,35 +1350,20 @@ def plot_cumulative_treatment_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortali
     plt.tight_layout()
     plt.suptitle('Cumulative TB Treatment Outcomes', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots based on filtered data
+    # Set consistent x-axis ticks for all subplots (same as refined TB prevalence plot)
     first_sim = sim_grid[0][0][0]
-    first_time = first_sim.results['timevec']
-    filtered_first_time, _ = filter_time_series_data(first_time, np.zeros_like(first_time), PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-    
-    if len(filtered_first_time) > 0:
-        time_years = np.array([d.year for d in filtered_first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        year_range = max_year - min_year
-        
-        # Adjust tick spacing based on year range
-        if year_range <= 50:
-            tick_spacing = 10
-        elif year_range <= 100:
-            tick_spacing = 20
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
+    for ax_row in axs:
+        if isinstance(ax_row, np.ndarray):
+            for ax in ax_row:
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            tick_spacing = 50
-            
-        xticks = np.arange(min_year, max_year + 1, tick_spacing)
-        
-        for ax_row in axs:
-            if isinstance(ax_row, np.ndarray):
-                for ax in ax_row:
-                    ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                    ax.set_xticklabels([str(year) for year in xticks], rotation=45)
-            else:
-                ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"cumulative_treatment_grid_{timestamp}.pdf"
     plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
@@ -2303,16 +1757,10 @@ def plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_morta
                     pop = n_alive[t]
                     incidence_rate[t] = (new_cases / pop) * 1e5 if pop > 0 else 0
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_notification_rate = filter_time_series_data(
-                    time, notification_rate, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-                filtered_time, filtered_incidence_rate = filter_time_series_data(
-                    time, incidence_rate, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(filtered_time, filtered_notification_rate, color='purple', label='Model Notification Rate')
-                ax.plot(filtered_time, filtered_incidence_rate, color='blue', label='Model Incidence Rate')
+                ax.plot(time, notification_rate, color='purple', label='Model Notification Rate')
+                ax.plot(time, incidence_rate, color='blue', label='Model Incidence Rate')
                 # Overlay real data
                 ax.plot([datetime.date(int(y), 1, 1) for y in real_years], real_rates, marker='o', color='red', label='SA Notification Data')
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
@@ -2328,35 +1776,20 @@ def plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_morta
     plt.tight_layout()
     plt.suptitle('Annualized TB Case Notification Rate (per 100,000)', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots based on filtered data
+    # Set consistent x-axis ticks for all subplots
     first_sim = sim_grid[0][0][0]
-    first_time = first_sim.results['timevec']
-    filtered_first_time, _ = filter_time_series_data(first_time, np.zeros_like(first_time), PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-    
-    if len(filtered_first_time) > 0:
-        time_years = np.array([d.year for d in filtered_first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        year_range = max_year - min_year
-        
-        # Adjust tick spacing based on year range
-        if year_range <= 50:
-            tick_spacing = 10
-        elif year_range <= 100:
-            tick_spacing = 20
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
+    for ax_row in axs:
+        if isinstance(ax_row, np.ndarray):
+            for ax in ax_row:
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            tick_spacing = 50
-            
-        xticks = np.arange(min_year, max_year + 1, tick_spacing)
-        
-        for ax_row in axs:
-            if isinstance(ax_row, np.ndarray):
-                for ax in ax_row:
-                    ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                    ax.set_xticklabels([str(year) for year in xticks], rotation=45)
-            else:
-                ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"case_notification_rate_grid_{timestamp}.pdf"
     plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
@@ -2438,13 +1871,9 @@ def plot_tb_mortality_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_
                 time = np.array(sim.results['timevec'])
                 mortality_rate = compute_annualized_tb_mortality_rate(sim)
 
-                # Filter time series data based on configuration
-                filtered_time, filtered_mortality_rate = filter_time_series_data(
-                    time, mortality_rate, PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-
                 ax_idx = m * len(rel_sus_vals) + i
                 ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                ax.plot(filtered_time, filtered_mortality_rate, color='red', label='Annual TB Mortality Rate', linewidth=2)
+                ax.plot(time, mortality_rate, color='red', label='Annual TB Mortality Rate', linewidth=2)
                 
                 ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
                 ax.grid(True)
@@ -2459,35 +1888,20 @@ def plot_tb_mortality_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_
     plt.tight_layout()
     plt.suptitle('Annualized TB Mortality Rate (per 100,000)', fontsize=14, y=1.02)
 
-    # Set consistent x-axis ticks for all subplots based on filtered data
+    # Set consistent x-axis ticks for all subplots
     first_sim = sim_grid[0][0][0]
-    first_time = first_sim.results['timevec']
-    filtered_first_time, _ = filter_time_series_data(first_time, np.zeros_like(first_time), PLOT_START_YEAR, TIME_POINTS_PER_YEAR)
-    
-    if len(filtered_first_time) > 0:
-        time_years = np.array([d.year for d in filtered_first_time])
-        min_year = time_years.min()
-        max_year = time_years.max()
-        year_range = max_year - min_year
-        
-        # Adjust tick spacing based on year range
-        if year_range <= 50:
-            tick_spacing = 10
-        elif year_range <= 100:
-            tick_spacing = 20
+    time_years = np.array([d.year for d in first_sim.results['timevec']])
+    min_year = time_years.min()
+    max_year = time_years.max()
+    xticks = np.arange(min_year, max_year + 1, 20)
+    for ax_row in axs:
+        if isinstance(ax_row, np.ndarray):
+            for ax in ax_row:
+                ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+                ax.set_xticklabels([str(year) for year in xticks], rotation=45)
         else:
-            tick_spacing = 50
-            
-        xticks = np.arange(min_year, max_year + 1, tick_spacing)
-        
-        for ax_row in axs:
-            if isinstance(ax_row, np.ndarray):
-                for ax in ax_row:
-                    ax.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                    ax.set_xticklabels([str(year) for year in xticks], rotation=45)
-            else:
-                ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
-                ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
+            ax_row.set_xticks([datetime.date(year, 1, 1) for year in xticks])
+            ax_row.set_xticklabels([str(year) for year in xticks], rotation=45)
 
     filename = f"tb_mortality_rate_grid_{timestamp}.pdf"
     plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
@@ -2607,115 +2021,10 @@ def plot_population_pyramid_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality
     plt.show()
 
 
-def plot_age_incidence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp):
-    """Plot age-stratified TB incidence for all parameter combinations
-    
-    This function creates a grid of plots showing age-stratified TB incidence rates
-    by age groups including children (0-4, 5-14) and adults (15+), normalized per 100,000 population.
-    The data is compared to available South Africa incidence data where available.
-    """
-    import matplotlib.ticker as mtick
-
-    # South Africa incidence data (per 100,000 population) - placeholder data
-    # Note: This would need to be replaced with actual South Africa incidence data by age group
-    sa_2018_data = {
-        '0-4': np.nan,      # No data available for children
-        '5-14': np.nan,     # No data available for children
-        '15-24': 432,       # Placeholder - replace with actual data
-        '25-34': 902,       # Placeholder - replace with actual data
-        '35-44': 1107,      # Placeholder - replace with actual data
-        '45-54': 1063,      # Placeholder - replace with actual data
-        '55-64': 845,       # Placeholder - replace with actual data
-        '65+': 1104         # Placeholder - replace with actual data
-    }
-    
-    # All age groups including children
-    all_age_groups = ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+']
-    
-    # Create extended data array with NaN for age groups without survey data
-    sa_2018_values = []
-    for group in all_age_groups:
-        if group in sa_2018_data:
-            sa_2018_values.append(sa_2018_data[group])
-        else:
-            sa_2018_values.append(np.nan)  # No data available for children
-
-    nrows = len(tb_mortality_vals) * len(rel_sus_vals)
-    ncols = len(beta_vals)
-    fig, axs = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3 * nrows), sharex=True, sharey=True)
-
-    for m, tb_mortality in enumerate(tb_mortality_vals):
-        for i, rel_sus in enumerate(rel_sus_vals):
-            for j, beta in enumerate(beta_vals):
-                sim = sim_grid[m][i][j]
-                
-                # Compute age-stratified incidence for 2018
-                age_incidence = compute_age_stratified_incidence(sim, target_year=2018)
-                model_incidence = [age_incidence[group]['incidence_per_100k'] for group in all_age_groups]
-
-                ax_idx = m * len(rel_sus_vals) + i
-                ax = axs[ax_idx][j] if nrows > 1 else axs[j]
-                
-                # Create bar plot
-                x_pos = np.arange(len(all_age_groups))
-                width = 0.35
-                
-                # Plot model results
-                bars1 = ax.bar(x_pos - width/2, model_incidence, width, 
-                              label='Model (2018)', alpha=0.8, color='blue')
-                
-                # Plot South Africa 2018 data (only for age groups with data)
-                valid_data_mask = ~np.isnan(sa_2018_values)
-                bars2 = ax.bar(x_pos[valid_data_mask] + width/2, 
-                              [sa_2018_values[i] for i in range(len(sa_2018_values)) if valid_data_mask[i]], 
-                              width, label='SA Data (2018)', alpha=0.8, color='red')
-                
-                # Add value labels on bars
-                for bar in bars1:
-                    height = bar.get_height()
-                    if height > 0:
-                        ax.text(bar.get_x() + bar.get_width()/2., height + 50,
-                               f'{height:.0f}', ha='center', va='bottom', fontsize=8)
-                
-                for bar in bars2:
-                    height = bar.get_height()
-                    if height > 0:
-                        ax.text(bar.get_x() + bar.get_width()/2., height + 50,
-                               f'{height:.0f}', ha='center', va='bottom', fontsize=8)
-                
-                ax.set_title(f'β={beta:.3f}, rel_sus={rel_sus:.2f}, mort={tb_mortality:.1e}')
-                ax.set_xlabel('Age Group')
-                ax.set_ylabel('TB Incidence (per 100,000)')
-                ax.set_xticks(x_pos)
-                ax.set_xticklabels(all_age_groups, rotation=45)
-                ax.grid(True, alpha=0.3)
-                
-                if m == 0 and i == 0 and j == 0:
-                    ax.legend(fontsize=6)
-                
-                # Add percentage differences (only for age groups with survey data)
-                for k, (model_val, data_val) in enumerate(zip(model_incidence, sa_2018_values)):
-                    if not np.isnan(data_val) and data_val > 0:
-                        pct_diff = ((model_val - data_val) / data_val) * 100
-                        ax.annotate(f'{pct_diff:.1f}%', 
-                                    xy=(k, max(model_val, data_val) + 100), 
-                                    xytext=(0, 5), 
-                                    textcoords='offset points',
-                                    ha='center', fontsize=7, color='darkgreen')
-
-    plt.tight_layout()
-    plt.suptitle('Age-Stratified TB Incidence: Model vs South Africa 2018 Data', fontsize=14, y=1.02)
-
-    filename = f"age_incidence_grid_{timestamp}.pdf"
-    plt.savefig(get_output_path(filename), dpi=300, bbox_inches='tight')
-    plt.show()
-
-
-def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baseline', diagnostic_start_year=2025, seed=0, years=200, n_agents=2000):  # 8000
+def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baseline', seed=0, years=200, n_agents=1000):  # 8000
     start_year = 1850  # 1750
     sim_pars = dict(
-        unit='day',
-        dt=30,
+        dt=ss.days(30),
         start=ss.date(f'{start_year}-01-01'),
         stop=ss.date(f'{start_year + years}-01-01'),
         rand_seed=seed,
@@ -2761,13 +2070,13 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
     cbr = pd.read_csv(cbr_path)  # Crude birth rate per 1000
     asmr = pd.read_csv(asmr_path)  # Age-specific mortality rate
     demog = [
-        ss.Births(birth_rate=cbr, unit='day', dt=30),
-        ss.Deaths(death_rate=asmr, unit='day', dt=30, rate_units=1),  # rate_units=1 = per person-year
+        ss.Births(birth_rate=cbr, dt=ss.days(30)),
+        ss.Deaths(death_rate=asmr, dt=ss.days(30), rate_units=1),  # rate_units=1 = per person-year
     ]
     people = make_people(n_agents=n_agents)
  
     tb_pars = dict(
-        beta=ss.rate_prob(beta, unit='day'),  # ss.beta(beta),
+        beta=ss.probpermonth(beta),  # ss.prob(beta),
         init_prev=ss.bernoulli(p=0.10),  # Higher initial prevalence for South Africa context
         rel_sus_latentslow=rel_sus_latentslow,
         p_latent_fast=ss.bernoulli(p=0.1),  # Base fast progressor fraction (will be overridden by age-specific intervention)
@@ -2820,14 +2129,12 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
     
     if diagnostic_scenario == 'baseline':
         # Baseline scenario: sputum-smear microscopy (current assumptions)
-        # Baseline starts from the beginning and continues throughout
         diagnostic_params = {
             'coverage': ss.bernoulli(0.7, strict=False),  # 70% coverage
             'use_oral_swab': False,
             'use_fujilam': False,
             'use_cadcxr': False,
             'care_seeking_multiplier': 1.0,
-            'start_year': start_year,  # Start from beginning of simulation
         }
     elif diagnostic_scenario == 'oral_swab':
         # Oral swab scenario: saliva-based test
@@ -2837,7 +2144,6 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
             'use_fujilam': False,
             'use_cadcxr': False,
             'care_seeking_multiplier': 1.0,
-            'start_year': diagnostic_start_year,  # Start from 2025
         }
     elif diagnostic_scenario == 'fujilam':
         # FujiLAM scenario: urine-based test
@@ -2847,7 +2153,6 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
             'use_fujilam': True,
             'use_cadcxr': False,
             'care_seeking_multiplier': 1.0,
-            'start_year': diagnostic_start_year,  # Start from 2025
         }
     elif diagnostic_scenario == 'cadcxr':
         # CAD CXR scenario: X-ray screening
@@ -2857,7 +2162,6 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
             'use_fujilam': False,
             'use_cadcxr': True,
             'care_seeking_multiplier': 1.0,
-            'start_year': diagnostic_start_year,  # Start from 2025
         }
     else:
         raise ValueError(f"Unknown diagnostic scenario: {diagnostic_scenario}")
@@ -2895,18 +2199,9 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
     return sim
 
 
-def run_multiple_diagnostic_scenarios(beta_vals, rel_sus_vals, tb_mortality_vals, 
-                                     plot_start_year=2000, plot_points_per_year=1):
+def run_multiple_diagnostic_scenarios(beta_vals, rel_sus_vals, tb_mortality_vals):
     """
     Run the same parameter sweep for multiple diagnostic scenarios and create comparison plots.
-    
-    Args:
-        beta_vals: Array of beta values for the parameter sweep
-        rel_sus_vals: Array of relative susceptibility values for the parameter sweep
-        tb_mortality_vals: Array of TB mortality values for the parameter sweep
-        plot_start_year: Year to start plotting from (default: 2000)
-        plot_points_per_year: Number of time points per calendar year to include in plots
-                             (default: 1 for annual data)
     """
     diagnostic_scenarios = ['baseline', 'oral_swab', 'fujilam', 'cadcxr']
     scenario_results = {}
@@ -2919,39 +2214,22 @@ def run_multiple_diagnostic_scenarios(beta_vals, rel_sus_vals, tb_mortality_vals
             print(f"  - Grid shape: {len(scenario_results[scenario])} x {len(scenario_results[scenario][0])} x {len(scenario_results[scenario][0][0])}")
         else:
             print(f"  - Warning: Result is None")
-            
-
     
-    # Create comparison plot with plot configuration options
-    plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_vals, tb_mortality_vals, 
-                                       start_year=plot_start_year, points_per_year=plot_points_per_year)
+    # Create comparison plot
+    plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_vals, tb_mortality_vals)
     
     return scenario_results
 
 
-def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_vals, tb_mortality_vals, 
-                                       start_year=None, points_per_year=None):
+def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_vals, tb_mortality_vals):
     """
-    Create comparison plots for different diagnostic scenarios with plot configuration options.
-    
-    Args:
-        scenario_results: Dictionary of simulation results for each diagnostic scenario
-        beta_vals: Array of beta values used in the sweep
-        rel_sus_vals: Array of relative susceptibility values used in the sweep
-        tb_mortality_vals: Array of TB mortality values used in the sweep
-        start_year: Year to start plotting from (None for all years, default: 2000)
-        points_per_year: Number of time points per calendar year to include
-                        (None for all time points, 1 for annual, 2 for semi-annual, etc.)
+    Create comparison plots for different diagnostic scenarios.
     """
-    # Set default start year if not provided
-    if start_year is None:
-        start_year = 2000
-    
     timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H%M")
     
     # Create a comprehensive comparison plot
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
-    fig.suptitle(f'Enhanced TB Diagnostic Scenarios Comparison (from {start_year})', fontsize=16)
+    fig.suptitle('Enhanced TB Diagnostic Scenarios Comparison', fontsize=16)
     
     # Colors for different scenarios
     colors = ['blue', 'red', 'green', 'orange']
@@ -2979,11 +2257,7 @@ def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_val
         if 'tb' in first_sim.results:
             tb_results = first_sim.results['tb']
             active_prev = tb_results['n_active'].values / len(first_sim.people) * 100
-            time_vec = tb_results['n_active'].timevec
-            
-            # Apply plot configuration filtering
-            filtered_time, filtered_data = filter_time_series_data(time_vec, active_prev, start_year, points_per_year)
-            axes[0, 0].plot(filtered_time, filtered_data, 
+            axes[0, 0].plot(tb_results['n_active'].timevec, active_prev, 
                            label=scenario_name, color=color, linewidth=2)
         
         # Plot 2: Latent TB prevalence comparison
@@ -2993,44 +2267,28 @@ def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_val
             latent_fast = tb_results['n_latent_fast'].values
             latent_total = latent_slow + latent_fast
             latent_prev = latent_total / len(first_sim.people) * 100
-            time_vec = tb_results['n_latent_slow'].timevec
-            
-            # Apply plot configuration filtering
-            filtered_time, filtered_data = filter_time_series_data(time_vec, latent_prev, start_year, points_per_year)
-            axes[0, 1].plot(filtered_time, filtered_data, 
+            axes[0, 1].plot(tb_results['n_latent_slow'].timevec, latent_prev, 
                            label=scenario_name, color=color, linewidth=2)
         
         # Plot 3: Diagnostic testing comparison
         if 'enhancedtbdiagnostic' in first_sim.results:
             diag_results = first_sim.results['enhancedtbdiagnostic']
-            time_vec = diag_results['cum_test_positive'].timevec
-            data = diag_results['cum_test_positive'].values
-            
-            # Apply plot configuration filtering
-            filtered_time, filtered_data = filter_time_series_data(time_vec, data, start_year, points_per_year)
-            axes[0, 2].plot(filtered_time, filtered_data, 
+            axes[0, 2].plot(diag_results['cum_test_positive'].timevec, 
+                           diag_results['cum_test_positive'].values, 
                            label=scenario_name, color=color, linewidth=2)
         
         # Plot 4: Treatment outcomes comparison
         if 'tbtreatment' in first_sim.results:
             tx_results = first_sim.results['tbtreatment']
-            time_vec = tx_results['cum_treatment_success'].timevec
-            data = tx_results['cum_treatment_success'].values
-            
-            # Apply plot configuration filtering
-            filtered_time, filtered_data = filter_time_series_data(time_vec, data, start_year, points_per_year)
-            axes[1, 0].plot(filtered_time, filtered_data, 
+            axes[1, 0].plot(tx_results['cum_treatment_success'].timevec, 
+                           tx_results['cum_treatment_success'].values, 
                            label=scenario_name, color=color, linewidth=2)
         
         # Plot 5: Health-seeking behavior comparison
         if 'healthseekingbehavior' in first_sim.results:
             hsb_results = first_sim.results['healthseekingbehavior']
-            time_vec = hsb_results['new_sought_care'].timevec
-            data = hsb_results['new_sought_care'].values
-            
-            # Apply plot configuration filtering
-            filtered_time, filtered_data = filter_time_series_data(time_vec, data, start_year, points_per_year)
-            axes[1, 1].plot(filtered_time, filtered_data, 
+            axes[1, 1].plot(hsb_results['new_sought_care'].timevec, 
+                           hsb_results['new_sought_care'].values, 
                            label=scenario_name, color=color, linewidth=2)
         
         # Plot 6: HIV-TB coinfection comparison
@@ -3038,11 +2296,7 @@ def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_val
         if len(hiv_tb_prev) > 0:
             # Get time vector from TB results
             tb_results = first_sim.results['tb']
-            time_vec = tb_results['n_active'].timevec
-            
-            # Apply plot configuration filtering
-            filtered_time, filtered_data = filter_time_series_data(time_vec, hiv_tb_prev, start_year, points_per_year)
-            axes[1, 2].plot(filtered_time, filtered_data, 
+            axes[1, 2].plot(tb_results['n_active'].timevec, hiv_tb_prev, 
                            label=scenario_name, color=color, linewidth=2)
     
     # Set labels and titles
@@ -3082,12 +2336,8 @@ def plot_diagnostic_scenario_comparison(scenario_results, beta_vals, rel_sus_val
     
     plt.tight_layout()
     
-    # Save the comparison plot with configuration info in filename
-    config_suffix = f"_from{start_year}"
-    if points_per_year is not None:
-        config_suffix += f"_pp{points_per_year}"
-    
-    output_path = get_output_path(f'enhanced_tb_diagnostic_scenarios_comparison{config_suffix}_{timestamp}.pdf')
+    # Save the comparison plot
+    output_path = get_output_path(f'enhanced_tb_diagnostic_scenarios_comparison_{timestamp}.pdf')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Saved diagnostic scenario comparison plot to: {output_path}")
     
@@ -3118,7 +2368,7 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals, diagnostic_scenari
             for j, beta in enumerate(beta_vals):
                 scen_key = f'beta={beta:.3f}_rel_sus={rel_sus:.2f}_mort={tb_mortality:.1e}'
                 print(f"▶️ Running simulation {scen_key} ({m},{i},{j})/{total_runs}")
-                sim = run_sim(beta=beta, rel_sus_latentslow=rel_sus, tb_mortality=tb_mortality, diagnostic_scenario=diagnostic_scenario, diagnostic_start_year=2025)
+                sim = run_sim(beta=beta, rel_sus_latentslow=rel_sus, tb_mortality=tb_mortality, diagnostic_scenario=diagnostic_scenario)
                 sim_grid[m][i][j] = sim
                 results[scen_key] = sim.results.flatten()
                 
@@ -3158,7 +2408,6 @@ def refined_sweep(beta_vals, rel_sus_vals, tb_mortality_vals, diagnostic_scenari
     plot_tb_sweep_with_data(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_annualized_infection_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_age_prevalence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
-    plot_age_incidence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_hiv_tb_coinfection_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_case_notification_rate_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp)
     plot_population_pyramid_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals, timestamp, target_year=2022)
@@ -3192,9 +2441,6 @@ if __name__ == '__main__':
     # Setup for TB prevalence sweeps
     # This section configures the parameter ranges and executes the sweep analysis
     
-    # Plot configuration: Check the PLOT_START_YEAR and TIME_POINTS_PER_YEAR options at the top of this file
-    print(f"📊 Plot configuration: Start year = {PLOT_START_YEAR}, Time points per year = {TIME_POINTS_PER_YEAR}")
-    
     # Plot population demographics
     # Run sweep
     # Reduced to 2 parameter combinations for faster runtime
@@ -3222,7 +2468,7 @@ def test_hiv_integration():
     print("Testing HIV integration...")
     
     # Run a simple simulation with HIV
-    sim = run_sim(beta=0.003, rel_sus_latentslow=0.05, tb_mortality=4e-4, diagnostic_start_year=2025, years=50, n_agents=600)
+    sim = run_sim(beta=0.003, rel_sus_latentslow=0.05, tb_mortality=4e-4, years=50, n_agents=500)
     
     # Debug HIV results
     debug_hiv_results(sim)
@@ -3247,7 +2493,7 @@ def test_health_seeking_diagnostic_integration():
     print("Testing health-seeking and diagnostic integration...")
     
     # Run a simple simulation with health-seeking and diagnostic
-    sim = run_sim(beta=0.003, rel_sus_latentslow=0.05, tb_mortality=4e-4, diagnostic_start_year=2025, years=50, n_agents=600)
+    sim = run_sim(beta=0.003, rel_sus_latentslow=0.05, tb_mortality=4e-4, years=50, n_agents=500)
     
     # Check if health-seeking results are available
     try:
@@ -3298,52 +2544,3 @@ def test_health_seeking_diagnostic_integration():
 
 # Uncomment the line below to run the health-seeking and diagnostic integration test
 # test_health_seeking_diagnostic_integration()
-
-
-def test_plot_configuration():
-    """Test function to verify plot configuration options work correctly"""
-    print("Testing plot configuration options...")
-    
-    # Create sample time series data
-    import datetime
-    start_date = datetime.date(1850, 1, 1)
-    end_date = datetime.date(2050, 1, 1)
-    
-    # Generate daily time points
-    time_points = []
-    current_date = start_date
-    while current_date <= end_date:
-        time_points.append(current_date)
-        current_date += datetime.timedelta(days=1)
-    
-    # Generate sample data (sine wave with some noise)
-    import numpy as np
-    data = np.sin(np.linspace(0, 4*np.pi, len(time_points))) + 0.1 * np.random.randn(len(time_points))
-    
-    print(f"Original data: {len(time_points)} time points from {time_points[0]} to {time_points[-1]}")
-    
-    # Test different configurations
-    test_configs = [
-        (None, None, "All data"),
-        (2000, None, "From 2000 onwards, all time points"),
-        (2000, 1, "From 2000 onwards, annual"),
-        (2000, 2, "From 2000 onwards, semi-annual"),
-        (2000, 12, "From 2000 onwards, monthly"),
-    ]
-    
-    for start_year, points_per_year, description in test_configs:
-        filtered_time, filtered_data = filter_time_series_data(time_points, data, start_year, points_per_year)
-        print(f"  {description}: {len(filtered_time)} time points from {filtered_time[0]} to {filtered_time[-1]}")
-        
-        if points_per_year is not None and len(filtered_time) > 0:
-            # Check that we have approximately the right number of points per year
-            years = np.array([t.year for t in filtered_time])
-            unique_years = np.unique(years)
-            points_per_year_actual = len(filtered_time) / len(unique_years)
-            print(f"    Average points per year: {points_per_year_actual:.1f} (target: {points_per_year})")
-    
-    print("Plot configuration test completed.")
-
-
-# Uncomment the line below to run the plot configuration test
-# test_plot_configuration()

@@ -178,6 +178,7 @@ class TBDiagnostic(ss.Intervention):
         - cum_test_positive: Cumulative number of positive test results
         - cum_test_negative: Cumulative number of negative test results
         """
+        super().init_results()
         self.define_results(
             ss.Result('n_tested', dtype=int),
             ss.Result('n_test_positive', dtype=int),
