@@ -1,10 +1,6 @@
 import tbsim as mtb
 import starsim as ss
-import starsim_examples as sse
-import sciris as sc 
-import matplotlib.pyplot as plt
-import numpy as np
-import scipy.stats as stats
+
 
 TBS = mtb.TBS
 
@@ -28,9 +24,9 @@ def build_tbsim(sim_pars=None):
         )
     tb = mtb.TB(tb_params)
     
-    net = sse.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
 
-    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True  # TODO: Check if adjust_to_unit is still needed in v3, dt=1.0, scenario_name='comprehensive_plots_example')
+    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True)  # TODO: Check if adjust_to_unit is still needed in v3, dt=1.0, scenario_name='comprehensive_plots_example')
 
     sim = ss.Sim(
         people=pop,

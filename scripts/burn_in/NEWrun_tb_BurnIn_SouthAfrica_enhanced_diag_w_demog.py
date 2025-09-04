@@ -2719,13 +2719,13 @@ def plot_age_incidence_grid(sim_grid, beta_vals, rel_sus_vals, tb_mortality_vals
 def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baseline', diagnostic_start_year=2025, seed=0, years=200, n_agents=2000):  # 8000
     start_year = 1850  # 1750
     sim_pars = dict(
-        dt=ss.years(1),
+        dt=ss.months(1),
         start=ss.date(f'{start_year}-01-01'),
         stop=ss.date(f'{start_year + years}-01-01'),
         rand_seed=seed,
         verbose=0,
     )
-
+    
     # demog = [ss.Births(pars=dict(birth_rate=20)), ss.Deaths(pars=dict(death_rate=1))]
     # people = ss.People(n_agents=n_agents)
     # To do: Add time-varying birth rate and age-, sex-, year-specific mortality
@@ -2891,7 +2891,7 @@ def run_sim(beta, rel_sus_latentslow, tb_mortality, diagnostic_scenario='baselin
         pars=sim_pars,
     )
     sim.run()
-
+    print(sim.pars)
     return sim
 
 

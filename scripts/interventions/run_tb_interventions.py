@@ -8,17 +8,17 @@ import pprint as pp
 # Default simulation parameters
 DEFAULT_SPARS = dict(
     dt=ss.days(7),
-    start=sc.date('1965-01-01'),
-    stop=sc.date('2035-12-31'),
+    start=ss.date('1965-01-01'),
+    stop=ss.date('2035-12-31'),
     rand_seed=123,
     verbose =0,
 )
 DEFAULT_TBPARS = dict(
-        beta = ss.prob(0.1),
+        beta = ss.peryear(0.1),
         init_prev = ss.bernoulli(p=0.25),
         dt=ss.days(7),      
-        start=sc.date('1975-02-01'),
-        stop=sc.date('2030-12-31'),
+        start=ss.date('1975-02-01'),
+        stop=ss.date('2030-12-31'),
     )
 
 def build_sim(scenario=None, spars=None):
@@ -114,13 +114,13 @@ def get_scenarios():
     return {
         'Baseline': {
             'name': 'BASELINE',
-            'tbpars': dict(start=sc.date('1975-02-07'), 
-                stop=sc.date('2030-12-31')),
+            'tbpars': dict(start=ss.date('1975-02-07'), 
+                stop=ss.date('2030-12-31')),
         },
         'BCG': {
             'name': 'BCG PROTECTION',
-            'tbpars': dict(start=sc.date('1975-02-15'), 
-                           stop=sc.date('2030-12-31')),
+            'tbpars': dict(start=ss.date('1975-02-15'), 
+                           stop=ss.date('2030-12-31')),
             'bcgintervention': dict(
                 coverage=0.90,
             ),
@@ -129,11 +129,11 @@ def get_scenarios():
             'name': 'TPT INITIATION',
             'tptintervention': dict(
                 p_tpt=ss.bernoulli(1.0),
-                tpt_duration=2.0,
-                max_age=25,
+                age_range=[0, 25],
                 hiv_status_threshold=True,
-                p_3HP=0.8,
-                start=sc.date('1970-01-01'),
+                tpt_treatment_duration=ss.peryear(0.25),
+                tpt_protection_duration=ss.peryear(2.0),
+                start=ss.date('1970-01-01'),
             ),
         },
     }

@@ -609,14 +609,20 @@ class DwtPlotter:
         if dwell_time_bins is None:
             dwell_time_bins = [0, 50, 100, 150, 200, 250]
 
-        #appemd infinity to the bins
-        dwell_time_bins.append(np.inf)
+        # Append infinity to the bins if not already present
+        if np.inf not in dwell_time_bins:
+            dwell_time_bins.append(np.inf)
 
         # Create bin labels, handling infinity separately
-        dwell_time_labels = [
-            f"{int(b)}-{int(d)} step_time_units" if d != np.inf else f"{int(b)}+ step_time_units"
-            for b, d in zip(dwell_time_bins[:-1], dwell_time_bins[1:])
-        ]
+        dwell_time_labels = []
+        for b, d in zip(dwell_time_bins[:-1], dwell_time_bins[1:]):
+            if b != np.inf and d != np.inf:
+                dwell_time_labels.append(f"{int(b)}-{int(d)} step_time_units")
+            elif b != np.inf and d == np.inf:
+                dwell_time_labels.append(f"{int(b)}+ step_time_units")
+            else:
+                # Handle case where b might be inf (shouldn't happen with normal bins)
+                dwell_time_labels.append(f"{b}-{d} step_time_units")
 
         # Create a dwell time category column
         self.data['dwell_time_category'] = pd.cut(
@@ -797,7 +803,12 @@ class DwtPlotter:
 
         # Define age bins
         age_bins = [0, 5, 16, 30, 40, 50, 60, 70, 80, 90, 100, np.inf]
-        age_labels = [f'{int(b)}-{int(age_bins[i+1])}' if age_bins[i+1] != np.inf else f'{int(b)}+' for i, b in enumerate(age_bins[:-1])]
+        age_labels = []
+        for i, b in enumerate(age_bins[:-1]):
+            if age_bins[i+1] != np.inf:
+                age_labels.append(f'{int(b)}-{int(age_bins[i+1])}')
+            else:
+                age_labels.append(f'{int(b)}+')
         max_reinfections['age_group'] = pd.cut(max_reinfections['age'], bins=age_bins, labels=age_labels, right=False)
 
         # Plot the data

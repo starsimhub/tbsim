@@ -172,3 +172,6 @@ def run():
     plt.gca().yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
     plt.tight_layout()
     plt.show()
+
+if __name__ == "__main__":
+    run()
