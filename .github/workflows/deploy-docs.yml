@@ -35,52 +35,36 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.11"
   
       - name: Install tbsim
         run: pip install -e .[dev]
   
-      - name: Set up Quarto
-        uses: quarto-dev/quarto-actions/setup@v2
-        
-      - name: Install Quarto extensions
-        working-directory: ./docs
-        run: |
-          quarto add machow/quartodoc --no-prompt
-  
       - name: Install Python dependencies
         working-directory: ./docs
         run: |
-          pip install -r requirements-quarto.txt
-          pip install jupyter nbformat ipykernel
+          pip install -r requirements.txt
+          pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
   
       - name: Clean existing build
         working-directory: ./docs
         run: |
-          rm -rf _site
           rm -rf _build
-          rm -rf .quarto/cache
-          rm -rf .quarto/tmp
-          rm -rf .quarto/logs
+          rm -rf _site
           find . -name "*.pyc" -delete
           find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-  
-      - name: Generate interlinks database
-        working-directory: ./docs
-        run: python generate_interlinks.py
   
       - name: Setup Python kernel for notebooks
         working-directory: ./docs
         run: |
-          python -m ipykernel install --user --name tbsim-docs --display-name "TBSim Documentation"
           python -c "import tbsim; print('TBSim imported successfully')"
   
-      - name: Build documentation
+      - name: Build documentation with Sphinx
         working-directory: ./docs
         run: |
-          quarto render --no-cache || {
-            echo "Build failed, attempting to build without notebook execution..."
-            quarto render --no-cache --execute-dir: false
+          make html || {
+            echo "Build failed, attempting to build with warnings as errors disabled..."
+            make html SPHINXOPTS="-W --keep-going"
           }
   
       - name: Setup Pages
@@ -89,7 +73,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './docs/_site'
+          path: './docs/_build/html'
   
       - name: Deploy to GitHub Pages
         id: deployment
