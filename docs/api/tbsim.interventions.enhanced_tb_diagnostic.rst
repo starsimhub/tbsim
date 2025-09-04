@@ -73,7 +73,7 @@ Basic enhanced diagnostic:
 
 Advanced diagnostic with multiple methods:
 
-.. code_block:: python
+.. code-block:: python
 
    diagnostic = EnhancedTBDiagnostic(
        use_oral_swab=True,      # Enable oral swab testing

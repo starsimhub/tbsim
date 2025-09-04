@@ -50,7 +50,7 @@ Basic TPT intervention:
 
 TPT with custom parameters:
 
-.. code_block:: python
+.. code-block:: python
 
    tpt = TPT(
        treatment_duration=6,  # 6 months of therapy

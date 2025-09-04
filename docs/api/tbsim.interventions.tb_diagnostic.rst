@@ -50,7 +50,7 @@ Basic TB diagnostic:
 
 Custom diagnostic parameters:
 
-.. code_block:: python
+.. code-block:: python
 
    diagnostic = TBDiagnostic(
        coverage=0.8,                    # 80% testing coverage

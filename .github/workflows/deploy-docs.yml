@@ -62,9 +62,10 @@ jobs:
       - name: Build documentation with Sphinx
         working-directory: ./docs
         run: |
-          make html || {
-            echo "Build failed, attempting to build with warnings as errors disabled..."
-            make html SPHINXOPTS="-W --keep-going"
+          # First try to build with warnings as errors
+          make html SPHINXOPTS="-W --keep-going" || {
+            echo "Build with warnings as errors failed, attempting to build without warnings as errors..."
+            make html SPHINXOPTS="--keep-going"
           }
   
       - name: Setup Pages

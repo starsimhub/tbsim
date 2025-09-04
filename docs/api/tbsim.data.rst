@@ -45,7 +45,7 @@ Extracting South Africa data:
 
 Extracting Global TB data:
 
-.. code_block:: python
+.. code-block:: python
 
    from tbsim.data.extract_gtb_data import extract_gtb_data
    

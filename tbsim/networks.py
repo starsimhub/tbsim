@@ -7,7 +7,7 @@ __all__ = ['HouseholdNet', 'HouseholdNetRationsTrial', 'plot_household_structure
 
 class HouseholdNetRationsTrial(ss.Network):
     """
-    **** RATIONS trial network ****
+    RATIONS trial network.
     A household-level contact network for agent-based simulations using Starsim.
 
     This network constructs complete graphs among household members and supports 

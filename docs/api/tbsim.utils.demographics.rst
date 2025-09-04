@@ -40,7 +40,7 @@ Creating age structures:
 
 Age group utilities:
 
-.. code_block:: python
+.. code-block:: python
 
    from tbsim.utils.demographics import get_age_group
    

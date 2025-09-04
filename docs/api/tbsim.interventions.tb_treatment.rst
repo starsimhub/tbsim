@@ -50,7 +50,7 @@ Basic TB treatment:
 
 Custom treatment parameters:
 
-.. code_block:: python
+.. code-block:: python
 
    treatment = TBTreatment(
        treatment_success_rate=0.9,  # 90% success rate

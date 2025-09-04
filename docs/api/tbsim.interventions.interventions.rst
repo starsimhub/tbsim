@@ -49,7 +49,7 @@ Creating custom interventions:
 
 Using intervention manager:
 
-.. code_block:: python
+.. code-block:: python
 
    from tbsim.interventions.interventions import InterventionManager
    

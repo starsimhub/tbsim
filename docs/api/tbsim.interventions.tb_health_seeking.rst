@@ -51,7 +51,7 @@ Basic TB health-seeking:
 
 Custom health-seeking parameters:
 
-.. code_block:: python
+.. code-block:: python
 
    health_seeking = HealthSeekingBehavior(
        initial_care_seeking_rate=ss.perday(0.2),  # 20% daily rate

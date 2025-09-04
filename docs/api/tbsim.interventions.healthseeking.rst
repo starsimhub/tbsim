@@ -50,7 +50,7 @@ Basic health-seeking behavior:
 
 Custom health-seeking parameters:
 
-.. code_block:: python
+.. code-block:: python
 
    health_seeking = HealthSeekingBehavior(
        prob=0.2,              # 20% daily probability of seeking care

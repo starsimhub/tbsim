@@ -12,7 +12,7 @@ Network Classes
    :show-inheritance:
 
 Household Network Implementation
-------------------------------
+--------------------------------
 
 .. automodule:: tbsim.networks.HouseholdNet
    :members:
@@ -20,7 +20,7 @@ Household Network Implementation
    :show-inheritance:
 
 RATIONS Trial Network
---------------------
+---------------------
 
 .. automodule:: tbsim.networks.HouseholdNetRationsTrial
    :members:
@@ -28,7 +28,7 @@ RATIONS Trial Network
    :show-inheritance:
 
 Network Visualization
---------------------
+---------------------
 
 .. automodule:: tbsim.networks
    :members:
@@ -59,7 +59,7 @@ The Networks module provides comprehensive social network modeling for tuberculo
    - Population dynamics support
 
 Key Features
------------
+------------
 
 **Household Network Management**
    - Automatic household generation
@@ -86,7 +86,7 @@ Key Features
    - Intervention effects on networks
 
 Usage Examples
--------------
+--------------
 
 Basic household network:
 

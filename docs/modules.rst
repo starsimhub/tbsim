@@ -4,7 +4,7 @@ API Reference
 This section provides comprehensive API documentation for all TBsim modules and components, automatically generated from Python docstrings.
 
 Core Modules
------------
+------------
 
 .. toctree::
    :maxdepth: 2
@@ -14,7 +14,7 @@ Core Modules
    api/tbsim.networks
 
 Analysis and Visualization
--------------------------
+--------------------------
 
 .. toctree::
    :maxdepth: 2
@@ -26,7 +26,7 @@ Analysis and Visualization
    api/tbsim.utils.probabilities
 
 Interventions
-------------
+-------------
 
 .. toctree::
    :maxdepth: 2
@@ -45,7 +45,7 @@ Interventions
    api/tbsim.interventions.tpt
 
 Comorbidities
-------------
+-------------
 
 .. toctree::
    :maxdepth: 2
@@ -55,7 +55,7 @@ Comorbidities
    api/tbsim.comorbidities.malnutrition
 
 Configuration and Support
-------------------------
+-------------------------
 
 .. toctree::
    :maxdepth: 2
@@ -67,7 +67,7 @@ Configuration and Support
    api/tbsim.wrappers
 
 Data and Utilities
------------------
+------------------
 
 .. toctree::
    :maxdepth: 2
@@ -75,7 +75,7 @@ Data and Utilities
    api/tbsim.data
 
 Module Overview
---------------
+---------------
 
 **Core TB Model** (`tbsim.tb`)
    Main tuberculosis simulation module with disease dynamics, transmission, and state transitions. Implements the TBS state enumeration and TB disease class.
