@@ -1,0 +1,29 @@
+{% extends "!layout.html" %}
+
+{% block extrahead %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ pathto('_static/theme-switch.css', 1) }}" type="text/css" />
+    <script type="text/javascript" src="{{ pathto('_static/theme-switch.js', 1) }}"></script>
+{% endblock %}
+
+{% block navigation %}
+    {{ super() }}
+    <!-- Theme switch will be added by JavaScript -->
+{% endblock %}
+
+{% block footer %}
+    {{ super() }}
+    <script>
+        // Ensure theme switch is initialized after the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof window.themeSwitch !== 'undefined') {
+                // Theme switch is already initialized
+                return;
+            }
+            
+            // Fallback initialization
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', currentTheme);
+        });
+    </script>
+{% endblock %} 

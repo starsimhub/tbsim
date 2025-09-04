@@ -1,0 +1,33 @@
+{% extends "!nav.html" %}
+
+{% block navbartoc %}
+    {{ super() }}
+    <div class="theme-switch-wrapper" style="
+        position: absolute; 
+        right: 15px; 
+        top: 50%; 
+        transform: translateY(-50%); 
+        display: flex; 
+        align-items: center; 
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 5px 10px;
+        border-radius: 20px;
+        backdrop-filter: blur(5px);
+    ">
+        <span class="theme-switch-label" style="
+            margin-right: 8px; 
+            font-size: 16px; 
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+        "></span>
+        <label class="theme-switch">
+            <input type="checkbox" id="theme-switch">
+            <span class="slider"></span>
+        </label>
+    </div>
+{% endblock %} 

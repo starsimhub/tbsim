@@ -66,6 +66,9 @@ jobs:
         working-directory: ./docs
         run: |
           python -c "import tbsim; print('TBSim imported successfully')"
+      
+      - name: Verify Furo theme configuration
+        run: python .github/scripts/verify_docs.py
   
       - name: Build documentation with Sphinx
         working-directory: ./docs

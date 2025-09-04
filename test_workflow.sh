@@ -30,7 +30,10 @@ test_step() {
 test_step "TBSim Installation" "pip install -e .[dev]"
 
 # Test 2: Sphinx dependencies
-test_step "Sphinx Dependencies" "pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints"
+test_step "Sphinx Dependencies" "pip install -r docs/requirements.txt"
+
+# Test 2.5: Check Pandoc availability
+test_step "Pandoc Availability" "which pandoc || echo 'Pandoc not found - notebooks may not process correctly'"
 
 # Test 3: TBSim import
 test_step "TBSim Import" "python -c \"import tbsim; print('TBSim imported successfully')\""
