@@ -52,7 +52,7 @@ def check_sphinx_packages():
         'sphinx',
         'nbsphinx',
         'myst_parser',
-        'sphinx_rtd_theme'
+        'furo'
     ]
     
     all_available = True
