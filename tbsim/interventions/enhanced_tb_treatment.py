@@ -198,6 +198,7 @@ class EnhancedTBTreatment(ss.Intervention):
         The results are designed to facilitate epidemiological analysis and
         intervention effectiveness evaluation.
         """
+        super().init_results()
         self.define_results(
             ss.Result('n_treated', dtype=int),
             ss.Result('n_treatment_success', dtype=int),

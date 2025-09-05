@@ -142,6 +142,13 @@ class BCGProtection(ss.Intervention):
         # which is called in the parent init_pre method
         return
     
+    def init_post(self):
+        """Initialize the intervention after the simulation starts."""
+        super().init_post()
+        # Initialize results tracking
+        self.init_results()
+        return
+    
     
     def check_eligibility(self):
         """
@@ -432,8 +439,9 @@ class BCGProtection(ss.Intervention):
         - Intervention timing metrics (average age at vaccination, protection immunity_period)
         - TB impact metrics (cases and deaths averted)
         """
-        # Check if results are already initialized to prevent duplicate definitions
-        if hasattr(self, 'results') and len(self.results) > 0:
+        super().init_results()
+        # Check if our specific results are already initialized to prevent duplicate definitions
+        if hasattr(self, 'results') and 'n_vaccinated' in self.results:
             return
             
         self.define_results(

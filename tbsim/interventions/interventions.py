@@ -32,7 +32,7 @@ def get_extrastates():
         ss.BoolState('household_contact', default=False),
         ss.BoolState('treatment_success', default=False),
         ss.BoolState('treatment_failure', default=False),
-        ss.BoolState('hhid', default=False),
+        ss.IntArr('hhid', default=-1),
         ss.FloatArr('vaccination_year', default=np.nan),]
     return exs
    

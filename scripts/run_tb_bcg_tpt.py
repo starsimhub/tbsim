@@ -16,8 +16,8 @@ DEFAULT_SPARS = dict(
 )
 
 DEFAULT_TBPARS = dict(
-    beta=ss.per(0.0025),
-    init_prev=ss.bernoulli(p=0.25),
+    beta=ss.peryear(0.025),
+    init_prev=ss.bernoulli(p=0.10),
     dt=ss.days(7),      
     start=ss.date('1975-02-01'),
     stop=ss.date('2030-12-31'),
@@ -127,8 +127,7 @@ def build_sim(scenario=None, spars=None):
     
     networks = [
         ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
-        mtb.HouseholdNet(),
-        mtb.HouseholdNetGeneric(hhs=households, pars={'add_newborns': True})
+        mtb.HouseholdNet(hhs=households, pars={'add_newborns': True})
     ]
     
     # Create and return simulation
