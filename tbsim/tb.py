@@ -207,7 +207,16 @@ class TB(ss.Infection):
         # return
 
     def _init_transition_probabilities(self):
-        """Initialize probability objects for state transitions."""
+        """Initialize probability objects for state transitions.
+        
+        This method is a placeholder for future dynamic probability initialization.
+        Currently, all transition probabilities are calculated on-demand in the
+        individual probability methods (p_latent_to_presym, p_presym_to_clear, etc.).
+        
+        The method exists to maintain consistency with the original design pattern
+        and can be extended in the future to pre-calculate or cache probability
+        objects for performance optimization.
+        """
         # These will be calculated dynamically in the transition methods
         pass
 
@@ -215,20 +224,33 @@ class TB(ss.Infection):
         """
         Calculate probability of transition from latent to pre-symptomatic TB.
         
-        This method computes the probability that individuals in latent TB states
-        will progress to active pre-symptomatic TB. The probability depends on
-        whether they are in the slow or fast latent state, and includes individual
-        risk modifiers.
+        This method computes the daily probability that individuals in latent TB states
+        will progress to active pre-symptomatic TB. The calculation uses different
+        base rates for slow vs. fast progressors and applies individual risk modifiers.
+        
+        **Mathematical Details:**
+        - Slow progressors: rate_LS_to_presym = 3e-5 per day
+        - Fast progressors: rate_LF_to_presym = 6e-3 per day  
+        - Individual risk: rate *= rr_activation[uids]
+        - Final probability: 1 - exp(-rate * dt)
+        
+        **State Requirements:**
+        All individuals must be in TBS.LATENT_SLOW or TBS.LATENT_FAST states.
         
         Args:
-            sim: Simulation object
-            uids: Array of individual IDs to evaluate
+            sim (starsim.Sim): Simulation object containing time step information
+            uids (numpy.ndarray): Array of individual IDs to evaluate (must be in latent states)
             
         Returns:
-            numpy.ndarray: Transition probabilities for each individual
+            numpy.ndarray: Daily transition probabilities for each individual (0.0 to 1.0)
             
         Raises:
-            AssertionError: If any individuals are not in latent states
+            AssertionError: If any individuals are not in latent states (LATENT_SLOW or LATENT_FAST)
+            
+        Example:
+            >>> probs = tb.p_latent_to_presym(sim, latent_uids)
+            >>> transition_mask = np.random.random(len(probs)) < probs
+            >>> new_presymp_uids = latent_uids[transition_mask]
         """
         # Validate input states
         assert np.isin(self.state[uids], TBS.all_latent()).all(), "All individuals must be in latent states"
@@ -257,19 +279,35 @@ class TB(ss.Infection):
         """
         Calculate probability of transition from pre-symptomatic to clearance.
         
-        This method computes the probability that individuals in pre-symptomatic
-        TB will clear the infection. The probability is zero for untreated
-        individuals and follows the treatment rate for those on treatment.
+        This method computes the daily probability that individuals in pre-symptomatic
+        TB will clear the infection. The probability is zero for untreated individuals
+        and follows the treatment clearance rate for those on treatment.
+        
+        **Mathematical Details:**
+        - Untreated individuals: probability = 0.0 (no spontaneous clearance)
+        - Treated individuals: rate_treatment_to_clear = 6 per year (2-month treatment duration)
+        - Final probability: 1 - exp(-rate * dt) for treated individuals
+        
+        **State Requirements:**
+        All individuals must be in TBS.ACTIVE_PRESYMP state.
+        
+        **Treatment Dependency:**
+        This transition only occurs for individuals with on_treatment = True.
         
         Args:
-            sim: Simulation object
-            uids: Array of individual IDs to evaluate
+            sim (starsim.Sim): Simulation object containing time step information
+            uids (numpy.ndarray): Array of individual IDs to evaluate (must be pre-symptomatic)
             
         Returns:
-            numpy.ndarray: Transition probabilities for each individual
+            numpy.ndarray: Daily clearance probabilities for each individual (0.0 for untreated, >0.0 for treated)
             
         Raises:
-            AssertionError: If any individuals are not in pre-symptomatic state
+            AssertionError: If any individuals are not in pre-symptomatic state (ACTIVE_PRESYMP)
+            
+        Example:
+            >>> probs = tb.p_presym_to_clear(sim, presym_uids)
+            >>> clear_mask = np.random.random(len(probs)) < probs
+            >>> cleared_uids = presym_uids[clear_mask]  # Only treated individuals will clear
         """
         # Validate input states
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "All individuals must be in pre-symptomatic state"
@@ -291,19 +329,37 @@ class TB(ss.Infection):
         """
         Calculate probability of transition from pre-symptomatic to active TB.
         
-        This method computes the probability that individuals in pre-symptomatic
-        TB will progress to symptomatic active TB. The probability is the same
-        for all individuals in this state.
+        This method computes the daily probability that individuals in pre-symptomatic
+        TB will progress to symptomatic active TB. The probability is uniform for all
+        individuals in this state, representing the natural progression of disease.
+        
+        **Mathematical Details:**
+        - Base rate: rate_presym_to_active = 3e-2 per day
+        - No individual risk modifiers applied (uniform progression)
+        - Final probability: 1 - exp(-rate * dt)
+        
+        **State Requirements:**
+        All individuals must be in TBS.ACTIVE_PRESYMP state.
+        
+        **Active State Assignment:**
+        Upon transition, individuals are assigned to specific active states based on
+        their pre-determined active_tb_state (SMPOS, SMNEG, or EXPTB).
         
         Args:
-            sim: Simulation object
-            uids: Array of individual IDs to evaluate
+            sim (starsim.Sim): Simulation object containing time step information
+            uids (numpy.ndarray): Array of individual IDs to evaluate (must be pre-symptomatic)
             
         Returns:
-            numpy.ndarray: Transition probabilities for each individual
+            numpy.ndarray: Daily progression probabilities for each individual (uniform values)
             
         Raises:
-            AssertionError: If any individuals are not in pre-symptomatic state
+            AssertionError: If any individuals are not in pre-symptomatic state (ACTIVE_PRESYMP)
+            
+        Example:
+            >>> probs = tb.p_presym_to_active(sim, presym_uids)
+            >>> active_mask = np.random.random(len(probs)) < probs
+            >>> new_active_uids = presym_uids[active_mask]
+            >>> # Assign specific active states based on active_tb_state[new_active_uids]
         """
         # Validate input states
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "All individuals must be in pre-symptomatic state"
@@ -324,20 +380,40 @@ class TB(ss.Infection):
         """
         Calculate probability of transition from active TB to clearance.
         
-        This method computes the probability that individuals with active TB
-        will clear the infection. The probability depends on whether they
-        are on treatment (higher clearance rate) and includes individual
-        risk modifiers.
+        This method computes the daily probability that individuals with active TB
+        will clear the infection. The probability depends on treatment status and
+        includes individual risk modifiers for natural clearance.
+        
+        **Mathematical Details:**
+        - Natural clearance: rate_active_to_clear = 2.4e-4 per day
+        - Treatment clearance: rate_treatment_to_clear = 6 per year (2-month duration)
+        - Individual risk: rate *= rr_clearance[uids]
+        - Final probability: 1 - exp(-rate * dt)
+        
+        **State Requirements:**
+        All individuals must be in active TB states (ACTIVE_SMPOS, ACTIVE_SMNEG, or ACTIVE_EXPTB).
+        
+        **Treatment Effect:**
+        Treated individuals use the higher treatment clearance rate instead of natural clearance.
+        
+        **Post-Clearance State:**
+        Upon clearance, individuals return to TBS.NONE (susceptible) and can be reinfected.
         
         Args:
-            sim: Simulation object
-            uids: Array of individual IDs to evaluate
+            sim (starsim.Sim): Simulation object containing time step information
+            uids (numpy.ndarray): Array of individual IDs to evaluate (must be in active states)
             
         Returns:
-            numpy.ndarray: Transition probabilities for each individual
+            numpy.ndarray: Daily clearance probabilities for each individual (varies by treatment status)
             
         Raises:
-            AssertionError: If any individuals are not in active states
+            AssertionError: If any individuals are not in active states (SMPOS, SMNEG, or EXPTB)
+            
+        Example:
+            >>> probs = tb.p_active_to_clear(sim, active_uids)
+            >>> clear_mask = np.random.random(len(probs)) < probs
+            >>> cleared_uids = active_uids[clear_mask]
+            >>> # These individuals will return to susceptible state
         """
         # Validate input states
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all(), "All individuals must be in active states"
@@ -365,19 +441,41 @@ class TB(ss.Infection):
         """
         Calculate probability of transition from active TB to death.
         
-        This method computes the probability that individuals with active TB
-        will die from the disease. The probability varies by active TB type
+        This method computes the daily probability that individuals with active TB
+        will die from the disease. The probability varies significantly by active TB type
         and includes individual risk modifiers.
         
+        **Mathematical Details:**
+        - Smear positive: rate_smpos_to_dead = 4.5e-4 per day (highest mortality)
+        - Smear negative: rate_smneg_to_dead = 0.3 * 4.5e-4 per day (30% of smear positive)
+        - Extra-pulmonary: rate_exptb_to_dead = 0.15 * 4.5e-4 per day (15% of smear positive)
+        - Individual risk: rate *= rr_death[uids]
+        - Final probability: 1 - exp(-rate * dt)
+        
+        **State Requirements:**
+        All individuals must be in active TB states (ACTIVE_SMPOS, ACTIVE_SMNEG, or ACTIVE_EXPTB).
+        
+        **Treatment Effect:**
+        Treated individuals have rr_death = 0, effectively preventing TB mortality.
+        
+        **Death Process:**
+        Upon death, individuals are marked as TBS.DEAD and removed from transmission.
+        
         Args:
-            sim: Simulation object
-            uids: Array of individual IDs to evaluate
+            sim (starsim.Sim): Simulation object containing time step information
+            uids (numpy.ndarray): Array of individual IDs to evaluate (must be in active states)
             
         Returns:
-            numpy.ndarray: Transition probabilities for each individual
+            numpy.ndarray: Daily death probabilities for each individual (varies by TB type and treatment)
             
         Raises:
-            AssertionError: If any individuals are not in active states
+            AssertionError: If any individuals are not in active states (SMPOS, SMNEG, or EXPTB)
+            
+        Example:
+            >>> probs = tb.p_active_to_death(sim, active_uids)
+            >>> death_mask = np.random.random(len(probs)) < probs
+            >>> death_uids = active_uids[death_mask]
+            >>> # These individuals will be marked for death by the simulation framework
         """
         # Validate input states
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all(), "All individuals must be in active states"
@@ -409,11 +507,30 @@ class TB(ss.Infection):
         Determine which individuals are currently infectious.
         
         An individual is considered infectious if they are in any active TB state
-        or currently on treatment. This property is used to calculate transmission
-        rates and contact tracing.
+        or currently on treatment. This property is used by the Starsim transmission
+        system to calculate transmission rates and for contact tracing.
+        
+        **Infectious States:**
+        - ACTIVE_PRESYMP: Pre-symptomatic active TB (low transmissibility)
+        - ACTIVE_SMPOS: Smear positive pulmonary TB (highest transmissibility)
+        - ACTIVE_SMNEG: Smear negative pulmonary TB (moderate transmissibility)
+        - ACTIVE_EXPTB: Extra-pulmonary TB (lowest transmissibility)
+        - on_treatment: Currently receiving treatment (reduced transmissibility)
+        
+        **Transmission Rates:**
+        The relative transmissibility of each state is defined by:
+        - rel_trans_presymp = 0.1 (10% of baseline)
+        - rel_trans_smpos = 1.0 (baseline, 100%)
+        - rel_trans_smneg = 0.3 (30% of baseline)
+        - rel_trans_exptb = 0.05 (5% of baseline)
+        - rel_trans_treatment = 0.5 (50% reduction for treated individuals)
         
         Returns:
             numpy.ndarray: Boolean array indicating infectious status for each individual
+            
+        Example:
+            >>> infectious_uids = tb.infectious.uids
+            >>> print(f"Number of infectious individuals: {len(infectious_uids)}")
         """
         return (self.on_treatment) | (self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)
 
@@ -421,13 +538,41 @@ class TB(ss.Infection):
         """
         Set initial prognoses for newly infected individuals.
         
-        This method is called when individuals first become infected with TB.
-        It determines their latent TB progression type (slow vs. fast), sets
-        their initial state, and configures individual risk factors.
+        This method is called by the Starsim framework when individuals first become
+        infected with TB. It determines their latent TB progression type, sets their
+        initial state, and configures individual risk factors and heterogeneity.
+        
+        **Progression Type Assignment:**
+        - Fast progressors (10%): p_latent_fast = 0.1, progress rapidly to active disease
+        - Slow progressors (90%): p_latent_slow = 0.9, progress slowly or remain latent
+        
+        **State Initialization:**
+        - Fast progressors: Set to TBS.LATENT_FAST, become non-susceptible
+        - Slow progressors: Set to TBS.LATENT_SLOW, remain susceptible to reinfection
+        
+        **Individual Risk Factors:**
+        - rr_activation: Multiplier for latent-to-active transition (default 1.0)
+        - rr_clearance: Multiplier for active-to-clearance transition (default 1.0)
+        - rr_death: Multiplier for active-to-death transition (default 1.0)
+        - reltrans_het: Individual transmission heterogeneity (default 1.0)
+        
+        **Active State Pre-assignment:**
+        - active_tb_state: Pre-determined active state for future progression
+        - Distribution: 10% SMPOS, 10% SMNEG, 60% SMNEG, 20% EXPTB
+        
+        **Reinfection Handling:**
+        - Tracks new infections vs. reinfections separately
+        - Slow progressors maintain susceptibility for reinfection
+        - Fast progressors become non-susceptible after infection
         
         Args:
-            uids: Array of individual IDs to set prognoses for
-            sources: Source of infection (not used in current implementation)
+            uids (numpy.ndarray): Array of individual IDs to set prognoses for
+            sources (numpy.ndarray, optional): Source of infection (not used in current implementation)
+            
+        Example:
+            >>> # Called automatically by Starsim when new infections occur
+            >>> tb.set_prognoses(new_infected_uids)
+            >>> # Individuals are now assigned to latent states with risk factors
         """
         super().set_prognoses(uids, sources)
 
@@ -468,16 +613,38 @@ class TB(ss.Infection):
         """
         Execute one simulation time step for TB disease progression.
         
-        This method handles all state transitions during a simulation step:
-        - Latent TB progression to active disease
-        - Pre-symptomatic to symptomatic progression
-        - Active TB clearance (natural or treatment-induced)
-        - Active TB mortality
-        - Transmission rate updates
-        - Treatment effects
+        This method is called by the Starsim framework at each simulation time step
+        and handles all TB-specific state transitions and updates. It processes state
+        transitions in a specific order to ensure proper disease progression.
         
-        The method updates individual states, timing variables, and result
-        tracking for epidemiological analysis.
+        **State Transition Sequence:**
+        1. **Latent → Pre-symptomatic**: Slow/fast progressors advance to active disease
+        2. **Pre-symptomatic → Active/Clear**: Progression to symptomatic or treatment clearance
+        3. **Active → Clear**: Natural recovery or treatment-induced clearance
+        4. **Active → Death**: TB mortality (varies by active state type)
+        5. **Transmission Updates**: Update relative transmission rates for all states
+        6. **Risk Reset**: Reset individual risk modifiers for next time step
+        
+        **Key Features:**
+        - **Age-specific tracking**: Separate counts for individuals 15+ years old
+        - **Treatment effects**: Treated individuals have reduced transmission and zero death risk
+        - **State-specific rates**: Different progression rates for each TB state
+        - **Individual heterogeneity**: Applies individual risk modifiers and transmission heterogeneity
+        - **Result tracking**: Updates all epidemiological metrics for analysis
+        
+        **Transmission Rate Updates:**
+        - Resets all relative transmission rates to 1.0
+        - Applies state-specific transmission rates (presymp, smpos, smneg, exptb)
+        - Applies individual transmission heterogeneity
+        - Reduces transmission for treated individuals
+        
+        **Result Updates:**
+        - new_active, new_active_15+: New cases of active TB
+        - new_deaths, new_deaths_15+: New TB deaths
+        - new_notifications_15+: New treatment initiations (15+ years)
+        
+        This method is the core of the TB disease model and must be called
+        at each simulation time step by the Starsim framework.
         """
         # Make all the updates from the SIR model 
         super().step()
@@ -486,7 +653,13 @@ class TB(ss.Infection):
 
         # Latent --> active pre-symptomatic
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
-        new_presymp_uids = self.p_latent_to_presym.filter(latent_uids)
+        if len(latent_uids):
+            probs = self.p_latent_to_presym(self.sim, latent_uids)
+            # Convert probabilities to boolean array for indexing
+            transition_mask = np.random.random(len(probs)) < probs
+            new_presymp_uids = latent_uids[transition_mask]
+        else:
+            new_presymp_uids = np.array([], dtype=int)
         if len(new_presymp_uids):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_cur[new_presymp_uids] = ti
@@ -497,13 +670,18 @@ class TB(ss.Infection):
 
         # Pre-symptomatic --> Active or Clear
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
-        new_clear_presymp_uids = ss.uids()
+        new_clear_presymp_uids = np.array([], dtype=int)
+        new_active_uids = np.array([], dtype=int)
         if len(presym_uids):
             # Pre-symptomatic --> Clear (if on treatment)
-            new_clear_presymp_uids = self.p_presym_to_clear.filter(presym_uids)
+            clear_probs = self.p_presym_to_clear(self.sim, presym_uids)
+            clear_mask = np.random.random(len(clear_probs)) < clear_probs
+            new_clear_presymp_uids = presym_uids[clear_mask]
 
             # Pre-symptomatic --> Active
-            new_active_uids = self.p_presym_to_active.filter(presym_uids)
+            active_probs = self.p_presym_to_active(self.sim, presym_uids)
+            active_mask = np.random.random(len(active_probs)) < active_probs
+            new_active_uids = presym_uids[active_mask]
             if len(new_active_uids):
                 active_state = self.active_tb_state[new_active_uids] 
                 self.state[new_active_uids] = active_state
@@ -512,7 +690,12 @@ class TB(ss.Infection):
 
         # Active --> Susceptible via natural recovery or treatment (clear)
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids
-        new_clear_active_uids = self.p_active_to_clear.filter(active_uids)
+        if len(active_uids):
+            clear_probs = self.p_active_to_clear(self.sim, active_uids)
+            clear_mask = np.random.random(len(clear_probs)) < clear_probs
+            new_clear_active_uids = active_uids[clear_mask]
+        else:
+            new_clear_active_uids = np.array([], dtype=int)
         new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
             # Set state and reset timers
@@ -527,7 +710,12 @@ class TB(ss.Infection):
 
         # Active --> Death
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
-        new_death_uids = self.p_active_to_death.filter(active_uids)
+        if len(active_uids):
+            death_probs = self.p_active_to_death(self.sim, active_uids)
+            death_mask = np.random.random(len(death_probs)) < death_probs
+            new_death_uids = active_uids[death_mask]
+        else:
+            new_death_uids = np.array([], dtype=int)
         if len(new_death_uids):
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
@@ -569,17 +757,41 @@ class TB(ss.Infection):
         """
         Start treatment for individuals with active TB.
         
-        This method initiates treatment for specified individuals, which:
-        - Marks them as being on treatment
-        - Sets their death rate to zero (treatment prevents TB mortality)
-        - Reduces their transmission rate
-        - Tracks notifications for reporting
+        This method initiates TB treatment for specified individuals, implementing
+        the key effects of treatment on disease progression and transmission.
+        
+        **Treatment Effects:**
+        - **Mortality Prevention**: Sets rr_death = 0 (treatment prevents TB death)
+        - **Transmission Reduction**: Applies rel_trans_treatment = 0.5 (50% reduction)
+        - **Clearance Enhancement**: Uses rate_treatment_to_clear = 6/year (2-month duration)
+        - **State Tracking**: Marks individuals as on_treatment = True
+        
+        **Eligibility Requirements:**
+        Only individuals in active TB states can start treatment:
+        - ACTIVE_PRESYMP: Pre-symptomatic active TB
+        - ACTIVE_SMPOS: Smear positive pulmonary TB
+        - ACTIVE_SMNEG: Smear negative pulmonary TB
+        - ACTIVE_EXPTB: Extra-pulmonary TB
+        
+        **Notification Tracking:**
+        - Tracks new_notifications_15+ for individuals 15+ years old
+        - Used for epidemiological reporting and program evaluation
+        
+        **Treatment Duration:**
+        - Treatment continues until clearance (rate_treatment_to_clear)
+        - Average treatment duration: 2 months (6 per year)
+        - Treatment effects persist throughout the treatment period
         
         Args:
-            uids: Array of individual IDs to start treatment for
+            uids (numpy.ndarray): Array of individual IDs to start treatment for
             
         Returns:
-            int: Number of individuals who started treatment
+            int: Number of individuals who actually started treatment (only active TB cases)
+            
+        Example:
+            >>> # Start treatment for detected active TB cases
+            >>> n_treated = tb.start_treatment(detected_uids)
+            >>> print(f"Started treatment for {n_treated} individuals")
         """
         if len(uids) == 0:
             return 0  # No one to treat
@@ -614,12 +826,36 @@ class TB(ss.Infection):
         """
         Handle death events for TB-infected individuals.
         
-        This method ensures that deceased individuals cannot transmit TB
-        or become infected after death. It's called by the simulation
-        framework when individuals die.
+        This method is called by the Starsim framework when individuals die from
+        any cause (TB-related or other). It ensures that deceased individuals
+        cannot transmit TB or become infected after death.
+        
+        **State Cleanup:**
+        - **Susceptibility**: Sets susceptible = False (cannot be infected)
+        - **Infection Status**: Sets infected = False (no longer infected)
+        - **Transmission**: Sets rel_trans = 0 (cannot transmit to others)
+        
+        **Death Sources:**
+        - **TB Deaths**: Individuals who died from active TB (TBS.DEAD state)
+        - **Other Deaths**: Individuals who died from other causes while infected
+        
+        **Framework Integration:**
+        - Calls super().step_die(uids) to handle base class death processing
+        - Ensures proper cleanup of TB-specific states
+        - Maintains consistency with Starsim death handling
+        
+        **Important Notes:**
+        - This method handles ALL deaths, not just TB deaths
+        - TB-specific death tracking is handled in the step() method
+        - Deceased individuals are removed from all TB calculations
         
         Args:
-            uids: Array of individual IDs who have died
+            uids (numpy.ndarray): Array of individual IDs who have died
+            
+        Example:
+            >>> # Called automatically by Starsim when deaths occur
+            >>> tb.step_die(deceased_uids)
+            >>> # Deceased individuals are now removed from TB transmission
         """
         if len(uids) == 0:
             return # Nothing to do
@@ -634,11 +870,41 @@ class TB(ss.Infection):
 
     def init_results(self):
         """
-        Initialize result tracking variables.
+        Initialize result tracking variables for TB epidemiological outcomes.
         
-        This method sets up all the result variables used to track
-        epidemiological outcomes throughout the simulation, including
-        counts by state, age-specific metrics, and cumulative measures.
+        This method sets up all the result variables used to track TB-specific
+        epidemiological outcomes throughout the simulation. It defines both
+        basic state counts and derived epidemiological indicators.
+        
+        **State Count Results:**
+        - n_latent_slow, n_latent_fast: Counts of individuals in latent states
+        - n_active_presymp, n_active_smpos, n_active_smneg, n_active_exptb: Active state counts
+        - n_active: Combined count of all active TB cases
+        - n_infectious: Total number of infectious individuals
+        
+        **Age-Specific Results (15+ years):**
+        - All active state counts have 15+ variants for adult-focused analysis
+        - new_active_15+, new_deaths_15+: Age-specific incidence and mortality
+        - new_notifications_15+: Treatment initiations for adults
+        - n_detectable_15+: Detectable cases including CXR screening
+        
+        **Incidence and Cumulative Measures:**
+        - new_active, new_deaths: Daily incidence of new cases and deaths
+        - cum_active, cum_deaths: Cumulative counts over simulation period
+        - cum_active_15+, cum_deaths_15+: Age-specific cumulative measures
+        
+        **Derived Epidemiological Indicators:**
+        - prevalence_active: Active TB prevalence (active cases / total population)
+        - incidence_kpy: Incidence per 1,000 person-years
+        - deaths_ppy: Death rate per person-year
+        - n_reinfected: Number of reinfection events
+        
+        **Detection and Treatment Metrics:**
+        - new_notifications_15+: New TB notifications (treatment initiations)
+        - n_detectable_15+: Detectable cases (smear pos/neg + CXR-screened pre-symptomatic)
+        
+        This method is called automatically by the Starsim framework during
+        simulation initialization and should not be called manually.
         """
         super().init_results()
         
@@ -684,10 +950,40 @@ class TB(ss.Infection):
         """
         Update result tracking variables for the current time step.
         
-        This method calculates and stores all epidemiological metrics
-        for the current simulation time step, including state counts,
-        age-specific measures, and derived indicators like prevalence
-        and incidence rates.
+        This method is called by the Starsim framework at each time step to
+        calculate and store all TB-specific epidemiological metrics. It updates
+        both basic state counts and derived epidemiological indicators.
+        
+        **State Count Updates:**
+        - Counts individuals in each TB state (latent, active, infectious)
+        - Calculates age-specific counts for individuals 15+ years old
+        - Updates total active TB and infectious case counts
+        
+        **Detection Metrics:**
+        - n_detectable_15+: Calculates detectable cases including:
+          * All smear positive and negative cases (100% detectable)
+          * CXR-screened pre-symptomatic cases (cxr_asymp_sens sensitivity)
+        
+        **Derived Epidemiological Indicators:**
+        - **prevalence_active**: Active TB prevalence = n_active / total_alive_population
+        - **incidence_kpy**: Incidence per 1,000 person-years = 1000 * new_infections / (alive_pop * dt_year)
+        - **deaths_ppy**: Death rate per person-year = new_deaths / (alive_pop * dt_year)
+        
+        **Age-Specific Calculations:**
+        - All 15+ metrics use age >= 15 filter for adult-focused analysis
+        - Important for TB epidemiology as adult cases are typically more severe
+        
+        **Population Scaling:**
+        - Uses sim.people.alive to get current living population
+        - Accounts for deaths and births during simulation
+        - Ensures rates are calculated relative to current population
+        
+        **Time Step Integration:**
+        - Uses sim.t.dt_year for time-based rate calculations
+        - Ensures consistent units across different time step sizes
+        
+        This method is called automatically by the Starsim framework at each
+        time step and should not be called manually.
         """
         super().update_results()
         res = self.results
@@ -728,8 +1024,32 @@ class TB(ss.Infection):
         """
         Finalize result calculations after simulation completion.
         
-        This method calculates cumulative measures and finalizes
-        any results that depend on the complete simulation history.
+        This method is called by the Starsim framework after the simulation
+        has completed to calculate cumulative measures and finalize any results
+        that depend on the complete simulation history.
+        
+        **Cumulative Calculations:**
+        - **cum_deaths**: Cumulative TB deaths = cumsum(new_deaths)
+        - **cum_deaths_15+**: Cumulative TB deaths for adults 15+ = cumsum(new_deaths_15+)
+        - **cum_active**: Cumulative active TB cases = cumsum(new_active)
+        - **cum_active_15+**: Cumulative active TB cases for adults 15+ = cumsum(new_active_15+)
+        
+        **Purpose:**
+        - Provides total burden measures over the entire simulation period
+        - Enables calculation of cumulative incidence and mortality rates
+        - Supports long-term epidemiological analysis and program evaluation
+        
+        **Usage:**
+        - Called automatically by Starsim at simulation end
+        - Results are available in self.results after completion
+        - Used for final analysis and reporting
+        
+        **Integration:**
+        - Calls super().finalize_results() to handle base class finalization
+        - Ensures compatibility with Starsim result system
+        
+        This method is called automatically by the Starsim framework at the
+        end of simulation and should not be called manually.
         """
         super().finalize_results()
         res = self.results
@@ -746,12 +1066,43 @@ class TB(ss.Infection):
         """
         Create a basic plot of all TB simulation results.
         
-        This method generates a matplotlib figure showing the time
-        series of all tracked epidemiological measures over the
-        simulation period.
+        This method generates a matplotlib figure showing the time series of all
+        tracked TB epidemiological measures over the simulation period. It provides
+        a quick visual overview of the simulation outcomes.
+        
+        **Plot Contents:**
+        - **Time Series**: All result variables plotted against simulation time
+        - **Multiple Metrics**: Includes state counts, incidence, mortality, and prevalence
+        - **Legend**: Each result variable is labeled in the legend
+        - **Automatic Scaling**: Matplotlib handles axis scaling automatically
+        
+        **Excluded Variables:**
+        - timevec: Excluded as it represents the x-axis (time)
+        - All other result variables are included in the plot
+        
+        **Plot Features:**
+        - **Line Plot**: Each result variable plotted as a separate line
+        - **Legend**: Automatic legend with result variable names
+        - **Time Axis**: X-axis represents simulation time steps
+        - **Value Axis**: Y-axis represents result variable values
+        
+        **Usage:**
+        - Useful for quick visual inspection of simulation results
+        - Can be customized by modifying the returned figure
+        - Suitable for basic analysis and presentation
+        
+        **Limitations:**
+        - All variables on same plot may have different scales
+        - No automatic subplot organization
+        - Basic styling without customization
         
         Returns:
-            matplotlib.figure.Figure: Figure containing the plot
+            matplotlib.figure.Figure: Figure containing the time series plot of all TB results
+            
+        Example:
+            >>> fig = tb.plot()
+            >>> fig.show()  # Display the plot
+            >>> fig.savefig('tb_results.png')  # Save to file
         """
         fig = plt.figure()
         for rkey in self.results.keys():
