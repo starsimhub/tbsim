@@ -23,7 +23,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = 'furo'
 html_static_path = ['_static']
-autodoc_mock_imports = ["starsim"]
+autodoc_mock_imports = ["starsim", "sciris", "matplotlib", "pandas", "numpy", "rdata"]
 
 # nbsphinx configuration
 nbsphinx_execute = 'never'
@@ -213,4 +213,8 @@ napoleon_type_aliases = None
 napoleon_include_summary_with_docstring = False
 napoleon_custom_sections = None
 napoleon_use_keyword = True
-napoleon_attr_annotations = True 
+napoleon_attr_annotations = True
+
+# Additional autodoc settings for scripts
+autodoc_ignore_module_all = True
+autodoc_preserve_defaults = True 

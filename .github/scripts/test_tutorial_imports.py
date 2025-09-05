@@ -38,14 +38,27 @@ def test_tutorial_script():
     """Test tutorial script functionality."""
     print("=== Testing tutorial script ===")
     
-    # Try to find scripts directory - could be current directory or parent
+    # Find scripts directory - try multiple locations
     current_dir = os.getcwd()
-    scripts_dir = os.path.join(current_dir, 'scripts')
+    possible_scripts_dirs = [
+        os.path.join(current_dir, 'scripts'),  # Current directory
+        os.path.join(os.path.dirname(current_dir), 'scripts'),  # Parent directory
+    ]
     
-    if not os.path.exists(scripts_dir):
-        # Try parent directory
-        parent_dir = os.path.dirname(current_dir)
-        scripts_dir = os.path.join(parent_dir, 'scripts')
+    # If we're in docs directory, scripts should be in parent
+    if os.path.basename(current_dir) == 'docs':
+        possible_scripts_dirs.insert(0, os.path.join(os.path.dirname(current_dir), 'scripts'))
+    
+    # Try to find scripts directory relative to this script's location
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(script_dir)
+    possible_scripts_dirs.append(os.path.join(repo_root, 'scripts'))
+    
+    scripts_dir = None
+    for dir_path in possible_scripts_dirs:
+        if os.path.exists(dir_path):
+            scripts_dir = dir_path
+            break
     
     if os.path.exists(scripts_dir):
         sys.path.insert(0, scripts_dir)
@@ -55,8 +68,17 @@ def test_tutorial_script():
         return False
     
     try:
-        import run_tb_interventions
-        print('✓ Tutorial script imported successfully')
+        # Try to import the script as a module
+        import importlib.util
+        script_path = os.path.join(scripts_dir, 'run_tb_interventions.py')
+        if os.path.exists(script_path):
+            spec = importlib.util.spec_from_file_location("run_tb_interventions", script_path)
+            run_tb_interventions = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(run_tb_interventions)
+            print('✓ Tutorial script imported successfully')
+        else:
+            print('✗ run_tb_interventions.py not found')
+            return False
         
         # Test function availability
         if hasattr(run_tb_interventions, 'build_sim'):
