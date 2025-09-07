@@ -1,0 +1,105 @@
+============================================================
+TB STATE MACHINE AGENT TRACKING REPORT
+============================================================
+
+Total Agents Tracked: 100
+Total Transitions Recorded: 23
+
+STATE PROGRESSION STATISTICS:
+----------------------------------------
+
+Latent Slow:
+  Total Entries: 11
+  Total Exits: 3
+  Average Duration: 61.15 days
+  Min Duration: 33.12 days
+  Max Duration: 93.80 days
+
+Latent Fast:
+  Total Entries: 3
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Active Pre-symptomatic:
+  Total Entries: 3
+  Total Exits: 3
+  Average Duration: 49.63 days
+  Min Duration: 0.68 days
+  Max Duration: 122.85 days
+
+Active Smear Positive:
+  Total Entries: 1
+  Total Exits: 1
+  Average Duration: 1052.67 days
+  Min Duration: 1052.67 days
+  Max Duration: 1052.67 days
+
+Active Smear Negative:
+  Total Entries: 2
+  Total Exits: 2
+  Average Duration: 1245.83 days
+  Min Duration: 377.36 days
+  Max Duration: 2114.30 days
+
+Active Extra-pulmonary:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Clear:
+  Total Entries: 103
+  Total Exits: 14
+  Average Duration: 362.85 days
+  Min Duration: 1.48 days
+  Max Duration: 881.77 days
+
+Dead:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Protected:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+
+TRANSITION FLOW ANALYSIS:
+----------------------------------------
+
+Clear → Latent Slow:
+  Total Transitions: 11
+  Unique Agents: 11
+
+Clear → Latent Fast:
+  Total Transitions: 3
+  Unique Agents: 3
+
+Latent Slow → Active Pre-symptomatic:
+  Total Transitions: 3
+  Unique Agents: 3
+
+Active Pre-symptomatic → Active Smear Negative:
+  Total Transitions: 2
+  Unique Agents: 2
+
+Active Smear Negative → Clear:
+  Total Transitions: 2
+  Unique Agents: 2
+
+Active Pre-symptomatic → Active Smear Positive:
+  Total Transitions: 1
+  Unique Agents: 1
+
+Active Smear Positive → Clear:
+  Total Transitions: 1
+  Unique Agents: 1
+
+
+AGENT-SPECIFIC STATISTICS:
+----------------------------------------
+Average Transitions per Agent: 0.23
+Max Transitions by Single Agent: 4
+Min Transitions by Single Agent: 0
+
+============================================================

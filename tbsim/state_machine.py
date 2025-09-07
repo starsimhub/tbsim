@@ -609,6 +609,17 @@ class TBStateManager:
     def __init__(self):
         self.state_machine = TBStateMachine()
         self.logger = logging.getLogger(f"{__name__}.TBStateManager")
+        
+        # Agent tracking data structures
+        self.agent_histories = {}  # uid -> list of (time, state_id, state_name, transition_reason)
+        self.transition_log = []   # list of (time, uid, from_state, to_state, rate, reason)
+        self.state_durations = {}  # uid -> dict of state_id -> total_duration
+        self.current_time = 0
+        
+        # Backup data structures to preserve data
+        self._backup_agent_histories = {}
+        self._backup_transition_log = []
+        self._backup_state_durations = {}
     
     def initialize_states(self, module: Any):
         """Initialize state machine with TB module."""
@@ -627,12 +638,23 @@ class TBStateManager:
         """
         sim = module.sim
         ti = sim.ti
+        self.current_time = ti  # Use time index instead of Timeline object
+        
+        # Debug output
+        if hasattr(self, 'logger'):
+            self.logger.debug(f"Processing time step {ti}, current_time: {self.current_time}")
         
         # Get all living individuals
         living_uids = module.sim.people.auids
         
+        # Initialize tracking for new agents
+        self._initialize_agent_tracking(living_uids, module)
+        
         # Process all state transitions
         transitions_made = self.state_machine.process_transitions(living_uids, sim, module)
+        
+        # Backup data to preserve it
+        self._backup_data()
         
         # Apply state transitions
         results = {
@@ -651,12 +673,16 @@ class TBStateManager:
             # Get target state object
             target_state = self.state_machine.get_state(target_state_id)
             
-            # Call exit actions for current states
+            # Call exit actions for current states and track transitions
             current_states = module.state[transitioning_uids]
             for current_state_id in np.unique(current_states):
                 current_state = self.state_machine.get_state(current_state_id)
                 current_uids = transitioning_uids[current_states == current_state_id]
                 current_state.on_exit(current_uids, sim, module)
+                
+                # Track the transition for each agent
+                self._track_transitions(current_uids, current_state_id, target_state_id, 
+                                      current_state, target_state, sim, module)
             
             # Update state
             module.state[transitioning_uids] = target_state_id
@@ -726,3 +752,153 @@ class TBStateManager:
                     key = (state_obj.name, transition.target_state.name)
                     matrix[key] = transition.rate.rate
         return matrix
+    
+    def _initialize_agent_tracking(self, uids: np.ndarray, module: Any):
+        """Initialize tracking for agents that don't have history yet."""
+        new_agents = 0
+        for uid in uids:
+            if uid not in self.agent_histories:
+                self.agent_histories[uid] = []
+                self.state_durations[uid] = {}
+                
+                # Record initial state
+                initial_state_id = module.state[uid]
+                initial_state = self.state_machine.get_state(initial_state_id)
+                self.agent_histories[uid].append((
+                    self.current_time, 
+                    initial_state_id, 
+                    initial_state.name, 
+                    'initial'
+                ))
+                self.state_durations[uid][initial_state_id] = 0
+                new_agents += 1
+        
+        # Debug output
+        if hasattr(self, 'logger') and new_agents > 0:
+            self.logger.debug(f"Initialized tracking for {new_agents} new agents")
+    
+    def _track_transitions(self, uids: np.ndarray, from_state_id: int, to_state_id: int,
+                          from_state: 'TBState', to_state: 'TBState', sim: Any, module: Any):
+        """Track state transitions for agents."""
+        for uid in uids:
+            # Update duration in previous state
+            if from_state_id in self.state_durations[uid]:
+                self.state_durations[uid][from_state_id] += 1  # Assuming 1 time unit per step
+            
+            # Record the transition
+            transition_reason = f"{from_state.name} -> {to_state.name}"
+            self.agent_histories[uid].append((
+                self.current_time,
+                to_state_id,
+                to_state.name,
+                transition_reason
+            ))
+            
+            # Log the transition
+            self.transition_log.append((
+                self.current_time,
+                uid,
+                from_state_id,
+                to_state_id,
+                from_state.name,
+                to_state.name,
+                transition_reason
+            ))
+            
+            # Initialize duration tracking for new state
+            if to_state_id not in self.state_durations[uid]:
+                self.state_durations[uid][to_state_id] = 0
+    
+    def get_agent_history(self, uid: int) -> List[Tuple[float, int, str, str]]:
+        """Get complete state history for a specific agent."""
+        return self.agent_histories.get(uid, [])
+    
+    def get_agent_state_durations(self, uid: int) -> Dict[int, float]:
+        """Get time spent in each state for a specific agent."""
+        return self.state_durations.get(uid, {})
+    
+    def _backup_data(self):
+        """Backup current data to preserve it."""
+        import copy
+        self._backup_agent_histories = copy.deepcopy(self.agent_histories)
+        self._backup_transition_log = copy.deepcopy(self.transition_log)
+        self._backup_state_durations = copy.deepcopy(self.state_durations)
+    
+    def get_all_agent_histories(self) -> Dict[int, List[Tuple[float, int, str, str]]]:
+        """Get state histories for all agents."""
+        # Return backup data if main data is empty
+        if len(self.agent_histories) == 0 and len(self._backup_agent_histories) > 0:
+            return self._backup_agent_histories.copy()
+        return self.agent_histories.copy()
+    
+    def get_transition_log(self) -> List[Tuple[float, int, int, int, str, str, str]]:
+        """Get complete log of all transitions."""
+        # Return backup data if main data is empty
+        if len(self.transition_log) == 0 and len(self._backup_transition_log) > 0:
+            return self._backup_transition_log.copy()
+        return self.transition_log.copy()
+    
+    def get_state_progression_stats(self) -> Dict[str, Dict[str, Any]]:
+        """Get statistics about state progressions and durations."""
+        stats = {}
+        
+        for state_id, state_obj in self.state_machine.states.items():
+            state_name = state_obj.name
+            stats[state_name] = {
+                'total_entries': 0,
+                'total_exits': 0,
+                'avg_duration': 0,
+                'durations': [],
+                'entry_times': [],
+                'exit_times': []
+            }
+        
+        # Analyze all agent histories
+        for uid, history in self.agent_histories.items():
+            for i, (time, state_id, state_name, reason) in enumerate(history):
+                stats[state_name]['total_entries'] += 1
+                stats[state_name]['entry_times'].append(time)
+                
+                # Calculate duration if this is not the last entry
+                if i < len(history) - 1:
+                    next_time = history[i + 1][0]
+                    duration = next_time - time
+                    stats[state_name]['durations'].append(duration)
+                    stats[state_name]['total_exits'] += 1
+                    stats[state_name]['exit_times'].append(next_time)
+        
+        # Calculate average durations
+        for state_name, state_stats in stats.items():
+            if state_stats['durations']:
+                state_stats['avg_duration'] = np.mean(state_stats['durations'])
+            else:
+                state_stats['avg_duration'] = 0
+        
+        return stats
+    
+    def get_transition_flow_analysis(self) -> Dict[Tuple[str, str], Dict[str, Any]]:
+        """Analyze transition flows between states."""
+        flow_stats = {}
+        
+        # Count transitions between states
+        for _, uid, from_state_id, to_state_id, from_name, to_name, reason in self.transition_log:
+            key = (from_name, to_name)
+            if key not in flow_stats:
+                flow_stats[key] = {
+                    'count': 0,
+                    'agents': set(),
+                    'times': [],
+                    'reasons': []
+                }
+            
+            flow_stats[key]['count'] += 1
+            flow_stats[key]['agents'].add(uid)
+            flow_stats[key]['times'].append(self.current_time)
+            flow_stats[key]['reasons'].append(reason)
+        
+        # Convert sets to counts for serialization
+        for key in flow_stats:
+            flow_stats[key]['unique_agents'] = len(flow_stats[key]['agents'])
+            del flow_stats[key]['agents']  # Remove set for JSON serialization
+        
+        return flow_stats

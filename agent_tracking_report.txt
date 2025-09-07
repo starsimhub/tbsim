@@ -1,0 +1,60 @@
+============================================================
+TB STATE MACHINE AGENT TRACKING REPORT
+============================================================
+
+Total Agents Tracked: 0
+Total Transitions Recorded: 0
+
+STATE PROGRESSION STATISTICS:
+----------------------------------------
+
+Latent Slow:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Latent Fast:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Active Pre-symptomatic:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Active Smear Positive:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Active Smear Negative:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Active Extra-pulmonary:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Clear:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Dead:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+Protected:
+  Total Entries: 0
+  Total Exits: 0
+  Average Duration: 0.00 days
+
+
+AGENT-SPECIFIC STATISTICS:
+----------------------------------------
+
+============================================================

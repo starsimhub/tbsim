@@ -52,10 +52,18 @@ class TBWithStateMachine(TB):
             use_state_machine: Whether to use the state machine for transitions
             **kwargs: Additional keyword arguments for parameters
         """
-        super().__init__(pars, **kwargs)
+        # Initialize the base TB class first
+        super().__init__()
         
+        # Set the use_state_machine flag before any other operations
         self.use_state_machine = use_state_machine
         self.state_manager: Optional[TBStateManager] = None
+        
+        # Update parameters with any provided values
+        if pars is not None:
+            self.update_pars(pars)
+        if kwargs:
+            self.update_pars(kwargs)
         
         if self.use_state_machine:
             self.state_manager = TBStateManager()
@@ -92,8 +100,12 @@ class TBWithStateMachine(TB):
         """
         if not self.use_state_machine:
             # Use original implementation
-            super().step()
+            self._step_original()
             return
+        
+        # Debug output
+        if hasattr(self, 'logger'):
+            self.logger.debug(f"TBWithStateMachine.step() called, ti: {self.ti}")
         
         # Use state machine for all transitions (this replaces the original transition logic)
         # First, handle SIR model updates (infection, demographics, etc.)
@@ -107,11 +119,19 @@ class TBWithStateMachine(TB):
         # Call the parent class (ss.Infection) step method to handle SIR updates
         # but skip the TB-specific transitions that are in the TB class
         super(TB, self).step()
+        
+        # Handle TB-specific infection setup for new infections
+        # This ensures that new infections are properly assigned to TB states
+        new_infected_uids = self.sim.people.auids[self.infected & (self.ti_infected == self.ti)]
+        if len(new_infected_uids) > 0:
+            self.set_prognoses(new_infected_uids)
     
     def _step_original(self):
         """Original step implementation for backward compatibility."""
-        # This is the original step() method from the TB class
-        # Included here for reference and fallback functionality
+        # First call the SIR model updates (infections, demographics, etc.)
+        super(TB, self).step()
+        
+        # Then handle TB-specific transitions (this is the original TB step logic)
         p = self.pars
         ti = self.ti
 
@@ -204,6 +224,10 @@ class TBWithStateMachine(TB):
         if self.state_manager is None:
             raise RuntimeError("State manager not initialized")
         
+        # Debug output
+        if hasattr(self, 'logger'):
+            self.logger.debug(f"_step_with_state_machine called, ti: {self.ti}")
+        
         # Process all state transitions using the state machine
         transition_results = self.state_manager.process_time_step(self)
         
@@ -216,7 +240,7 @@ class TBWithStateMachine(TB):
         
         # Log transition statistics
         if hasattr(self, 'logger'):
-            self.logger.debug(f"Time step {ti}: {transition_results['transitions_by_state']}")
+            self.logger.debug(f"Time step {ti}: {transition_results.get('transitions_by_state', 'No transitions')}")
     
     def _update_transmission_rates_original(self):
         """Original transmission rate update method."""
