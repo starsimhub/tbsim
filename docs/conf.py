@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath('..'))
 project = 'TBsim'
 copyright = '2024, IDM, Burnet Institute, and Collaborators'
 author = 'Daniel Klein, Minerva Enriquez, Stewart Chang, Deven Gokhale, Mike Famulare'
-release = '0.1.0'
+release = '0.5.0'
 
 extensions = [
     'sphinx.ext.autodoc',
