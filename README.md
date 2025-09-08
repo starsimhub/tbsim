@@ -40,7 +40,7 @@ Available tutorials:
 
 #### Prerequisites
 
-- Python 3.x
+- Python 3.11 or higher
 - Starsim package
 - Other dependencies (listed in `requirements.txt`)
 

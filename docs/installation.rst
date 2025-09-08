@@ -6,7 +6,7 @@ This guide covers different ways to install and set up TBsim for your tuberculos
 Prerequisites
 ------------
 
-- Python 3.8 or higher
+- Python 3.11 or higher
 - pip package manager
 - Git (for development installation)
 
