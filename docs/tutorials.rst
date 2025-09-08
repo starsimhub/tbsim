@@ -10,7 +10,7 @@ Getting Started
    :maxdepth: 2
    :caption: Beginner Tutorials:
 
-   tutorials/example_tutorial
+   tutorials/basic_tbrun
    tutorials/tuberculosis_sim.ipynb
 
 Core Modeling
@@ -36,7 +36,7 @@ Advanced Topics
 Tutorial Descriptions
 --------------------
 
-**example_tutorial.rst**
+**basic_tbrun.rst**
    Basic introduction to TBsim concepts and workflow
 
 **tuberculosis_sim.ipynb**
