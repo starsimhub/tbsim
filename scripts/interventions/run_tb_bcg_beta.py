@@ -127,8 +127,7 @@ def build_sim(scenario=None, spars=None):
     
     networks = [
         ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
-        mtb.HouseholdNet(),
-        mtb.HouseholdNetGeneric(hhs=households, pars={'add_newborns': True})
+        mtb.HouseholdNet(hhs=households, pars={'add_newborns': True})
     ]
     
     # Create and return simulation
@@ -177,11 +176,11 @@ def get_scenarios():
                 stop=ss.date('2020-12-31'),
             ),
         },
-        # 'Baseline and BetaByYear': {
-        #     'name': 'No interventions',
-        #     'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
-        #     'betabyyear':dict(years=[1990, 2000], x_beta=[0.5, 1.4])
-        # },
+        'Baseline and BetaByYear': {
+            'name': 'No interventions',
+            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
+            'betabyyear':dict(years=[1990, 2000], x_beta=[0.5, 1.4])
+        },
         'Single BCG': {
             'name': 'Single BCG intervention',
             'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
@@ -192,25 +191,24 @@ def get_scenarios():
                 age_range=[1, 5],
             ),
         },
-        
-        # 'Multiple BCG': {
-        #     'name': 'Multiple BCG interventions',
-        #     'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
-        #     'bcgintervention': [
-        #         dict(
-        #             coverage=0.9,
-        #             start=ss.date('1980-01-01'),
-        #             stop=ss.date('2020-12-31'),
-        #             age_range=[0, 2],           # For children
-        #         ),
-        #         dict(
-        #             coverage=0.3,
-        #             start=ss.date('1985-01-01'),
-        #             stop=ss.date('2015-12-31'),
-        #             age_range=[25, 40],         # For adults
-        #         ),
-        #     ],
-        # },
+        'Multiple BCG': {
+            'name': 'Multiple BCG interventions',
+            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
+            'bcgintervention': [
+                dict(
+                    coverage=0.9,
+                    start=ss.date('1980-01-01'),
+                    stop=ss.date('2020-12-31'),
+                    age_range=[0, 2],           # For children
+                ),
+                dict(
+                    coverage=0.3,
+                    start=ss.date('1985-01-01'),
+                    stop=ss.date('2015-12-31'),
+                    age_range=[25, 40],         # For adults
+                ),
+            ],
+        },
     }
 
 def run_scenarios(plot=True):
@@ -229,7 +227,6 @@ def run_scenarios(plot=True):
     if plot:
         pl.plot_combined(results, 
                         heightfold=2, outdir='results/interventions')
-                        
                         # filter=mtb.FILTERS.important_metrics)
         plt.show()
     

@@ -220,14 +220,14 @@ class BCGProtection(ss.Intervention):
         else:
             now_date = now
             
-        # Convert start and stop dates to datetime.date for comparison
-        start_date = self.pars.start.date() if hasattr(self.pars.start, 'date') else self.pars.start
-        stop_date = self.pars.stop.date() if hasattr(self.pars.stop, 'date') else self.pars.stop
-            
-        # Debug temporal eligibility
-        if self.ti % 5 == 0:  # Every 5 timesteps
-            logger.info(f"Temporal Eligibility Check - timestep {self.ti}: now_date={now_date}, start={start_date}, stop={stop_date}, within_window={start_date <= now_date <= stop_date}")
-            
+        # validate if start and stop are dates, otherwise throw an error
+        assert isinstance(self.pars.start, ss.date), "ERROR: BCG Intervention's 'start' parameter value must be a ss.date object"
+        assert isinstance(self.pars.stop, ss.date), "ERROR: BCG Intervention's 'stop' parameter value must be a ss.date object"
+        
+        start_date = self.pars.start.date()
+        stop_date = self.pars.stop.date()
+        
+
         if now_date < start_date or now_date > stop_date:
             if self.ti % 10 == 0:  # Log less frequently for skipped timesteps
                 logger.info(f"BCG intervention skipped - outside time window: {now_date} not in [{start_date}, {stop_date}]")
