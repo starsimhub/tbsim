@@ -68,10 +68,10 @@ The steps described below will allow you to use the latest unreleased features o
 
 ### Running a sample simulation
 
-1. Navigate to the directory **_scripts_**
+1. Navigate to the directory **_scripts/basic_**
 2. Run the script:
    ```bash
-   python run_tb.py
+   python run_tb_sample.py
    ```
 3. running this script should result in basic charts being displayed.
 
