@@ -486,14 +486,14 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
     
     # Load demographic data
     possible_cbr_paths = [
-        '../data/Vietnam_CBR.csv',
-        'tbsim/data/Vietnam_CBR.csv',
-        'data/Vietnam_CBR.csv',
+        '../data/South_Africa_CBR.csv',
+        'tbsim/data/South_Africa_CBR.csv',
+        'data/South_Africa_CBR.csv',
     ]
     possible_asmr_paths = [
-        '../data/Vietnam_ASMR.csv',
-        'tbsim/data/Vietnam_ASMR.csv',
-        'data/Vietnam_ASMR.csv',
+        '../data/South_Africa_ASMR.csv',
+        'tbsim/data/South_Africa_ASMR.csv',
+        'data/South_Africa_ASMR.csv',
     ]
     
     cbr_path = None
@@ -502,7 +502,7 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
             cbr_path = path
             break
     if cbr_path is None:
-        raise FileNotFoundError(f"Could not find Vietnam_CBR.csv in any of the expected locations")
+        raise FileNotFoundError(f"Could not find South_Africa_CBR.csv in any of the expected locations")
     
     asmr_path = None
     for path in possible_asmr_paths:
@@ -510,7 +510,7 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
             asmr_path = path
             break
     if asmr_path is None:
-        raise FileNotFoundError(f"Could not find Vietnam_ASMR.csv in any of the expected locations")
+        raise FileNotFoundError(f"Could not find South_Africa_ASMR.csv in any of the expected locations")
     
     cbr = pd.read_csv(cbr_path)
     asmr = pd.read_csv(asmr_path)
