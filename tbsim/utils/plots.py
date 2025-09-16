@@ -10,7 +10,8 @@ import sys
 
 def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
                  dark=True, cmap='tab20', heightfold=2, 
-                 style='default', savefig=True, outdir=None, metric_filter=None, title=''):
+                 style='default', savefig=True, outdir=None, metric_filter=None, title='',
+                 shared_legend=True, legend_position='upper right'):
     """
     Visualize simulation outputs from multiple scenarios in a structured grid layout.
 
@@ -34,6 +35,8 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
         savefig (bool, optional): If True (default), saves the figure as a PNG file with a timestamped filename.
         outdir (str, optional): Directory to save the figure. If None, saves in the current script's directory under 'results'.
         metric_filter (list[str], optional): List of metric names to plot. If provided, only these metrics will be plotted.
+        shared_legend (bool, optional): If True, creates a single shared legend for all subplots. Default is True.
+        legend_position (str, optional): Position for the shared legend. Options: 'upper right', 'upper left', 'lower right', 'lower left', 'center', etc. Default is 'upper right'.
     
     Returns:
         None: The figure is displayed and also saved as a PNG with a timestamped filename.
@@ -147,12 +150,36 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
 
         # grid lines
         ax.grid(True, color='white' if dark else 'gray', alpha=0.3)
-        leg = ax.legend(fontsize=6 if len(flat_results)>5 else 7)
-        if leg: leg.get_frame().set_alpha(0.3)
+        
+        # Only add individual legends if shared_legend is False
+        if not shared_legend:
+            leg = ax.legend(fontsize=6 if len(flat_results)>5 else 7)
+            if leg: leg.get_frame().set_alpha(0.3)
 
     # remove unused axes
     for ax in axs[len(metrics):]:
         fig.delaxes(ax)
+
+    # Create shared legend if requested
+    if shared_legend:
+        # Get handles and labels from the first subplot that has data
+        handles, labels = None, None
+        for ax in axs[:len(metrics)]:
+            if ax.get_legend_handles_labels()[0]:  # Check if there are handles
+                handles, labels = ax.get_legend_handles_labels()
+                break
+        
+        if handles and labels:
+            # Create shared legend
+            fig.legend(handles, labels, loc=legend_position, fontsize=6 if len(flat_results)>5 else 7, 
+                      frameon=True, fancybox=True, shadow=True)
+            # Style the shared legend
+            legend = fig.legends[-1]
+            legend.get_frame().set_alpha(0.9)
+            legend.get_frame().set_facecolor('#f0f0f0')
+            legend.get_frame().set_edgecolor('#888')
+            for text in legend.get_texts():
+                text.set_color('#222')
 
     if title:
         fig.suptitle(title, fontsize=12, color='white' if dark else 'black')
@@ -169,9 +196,10 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
 def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
                  dark=True, cmap='plasma', heightfold=2, 
                  style='default', savefig=True, outdir=None, plot_type='line',
-                 marker_styles=None, alpha=0.85, grid_alpha=0.4, title_fontsize=10, legend_fontsize=6, 
+                 marker_styles=None, alpha=0.85, grid_alpha=0.4, title_fontsize=10, legend_fontsize=7, 
                  line_width=0.3, marker_size=2, markeredgewidth=0.2, grid_linewidth=0.5, 
-                 spine_linewidth=0.5, label_fontsize=6, tick_fontsize=6, filter=None, title=''):
+                 spine_linewidth=0.5, label_fontsize=6, tick_fontsize=6, filter=None, title='',
+                 shared_legend=True, legend_position='auto'):
     """
     Visualize simulation outputs from multiple scenarios in a structured grid layout.
 
@@ -207,6 +235,8 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
         spine_linewidth (float, optional): Axis spine line width. Default is 0.5.
         label_fontsize (int, optional): Font size for axis labels. Default is 9.
         tick_fontsize (int, optional): Font size for axis tick labels. Default is 5.
+        shared_legend (bool, optional): If True, creates a single shared legend for all subplots. Default is True.
+        legend_position (str, optional): Position for the shared legend. Options: 'upper right', 'upper left', 'lower right', 'lower left', 'center', etc. Default is 'upper right'.
     
     Returns:
         None: The figure is displayed and also saved as a PNG with a timestamped filename.
@@ -366,16 +396,46 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
         ax.grid(True, color='white' if dark else 'gray', alpha=grid_alpha, linestyle='--', linewidth=grid_linewidth)
         # Set consistent X-axis range for all plots
         ax.set_xlim(all_x_min, all_x_max)
-        leg = ax.legend(fontsize=legend_fontsize, frameon=True, loc='best')
-        if leg: 
-            leg.get_frame().set_alpha(0.7)
-            leg.get_frame().set_facecolor('#eee')
-            for text in leg.get_texts():
-                text.set_color('#222')
+        
+        # Only add individual legends if shared_legend is False
+        if not shared_legend:
+            leg = ax.legend(fontsize=legend_fontsize, frameon=True, loc='best')
+            if leg: 
+                leg.get_frame().set_alpha(0.7)
+                leg.get_frame().set_facecolor('#eee')
+                for text in leg.get_texts():
+                    text.set_color('#222')
 
     # remove unused axes
     for ax in axs[len(metrics):]:
         fig.delaxes(ax)
+
+    # Create shared legend if requested
+    if shared_legend:
+        # Collect all unique handles and labels from all subplots to get maximum coverage
+        all_handles = []
+        all_labels = []
+        seen_labels = set()
+        
+        for ax in axs[:len(metrics)]:
+            handles, labels = ax.get_legend_handles_labels()
+            for handle, label in zip(handles, labels):
+                if label not in seen_labels:
+                    all_handles.append(handle)
+                    all_labels.append(label)
+                    seen_labels.add(label)
+        
+        if all_handles and all_labels:
+            # Create shared legend with all unique entries
+            fig.legend(all_handles, all_labels, loc=legend_position, fontsize=legend_fontsize, 
+                      frameon=True, fancybox=True, shadow=True)
+            # Style the shared legend
+            legend = fig.legends[-1]
+            legend.get_frame().set_alpha(0.9)
+            legend.get_frame().set_facecolor('#f0f0f0')
+            legend.get_frame().set_edgecolor('#888')
+            for text in legend.get_texts():
+                text.set_color('#222')
 
     if title:
         fig.suptitle(title, fontsize=12, color='white' if dark else 'black')
