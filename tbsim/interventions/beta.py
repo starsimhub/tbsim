@@ -89,8 +89,10 @@ class BetaByYear(ss.Intervention):
         if len(self.pars.years)>0:
             target_year = self.pars.years[0]
             x_beta = self._x_beta_list[0]
-            if (year >= target_year) and (year < target_year + self.t.dt_year):
-                #print(f"NEW BETA: At year:{year}, Value:{x_beta}")
+            
+            # Apply intervention only when we first reach the target year
+            # This ensures it's applied only once, not repeatedly
+            if year == target_year:
                 self.sim.diseases.tb.pars['beta'] *= x_beta
                 print(f"At year:{year}, Modified BetaValue:{x_beta}")
                 # Always remove the year and x_beta after application
