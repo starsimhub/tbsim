@@ -76,7 +76,7 @@ def test_beta_intervention_changes_beta():
     stop_year = 2010
     
     tb_pars = dict(beta=initial_beta, init_prev=0.25)
-    sim_pars = dict(start=intervention_year-1, stop=stop_year, dt=ss.days(1), rand_seed=42)
+    sim_pars = dict(start=f'{intervention_year-1}-01-01', stop=f'{stop_year}-01-01', dt=ss.days(1), rand_seed=42)
     
     pop = ss.People(n_agents=100)
     tb = mtb.TB(pars=tb_pars)

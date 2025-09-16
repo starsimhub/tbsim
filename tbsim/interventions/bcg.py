@@ -110,7 +110,7 @@ class BCGProtection(ss.Intervention):
             start=ss.date('1900-01-01'),
             stop=ss.date('2100-12-31'),
             efficacy=0.8,  # Default 80% efficacy
-            immunity_period=ss.years(10),  # Default 10 years
+            immunity_period=10,  # Default 10 years (will be converted to timesteps in init_pre)
             age_range=[0, 5],
             # Default modifiers
             activation_modifier=ss.uniform(0.5, 0.65),  # Reduces activation risk
@@ -138,6 +138,14 @@ class BCGProtection(ss.Intervention):
     def init_pre(self, sim):
         """Initialize the intervention before the simulation starts."""
         super().init_pre(sim)
+        # Convert immunity_period from years to timesteps
+        if hasattr(self.pars.immunity_period, 'value'):
+            # If it's already a starsim time object, convert it
+            self.pars.immunity_period = self.pars.immunity_period.value
+        # Convert years to timesteps using the simulation's timestep
+        years = self.pars.immunity_period
+        timesteps_per_year = 365.25 / sim.dt.value  # Assuming dt is in days
+        self.pars.immunity_period = years * timesteps_per_year
         # The probability objects will be automatically initialized by ss.link_dists()
         # which is called in the parent init_pre method
         return

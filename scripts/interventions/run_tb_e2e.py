@@ -549,48 +549,48 @@ def get_scenarios():
         # =============================================================================
         # These scenarios combine multiple types of interventions
         
-        # 'End-to-End with BCG': {
-        #     'name': 'Complete TB care cascade plus BCG vaccination',
-        #     'description': 'This scenario combines the complete TB care cascade with BCG vaccination. '
-        #                    'BCG provides partial protection against TB, especially in children, '
-        #                    'and works synergistically with the care cascade interventions.',
-        #     'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
+        'End-to-End with BCG': {
+            'name': 'Complete TB care cascade plus BCG vaccination',
+            'description': 'This scenario combines the complete TB care cascade with BCG vaccination. '
+                           'BCG provides partial protection against TB, especially in children, '
+                           'and works synergistically with the care cascade interventions.',
+            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
             
-        #     # BCG vaccination (currently commented out but available for testing)
-        #     'bcgintervention': dict(
-        #         coverage=0.80,                          # 80% BCG vaccination coverage
-        #         start=ss.date('1975-01-01'),           # BCG starts early (before other interventions)
-        #         stop=ss.date('1980-12-31'),            # BCG ends before care cascade begins
-        #         age_range=[0, 2],                      # Early childhood vaccination (0-2 years)
-        #     ),
-        #     # Standard care cascade parameters (same as End-to-End TB Care Cascade)
-        #     'healthseeking': dict(
-        #         initial_care_seeking_rate=ss.perday(0.15),
-        #         start=ss.date('1980-01-01'),
-        #         stop=ss.date('2030-12-31'),
-        #     ),
-        #     'diagnostic': dict(
-        #         coverage=0.85,
-        #         sensitivity=0.80,
-        #         specificity=0.95,
-        #         start=ss.date('1980-01-01'),
-        #         stop=ss.date('2030-12-31'),
-        #     ),
-        #     'treatment': dict(
-        #         treatment_success_rate=0.85,  # Slightly higher than standard (85% vs 60%)
-        #         start=ss.date('1980-01-01'),
-        #         stop=ss.date('2030-12-31'),
-        #     ),
-        #     'tptintervention': dict(
-        #         p_tpt=0.75,
-        #         age_range=[0, 100],  # All ages eligible (vs 1-100 in standard)
-        #         hiv_status_threshold=False,
-        #         tpt_treatment_duration=ss.peryear(0.25),
-        #         tpt_protection_duration=ss.peryear(2.0),
-        #         start=ss.date('1980-01-01'),
-        #         stop=ss.date('2030-12-31'),
-        #     ),
-        # },
+            # BCG vaccination (currently commented out but available for testing)
+            'bcgintervention': dict(
+                coverage=0.50,                          # 80% BCG vaccination coverage
+                start=ss.date('1975-01-01'),           # BCG starts early (before other interventions)
+                stop=ss.date('2030-12-31'),            # BCG ends before care cascade begins
+                age_range=[0, 5],                      # Early childhood vaccination (0-2 years)
+            ),
+            # Standard care cascade parameters (same as End-to-End TB Care Cascade)
+            'healthseeking': dict(
+                initial_care_seeking_rate=ss.perday(0.15),
+                start=ss.date('1980-01-01'),
+                stop=ss.date('2030-12-31'),
+            ),
+            'diagnostic': dict(
+                coverage=0.85,
+                sensitivity=0.80,
+                specificity=0.95,
+                start=ss.date('1980-01-01'),
+                stop=ss.date('2030-12-31'),
+            ),
+            'treatment': dict(ß
+                treatment_success_rate=0.85,  # Slightly higher than standard (85% vs 60%)
+                start=ss.date('1980-01-01'),
+                stop=ss.date('2030-12-31'),
+            ),
+            'tptintervention': dict(
+                p_tpt=0.75,
+                age_range=[0, 100],  # All ages eligible (vs 1-100 in standard)
+                hiv_status_threshold=False,
+                tpt_treatment_duration=ss.peryear(0.25),
+                tpt_protection_duration=ss.peryear(2.0),
+                start=ss.date('1980-01-01'),
+                stop=ss.date('2030-12-31'),
+            ),
+        },
         'High Transmission + Interventions': {
             'name': 'High transmission with full intervention package',
             'description': 'This challenging scenario combines high TB transmission with comprehensive '

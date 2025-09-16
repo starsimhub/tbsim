@@ -87,7 +87,7 @@ def test_bcg_intervention_default_values():
     assert bcg.pars.start == ss.date('1900-01-01'), "Default start year should be 1900-01-01 with type ss.date"
     assert bcg.pars.stop == ss.date('2100-12-31'), "Default stop year should be 2100-12-31 with type ss.date"
     # Check that immunity_period is approximately 10 years (in timesteps)
-    assert abs(bcg.pars.immunity_period.value - 521.43) < 1.0, "Default immunity_period should be approximately 10 years"
+    assert abs(bcg.pars.immunity_period - 521.43) < 1.0, "Default immunity_period should be approximately 10 years"
     assert bcg.pars.age_range == [0, 5], "Default age range should be [0, 5]"
     assert bcg.min_age == 0, "Default min_age should be 0"
     assert bcg.max_age == 5, "Default max_age should be 5"
@@ -120,7 +120,7 @@ def test_bcg_intervention_custom_values():
     assert bcg.pars.start == ss.date('2000-01-01'), "Custom start year should be 2000-01-01 with type ss.date"
     assert bcg.pars.stop == ss.date('2015-01-01'), "Custom stop year should be 2015-01-01 with type ss.date"
     # Check that immunity_period is approximately 15 years (in timesteps)
-    assert abs(bcg.pars.immunity_period.value - 782.14) < 1.0, "Custom immunity_period should be approximately 15 years"
+    assert abs(bcg.pars.immunity_period - 782.14) < 1.0, "Custom immunity_period should be approximately 15 years"
     assert bcg.pars.age_range == (1, 10), "Custom age range should be (1, 10)"
     assert bcg.min_age == 1, "Custom min_age should be 1"
     assert bcg.max_age == 10, "Custom max_age should be 10"
@@ -227,9 +227,18 @@ def test_bcg_improves_tb_outcomes():
     bcg.step()
     
     # Check if TB outcomes have improved
-    assert np.any(tb.rr_activation < initial_rr_activation), "BCG should reduce activation risk"
-    assert np.any(tb.rr_clearance > initial_rr_clearance), "BCG should improve clearance rate"
-    assert np.any(tb.rr_death < initial_rr_death), "BCG should reduce death risk"
+    # Convert to numpy arrays to avoid starsim array comparison bug
+    current_activation = np.array(tb.rr_activation)
+    current_clearance = np.array(tb.rr_clearance)
+    current_death = np.array(tb.rr_death)
+    
+    initial_activation = np.array(initial_rr_activation)
+    initial_clearance = np.array(initial_rr_clearance)
+    initial_death = np.array(initial_rr_death)
+    
+    assert np.any(current_activation < initial_activation), "BCG should reduce activation risk"
+    assert np.any(current_clearance > initial_clearance), "BCG should improve clearance rate"
+    assert np.any(current_death < initial_death), "BCG should reduce death risk"
 
 def test_bcg_age_at_vaccination_recording():
     """Test that age at vaccination is properly recorded"""
@@ -265,7 +274,7 @@ def test_bcg_protection_duration():
     bcg = sim.interventions['bcgprotection']
     
     # Test that immunity_period is set correctly (approximately 8 years in timesteps)
-    assert abs(bcg.pars.immunity_period.value - 417.14) < 1.0, "immunity_period should be set to approximately 8 years"
+    assert abs(bcg.pars.immunity_period - 417.14) < 1.0, "immunity_period should be set to approximately 8 years"
     
     # Simulate vaccination
     bcg.step()
@@ -323,7 +332,10 @@ def test_bcg_maintain_ongoing_protection():
     rr_activation_before = tb.rr_activation.copy()
     bcg._maintain_ongoing_protection(bcg.ti)
     # After maintenance, risk modifiers should not increase (protection persists)
-    assert np.all(tb.rr_activation <= rr_activation_before), "Ongoing protection should not increase activation risk"
+    # Convert to numpy arrays to avoid starsim array comparison bug
+    current_activation = np.array(tb.rr_activation)
+    before_activation = np.array(rr_activation_before)
+    assert np.all(current_activation <= before_activation), "Ongoing protection should not increase activation risk"
 
 
 def test_bcg_result_metrics():
