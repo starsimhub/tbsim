@@ -199,7 +199,7 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
                  marker_styles=None, alpha=0.85, grid_alpha=0.4, title_fontsize=10, legend_fontsize=7, 
                  line_width=0.3, marker_size=2, markeredgewidth=0.2, grid_linewidth=0.5, 
                  spine_linewidth=0.5, label_fontsize=6, tick_fontsize=6, filter=None, title='',
-                 shared_legend=True, legend_position='auto'):
+                 shared_legend=True, legend_position='upper left'):
     """
     Visualize simulation outputs from multiple scenarios in a structured grid layout.
 
