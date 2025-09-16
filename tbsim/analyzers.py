@@ -31,8 +31,8 @@ from tbsim import TB
 from tbsim.analyzers import DwtAnalyzer
 
 # Create simulation with analyzer
-sim = ss.Sim(diseases=[TB()])
-sim.add_analyzer(DwtAnalyzer(scenario_name="Baseline"))
+sim = ss.Sim(diseases=[TB()], analyzers=DwtAnalyzer(scenario_name="Baseline"))
+
 sim.run()
 
 # Access analyzer results
@@ -484,7 +484,7 @@ class DwtPlotter:
         - Interactive hover showing total time
         - Color-coded nodes and links
         - Professional styling and layout
-        - Time unit annotations
+        - Time annotations
         """
         
 
@@ -529,7 +529,7 @@ class DwtPlotter:
                 target=target_indices,
                 color=link_colors,
                 value=value,
-                hovertemplate='%{source.label} → %{target.label}: %{value} step_time_units<br>',
+                hovertemplate='%{source.label} → %{target.label}: %{value}<br>',  #TODO: Add time unit
                 line=dict(color="lightgray", width=0.1),
             )
         ))
@@ -643,7 +643,7 @@ class DwtPlotter:
 
         # Group by state transitions and dwell time category
         grouped = filtered_logger.groupby(
-            ['state_name', 'going_to_state', 'dwell_time_category']
+            ['state_name', 'going_to_state', 'dwell_time_category'], observed=True
         ).size().reset_index(name='count')
 
         # Filter out empty ranges
@@ -718,8 +718,8 @@ class DwtPlotter:
         # Calculate cumulative dwell time for each agent and state
         df['cumulative_dwell_time'] = df.groupby(['agent_id', 'state_name'])['dwell_time'].cumsum()
 
-        # Convert dwell time to suplied step_time_units
-        df['cumulative_dwell_time_units'] = df['cumulative_dwell_time']#/24
+        # Use cumulative dwell time directly
+        df['cumulative_dwell_time_units'] = df['cumulative_dwell_time']
 
         # Ensure column order matches color mapping
         state_colors, cmap = Utils.colors()
@@ -733,7 +733,7 @@ class DwtPlotter:
 
         # Plot the data
         # pivot_df.plot(kind='bar', stacked=True, figsize=(15, 7))
-        plt.title('Cumulative Time in step_time_units on Each State for All Agents')
+        plt.title('Cumulative Time on Each State for All Agents')
         plt.annotate('DwtPlotter.stacked_bars_states_per_agent_static()', xy=(0.5, -0.1), xycoords='axes fraction', ha='center', fontsize=12)
         plt.xlabel('Agent ID')
         plt.ylabel('Cumulative Time (step_time_units)')
@@ -1009,7 +1009,7 @@ class DwtPlotter:
             state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
 
             # Group by dwell time bins and going to state
-            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
+            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state'], observed=True).size().unstack(fill_value=0)
 
             for going_to_state in grouped.columns:
                 fig.add_trace(go.Bar(
@@ -1165,19 +1165,34 @@ class DwtPlotter:
         axes = axes.flatten()
         fig.suptitle(f'State Transitions by Dwell Time Bins)', fontsize=16)
         for ax, state in zip(axes, states):
-            state_data = self.data[self.data['state_name'] == state]
+            state_data = self.data[self.data['state_name'] == state].copy()
             state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
 
             # Group by dwell time bins and going to state
-            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
+            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state'], observed=True).size().unstack(fill_value=0)
+
+            # Check if there's any data to plot
+            if grouped.empty or grouped.shape[1] == 0:
+                ax.text(0.5, 0.5, f'No data for {state}', ha='center', va='center', transform=ax.transAxes)
+                ax.set_title(f'State: {state}')
+                continue
 
             # Ensure column order matches color mapping
             state_colors, cmap = Utils.colors()
             matching_colors = [state_colors[state] for state in grouped.columns if state in state_colors]
-            cmap = mcolors.ListedColormap(matching_colors)
+            if matching_colors:
+                cmap = mcolors.ListedColormap(matching_colors)
+            else:
+                cmap = 'tab10'  # fallback colormap
 
             # Plot stacked bar chart
-            grouped.plot(kind='bar', stacked=True, ax=ax, colormap=cmap) #'tab20')
+            try:
+                grouped.plot(kind='bar', stacked=True, ax=ax, colormap=cmap) #'tab20')
+            except TypeError as e:
+                # Handle case where there's no numeric data to plot
+                ax.text(0.5, 0.5, f'No numeric data for {state}', ha='center', va='center', transform=ax.transAxes)
+                ax.set_title(f'State: {state}')
+                continue
             ax.set_title(f'State: {state}')
             ax.set_xlabel('Dwell Time Bins')
             ax.set_ylabel('Count')
@@ -2386,37 +2401,30 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         from tbsim.analyzers import DwtAnalyzer
         
         # Create simulation with analyzer
-        sim = ss.Sim(diseases=[TB()])
-        sim.add_analyzer(DwtAnalyzer(scenario_name="Baseline"))
+        sim = ss.Sim(diseases=mtb.TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
         sim.run()
-        
         # Access analyzer results
         analyzer = sim.analyzers[0]
+        analyzer.sankey_agents()
         analyzer.plot_dwell_time_validation()
         analyzer.sankey_agents()
         ```
     
     Attributes:
         eSTATES (IntEnum): State enumeration system (e.g., TBS, TBSL)
-        adjust_to_unit (bool): Whether to adjust dwell times to specific units
-        unit (float): Time unit multiplier for dwell time adjustment
         scenario_name (str): Name of the simulation scenario
         data (pd.DataFrame): Collected dwell time data
         __latest_sts_df__ (pd.DataFrame): Internal state tracking
     """
     
-    def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=mtb.TBS, scenario_name=''):
+    def __init__(self, states_ennumerator=mtb.TBS, scenario_name=''):
         """
         Initialize the dwell time analyzer.
         
-        Sets up the analyzer to track dwell times during simulation execution,
-        with options for unit adjustment and state enumeration system selection.
+        Sets up the analyzer to track dwell times during simulation execution
+        with state enumeration system selection.
         
         Args:
-            adjust_to_unit (bool): If True, adjusts dwell times by multiplying by unit.
-                                 Default False
-            unit (float | ss.t): Time unit multiplier for dwell time adjustment.
-                               Default 1.0
             states_ennumerator (IntEnum): State enumeration class (e.g., TBS, TBSL).
                                         Default mtb.TBS
             scenario_name (str): Name for the simulation scenario. Default ''
@@ -2425,13 +2433,6 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             ```python
             # Basic analyzer
             analyzer = DwtAnalyzer()
-            
-            # Analyzer with unit adjustment
-            analyzer = DwtAnalyzer(
-                adjust_to_unit=True,
-                unit=24.0,  # Convert to days
-                scenario_name="Baseline_TB_Model"
-            )
             
             # Analyzer with custom state enumeration
             from tb_acf import TBSL
@@ -2446,8 +2447,6 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         """
         ss.Analyzer.__init__(self)
         self.eSTATES = states_ennumerator
-        self.adjust_to_unit = adjust_to_unit
-        self.unit = unit
         self.file_path = None
         self.scenario_name = scenario_name
         self.data = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state_id','going_to_state'])
@@ -2473,13 +2472,9 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             - Creates DataFrame with columns: agent_id, last_state, last_state_time
             - Initializes all agents to state -1 (default/susceptible)
             - Sets all entry times to 0 (simulation start)
-            - Handles unit configuration for time scaling
         """
         # Initialize the latest state dataframe
         # NOTE: This module assumes the default state is '-1'
-        if self.unit is None:
-            # In Starsim v3, unit parameter has been removed, use default of 1.0 (years)
-            self.unit = 1.0
         agent_ids = self.sim.people.auids.copy()
         population = len(agent_ids)
         new_logs = pd.DataFrame({
@@ -2514,8 +2509,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         Example:
         ```python
         # The step method is called automatically during simulation
-        sim = ss.Sim(diseases=[TB()])
-        sim.add_analyzer(DwtAnalyzer())
+        sim = ss.Sim(diseases=mtb.TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
         sim.run()  # step() is called internally at each time step
         ```
         """
@@ -2674,8 +2668,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         1. Record agents who never changed states (never infected)
         2. Detect and use appropriate state enumeration system
         3. Map state IDs to human-readable names
-        4. Apply unit adjustments if configured
-        5. Save results to CSV and metadata files
+        4. Save results to CSV and metadata files
         
         Mathematical Model:
             For agents who never changed states:
@@ -2728,25 +2721,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         self.data['state_name'] = self.data.apply(lambda row: f"{row['state']}.{row['state_name']}", axis=1 )        
         self.data['state_name'] = self.data['state_name'].replace('None', 'Susceptible')
         # self.data['compartment'] = 'tbd'
-        if self.adjust_to_unit:
-            self.data['dwell_time_raw'] = self.data['dwell_time']   # Save the original recorded values for comparison or later use
-            if isinstance(self.unit, (float, int)):
-                self.data['dwell_time'] = self.data['dwell_time'] * self.unit   
-            elif isinstance(self.unit, str):
-                # Convert time unit string to appropriate Starsim v3 time unit
-                if self.unit.lower() in ['day', 'days']:
-                    unit_rate = ss.day
-                elif self.unit.lower() in ['week', 'weeks']:
-                    unit_rate = ss.week
-                elif self.unit.lower() in ['month', 'months']:
-                    unit_rate = ss.month
-                elif self.unit.lower() in ['year', 'years']:
-                    unit_rate = ss.year
-                else:
-                    # Default to years if unit is not recognized
-                    unit_rate = ss.year
-                self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / unit_rate)
-                # self.data['dwell_time'] = self.data['dwell_time'].apply(lambda x: eval(f"{x} {self.unit}"))
+        
+        
         self.file_path = self.__save_to_file__()
         return
 
@@ -2999,9 +2975,7 @@ if __name__ == '__main__':
     if debug == 0:
         # # # Initialize the DwtAnalyzer
         import starsim as ss
-        sim = ss.Sim()
-        
-        sim.add_analyzer(DwtAnalyzer())
+        sim = ss.Sim(diseases=mtb.TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
         sim.run()
 
         # # # Initialize the DwtPostProcessor
