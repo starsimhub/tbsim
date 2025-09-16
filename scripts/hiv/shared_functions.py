@@ -37,6 +37,8 @@ def make_tb(include:bool=True, tb_pars=None):
             init_prev=ss.bernoulli(p=0.25),
             rel_sus_latentslow=0.1,             # 10% reduction in susceptibility to latent slow TB
         )
+    else:
+        pars = tb_pars
     return mtb.TB(pars=pars)
 
 # - - - - - - - MAKE TB-HIV CONNECTOR - - - - - -
