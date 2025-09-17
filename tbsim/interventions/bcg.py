@@ -16,81 +16,207 @@ class BCGProtection(ss.Intervention):
     
     This intervention identifies individuals within a configurable age range who have not yet been vaccinated. At each timestep, a proportion of these eligible individuals is selected based on the `coverage` parameter to receive simulated BCG protection. Once vaccinated, individuals are considered protected for a fixed number of years (`immunity_period`). While protected, their TB-related risk modifiers — activation, clearance, and death — are adjusted using scaled and sampled values from BCG-specific probability distributions.
 
-    PARAMETERS:
-        pars (`dict`, optional): Dictionary of parameters. Supported keys:
-        - `coverage` (`float`): Fraction of eligible individuals vaccinated per timestep (default: 0.5).
-        - `start` (`str`/`datetime.date`): Start date for the intervention (default: '1900-01-01').
-        - `stop` (`str`/`datetime.date`): Stop date for the intervention (default: '2100-12-31').
-        - `efficacy` (`float`): Probability of effective vaccine response (default: 0.8).
-        - `immunity_period` (`int`): Immunity period (in years) for which BCG protection remains effective (default: 10).
-        - `age_range` (`tuple`): Age range (`min_age`, `max_age`) for vaccination eligibility (default: (0, 5)).
-        - `activation_modifier` (`ss.uniform`): Distribution for TB activation risk modifier (default: `uniform(0.5, 0.65)`) - reduces activation risk.
-        - `clearance_modifier` (`ss.uniform`): Distribution for bacterial clearance modifier (default: `uniform(1.3, 1.5)`) - increases clearance probability.
-        - `death_modifier` (`ss.uniform`): Distribution for TB mortality modifier (default: `uniform(0.05, 0.15)`) - reduces mortality risk (lower values = better protection).
+    ## USE CASES
 
-    USAGE EXAMPLES:
-        ```python
-        # Basic usage with default parameters (targets individuals 0-5 years)
-        bcg = BCGProtection()
-        
-        # Custom parameters using dictionary (targets individuals 1-7 years)
-        bcg = BCGProtection(pars={
-            'coverage': 0.8,
-            'start': '2020-01-01',
-            'stop': '2030-12-31',
-            'efficacy': 0.9,
-            'immunity_period': 15,
-            'age_range': (1, 7)
-        })
-        
-        # Adult vaccination example (targets individuals 18-65 years)
-        bcg = BCGProtection(pars={
-            'age_range': (18, 65),
-            'coverage': 0.4,
-            'efficacy': 0.7,
-            'immunity_period': 8
-        })
-        
-        # Custom probability distributions
-        bcg = BCGProtection(pars={
-            'activation_modifier': ss.uniform(0.4, 0.6),
-            'clearance_modifier': ss.uniform(1.2, 1.6),
-            'death_modifier': ss.uniform(0.03, 0.12)
-        })
-        ```
+    ### 1. Pediatric BCG Vaccination Programs
+    - **Newborn vaccination**: Target infants 0-1 years with high coverage (80-95%)
+    - **Childhood vaccination**: Target children 1-5 years with moderate coverage (60-80%)
+    - **School-age vaccination**: Target children 5-15 years with lower coverage (40-60%)
 
-    ATTRIBUTES:
-        coverage_dist (ss.bernoulli): Probability distribution for vaccination coverage.
-        eligible      (np.ndarray): Boolean mask of currently eligible individuals.
-        n_eligible    (int): Number of individuals eligible for vaccination in the current step.
-        p_vaccine_response (ss.bernoulli): Probability distribution for vaccine response.
-        start         (datetime.date): Start date for the intervention.
-        stop          (datetime.date): Stop date for the intervention.
-        min_age       (float): Minimum age for vaccination eligibility.
-        max_age       (float): Maximum age for vaccination eligibility.
-        
-    STATES:
-        is_bcg_vaccinated (bool): Indicates whether an individual has received the BCG vaccine.
-        ti_bcg_vaccinated (float): Timestep at which the individual was vaccinated.
-        ti_bcg_protection_expires (float): Timestep when protection expires.
-        age_at_vaccination (float): Age when the individual was vaccinated.
-        bcg_activation_modifier_applied (float): Activation risk modifier applied to each individual.
-        bcg_clearance_modifier_applied (float): Clearance modifier applied to each individual.
-        bcg_death_modifier_applied (float): Death risk modifier applied to each individual.
-    Methods:
-        check_eligibility(): Identify and randomly select eligible individuals for vaccination.
-        is_protected(uids, current_time): Return boolean mask indicating protected individuals.
-        step(): Apply BCG protection and adjust TB risk modifiers accordingly.
-        _apply_protection_effects(protected_uids): Apply BCG protection effects to TB risk modifiers.
-        _remove_protection(expired_uids): Remove BCG protection effects when protection expires.
-        _maintain_ongoing_protection(current_time): Maintain protection effects for all currently protected individuals.
-        init_results(): Define simulation result metrics.
-        update_results(): Record the number of vaccinated and eligible individuals each timestep.
-        get_summary_stats(): Get summary statistics for the intervention.
-        debug_population(): Debug method to check population demographics and vaccination status.
-        calculate_tb_impact(tb_model): Calculate the impact of BCG vaccination on TB outcomes.
-    Notes:
-        This intervention assumes the presence of a TB disease model attached to the simulation and modifies its rr_activation, rr_clearance, and rr_death arrays. The intervention uses starsim probability distributions for stochastic modeling and proper date handling for temporal eligibility checks. The age_range parameter allows targeting of any age group, making this intervention suitable for both pediatric and adult vaccination strategies.
+    ### 2. Adult BCG Vaccination Strategies
+    - **Healthcare worker vaccination**: Target adults 18-65 years with moderate coverage (40-70%)
+    - **High-risk population vaccination**: Target specific age groups with elevated TB risk
+    - **Mass vaccination campaigns**: Target broad age ranges during outbreak responses
+
+    ### 3. Research and Policy Analysis
+    - **Vaccine effectiveness studies**: Compare different efficacy levels and protection durations
+    - **Coverage optimization**: Evaluate optimal vaccination coverage for population-level impact
+    - **Age-stratified analysis**: Assess vaccination strategies across different age groups
+    - **Economic evaluation**: Model cost-effectiveness of different vaccination scenarios
+
+    ### 4. Scenario Modeling
+    - **Baseline vs intervention**: Compare TB outcomes with and without BCG vaccination
+    - **Combined interventions**: Model BCG alongside other TB interventions (TPT, treatment, diagnostics)
+    - **Sensitivity analysis**: Test robustness across different parameter ranges
+    - **Policy planning**: Evaluate vaccination strategies for different populations and settings
+
+    ## INPUTS AND REQUIREMENTS
+
+    ### Required Dependencies
+    - **TB Disease Model**: The simulation must include a TB disease model with the following attributes:
+      - `rr_activation`: Risk ratio for TB activation (modified by BCG)
+      - `rr_clearance`: Risk ratio for bacterial clearance (modified by BCG)  
+      - `rr_death`: Risk ratio for TB mortality (modified by BCG)
+      - `state`: TB disease states (set to TBS.PROTECTED for vaccinated individuals)
+    - **Population**: Must have age information accessible via `sim.people.age`
+    - **Starsim Framework**: Requires starsim probability distributions and date handling
+
+    ### Required TB States (TBS enum)
+    - `TBS.PROTECTED` (100): Special state for BCG-protected individuals
+    - `TBS.NONE` (-1): Default state for unprotected individuals
+    - Standard TB states: `LATENT_SLOW`, `LATENT_FAST`, `ACTIVE_PRESYMP`, `ACTIVE_SMPOS`, `ACTIVE_SMNEG`, `ACTIVE_EXPTB`, `DEAD`
+
+    ### Simulation Requirements
+    - **Timestep compatibility**: Works with any timestep duration (automatically converts immunity_period from years to timesteps)
+    - **Date handling**: Requires proper date objects for start/stop parameters
+    - **Population size**: Compatible with any population size (tested with 500+ individuals)
+
+    ## OUTPUTS AND REPORTS
+
+    ### Real-time Metrics (Updated Each Timestep)
+    - **Vaccination Metrics**:
+      - `n_vaccinated`: Total number of vaccinated individuals
+      - `n_eligible`: Number of eligible individuals in current timestep
+      - `n_newly_vaccinated`: Number of newly vaccinated individuals
+      - `n_vaccine_responders`: Number of individuals who responded to vaccine
+    - **Protection Status**:
+      - `n_protected`: Currently protected individuals
+      - `n_protection_expired`: Individuals whose protection has expired
+    - **Coverage and Effectiveness**:
+      - `vaccination_coverage`: Coverage rate (vaccinated/eligible)
+      - `protection_coverage`: Protection rate (protected/total_population)
+      - `vaccine_effectiveness`: Response rate (responders/vaccinated)
+
+    ### Cumulative Metrics
+    - **Cumulative Totals**:
+      - `cumulative_vaccinated`: Total ever vaccinated
+      - `cumulative_responders`: Total ever responded to vaccine
+      - `cumulative_expired`: Total ever expired protection
+    - **Intervention Timing**:
+      - `avg_age_at_vaccination`: Average age when vaccinated
+      - `avg_protection_duration`: Average protection period
+
+    ### TB Impact Assessment
+    - **Disease Outcomes** (via `calculate_tb_impact()`):
+      - `vaccinated_tb_deaths`: TB deaths among vaccinated individuals
+      - `unvaccinated_tb_deaths`: TB deaths among unvaccinated individuals
+      - `vaccinated_tb_cases`: TB cases among vaccinated individuals
+      - `unvaccinated_tb_cases`: TB cases among unvaccinated individuals
+      - `deaths_averted`: Estimated deaths prevented by vaccination
+      - `cases_averted`: Estimated cases prevented by vaccination
+    - **Risk Modifiers**:
+      - `vaccinated_death_modifier`: Average death risk modifier for vaccinated
+      - `unvaccinated_death_modifier`: Average death risk modifier for unvaccinated
+
+    ### Summary Statistics (via `get_summary_stats()`)
+    - `total_vaccinated`: Final count of vaccinated individuals
+    - `total_responders`: Final count of vaccine responders
+    - `final_coverage`: Final population coverage
+    - `vaccine_effectiveness`: Overall vaccine effectiveness
+    - `total_population`: Total population size
+
+    ### Debug Information (via `debug_population()`)
+    - Population demographics by age group
+    - Vaccination status by age range
+    - Eligibility counts for targeted age groups
+
+    ## PARAMETERS
+
+    ### Core Parameters
+    - `coverage` (`float`): Fraction of eligible individuals vaccinated per timestep (default: 0.5)
+    - `start` (`str`/`datetime.date`): Start date for the intervention (default: '1900-01-01')
+    - `stop` (`str`/`datetime.date`): Stop date for the intervention (default: '2100-12-31')
+    - `efficacy` (`float`): Probability of effective vaccine response (default: 0.8)
+    - `immunity_period` (`int`): Immunity period in years (default: 10)
+    - `age_range` (`tuple`): Age range (min_age, max_age) for eligibility (default: (0, 5))
+
+    ### Risk Modifier Distributions
+    - `activation_modifier` (`ss.uniform`): TB activation risk modifier (default: uniform(0.5, 0.65))
+    - `clearance_modifier` (`ss.uniform`): Bacterial clearance modifier (default: uniform(1.3, 1.5))
+    - `death_modifier` (`ss.uniform`): TB mortality modifier (default: uniform(0.05, 0.15))
+
+    ## USAGE EXAMPLES
+
+    ### Basic Pediatric Vaccination
+    ```python
+    # Standard newborn BCG vaccination
+    bcg = BCGProtection(pars={
+        'coverage': 0.9,
+        'age_range': (0, 1),
+        'efficacy': 0.8,
+        'immunity_period': 10
+    })
+    ```
+
+    ### School-age Vaccination Campaign
+    ```python
+    # School-based vaccination program
+    bcg = BCGProtection(pars={
+        'coverage': 0.7,
+        'start': '2020-01-01',
+        'stop': '2025-12-31',
+        'age_range': (5, 15),
+        'efficacy': 0.75,
+        'immunity_period': 8
+    })
+    ```
+
+    ### Adult Healthcare Worker Vaccination
+    ```python
+    # Healthcare worker vaccination
+    bcg = BCGProtection(pars={
+        'coverage': 0.6,
+        'age_range': (18, 65),
+        'efficacy': 0.7,
+        'immunity_period': 5
+    })
+    ```
+
+    ### Research Scenario with Custom Distributions
+    ```python
+    # Research scenario with custom risk modifiers
+    bcg = BCGProtection(pars={
+        'activation_modifier': ss.uniform(0.4, 0.6),
+        'clearance_modifier': ss.uniform(1.2, 1.6),
+        'death_modifier': ss.uniform(0.03, 0.12)
+    })
+    ```
+
+    ## ATTRIBUTES
+
+    ### Core Attributes
+    - `coverage_dist` (ss.bernoulli): Probability distribution for vaccination coverage
+    - `eligible` (np.ndarray): Boolean mask of currently eligible individuals
+    - `n_eligible` (int): Number of individuals eligible for vaccination in current step
+    - `p_vaccine_response` (ss.bernoulli): Probability distribution for vaccine response
+    - `start` (datetime.date): Start date for the intervention
+    - `stop` (datetime.date): Stop date for the intervention
+    - `min_age` (float): Minimum age for vaccination eligibility
+    - `max_age` (float): Maximum age for vaccination eligibility
+
+    ### Individual States
+    - `is_bcg_vaccinated` (bool): Whether individual has received BCG vaccine
+    - `ti_bcg_vaccinated` (float): Timestep when individual was vaccinated
+    - `ti_bcg_protection_expires` (float): Timestep when protection expires
+    - `age_at_vaccination` (float): Age when individual was vaccinated
+    - `bcg_activation_modifier_applied` (float): Activation risk modifier applied
+    - `bcg_clearance_modifier_applied` (float): Clearance modifier applied
+    - `bcg_death_modifier_applied` (float): Death risk modifier applied
+
+    ## METHODS
+
+    ### Core Methods
+    - `check_eligibility()`: Identify and randomly select eligible individuals for vaccination
+    - `is_protected(uids, current_time)`: Return boolean mask indicating protected individuals
+    - `step()`: Apply BCG protection and adjust TB risk modifiers accordingly
+
+    ### Protection Management
+    - `_apply_protection_effects(protected_uids)`: Apply BCG protection effects to TB risk modifiers
+    - `_remove_protection(expired_uids)`: Remove BCG protection effects when protection expires
+    - `_maintain_ongoing_protection(current_time)`: Maintain protection effects for all currently protected individuals
+
+    ### Results and Analysis
+    - `init_results()`: Define simulation result metrics
+    - `update_results()`: Record vaccination and eligibility metrics each timestep
+    - `get_summary_stats()`: Get summary statistics for the intervention
+    - `debug_population()`: Debug method to check population demographics and vaccination status
+    - `calculate_tb_impact(tb_model)`: Calculate the impact of BCG vaccination on TB outcomes
+
+    ## NOTES
+
+    This intervention assumes the presence of a TB disease model attached to the simulation and modifies its `rr_activation`, `rr_clearance`, and `rr_death` arrays. The intervention uses starsim probability distributions for stochastic modeling and proper date handling for temporal eligibility checks. The `age_range` parameter allows targeting of any age group, making this intervention suitable for both pediatric and adult vaccination strategies.
+
+    The intervention automatically handles protection expiration and re-application of effects each timestep, ensuring that BCG protection persists throughout the immunity period. Risk modifiers are applied individually to each vaccinated person, allowing for heterogeneity in vaccine response.
     """
     def __init__(self, pars={}, **kwargs):
         """
@@ -294,14 +420,14 @@ class BCGProtection(ss.Intervention):
         current_time = self.sim.ti
         self._maintain_ongoing_protection(current_time)
         
-    def begin_step(self):
-        """
-        Called at the very start of each simulation timestep, before any disease model steps.
-        Ensures that BCG protection effects are applied to all currently protected individuals
-        before the TB model uses the risk modifiers.
-        """
-        current_time = self.sim.ti
-        self._maintain_ongoing_protection(current_time)
+    # def begin_step(self):
+    #     """
+    #     Called at the very start of each simulation timestep, before any disease model steps.
+    #     Ensures that BCG protection effects are applied to all currently protected individuals
+    #     before the TB model uses the risk modifiers.
+    #     """
+    #     current_time = self.sim.ti
+    #     self._maintain_ongoing_protection(current_time)
 
     def _apply_protection_effects(self, protected_uids):
         """
