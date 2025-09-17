@@ -109,11 +109,14 @@ class TBDiagnostic(ss.Intervention):
         initializes temporary storage for result tracking. The intervention is ready
         to be added to a simulation after initialization.
         
-        Args:
-            pars (dict, optional): Dictionary of parameters to override defaults.
-                                 Valid keys: 'coverage', 'sensitivity', 'specificity',
-                                 'reset_flag', 'care_seeking_multiplier'.
-            **kwargs: Additional keyword arguments passed to parent class.
+        Parameters
+        ----------
+        pars : dict, optional
+            Dictionary of parameters to override defaults.
+            Valid keys: 'coverage', 'sensitivity', 'specificity',
+            'reset_flag', 'care_seeking_multiplier'.
+        **kwargs
+            Additional keyword arguments passed to parent class.
         
         Default Parameters:
         -------------------
