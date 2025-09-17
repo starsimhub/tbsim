@@ -53,5 +53,6 @@ setup(
         'networkx',
         'plotly',
         'rdata',
+        'nbformat',
     ],
 )
