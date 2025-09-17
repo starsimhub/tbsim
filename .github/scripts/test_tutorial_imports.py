@@ -41,13 +41,13 @@ def test_tutorial_script():
     # Find scripts directory - try multiple locations
     current_dir = os.getcwd()
     possible_scripts_dirs = [
-        os.path.join(current_dir, 'scripts'),  # Current directory
-        os.path.join(os.path.dirname(current_dir), 'scripts'),  # Parent directory
+        os.path.join(current_dir, 'scripts', 'interventions'),  # Current directory
+        os.path.join(os.path.dirname(current_dir), 'scripts', 'interventions'),  # Parent directory
     ]
     
     # If we're in docs directory, scripts should be in parent
     if os.path.basename(current_dir) == 'docs':
-        possible_scripts_dirs.insert(0, os.path.join(os.path.dirname(current_dir), 'scripts'))
+        possible_scripts_dirs.insert(0, os.path.join(os.path.dirname(current_dir), 'scripts', 'interventions'))
     
     # Try to find scripts directory relative to this script's location
     script_dir = os.path.dirname(os.path.abspath(__file__))
