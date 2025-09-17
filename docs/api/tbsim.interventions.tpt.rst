@@ -36,16 +36,14 @@ Basic TPT intervention:
    from tbsim.interventions.tpt import TPT
    from tbsim import TB
    
-   sim = ss.Sim()
-   
-   # Add TB module
+   # Add TB module and preventive therapy
    tb = TB()
-   sim.add_module(tb)
-   
-   # Add preventive therapy
    tpt = TPT()
-   sim.add_module(tpt)
    
+   sim = ss.Sim(
+       diseases=tb,
+       interventions=tpt
+   )
    sim.run()
 
 TPT with custom parameters:

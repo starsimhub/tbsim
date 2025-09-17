@@ -36,16 +36,14 @@ Basic beta intervention:
    from tbsim.interventions.beta import BetaByYear
    from tbsim import TB
    
-   sim = ss.Sim()
-   
-   # Add TB module
+   # Add TB module and time-varying transmission parameters
    tb = TB()
-   sim.add_module(tb)
-   
-   # Add time-varying transmission parameters
    beta = BetaByYear()
-   sim.add_module(beta)
    
+   sim = ss.Sim(
+       diseases=tb,
+       interventions=beta
+   )
    sim.run()
 
 Custom beta schedule:

@@ -55,9 +55,7 @@ Basic TB simulation:
    from tbsim import TB
    import starsim as ss
    
-   sim = ss.Sim()
-   tb = TB()
-   sim.add_module(tb)
+   sim = ss.Sim(diseases=TB())
    sim.run()
 
 With comorbidities:
@@ -68,19 +66,10 @@ With comorbidities:
    from tbsim.comorbidities.hiv.tb_hiv_cnn import TB_HIV_Connector
    from tbsim.comorbidities.malnutrition.tb_malnut_cnn import TB_Nutrition_Connector
    
-   sim = ss.Sim()
-   tb = TB()
-   hiv = HIV()
-   malnutrition = Malnutrition()
-   
-   sim.add_module(tb)
-   sim.add_module(hiv)
-   sim.add_module(malnutrition)
-   
-   # Add connectors for disease interactions
-   sim.add_connector(TB_HIV_Connector())
-   sim.add_connector(TB_Nutrition_Connector())
-   
+   sim = ss.Sim(
+       diseases=[TB(), HIV(), Malnutrition()],
+       connectors=[TB_HIV_Connector(), TB_Nutrition_Connector()]
+   )
    sim.run()
 
 With interventions:
@@ -90,14 +79,13 @@ With interventions:
    from tbsim.interventions.enhanced_tb_treatment import create_dots_treatment
    from tbsim.interventions.bcg import BCGProtection
    
-   # Add DOTS treatment
+   # Add DOTS treatment and BCG vaccination
    dots = create_dots_treatment()
-   sim.add_intervention(dots)
-   
-   # Add BCG vaccination
    bcg = BCGProtection()
-   sim.add_intervention(bcg)
-   
+   sim = ss.Sim(
+       diseases=TB(),
+       interventions=[dots, bcg]
+   )
    sim.run()
 
 Analysis and visualization:

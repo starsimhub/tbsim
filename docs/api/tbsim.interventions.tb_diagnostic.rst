@@ -36,16 +36,10 @@ Basic TB diagnostic:
    from tbsim.interventions.tb_diagnostic import TBDiagnostic
    from tbsim import TB
    
-   sim = ss.Sim()
-   
-   # Add TB module
-   tb = TB()
-   sim.add_module(tb)
-   
-   # Add diagnostic testing
-   diagnostic = TBDiagnostic()
-   sim.add_module(diagnostic)
-   
+   sim = ss.Sim(
+       diseases=TB(),
+       interventions=TBDiagnostic()
+   )
    sim.run()
 
 Custom diagnostic parameters:

@@ -36,16 +36,14 @@ Basic TB treatment:
    from tbsim.interventions.tb_treatment import TBTreatment
    from tbsim import TB
    
-   sim = ss.Sim()
-   
-   # Add TB module
+   # Add TB module and basic treatment
    tb = TB()
-   sim.add_module(tb)
-   
-   # Add basic treatment
    treatment = TBTreatment()
-   sim.add_module(treatment)
    
+   sim = ss.Sim(
+       diseases=tb,
+       interventions=treatment
+   )
    sim.run()
 
 Custom treatment parameters:

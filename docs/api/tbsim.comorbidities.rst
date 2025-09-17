@@ -51,12 +51,10 @@ TB-HIV co-infection modeling:
    from tbsim.comorbidities.hiv import HIV
    from tbsim import TB
    
-   sim = ss.Sim()
    tb = TB()
    hiv = HIV()
    
-   sim.add_module(tb)
-   sim.add_module(hiv)
+   sim = ss.Sim(diseases=[tb, hiv])
    sim.run()
 
 TB with malnutrition:
@@ -67,7 +65,7 @@ TB with malnutrition:
    from tbsim import TB
    
    malnutrition = Malnutrition()
-   sim.add_module(malnutrition)
+   sim = ss.Sim(diseases=malnutrition)
 
 Connector Classes
 ----------------

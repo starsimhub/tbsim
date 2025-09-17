@@ -59,16 +59,10 @@ Basic enhanced diagnostic:
    from tbsim.interventions.enhanced_tb_diagnostic import EnhancedTBDiagnostic
    from tbsim import TB
    
-   sim = ss.Sim()
-   
-   # Add TB module
-   tb = TB()
-   sim.add_module(tb)
-   
-   # Add enhanced diagnostic testing
-   diagnostic = EnhancedTBDiagnostic()
-   sim.add_module(diagnostic)
-   
+   sim = ss.Sim(
+       diseases=TB(),
+       interventions=EnhancedTBDiagnostic()
+   )
    sim.run()
 
 Advanced diagnostic with multiple methods:

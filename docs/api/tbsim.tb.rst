@@ -84,9 +84,7 @@ Basic TB simulation:
    from tbsim import TB
    import starsim as ss
    
-   sim = ss.Sim()
-   tb = TB()
-   sim.add_module(tb)
+   sim = ss.Sim(diseases=TB())
    sim.run()
 
 With custom parameters:
@@ -103,7 +101,7 @@ With custom parameters:
        'p_active_to_death': 0.05   # Mortality rate
    })
    
-   sim.add_module(tb)
+   sim = ss.Sim(diseases=tb)
    sim.run()
 
 Accessing results:

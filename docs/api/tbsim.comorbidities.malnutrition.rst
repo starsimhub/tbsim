@@ -79,9 +79,7 @@ Basic malnutrition simulation:
    from tbsim.comorbidities.malnutrition.malnutrition import Malnutrition
    import starsim as ss
    
-   sim = ss.Sim()
-   malnutrition = Malnutrition()
-   sim.add_module(malnutrition)
+   sim = ss.Sim(diseases=Malnutrition())
    sim.run()
 
 With custom parameters:
@@ -95,7 +93,7 @@ With custom parameters:
        'beta': 0.8            # Custom transmission rate
    })
    
-   sim.add_module(malnutrition)
+   sim = ss.Sim(diseases=malnutrition)
    sim.run()
 
 TB-malnutrition integration:
@@ -105,18 +103,17 @@ TB-malnutrition integration:
    from tbsim.comorbidities.malnutrition.tb_malnut_cnn import TB_Nutrition_Connector
    from tbsim import TB, Malnutrition
    
-   # Add both diseases
-   sim.add_module(TB())
-   sim.add_module(Malnutrition())
-   
-   # Add connector for interactions
+   # Add both diseases and connector for interactions
    connector = TB_Nutrition_Connector(pars={
        'rr_activation_func': TB_Nutrition_Connector.lonnroth_bmi_rr,
        'rr_clearance_func': TB_Nutrition_Connector.supplementation_rr,
        'relsus_func': TB_Nutrition_Connector.compute_relsus
    })
    
-   sim.add_connector(connector)
+   sim = ss.Sim(
+       diseases=[TB(), Malnutrition()],
+       connectors=connector
+   )
    sim.run()
 
 Accessing anthropometric data:

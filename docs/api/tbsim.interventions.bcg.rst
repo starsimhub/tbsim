@@ -36,16 +36,14 @@ Basic BCG intervention:
    from tbsim.interventions.bcg import BCGProtection
    from tbsim import TB
    
-   sim = ss.Sim()
-   
-   # Add TB module
+   # Add TB module and BCG vaccination
    tb = TB()
-   sim.add_module(tb)
-   
-   # Add BCG vaccination
    bcg = BCGProtection()
-   sim.add_module(bcg)
    
+   sim = ss.Sim(
+       diseases=tb,
+       interventions=bcg
+   )
    sim.run()
 
 BCG with custom parameters:

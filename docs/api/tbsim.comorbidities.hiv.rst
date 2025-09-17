@@ -89,9 +89,7 @@ Basic HIV simulation:
    from tbsim.comorbidities.hiv.hiv import HIV
    import starsim as ss
    
-   sim = ss.Sim()
-   hiv = HIV()
-   sim.add_module(hiv)
+   sim = ss.Sim(diseases=HIV())
    sim.run()
 
 With custom parameters:
@@ -108,7 +106,7 @@ With custom parameters:
        'art_progression_factor': 0.1 # ART reduces progression by 90%
    })
    
-   sim.add_module(hiv)
+   sim = ss.Sim(diseases=hiv)
    sim.run()
 
 HIV interventions:
@@ -136,18 +134,17 @@ TB-HIV integration:
    from tbsim.comorbidities.hiv.tb_hiv_cnn import TB_HIV_Connector
    from tbsim import TB, HIV
    
-   # Add both diseases
-   sim.add_module(TB())
-   sim.add_module(HIV())
-   
-   # Add connector for interactions
+   # Add both diseases and connector for interactions
    connector = TB_HIV_Connector(pars={
        'acute_multiplier': 1.5,     # Custom risk multiplier for acute HIV
        'latent_multiplier': 2.0,    # Custom risk multiplier for latent HIV
        'aids_multiplier': 3.0       # Custom risk multiplier for AIDS
    })
    
-   sim.add_connector(connector)
+   sim = ss.Sim(
+       diseases=[TB(), HIV()],
+       connectors=connector
+   )
    sim.run()
 
 Accessing results:

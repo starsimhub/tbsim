@@ -36,16 +36,14 @@ Basic health-seeking behavior:
    from tbsim.interventions.healthseeking import HealthSeekingBehavior
    from tbsim import TB
    
-   sim = ss.Sim()
-   
-   # Add TB module
+   # Add TB module and health-seeking behavior
    tb = TB()
-   sim.add_module(tb)
-   
-   # Add health-seeking behavior
    health_seeking = HealthSeekingBehavior()
-   sim.add_module(health_seeking)
    
+   sim = ss.Sim(
+       diseases=tb,
+       interventions=health_seeking
+   )
    sim.run()
 
 Custom health-seeking parameters:

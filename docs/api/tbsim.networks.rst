@@ -95,9 +95,7 @@ Basic household network:
    from tbsim.networks import HouseholdNet
    import starsim as ss
    
-   sim = ss.Sim()
-   households = HouseholdNet()
-   sim.add_module(households)
+   sim = ss.Sim(networks=HouseholdNet())
    sim.run()
 
 RATIONS trial network:
@@ -113,7 +111,7 @@ RATIONS trial network:
        'contact_probability': 0.3
    })
    
-   sim.add_module(rations_network)
+   sim = ss.Sim(networks=rations_network)
    sim.run()
 
 Custom network parameters:
@@ -130,7 +128,7 @@ Custom network parameters:
        'max_household_size': 8
    })
    
-   sim.add_module(households)
+   sim = ss.Sim(networks=households)
    sim.run()
 
 Network visualization:

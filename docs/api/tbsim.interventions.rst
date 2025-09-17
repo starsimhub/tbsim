@@ -84,12 +84,13 @@ Adding BCG vaccination:
    from tbsim.interventions.bcg import BCG
    from tbsim import TB
    
-   sim = ss.Sim()
    tb = TB()
    bcg = BCG()
    
-   sim.add_module(tb)
-   sim.add_module(bcg)
+   sim = ss.Sim(
+       diseases=tb,
+       interventions=bcg
+   )
    sim.run()
 
 Implementing preventive therapy:
@@ -99,7 +100,7 @@ Implementing preventive therapy:
    from tbsim.interventions.tpt import TPT
    
    tpt = TPT()
-   sim.add_module(tpt)
+   sim = ss.Sim(interventions=tpt)
 
 Key Features
 -----------
