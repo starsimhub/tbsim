@@ -52,7 +52,7 @@ def test_tutorial_script():
     # Try to find scripts directory relative to this script's location
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.dirname(script_dir)
-    possible_scripts_dirs.append(os.path.join(repo_root, 'scripts'))
+    possible_scripts_dirs.append(os.path.join(repo_root, 'scripts', 'interventions'))
     
     scripts_dir = None
     for dir_path in possible_scripts_dirs:
@@ -60,11 +60,12 @@ def test_tutorial_script():
             scripts_dir = dir_path
             break
     
-    if os.path.exists(scripts_dir):
+    if scripts_dir and os.path.exists(scripts_dir):
         sys.path.insert(0, scripts_dir)
-        print("✓ Scripts directory added to path")
+        print(f"✓ Scripts directory added to path: {scripts_dir}")
     else:
         print("✗ Scripts directory not found")
+        print(f"  Searched paths: {possible_scripts_dirs}")
         return False
     
     try:
