@@ -33,12 +33,14 @@ Basic TPT intervention:
 
 .. code-block:: python
 
-   from tbsim.interventions.tpt import TPT
+   from tbsim.interventions.tpt import TPTInitiation
    from tbsim import TB
    
    # Add TB module and preventive therapy
+   # Note: TPT requires 'sought_care', 'non_symptomatic', 'symptomatic' attributes
+   # These are typically added by health-seeking interventions
    tb = TB()
-   tpt = TPT()
+   tpt = TPTInitiation()
    
    sim = ss.Sim(
        diseases=tb,

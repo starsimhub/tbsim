@@ -95,10 +95,8 @@ With custom parameters:
    
    # Customize TB parameters
    tb = TB(pars={
-       'beta': 0.5,           # Transmission rate
-       'init_prev': 0.01,     # Initial prevalence
-       'p_latent_to_active': 0.1,  # Progression rate
-       'p_active_to_death': 0.05   # Mortality rate
+       'beta': ss.peryear(0.5),           # Transmission rate
+       'init_prev': ss.bernoulli(0.01),   # Initial prevalence
    })
    
    sim = ss.Sim(diseases=tb)

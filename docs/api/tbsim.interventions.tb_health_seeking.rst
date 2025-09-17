@@ -38,6 +38,7 @@ Basic TB health-seeking:
    import starsim as ss
    
    # Add TB module and health-seeking behavior
+   # Note: HealthSeekingBehavior creates 'sought_care' attribute
    tb = TB()
    health_seeking = HealthSeekingBehavior()
    

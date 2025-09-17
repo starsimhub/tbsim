@@ -37,6 +37,7 @@ Basic health-seeking behavior:
    from tbsim import TB
    
    # Add TB module and health-seeking behavior
+   # Note: HealthSeekingBehavior creates 'sought_care' attribute
    tb = TB()
    health_seeking = HealthSeekingBehavior()
    

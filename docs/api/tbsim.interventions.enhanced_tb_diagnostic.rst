@@ -59,6 +59,8 @@ Basic enhanced diagnostic:
    from tbsim.interventions.enhanced_tb_diagnostic import EnhancedTBDiagnostic
    from tbsim import TB
    
+   # Note: EnhancedTBDiagnostic requires 'sought_care' and 'diagnosed' attributes
+   # These are typically added by health-seeking interventions
    sim = ss.Sim(
        diseases=TB(),
        interventions=EnhancedTBDiagnostic()

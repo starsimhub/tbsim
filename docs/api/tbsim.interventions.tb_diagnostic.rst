@@ -36,6 +36,8 @@ Basic TB diagnostic:
    from tbsim.interventions.tb_diagnostic import TBDiagnostic
    from tbsim import TB
    
+   # Note: TBDiagnostic requires 'sought_care' and 'diagnosed' attributes
+   # These are typically added by health-seeking interventions
    sim = ss.Sim(
        diseases=TB(),
        interventions=TBDiagnostic()

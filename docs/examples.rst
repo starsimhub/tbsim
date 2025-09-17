@@ -14,9 +14,7 @@ The simplest way to run a TB simulation:
    import starsim as ss
    
    # Create a basic TB simulation
-   sim = ss.Sim()
-   tb = TB()
-   sim.add_module(tb)
+   sim = ss.Sim(diseases=TB())
    
    # Run the simulation
    sim.run()
@@ -31,21 +29,19 @@ Adding BCG vaccination and treatment interventions:
 
 .. code-block:: python
 
-   from tbsim.interventions import BCG, TPT
+   from tbsim.interventions.bcg import BCGProtection
+   from tbsim.interventions.tpt import TPTInitiation
    from tbsim import TB
    
-   sim = ss.Sim()
-   
-   # Add TB module
+   # Add TB module and interventions
    tb = TB()
-   sim.add_module(tb)
+   bcg = BCGProtection()
+   tpt = TPTInitiation()
    
-   # Add interventions
-   bcg = BCG()
-   tpt = TPT()
-   sim.add_module(bcg)
-   sim.add_module(tpt)
-   
+   sim = ss.Sim(
+       diseases=tb,
+       interventions=[bcg, tpt]
+   )
    sim.run()
 
 TB-HIV Comorbidity
@@ -55,17 +51,14 @@ Modeling TB and HIV together:
 
 .. code-block:: python
 
-   from tbsim.comorbidities.hiv import HIV
+   from tbsim.comorbidities.hiv.hiv import HIV
    from tbsim import TB
-   
-   sim = ss.Sim()
    
    # Add both modules
    tb = TB()
    hiv = HIV()
-   sim.add_module(tb)
-   sim.add_module(hiv)
    
+   sim = ss.Sim(diseases=[tb, hiv])
    sim.run()
 
 Household Networks
@@ -78,16 +71,14 @@ Using household-based social networks:
    from tbsim.networks import HouseholdNet
    from tbsim import TB
    
-   sim = ss.Sim()
-   
-   # Create household network
+   # Create household network and TB
    households = HouseholdNet()
-   sim.add_module(households)
-   
-   # Add TB with network transmission
    tb = TB()
-   sim.add_module(tb)
    
+   sim = ss.Sim(
+       networks=households,
+       diseases=tb
+   )
    sim.run()
 
 Advanced Analysis
@@ -121,9 +112,7 @@ Running multiple parameter combinations:
    
    results = []
    for rate in transmission_rates:
-       sim = ss.Sim()
-       tb = TB(transmission_rate=rate)
-       sim.add_module(tb)
+       sim = ss.Sim(diseases=TB(pars={'beta': ss.peryear(rate)}))
        sim.run()
        results.append(sim.results)
 

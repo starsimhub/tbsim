@@ -37,6 +37,8 @@ Basic TB treatment:
    from tbsim import TB
    
    # Add TB module and basic treatment
+   # Note: TBTreatment requires 'diagnosed' attribute
+   # This is typically added by diagnostic interventions
    tb = TB()
    treatment = TBTreatment()
    
