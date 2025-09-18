@@ -560,7 +560,7 @@ def make_people(n_agents, age_data=None):
         })
 
     # Create population with extra states required for health-seeking and diagnostic interventions
-    people = ss.People(n_agents=n_agents, age_data=age_data, extra_states=mtb.get_extrastates())
+    people = mtb.TBPeople(n_agents=n_agents, age_data=age_data)
 
     return people
 

@@ -27,3 +27,4 @@ from .analyzers import DwtAnalyzer, DwtPlotter, DwtPostProcessor
 from .utils.plots import *
 from .wrappers import Agents
 from .misc.tbterms import TBTerms, TermsExport
+from .people import TBPeople
