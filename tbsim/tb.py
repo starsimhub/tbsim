@@ -12,19 +12,28 @@ class TBS(IntEnum):
     """
     Tuberculosis disease states enumeration.
     
-    This enumeration defines all possible states an individual can be in
     with respect to tuberculosis infection and disease progression.
+    It is based on the tb natural history model from https://www.pnas.org/doi/full/10.1073/pnas.0901720106
+    and updated with rates from TB natural history literature (e.g., PMID: 32766718, 9363017)
     
-    Attributes:
-        NONE: No TB infection (susceptible)
-        LATENT_SLOW: Latent TB with slow progression to active disease
-        LATENT_FAST: Latent TB with fast progression to active disease
-        ACTIVE_PRESYMP: Active TB in pre-symptomatic phase
-        ACTIVE_SMPOS: Active TB, smear positive (most infectious)
-        ACTIVE_SMNEG: Active TB, smear negative (moderately infectious)
-        ACTIVE_EXPTB: Active TB, extra-pulmonary (least infectious)
-        DEAD: Death from TB
-        PROTECTED: Protected from TB (e.g., from BCG vaccination)
+    Enumeration:
+        | State           | Value | Description                                           |
+        |-----------------|-------|-------------------------------------------------------|
+        | NONE            | -1    | No TB infection (susceptible)                        |
+        | LATENT_SLOW     | 0     | Latent TB with slow progression to active disease   |
+        | LATENT_FAST     | 1     | Latent TB with fast progression to active disease   |
+        | ACTIVE_PRESYMP  | 2     | Active TB in pre-symptomatic phase                  |
+        | ACTIVE_SMPOS    | 3     | Active TB, smear positive (most infectious)         |
+        | ACTIVE_SMNEG    | 4     | Active TB, smear negative (moderately infectious)   |
+        | ACTIVE_EXPTB    | 5     | Active TB, extra-pulmonary (least infectious)       |
+        | DEAD            | 8     | Death from TB                                         |
+        | PROTECTED       | 100   | Protected from TB (e.g., from BCG vaccination)      |
+        
+    Methods:
+        all(): Get all TB states including special states
+        all_active(): Get all active TB states
+        all_latent(): Get all latent TB states
+        all_infected(): Get all states that represent TB infection (excluding NONE, DEAD, and PROTECTED)
     """
     NONE            = -1    # No TB
     LATENT_SLOW     = 0     # Latent TB, slow progression
@@ -93,7 +102,7 @@ class TB(ss.Infection):
     and treatment. The model includes:
     
     - Multiple latent TB states (slow vs. fast progression)
-    - Pre-symptomatic active TB phase
+    - Pre-symptomatic active TB phase 
     - Different active TB forms (smear positive/negative, extra-pulmonary)
     - Treatment effects on transmission and mortality
     - Age-specific reporting (15+ years)
@@ -597,10 +606,16 @@ class TB(ss.Infection):
         self.rel_sus[slow_uids] = self.pars.rel_sus_latentslow
 
         # Determine active TB state for future progression
-        self.active_tb_state[uids] = self.pars.active_state.rvs(uids)
+        # Filter out invalid UIDs (like -1)
+        valid_uids = uids[uids >= 0]
+        if len(valid_uids) > 0:
+            self.active_tb_state[valid_uids] = self.pars.active_state.rvs(valid_uids)
 
         # Set base transmission heterogeneity
-        self.reltrans_het[uids] = p.reltrans_het.rvs(uids)
+        # Filter out invalid UIDs (like -1)
+        valid_uids = uids[uids >= 0]
+        if len(valid_uids) > 0:
+            self.reltrans_het[valid_uids] = p.reltrans_het.rvs(valid_uids)
 
         # Update result count of new infections 
         self.ti_infected[new_uids] = self.ti # Only update ti_infected for new...
@@ -646,7 +661,7 @@ class TB(ss.Infection):
         This method is the core of the TB disease model and must be called
         at each simulation time step by the Starsim framework.
         """
-        # Make all the updates from the SIR model 
+        # Make all the updates from the base class
         super().step()
         p = self.pars
         ti = self.ti
