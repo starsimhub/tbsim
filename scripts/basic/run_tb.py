@@ -2,6 +2,139 @@
 """
 TB Simulation Comparison: Static vs Dynamic Prevalence Control
 
+===============================================================================
+📋 SCRIPT SUMMARY
+===============================================================================
+
+This script compares two approaches for maintaining constant TB prevalence in
+epidemiological simulations over a 70-year period (1940-2010):
+
+🎯 APPROACH 1: STATIC CALIBRATED PARAMETERS
+   • Uses pre-calibrated, fixed parameters tuned to maintain 1% prevalence
+   • No real-time adjustments during simulation
+   • Relies on parameter calibration accuracy
+   • Simpler implementation, faster execution
+
+🎯 APPROACH 2: DYNAMIC PREVALENCE CONTROLLER  
+   • Implements real-time feedback control system
+   • Monitors prevalence and automatically adjusts transmission rates
+   • Maintains target prevalence through parameter adaptation
+   • More complex but potentially more accurate
+
+📊 WHAT YOU'LL GET:
+   • Comparative analysis of both approaches
+   • Statistical performance metrics (mean, CV, stability)
+   • Comprehensive validation plots and dashboards
+   • Best approach recommendation based on performance
+   • Detailed results saved to 'results/' directory
+
+===============================================================================
+📝 STEP-BY-STEP EXECUTION GUIDE
+===============================================================================
+
+STEP 1: INITIALIZATION (Lines 620-625)
+   • Set target prevalence to 1% (0.01)
+   • Initialize result storage dictionaries
+   • Display execution plan to user
+
+STEP 2: STATIC APPROACH EXECUTION (Lines 448-468)
+   • Build simulation with static calibrated parameters
+   • Run 70-year simulation (1940-2010)
+   • Calculate prevalence stability metrics
+   • Store results for comparison
+
+STEP 3: DYNAMIC APPROACH EXECUTION (Lines 471-492)
+   • Build simulation with dynamic prevalence controller
+   • Run 70-year simulation with real-time parameter adjustment
+   • Calculate prevalence stability metrics
+   • Store results for comparison
+
+STEP 4: COMPREHENSIVE COMPARISON (Lines 495-501)
+   • Run detailed side-by-side comparison
+   • Calculate performance metrics for both approaches
+   • Determine best performing approach
+
+STEP 5: ANALYSIS AND VISUALIZATION (Lines 534-597)
+   • Generate model accuracy metrics
+   • Create interactive accuracy dashboard
+   • Produce comprehensive validation plots
+   • Create comparative visualization plots
+
+STEP 6: RESULTS SUMMARY (Lines 636-644)
+   • Display final performance comparison
+   • Show best approach recommendation
+   • Provide file location information
+
+===============================================================================
+🎯 WHAT TO EXPECT
+===============================================================================
+
+⏱️  EXECUTION TIME:
+   • Total runtime: ~5-10 minutes (depending on system)
+   • Static approach: ~2-3 minutes
+   • Dynamic approach: ~3-5 minutes
+   • Analysis phase: ~1-2 minutes
+
+📊  OUTPUT METRICS:
+   • Mean Prevalence: Average TB prevalence over simulation period
+   • Coefficient of Variation (CV): Stability measure (lower = more stable)
+   • Target Percentage: Time spent within ±0.2% of target prevalence
+   • Adjustment Count: Number of parameter adjustments (dynamic approach only)
+
+📁  GENERATED FILES:
+   • results/comparison/ - Comparative visualization plots
+   • results/validation/ - Model validation plots and dashboards
+   • TB_Model_Validation_*.csv - Detailed simulation data
+   • TB_Model_Validation_*.json - Structured results data
+
+📈  VISUALIZATIONS:
+   • Prevalence over time plots for both approaches
+   • Disease progression and state transition diagrams
+   • Model accuracy and validation dashboards
+   • Side-by-side comparative analysis plots
+
+🏆  PERFORMANCE COMPARISON:
+   • Best approach determination based on coefficient of variation
+   • Statistical significance testing of differences
+   • Stability and accuracy recommendations
+   • Parameter adjustment frequency analysis (dynamic approach)
+
+⚠️  IMPORTANT NOTES:
+   • Simulations use fixed random seeds for reproducibility
+   • Population size: 5,000 agents for statistical reliability
+   • Time step: Weekly (7-day intervals)
+   • Target prevalence: 1% (0.01) with ±0.2% tolerance
+   • All results are automatically saved to 'results/' directory
+
+===============================================================================
+🔧 TECHNICAL DETAILS
+===============================================================================
+
+SIMULATION PARAMETERS:
+   • Population: 5,000 agents
+   • Time Period: 1940-2010 (70 years)
+   • Time Steps: Weekly (7-day intervals)
+   • Random Seed: Fixed for reproducibility
+   • Contact Network: Random network with Poisson contacts
+
+DISEASE MODEL:
+   • TB States: Susceptible → Latent → Presymptomatic → Active → Clear/Dead
+   • Active TB Types: Smear-positive, Smear-negative, Extra-pulmonary
+   • Transmission: Contact-based with configurable rates
+   • Mortality: TB-specific death rates by disease type
+
+CONTROL MECHANISMS:
+   • Static: Pre-calibrated parameters, no adjustment
+   • Dynamic: Real-time beta adjustment based on prevalence feedback
+   • Tolerance: ±0.2% deviation from target prevalence
+   • Cooldown: 5 time steps between adjustments (dynamic approach)
+
+===============================================================================
+"""
+
+"""
+TB Simulation Comparison: Static vs Dynamic Prevalence Control
+
 This module provides comprehensive TB simulation capabilities comparing different
 approaches to maintaining constant prevalence levels. It implements two main
 strategies:
@@ -440,7 +573,14 @@ def run_all_approaches():
     all_results = {}          # Store results from all approaches
     all_sims = {}            # Store simulation objects for analysis
     
-    print("TB SIMULATION: RUNNING ALL APPROACHES")
+    print("🔄 INITIALIZING TB SIMULATION COMPARISON")
+    print("="*60)
+    print("📋 APPROACHES TO BE TESTED:")
+    print("   1. Static Calibrated Parameters (Pre-tuned, no adjustment)")
+    print("   2. Dynamic Prevalence Controller (Real-time feedback control)")
+    print("   3. Comprehensive Performance Comparison")
+    print("\n⏱️  ESTIMATED EXECUTION TIME: 5-8 minutes")
+    print("🎯 TARGET PREVALENCE: 1% (0.01) with ±0.2% tolerance")
     print("="*60)
     
     # ============================================================================
@@ -449,23 +589,30 @@ def run_all_approaches():
     # This approach uses pre-calibrated, fixed parameters that are tuned to
     # maintain target prevalence without any real-time adjustment
     print("\n" + "="*60)
-    print("APPROACH 1: STATIC CALIBRATED PARAMETERS")
+    print("🔧 APPROACH 1: STATIC CALIBRATED PARAMETERS")
     print("="*60)
-    print("Running with static calibrated parameters...")
+    print("📝 DESCRIPTION:")
+    print("   • Uses pre-calibrated, fixed parameters")
+    print("   • No real-time parameter adjustment")
+    print("   • Relies on parameter calibration accuracy")
+    print("   • Simpler implementation, faster execution")
+    print("\n🚀 Building simulation with static parameters...")
     
     # Build and run simulation with static parameters
     sim1 = build_tbsim(target_prevalence=target_prevalence)
+    print("⚙️  Running 70-year simulation (1940-2010)...")
     sim1.run()
     
     # Analyze prevalence stability for this approach
+    print("📊 Analyzing prevalence stability...")
     prevalence_stats1 = monitor_prevalence_stability(sim1, target_prevalence=target_prevalence)
     all_results["Static Parameters"] = prevalence_stats1
     all_sims["Static Parameters"] = sim1
     
-    print(f"✓ Static approach completed")
-    print(f"  Mean Prevalence: {prevalence_stats1['mean_prevalence']:.3%}")
-    print(f"  Coefficient of Variation: {prevalence_stats1['cv_prevalence']:.1f}%")
-    print(f"  Time in Target: {prevalence_stats1['target_percentage']:.1f}%")
+    print(f"✅ Static approach completed successfully!")
+    print(f"   📈 Mean Prevalence: {prevalence_stats1['mean_prevalence']:.3%}")
+    print(f"   📊 Coefficient of Variation: {prevalence_stats1['cv_prevalence']:.1f}%")
+    print(f"   🎯 Time in Target: {prevalence_stats1['target_percentage']:.1f}%")
     
     # ============================================================================
     # APPROACH 2: DYNAMIC PREVALENCE CONTROLLER
@@ -473,31 +620,45 @@ def run_all_approaches():
     # This approach uses real-time feedback control to maintain target prevalence
     # by automatically adjusting transmission parameters during simulation
     print("\n" + "="*60)
-    print("APPROACH 2: DYNAMIC PREVALENCE CONTROLLER")
+    print("🎛️  APPROACH 2: DYNAMIC PREVALENCE CONTROLLER")
     print("="*60)
-    print("Running with dynamic prevalence controller...")
+    print("📝 DESCRIPTION:")
+    print("   • Implements real-time feedback control system")
+    print("   • Monitors prevalence and adjusts transmission rates")
+    print("   • Maintains target prevalence through parameter adaptation")
+    print("   • More complex but potentially more accurate")
+    print("\n🚀 Building simulation with dynamic prevalence controller...")
     
     # Build and run simulation with dynamic control
     sim2 = build_tbsim_with_control(target_prevalence=target_prevalence, use_controller=True)
+    print("⚙️  Running 70-year simulation with real-time parameter adjustment...")
+    print("   🔄 Controller will monitor prevalence and adjust parameters as needed")
     sim2.run()
     
     # Analyze prevalence stability for this approach
+    print("📊 Analyzing prevalence stability and controller performance...")
     prevalence_stats2 = monitor_prevalence_stability(sim2, target_prevalence=target_prevalence)
     all_results["Dynamic Controller"] = prevalence_stats2
     all_sims["Dynamic Controller"] = sim2
     
-    print(f"✓ Dynamic controller approach completed")
-    print(f"  Mean Prevalence: {prevalence_stats2['mean_prevalence']:.3%}")
-    print(f"  Coefficient of Variation: {prevalence_stats2['cv_prevalence']:.1f}%")
-    print(f"  Time in Target: {prevalence_stats2['target_percentage']:.1f}%")
+    print(f"✅ Dynamic controller approach completed successfully!")
+    print(f"   📈 Mean Prevalence: {prevalence_stats2['mean_prevalence']:.3%}")
+    print(f"   📊 Coefficient of Variation: {prevalence_stats2['cv_prevalence']:.1f}%")
+    print(f"   🎯 Time in Target: {prevalence_stats2['target_percentage']:.1f}%")
     
     # ============================================================================
     # COMPREHENSIVE COMPARISON
     # ============================================================================
     # Run detailed comparison between approaches and determine best performer
     print("\n" + "="*60)
-    print("COMPREHENSIVE COMPARISON")
+    print("📊 COMPREHENSIVE COMPARISON ANALYSIS")
     print("="*60)
+    print("📝 DESCRIPTION:")
+    print("   • Side-by-side performance comparison")
+    print("   • Statistical analysis of differences")
+    print("   • Best approach determination")
+    print("   • Performance metrics calculation")
+    print("\n🔄 Running detailed comparison...")
     comparison_results = run_prevalence_comparison()
     
     # ============================================================================
@@ -505,6 +666,7 @@ def run_all_approaches():
     # ============================================================================
     # Determine best performing approach based on coefficient of variation
     # Lower CV indicates more stable prevalence (better performance)
+    print("\n🏆 DETERMINING BEST PERFORMING APPROACH...")
     best_approach = None
     best_cv = float('inf')
     for name, stats in all_results.items():
@@ -512,21 +674,30 @@ def run_all_approaches():
             best_cv = stats['cv_prevalence']
             best_approach = name
     
-    print(f"\n🏆 BEST PERFORMING APPROACH: {best_approach}")
-    print(f"   Coefficient of Variation: {best_cv:.1f}%")
+    print(f"✅ BEST PERFORMING APPROACH: {best_approach}")
+    print(f"   📊 Coefficient of Variation: {best_cv:.1f}% (lower = more stable)")
+    print(f"   🎯 This approach achieved the most stable prevalence over time")
     
     # Summary comparison
     print(f"\n" + "="*60)
-    print("COMPREHENSIVE COMPARISON SUMMARY")
+    print("📈 COMPREHENSIVE COMPARISON SUMMARY")
     print(f"="*60)
+    print("📊 PERFORMANCE METRICS COMPARISON:")
+    print("-" * 40)
     
     for name, stats in all_results.items():
-        status = "🏆 BEST" if name == best_approach else ""
-        print(f"{name} {status}:")
-        print(f"  Mean Prevalence: {stats['mean_prevalence']:.3%}")
-        print(f"  Coefficient of Variation: {stats['cv_prevalence']:.1f}%")
-        print(f"  Time in Target: {stats['target_percentage']:.1f}%")
+        status = "🏆 BEST" if name == best_approach else "   "
+        print(f"{status} {name}:")
+        print(f"    📈 Mean Prevalence: {stats['mean_prevalence']:.3%}")
+        print(f"    📊 Coefficient of Variation: {stats['cv_prevalence']:.1f}%")
+        print(f"    🎯 Time in Target: {stats['target_percentage']:.1f}%")
         print()
+    
+    print("📋 INTERPRETATION GUIDE:")
+    print("   • Mean Prevalence: Average TB prevalence over simulation period")
+    print("   • Coefficient of Variation: Stability measure (lower = more stable)")
+    print("   • Time in Target: Percentage of time within ±0.2% of target")
+    print("   • Best approach has lowest coefficient of variation")
     
     return all_results, all_sims, best_approach
 
@@ -546,43 +717,73 @@ def create_comprehensive_analysis(all_sims, best_approach):
         best_approach: Name of the best performing approach
     """
     print(f"\n" + "="*60)
-    print("CREATING COMPREHENSIVE ANALYSIS")
+    print("📊 CREATING COMPREHENSIVE ANALYSIS")
     print(f"="*60)
+    print("📝 DESCRIPTION:")
+    print("   • Model accuracy metrics calculation")
+    print("   • Interactive accuracy dashboard creation")
+    print("   • Comprehensive validation plots generation")
+    print("   • Comparative results visualization")
+    print(f"\n🎯 Using {best_approach} for detailed analysis...")
     
     # ============================================================================
     # DETAILED ANALYSIS USING BEST PERFORMING APPROACH
     # ============================================================================
     # Use the best performing simulation for comprehensive analysis and visualization
     best_sim = all_sims[best_approach]
-    print(f"Using {best_approach} for detailed analysis...")
     
     # ============================================================================
     # STEP 1: QUANTITATIVE ACCURACY METRICS
     # ============================================================================
     # Calculate statistical metrics to assess model accuracy and performance
-    print("\nCalculating model accuracy metrics...")
+    print("\n📈 STEP 1: CALCULATING MODEL ACCURACY METRICS")
+    print("-" * 50)
+    print("🔍 Computing statistical metrics to assess model performance...")
+    print("   • Accuracy assessment across different scenarios")
+    print("   • Statistical validation of model predictions")
+    print("   • Performance benchmarking against target prevalence")
     calculate_model_accuracy_metrics(best_sim)
+    print("✅ Model accuracy metrics calculated successfully!")
     
     # ============================================================================
     # STEP 2: INTERACTIVE ACCURACY DASHBOARD
     # ============================================================================
     # Create comprehensive dashboard with multiple visualization panels
-    print("Creating accuracy dashboard...")
+    print("\n📊 STEP 2: CREATING INTERACTIVE ACCURACY DASHBOARD")
+    print("-" * 50)
+    print("🎛️  Building comprehensive dashboard with multiple visualization panels...")
+    print("   • Interactive analysis tools")
+    print("   • Multi-panel visualization dashboard")
+    print("   • Real-time data exploration capabilities")
     create_accuracy_dashboard(best_sim)
+    print("✅ Interactive accuracy dashboard created successfully!")
     
     # ============================================================================
     # STEP 3: COMPREHENSIVE VALIDATION PLOTS
     # ============================================================================
     # Generate detailed validation plots including dwell time analysis,
     # state transitions, and model accuracy assessments
-    print("Creating validation plots...")
+    print("\n📈 STEP 3: GENERATING COMPREHENSIVE VALIDATION PLOTS")
+    print("-" * 50)
+    print("🎨 Creating detailed validation plots...")
+    print("   • Disease progression and state transition diagrams")
+    print("   • Dwell time analysis plots")
+    print("   • Model accuracy assessment visualizations")
+    print("   • Prevalence stability over time plots")
     create_validation_plots(best_sim)
+    print("✅ Comprehensive validation plots generated successfully!")
     
     # ============================================================================
     # STEP 4: COMPARATIVE VISUALIZATION
     # ============================================================================
     # Create comparative visualization showing all approaches side-by-side
-    print("Creating comparative results plot...")
+    print("\n📊 STEP 4: CREATING COMPARATIVE VISUALIZATION")
+    print("-" * 50)
+    print("🔄 Generating side-by-side comparison plots...")
+    print("   • All approaches comparison visualization")
+    print("   • Direct performance comparison plots")
+    print("   • Combined results analysis")
+    
     results_dict = {}
     for name, sim in all_sims.items():
         results_dict[name] = sim.results.flatten()
@@ -594,7 +795,14 @@ def create_comprehensive_analysis(all_sims, best_approach):
                      heightfold=1.5,
                      outdir='results/comparison')
     
-    print("✓ All analysis and visualizations completed")
+    print("✅ Comparative visualization created successfully!")
+    print("\n🎉 ALL ANALYSIS AND VISUALIZATIONS COMPLETED!")
+    print("📁 Results saved to 'results/' directory")
+    print("🔍 Check the following locations for outputs:")
+    print("   • results/comparison/ - Comparative visualization plots")
+    print("   • results/validation/ - Model validation plots and dashboards")
+    print("   • TB_Model_Validation_*.csv - Detailed simulation data")
+    print("   • TB_Model_Validation_*.json - Structured results data")
 
 
 if __name__ == '__main__':
@@ -606,39 +814,87 @@ if __name__ == '__main__':
     - Dynamic control: Real-time parameter adjustment based on prevalence
     - Analysis: Comprehensive comparison and visualization of results
     """
+    # ============================================================================
+    # EXECUTION INITIALIZATION
+    # ============================================================================
     # Set target prevalence (1% = 0.01)
     target_prevalence = 0.01
     
-    print("TB SIMULATION: RUNNING ALL APPROACHES")
-    print("="*60)
-    print("This will run two approaches and their comparison:")
-    print("1. Static calibrated parameters")
-    print("2. Dynamic prevalence controller") 
-    print("3. Comprehensive comparison of both approaches")
-    print("\nStarting execution...")
+    print("="*80)
+    print("🦠 TB SIMULATION: COMPREHENSIVE COMPARISON")
+    print("="*80)
+    print("📋 EXECUTION PLAN:")
+    print("   • Phase 1: Static Calibrated Parameters Simulation")
+    print("   • Phase 2: Dynamic Prevalence Controller Simulation") 
+    print("   • Phase 3: Comprehensive Comparison Analysis")
+    print("   • Phase 4: Results Visualization and Dashboard Creation")
+    print("   • Phase 5: Performance Summary and Recommendations")
+    print("\n⏱️  ESTIMATED RUNTIME: 5-10 minutes")
+    print("📁  OUTPUT LOCATION: 'results/' directory")
+    print("🎯  TARGET PREVALENCE: 1% (0.01) with ±0.2% tolerance")
+    print("\n🚀 Starting execution...")
+    print("="*80)
     
     # ============================================================================
-    # EXECUTION PHASE
+    # PHASE 1: SIMULATION EXECUTION
     # ============================================================================
+    print("\n📊 PHASE 1: RUNNING SIMULATION APPROACHES")
+    print("-" * 50)
+    print("Executing both static and dynamic approaches...")
+    
     # Execute all simulation approaches and collect results
     all_results, all_sims, best_approach = run_all_approaches()
     
     # ============================================================================
-    # ANALYSIS PHASE
+    # PHASE 2: COMPREHENSIVE ANALYSIS
     # ============================================================================
+    print("\n📈 PHASE 2: GENERATING ANALYSIS AND VISUALIZATIONS")
+    print("-" * 50)
+    print("Creating comprehensive analysis using best performing approach...")
+    
     # Generate comprehensive analysis and visualizations using best approach
     create_comprehensive_analysis(all_sims, best_approach)
     
     # ============================================================================
-    # FINAL SUMMARY
+    # PHASE 3: FINAL SUMMARY AND RECOMMENDATIONS
     # ============================================================================
-    # Display final results and completion status
-    print(f"\n" + "="*60)
-    print("ALL APPROACHES COMPLETED SUCCESSFULLY!")
-    print(f"="*60)
-    print(f"Best performing approach: {best_approach}")
-    print("Results and plots have been generated.")
-    print("Check the 'results' directory for output files.")
+    print("\n🏆 PHASE 3: FINAL RESULTS AND RECOMMENDATIONS")
+    print("="*80)
+    print("✅ ALL SIMULATIONS COMPLETED SUCCESSFULLY!")
+    print("="*80)
+    
+    # Display detailed performance comparison
+    print("\n📊 PERFORMANCE COMPARISON SUMMARY:")
+    print("-" * 40)
+    for name, stats in all_results.items():
+        status = "🏆 BEST" if name == best_approach else "   "
+        print(f"{status} {name}:")
+        print(f"    Mean Prevalence: {stats['mean_prevalence']:.3%}")
+        print(f"    Coefficient of Variation: {stats['cv_prevalence']:.1f}%")
+        print(f"    Time in Target: {stats['target_percentage']:.1f}%")
+        print()
+    
+    # Display best approach recommendation
+    print(f"🎯 RECOMMENDED APPROACH: {best_approach}")
+    print(f"   This approach achieved the lowest coefficient of variation")
+    print(f"   (most stable prevalence over time)")
+    
+    # Display output information
+    print(f"\n📁 OUTPUT FILES GENERATED:")
+    print(f"   • results/comparison/ - Comparative visualization plots")
+    print(f"   • results/validation/ - Model validation plots and dashboards")
+    print(f"   • TB_Model_Validation_*.csv - Detailed simulation data")
+    print(f"   • TB_Model_Validation_*.json - Structured results data")
+    
+    print(f"\n🔍 NEXT STEPS:")
+    print(f"   1. Review the generated plots in the 'results/' directory")
+    print(f"   2. Analyze the CSV/JSON files for detailed data")
+    print(f"   3. Use the recommended approach for future simulations")
+    print(f"   4. Consider parameter sensitivity analysis if needed")
+    
+    print(f"\n" + "="*80)
+    print("🎉 TB SIMULATION COMPARISON COMPLETED SUCCESSFULLY!")
+    print("="*80)
     
     # Display plots if running interactively
     plt.show()

@@ -50,7 +50,7 @@ import matplotlib.pyplot as plt  # Plotting library
 import pprint as pprint  # Pretty printing for debugging
 import pandas as pd  # Data manipulation
 import numpy as np  # Numerical computations
-from tbsim.interventions.simple_immigration import SimpleImmigration  # Immigration intervention
+from tbsim.interventions.immigration import SimpleImmigration  # Immigration intervention
 
 # =============================================================================
 # SIMULATION PARAMETERS
@@ -576,7 +576,7 @@ def get_scenarios():
                 start=ss.date('1980-01-01'),
                 stop=ss.date('2030-12-31'),
             ),
-            'treatment': dict(ß
+            'treatment': dict(
                 treatment_success_rate=0.85,  # Slightly higher than standard (85% vs 60%)
                 start=ss.date('1980-01-01'),
                 stop=ss.date('2030-12-31'),
