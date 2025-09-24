@@ -29,7 +29,7 @@ def build_tbsim(sim_pars=None):
     
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
 
-    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=1.0, scenario_name='run_TB_Dwell_analyzer') # ANALYZER
+    dwell_analyzer = mtb.DwtAnalyzer(scenario_name='run_TB_Dwell_analyzer') # ANALYZER
 
     sim = ss.Sim(
         people=pop,
