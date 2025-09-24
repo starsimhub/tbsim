@@ -1,7 +1,7 @@
 import numpy as np
 import starsim as ss
 from tbsim import TBS
-from tbsim.interventions.interventions_eh import TBDiagnosticErrors
+from interventions_eh import TBDiagnosticErrors
 
 __all__ = ['TBDiagnostic', 'EnhancedTBDiagnostic']
 
@@ -239,7 +239,7 @@ class TBDiagnostic(ss.Intervention):
             selected = self.pars.coverage.filter(uids)
         else:
             # Use starsim bernoulli distribution for coverage selection
-            selected = ss.bernoulli(self.pars.coverage).filter(uids)
+            selected = ss.bernoulli(self.pars.coverage, strict=False).filter(uids)
         if len(selected) == 0:
             return
 
@@ -258,7 +258,7 @@ class TBDiagnostic(ss.Intervention):
         tb_cases = selected[has_tb]
         if len(tb_cases) > 0:
             try:
-                tb_test_positive = ss.bernoulli(self.pars.sensitivity).filter(tb_cases)
+                tb_test_positive = ss.bernoulli(self.pars.sensitivity, strict=False).filter(tb_cases)
                 test_positive[has_tb] = np.isin(selected[has_tb], tb_test_positive)
             except Exception as e:
                 raise AssertionError(TBDiagnosticErrors.sensitivity_test_failed(e, self.pars.sensitivity))
@@ -267,7 +267,7 @@ class TBDiagnostic(ss.Intervention):
         non_tb_cases = selected[~has_tb]
         if len(non_tb_cases) > 0:
             try:
-                non_tb_test_positive = ss.bernoulli(1 - self.pars.specificity).filter(non_tb_cases)
+                non_tb_test_positive = ss.bernoulli(1 - self.pars.specificity, strict=False).filter(non_tb_cases)
                 test_positive[~has_tb] = np.isin(selected[~has_tb], non_tb_test_positive)
             except Exception as e:
                 raise AssertionError(TBDiagnosticErrors.specificity_test_failed(e, self.pars.specificity))
@@ -567,7 +567,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         if isinstance(self.pars.coverage, ss.Dist):
             selected = self.pars.coverage.filter(uids)
         else:
-            selected = ss.bernoulli(self.pars.coverage).filter(uids)
+            selected = ss.bernoulli(self.pars.coverage, strict=False).filter(uids)
         if len(selected) == 0:
             return
 

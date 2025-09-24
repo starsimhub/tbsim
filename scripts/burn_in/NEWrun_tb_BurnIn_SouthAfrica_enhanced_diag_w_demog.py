@@ -94,7 +94,7 @@ TIME_POINTS_PER_YEAR = 1  # 1 = annual (January 1st), 2 = semi-annual, 12 = mont
 import starsim as ss
 import tbsim as mtb
 from tbsim.comorbidities.hiv.hiv import HIVState
-from tbsim.interventions.enhanced_tb_diagnostic import EnhancedTBDiagnostic, create_enhanced_diagnostic_scenarios
+from tbsim.interventions.tb_diagnostic import EnhancedTBDiagnostic, create_enhanced_diagnostic_scenarios
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
