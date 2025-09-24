@@ -10,10 +10,10 @@ from .config import *
 from .interventions.interventions import *
 from .interventions.tb_health_seeking import *
 from .interventions.tb_diagnostic import *
-from .interventions.enhanced_tb_diagnostic import *
+# from .interventions.enhanced_tb_diagnostic import *
 from .interventions.tb_treatment import *
-from .interventions.enhanced_tb_treatment import *
-from .interventions.enhanced_tb_treatment import create_dots_treatment, create_dots_improved_treatment, create_first_line_treatment
+# from .interventions.enhanced_tb_treatment import *
+# from .interventions.enhanced_tb_treatment import create_dots_treatment, create_dots_improved_treatment, create_first_line_treatment
 from .interventions.tpt import *
 from .interventions.bcg import *
 from .interventions.beta import BetaByYear
