@@ -34,26 +34,26 @@ ui <- fluidPage(
       
       # Basic simulation parameters
       h4("Basic Settings"),
-      numericInput("n_agents", "Population Size", value = 1000, min = 100, max = 10000, step = 100),
+      sliderInput("n_agents", "Population Size", value = 1000, min = 100, max = 10000, step = 100),
       dateInput("start_date", "Start Date", value = "1940-01-01"),
       dateInput("end_date", "End Date", value = "2010-12-31"),
-      numericInput("dt", "Time Step (days)", value = 7, min = 1, max = 30),
-      numericInput("rand_seed", "Random Seed", value = 1, min = 1, max = 10000),
+      sliderInput("dt", "Time Step (days)", value = 7, min = 1, max = 30, step = 1),
+      sliderInput("rand_seed", "Random Seed", value = 1, min = 1, max = 10000, step = 1),
       
       # TB-specific parameters
       h4("TB Disease Parameters"),
-      numericInput("init_prev", "Initial Prevalence", value = 0.01, min = 0, max = 1, step = 0.001),
-      numericInput("beta", "Transmission Rate (per year)", value = 0.0025, min = 0, max = 0.1, step = 0.0001),
-      numericInput("p_latent_fast", "Probability of Fast Latent TB", value = 0.1, min = 0, max = 1, step = 0.01),
+      sliderInput("init_prev", "Initial Prevalence", value = 0.01, min = 0, max = 1, step = 0.001),
+      sliderInput("beta", "Transmission Rate (per year)", value = 0.0025, min = 0, max = 0.1, step = 0.0001),
+      sliderInput("p_latent_fast", "Probability of Fast Latent TB", value = 0.1, min = 0, max = 1, step = 0.01),
       
       # Demographics
       h4("Demographics"),
-      numericInput("birth_rate", "Birth Rate (per 1000)", value = 20, min = 0, max = 100),
-      numericInput("death_rate", "Death Rate (per 1000)", value = 15, min = 0, max = 100),
+      sliderInput("birth_rate", "Birth Rate (per 1000)", value = 20, min = 0, max = 100, step = 1),
+      sliderInput("death_rate", "Death Rate (per 1000)", value = 15, min = 0, max = 100, step = 1),
       
       # Network parameters
       h4("Social Network"),
-      numericInput("n_contacts", "Average Contacts per Person", value = 5, min = 1, max = 50),
+      sliderInput("n_contacts", "Average Contacts per Person", value = 5, min = 1, max = 50, step = 1),
       
       # Action buttons
       br(),
@@ -135,17 +135,17 @@ server <- function(input, output, session) {
   
   # Reset parameters to defaults
   observeEvent(input$reset_params, {
-    updateNumericInput(session, "n_agents", value = 1000)
+    updateSliderInput(session, "n_agents", value = 1000)
     updateDateInput(session, "start_date", value = as.Date("1940-01-01"))
     updateDateInput(session, "end_date", value = as.Date("2010-12-31"))
-    updateNumericInput(session, "dt", value = 7)
-    updateNumericInput(session, "rand_seed", value = 1)
-    updateNumericInput(session, "init_prev", value = 0.01)
-    updateNumericInput(session, "beta", value = 0.0025)
-    updateNumericInput(session, "p_latent_fast", value = 0.1)
-    updateNumericInput(session, "birth_rate", value = 20)
-    updateNumericInput(session, "death_rate", value = 15)
-    updateNumericInput(session, "n_contacts", value = 5)
+    updateSliderInput(session, "dt", value = 7)
+    updateSliderInput(session, "rand_seed", value = 1)
+    updateSliderInput(session, "init_prev", value = 0.01)
+    updateSliderInput(session, "beta", value = 0.0025)
+    updateSliderInput(session, "p_latent_fast", value = 0.1)
+    updateSliderInput(session, "birth_rate", value = 20)
+    updateSliderInput(session, "death_rate", value = 15)
+    updateSliderInput(session, "n_contacts", value = 5)
   })
   
   # Run simulation
