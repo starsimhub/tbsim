@@ -66,8 +66,8 @@ class TB(ss.Infection):
             ss.FloatArr('rr_activation', default=1.0),          # Multiplier on the latent-to-presymp rate
             ss.FloatArr('rr_clearance', default=1.0),           # Multiplier on the active-to-susceptible rate
             ss.FloatArr('rr_death', default=1.0),               # Multiplier on the active-to-dead rate
-            ss.State('on_treatment', default=False),
-            ss.State('ever_infected', default=False),           # Flag for ever infected
+            ss.BoolState('on_treatment', default=False),
+            ss.BoolState('ever_infected', default=False),           # Flag for ever infected
 
             ss.FloatArr('ti_presymp'),
             ss.FloatArr('ti_active'),
@@ -92,6 +92,10 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_LS_to_presym)
         rate[self.state[uids] == TBS.LATENT_FAST] = self.pars.rate_LF_to_presym
         rate *= self.rr_activation[uids]
+        
+        # Convert to numpy array and ensure rate is non-negative
+        rate = np.array(rate, dtype=float)
+        rate = np.maximum(rate, 0)
 
         prob = 1-np.exp(-rate)
         return prob
@@ -110,6 +114,11 @@ class TB(ss.Infection):
         # Could be more complex function of time in state, but exponential for now
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all()
         rate = np.full(len(uids), fill_value=self.pars.rate_presym_to_active)
+        
+        # Convert to numpy array and ensure rate is non-negative
+        rate = np.array(rate, dtype=float)
+        rate = np.maximum(rate, 0)
+        
         prob = 1-np.exp(-rate)
         return prob
 
@@ -119,6 +128,10 @@ class TB(ss.Infection):
         rate = np.full(len(uids), fill_value=self.pars.rate_active_to_clear)
         rate[self.on_treatment[uids]] = self.pars.rate_treatment_to_clear # Those on treatment have a different clearance rate
         rate *= self.rr_clearance[uids]
+        
+        # Convert to numpy array and ensure rate is non-negative
+        rate = np.array(rate, dtype=float)
+        rate = np.maximum(rate, 0)
 
         prob = 1-np.exp(-rate)
         return prob
@@ -131,6 +144,10 @@ class TB(ss.Infection):
         rate[self.state[uids] == TBS.ACTIVE_SMNEG] = self.pars.rate_smneg_to_dead
 
         rate *= self.rr_death[uids]
+        
+        # Convert to numpy array and ensure rate is non-negative
+        rate = np.array(rate, dtype=float)
+        rate = np.maximum(rate, 0)
 
         prob = 1-np.exp(-rate)
         return prob
@@ -142,7 +159,7 @@ class TB(ss.Infection):
         """
         return (self.on_treatment) | (self.state==TBS.ACTIVE_PRESYMP) | (self.state==TBS.ACTIVE_SMPOS) | (self.state==TBS.ACTIVE_SMNEG) | (self.state==TBS.ACTIVE_EXPTB)
 
-    def set_prognoses(self, uids, from_uids=None):
+    def set_prognoses(self, uids, from_uids=None, sources=None):
         super().set_prognoses(uids, from_uids)
 
         p = self.pars
