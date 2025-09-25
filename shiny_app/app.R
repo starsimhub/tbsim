@@ -62,16 +62,16 @@ ui <- fluidPage(
       
       # TB-specific parameters
       h4("TB Disease Parameters"),
-      sliderInput("init_prev", "Initial Prevalence", value = 0.01, min = 0, max = 1, step = 0.001),
-      sliderInput("beta", "Transmission Rate (per year)", value = 0.0025, min = 0, max = 0.1, step = 0.0001),
+      sliderInput("init_prev", "Initial Prevalence", value = 0.05, min = 0, max = 1, step = 0.001),
+      sliderInput("beta", "Transmission Rate (per year)", value = 0.1, min = 0, max = 1, step = 0.01),
       sliderInput("p_latent_fast", "Probability of Fast Latent TB", value = 0.1, min = 0, max = 1, step = 0.01),
       
       # TB State Transition Rates
       h4("TB State Transition Rates"),
-      sliderInput("rate_LS_to_presym", "Latent Slow → Pre-symptomatic (per day)", value = 3e-5, min = 0, max = 1e-3, step = 1e-6),
-      sliderInput("rate_LF_to_presym", "Latent Fast → Pre-symptomatic (per day)", value = 6e-3, min = 0, max = 0.1, step = 1e-4),
-      sliderInput("rate_presym_to_active", "Pre-symptomatic → Active (per day)", value = 3e-2, min = 0, max = 1, step = 1e-3),
-      sliderInput("rate_active_to_clear", "Active → Clearance (per day)", value = 2.4e-4, min = 0, max = 1e-2, step = 1e-5),
+      sliderInput("rate_LS_to_presym", "Latent Slow → Pre-symptomatic (per day)", value = 0.001, min = 0, max = 0.1, step = 0.0001),
+      sliderInput("rate_LF_to_presym", "Latent Fast → Pre-symptomatic (per day)", value = 0.01, min = 0, max = 0.1, step = 0.001),
+      sliderInput("rate_presym_to_active", "Pre-symptomatic → Active (per day)", value = 0.1, min = 0, max = 1, step = 0.01),
+      sliderInput("rate_active_to_clear", "Active → Clearance (per day)", value = 0.01, min = 0, max = 0.1, step = 0.001),
       sliderInput("rate_treatment_to_clear", "Treatment → Clearance (per year)", value = 6, min = 0, max = 50, step = 1),
       
       # TB Mortality Rates
@@ -144,6 +144,39 @@ ui <- fluidPage(
           plotlyOutput("transitions_plot", height = "400px")
         ),
         
+        # Advanced Visualizations tab
+        tabPanel("Advanced Visualizations",
+          h3("Advanced TB Analysis"),
+          fluidRow(
+            column(6,
+              h4("📊 Disease Prevalence Over Time"),
+              plotlyOutput("prevalence_plot", height = "400px")
+            ),
+            column(6,
+              h4("🔄 Transmission Flow"),
+              plotlyOutput("transmission_sankey", height = "400px")
+            )
+          ),
+          br(),
+          fluidRow(
+            column(12,
+              h4("📈 Interactive Time Series"),
+              plotlyOutput("interactive_timeseries", height = "500px")
+            )
+          ),
+          br(),
+          fluidRow(
+            column(6,
+              h4("🎯 Disease Progression"),
+              plotlyOutput("disease_progression", height = "400px")
+            ),
+            column(6,
+              h4("📉 Mortality Analysis"),
+              plotlyOutput("mortality_analysis", height = "400px")
+            )
+          )
+        ),
+        
         # Data tab
         tabPanel("Raw Data",
           h3("Raw Simulation Data"),
@@ -198,8 +231,8 @@ server <- function(input, output, session) {
     updateDateInput(session, "end_date", value = as.Date("2010-12-31"))
     updateSliderInput(session, "dt", value = 7)
     updateNumericInput(session, "rand_seed", value = 1)
-    updateSliderInput(session, "init_prev", value = 0.01)
-    updateSliderInput(session, "beta", value = 0.0025)
+    updateSliderInput(session, "init_prev", value = 0.05)
+    updateSliderInput(session, "beta", value = 0.1)
     updateSliderInput(session, "p_latent_fast", value = 0.1)
     updateSliderInput(session, "birth_rate", value = 20)
     updateSliderInput(session, "death_rate", value = 15)
@@ -349,53 +382,121 @@ server <- function(input, output, session) {
       presymp_data <- results$n_presymp
     }
     
-    # Create time series plot
+    # Create fancy interactive time series plot
     p <- plot_ly() %>%
     add_trace(
       x = time_data,
       y = susceptible_data,
       type = 'scatter',
-      mode = 'lines',
+      mode = 'lines+markers',
       name = 'Susceptible',
-      line = list(color = '#440154')
+      line = list(color = '#440154', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#440154', opacity = 0.7),
+      hovertemplate = '<b>Susceptible</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(68, 1, 84, 0.1)'
     ) %>%
     add_trace(
       x = time_data,
       y = infected_data,
       type = 'scatter',
-      mode = 'lines',
+      mode = 'lines+markers',
       name = 'Total Infected',
-      line = list(color = '#31688e')
+      line = list(color = '#31688e', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#31688e', opacity = 0.7),
+      hovertemplate = '<b>Total Infected</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(49, 104, 142, 0.1)'
     ) %>%
     add_trace(
       x = time_data,
       y = latent_data,
       type = 'scatter',
-      mode = 'lines',
+      mode = 'lines+markers',
       name = 'Latent TB',
-      line = list(color = '#35b779')
+      line = list(color = '#35b779', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#35b779', opacity = 0.7),
+      hovertemplate = '<b>Latent TB</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(53, 183, 121, 0.1)'
     ) %>%
     add_trace(
       x = time_data,
       y = presymp_data,
       type = 'scatter',
-      mode = 'lines',
+      mode = 'lines+markers',
       name = 'Pre-symptomatic',
-      line = list(color = '#fde725')
+      line = list(color = '#fde725', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#fde725', opacity = 0.7),
+      hovertemplate = '<b>Pre-symptomatic</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(253, 231, 37, 0.1)'
     ) %>%
     add_trace(
       x = time_data,
       y = active_data,
       type = 'scatter',
-      mode = 'lines',
+      mode = 'lines+markers',
       name = 'Active TB',
-      line = list(color = '#e16462')
+      line = list(color = '#e16462', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#e16462', opacity = 0.7),
+      hovertemplate = '<b>Active TB</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(225, 100, 98, 0.1)'
     ) %>%
     layout(
-      title = "TB Simulation Results (Real TBsim Model)",
-      xaxis = list(title = "Time (years)"),
-      yaxis = list(title = "Number of Individuals", type = "log"),
-      hovermode = 'x unified'
+      title = list(
+        text = "TB Simulation Results (Real TBsim Model)",
+        font = list(size = 20, color = '#2c3e50'),
+        x = 0.5,
+        xanchor = 'center'
+      ),
+      xaxis = list(
+        title = list(text = "Time (years)", font = list(size = 14, color = '#34495e')),
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12)
+      ),
+      yaxis = list(
+        title = list(text = "Number of Individuals", font = list(size = 14, color = '#34495e')),
+        type = "log",
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12)
+      ),
+      hovermode = 'x unified',
+      hoverlabel = list(
+        bgcolor = 'rgba(255,255,255,0.9)',
+        bordercolor = '#34495e',
+        font = list(size = 12, color = '#2c3e50')
+      ),
+      legend = list(
+        orientation = "v",
+        x = 1.02,
+        y = 1,
+        bgcolor = 'rgba(255,255,255,0.8)',
+        bordercolor = '#bdc3c7',
+        borderwidth = 1,
+        font = list(size = 12)
+      ),
+      plot_bgcolor = 'rgba(248,249,250,0.8)',
+      paper_bgcolor = 'rgba(255,255,255,0.9)',
+      margin = list(l = 60, r = 60, t = 80, b = 60),
+      showlegend = TRUE
+    ) %>%
+    config(
+      displayModeBar = TRUE,
+      modeBarButtonsToRemove = c('pan2d', 'lasso2d', 'select2d'),
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = "png",
+        filename = "tb_simulation",
+        height = 600,
+        width = 1000,
+        scale = 2
+      )
     )
     
     p
@@ -693,6 +794,281 @@ server <- function(input, output, session) {
         scrollX = TRUE
       )
     )
+  })
+  
+  # Advanced Visualizations
+  
+  # Disease Prevalence Plot
+  output$prevalence_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Calculate prevalence rates
+    total_pop <- results$n_susceptible + results$n_infected
+    prevalence_infected <- (results$n_infected / total_pop) * 100
+    prevalence_active <- (results$n_active / total_pop) * 100
+    prevalence_latent <- (results$n_latent / total_pop) * 100
+    
+    p <- plot_ly() %>%
+    add_trace(
+      x = time_data,
+      y = prevalence_infected,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Total Infected %',
+      line = list(color = '#31688e', width = 3),
+      marker = list(size = 4, color = '#31688e'),
+      hovertemplate = '<b>Total Infected</b><br>Time: %{x:.2f} years<br>Prevalence: %{y:.2f}%<extra></extra>'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = prevalence_active,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Active TB %',
+      line = list(color = '#e16462', width = 3),
+      marker = list(size = 4, color = '#e16462'),
+      hovertemplate = '<b>Active TB</b><br>Time: %{x:.2f} years<br>Prevalence: %{y:.2f}%<extra></extra>'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = prevalence_latent,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Latent TB %',
+      line = list(color = '#35b779', width = 3),
+      marker = list(size = 4, color = '#35b779'),
+      hovertemplate = '<b>Latent TB</b><br>Time: %{x:.2f} years<br>Prevalence: %{y:.2f}%<extra></extra>'
+    ) %>%
+    layout(
+      title = "TB Disease Prevalence Over Time",
+      xaxis = list(title = "Time (years)"),
+      yaxis = list(title = "Prevalence (%)"),
+      hovermode = 'x unified',
+      legend = list(orientation = "v", x = 1.02, y = 1)
+    )
+    
+    p
+  })
+  
+  # Transmission Sankey Diagram
+  output$transmission_sankey <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    
+    # Calculate flow rates between states
+    n_points <- length(results$time)
+    if (n_points > 1) {
+      # Calculate transitions
+      susceptible_to_infected <- diff(results$n_susceptible) * -1
+      latent_to_active <- diff(results$n_latent) * -1
+      active_to_clear <- diff(results$n_active) * -1
+      
+      # Create Sankey diagram
+      p <- plot_ly(
+        type = "sankey",
+        orientation = "h",
+        node = list(
+          label = c("Susceptible", "Latent", "Active", "Cleared"),
+          color = c('#440154', '#35b779', '#e16462', '#31688e'),
+          pad = 15,
+          thickness = 20,
+          line = list(color = "black", width = 0.5)
+        ),
+        link = list(
+          source = c(0, 1, 2),
+          target = c(1, 2, 3),
+          value = c(
+            mean(susceptible_to_infected, na.rm = TRUE),
+            mean(latent_to_active, na.rm = TRUE),
+            mean(active_to_clear, na.rm = TRUE)
+          )
+        )
+      ) %>%
+      layout(
+        title = "TB Disease Progression Flow",
+        font = list(size = 12)
+      )
+    } else {
+      # Fallback simple plot
+      p <- plot_ly() %>%
+      add_annotation(
+        text = "Insufficient data for Sankey diagram",
+        x = 0.5, y = 0.5,
+        xref = "paper", yref = "paper",
+        showarrow = FALSE,
+        font = list(size = 16)
+      ) %>%
+      layout(
+        xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+        yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+        plot_bgcolor = 'rgba(0,0,0,0)',
+        paper_bgcolor = 'rgba(0,0,0,0)'
+      )
+    }
+    
+    p
+  })
+  
+  # Interactive Time Series
+  output$interactive_timeseries <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Create interactive subplot
+    p1 <- plot_ly(
+      x = time_data,
+      y = results$n_susceptible,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Susceptible',
+      line = list(color = '#440154', width = 2),
+      hovertemplate = '<b>Susceptible</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(yaxis = list(title = "Susceptible", type = "log"))
+    
+    p2 <- plot_ly(
+      x = time_data,
+      y = results$n_infected,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Total Infected',
+      line = list(color = '#31688e', width = 2),
+      hovertemplate = '<b>Total Infected</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(yaxis = list(title = "Total Infected", type = "log"))
+    
+    p3 <- plot_ly(
+      x = time_data,
+      y = results$n_active,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Active TB',
+      line = list(color = '#e16462', width = 2),
+      hovertemplate = '<b>Active TB</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(yaxis = list(title = "Active TB", type = "log"))
+    
+    subplot(p1, p2, p3, nrows = 3, shareX = TRUE) %>%
+    layout(
+      title = "Interactive TB Simulation Time Series",
+      showlegend = FALSE,
+      margin = list(l = 60, r = 30, t = 50, b = 50)
+    )
+  })
+  
+  # Disease Progression
+  output$disease_progression <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Create stacked area chart
+    p <- plot_ly(
+      x = time_data,
+      y = results$n_susceptible,
+      type = 'scatter',
+      mode = 'lines',
+      fill = 'tonexty',
+      name = 'Susceptible',
+      line = list(color = '#440154', width = 0),
+      fillcolor = 'rgba(68, 1, 84, 0.6)'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = results$n_latent,
+      type = 'scatter',
+      mode = 'lines',
+      fill = 'tonexty',
+      name = 'Latent',
+      line = list(color = '#35b779', width = 0),
+      fillcolor = 'rgba(53, 183, 121, 0.6)'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = results$n_presymp,
+      type = 'scatter',
+      mode = 'lines',
+      fill = 'tonexty',
+      name = 'Pre-symptomatic',
+      line = list(color = '#fde725', width = 0),
+      fillcolor = 'rgba(253, 231, 37, 0.6)'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = results$n_active,
+      type = 'scatter',
+      mode = 'lines',
+      fill = 'tonexty',
+      name = 'Active',
+      line = list(color = '#e16462', width = 0),
+      fillcolor = 'rgba(225, 100, 98, 0.6)'
+    ) %>%
+    layout(
+      title = "Disease Progression Stacked View",
+      xaxis = list(title = "Time (years)"),
+      yaxis = list(title = "Population Count"),
+      hovermode = 'x unified'
+    )
+    
+    p
+  })
+  
+  # Mortality Analysis
+  output$mortality_analysis <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Calculate mortality rate over time
+    if (length(results$n_active) > 1) {
+      mortality_rate <- diff(results$n_active) / results$n_active[-1] * 100
+      mortality_rate <- c(0, mortality_rate) # Add initial value
+    } else {
+      mortality_rate <- rep(0, length(time_data))
+    }
+    
+    p <- plot_ly(
+      x = time_data,
+      y = mortality_rate,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Mortality Rate',
+      line = list(color = '#e74c3c', width = 3),
+      marker = list(size = 6, color = '#e74c3c'),
+      hovertemplate = '<b>Mortality Rate</b><br>Time: %{x:.2f} years<br>Rate: %{y:.2f}%<extra></extra>'
+    ) %>%
+    layout(
+      title = "TB Mortality Rate Over Time",
+      xaxis = list(title = "Time (years)"),
+      yaxis = list(title = "Mortality Rate (%)"),
+      shapes = list(
+        list(
+          type = "line",
+          x0 = min(time_data), x1 = max(time_data),
+          y0 = mean(mortality_rate, na.rm = TRUE), y1 = mean(mortality_rate, na.rm = TRUE),
+          line = list(color = "red", width = 2, dash = "dash")
+        )
+      ),
+      annotations = list(
+        list(
+          x = max(time_data) * 0.7,
+          y = mean(mortality_rate, na.rm = TRUE) * 1.1,
+          text = paste("Average:", round(mean(mortality_rate, na.rm = TRUE), 2), "%"),
+          showarrow = FALSE,
+          font = list(size = 12, color = "red")
+        )
+      )
+    )
+    
+    p
   })
 }
 
