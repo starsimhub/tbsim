@@ -204,79 +204,78 @@ server <- function(input, output, session) {
     updateSliderInput(session, "n_contacts", value = 5)
   })
   
-  # Run simulation using hybrid approach (TBsim-inspired but simplified)
+  # Run simulation using real TBsim model
   observeEvent(input$run_simulation, {
     simulation_status("Running simulation...")
     
     tryCatch({
-      # Use a simplified TB model inspired by TBsim but avoiding compatibility issues
-      n_agents <- input$n_agents
+      # Set random seed
+      set.seed(input$rand_seed)
+      
+      # Build TBsim simulation using the real model
+      sim_pars <- list(
+        dt = starsim$days(input$dt),
+        start = as.character(input$start_date),
+        stop = as.character(input$end_date),
+        rand_seed = as.integer(input$rand_seed),
+        verbose = 0
+      )
+      
+      # Create population
+      pop <- starsim$People(n_agents = input$n_agents)
+      
+      # Create TB disease model with working parameters
+      tb_pars <- list(
+        dt = starsim$days(input$dt),
+        start = as.character(input$start_date),
+        stop = as.character(input$end_date),
+        init_prev = starsim$bernoulli(p = input$init_prev),
+        beta = starsim$peryear(input$beta),
+        p_latent_fast = starsim$bernoulli(p = input$p_latent_fast)
+      )
+      
+      tb <- tbsim$TB(pars = tb_pars)
+      
+      # Create social network
+      net <- starsim$RandomNet(list(
+        n_contacts = starsim$poisson(lam = input$n_contacts),
+        dur = 0
+      ))
+      
+      # Create demographic processes
+      births <- starsim$Births(pars = list(birth_rate = input$birth_rate))
+      deaths <- starsim$Deaths(pars = list(death_rate = input$death_rate))
+      
+      # Create simulation
+      sim <- starsim$Sim(
+        people = pop,
+        networks = net,
+        diseases = tb,
+        demographics = list(deaths, births),
+        pars = sim_pars
+      )
+      
+      # Run simulation
+      sim$run()
+      
+      # Extract results from sim.results
+      results <- sim$results$flatten()
+      
+      # Create time vector based on simulation parameters
       n_days <- as.numeric(input$end_date - input$start_date)
-      dt <- input$dt
-      n_steps <- ceiling(n_days / dt)
+      time_days <- seq(0, n_days, by = input$dt)
+      time_years <- time_days / 365.25
       
-      # Create time series
-      time_days <- seq(0, n_days, by = dt)
-      time_years <- time_days / 365.25  # Convert to years
-      
-      # Initialize arrays
-      n_infected <- rep(0, length(time_days))
-      n_latent <- rep(0, length(time_days))
-      n_active <- rep(0, length(time_days))
-      n_susceptible <- rep(0, length(time_days))
-      
-      # Initial conditions
-      n_infected[1] <- round(n_agents * input$init_prev)
-      n_latent[1] <- round(n_infected[1] * 0.7)
-      n_active[1] <- round(n_infected[1] * 0.3)
-      n_susceptible[1] <- n_agents - n_infected[1]
-      
-      # Enhanced TB transmission model with all parameters
-      for (i in 2:length(time_days)) {
-        # Calculate transmission rate based on active cases with transmissibility factors
-        base_transmission <- input$beta * n_active[i-1] / n_agents * dt / 365.25
-        transmission_rate <- base_transmission * input$rel_trans_smpos * input$reltrans_het
-        
-        # New infections (S -> L)
-        new_infections <- rbinom(1, n_susceptible[i-1], min(transmission_rate, 1))
-        
-        # Latent progression (L -> A) with different rates for fast/slow
-        latent_slow <- n_latent[i-1] * (1 - input$p_latent_fast)
-        latent_fast <- n_latent[i-1] * input$p_latent_fast
-        
-        # Fast latent progression
-        latent_fast_to_active <- rbinom(1, latent_fast, input$rate_LF_to_presym * dt)
-        
-        # Slow latent progression
-        latent_slow_to_active <- rbinom(1, latent_slow, input$rate_LS_to_presym * dt)
-        
-        total_latent_to_active <- latent_fast_to_active + latent_slow_to_active
-        
-        # Pre-symptomatic to active progression
-        presymp_to_active <- rbinom(1, total_latent_to_active, input$rate_presym_to_active * dt)
-        
-        # Recovery and clearance (A -> S)
-        natural_clearance <- rbinom(1, n_active[i-1], input$rate_active_to_clear * dt)
-        treatment_clearance <- rbinom(1, n_active[i-1], input$rate_treatment_to_clear * dt / 365.25)
-        total_recoveries <- natural_clearance + treatment_clearance
-        
-        # TB-related deaths
-        tb_deaths <- rbinom(1, n_active[i-1], input$rate_smpos_to_dead * dt)
-        
-        # Update counts
-        n_susceptible[i] <- max(n_susceptible[i-1] - new_infections + total_recoveries, 0)
-        n_latent[i] <- max(n_latent[i-1] + new_infections - total_latent_to_active, 0)
-        n_active[i] <- max(n_active[i-1] + presymp_to_active - total_recoveries - tb_deaths, 0)
-        n_infected[i] <- n_latent[i] + n_active[i]
-      }
-      
-      # Store results
+      # Store results using actual TBsim results
       simulation_results(list(
         time = time_years,
-        n_infected = n_infected,
-        n_latent = n_latent,
-        n_active = n_active,
-        n_susceptible = n_susceptible,
+        n_infected = results$tb_n_infected,
+        n_latent = results$tb_n_latent_slow + results$tb_n_latent_fast,
+        n_active = results$tb_n_active,
+        n_susceptible = results$tb_n_susceptible,
+        n_presymp = results$tb_n_active_presymp,
+        sim = sim,
+        results = results,
         parameters = list(
           n_agents = input$n_agents,
           start_date = input$start_date,
@@ -311,21 +310,23 @@ server <- function(input, output, session) {
     
     results <- simulation_results()
     
-  # Handle different result formats
-  if (!is.null(results$time)) {
-    # New format with time in years
+  # Use actual TBsim results
+  if (!is.null(results$results)) {
+    # Real TBsim results format
     time_data <- results$time
     infected_data <- results$n_infected
     latent_data <- results$n_latent
     active_data <- results$n_active
     susceptible_data <- results$n_susceptible
+    presymp_data <- results$n_presymp
   } else {
-    # Fallback to old format
-    time_data <- results$results$t / 365.25
-    infected_data <- results$results$n_infected
-    latent_data <- results$results$n_latent
-    active_data <- results$results$n_active
-    susceptible_data <- rep(0, length(time_data))  # Default if not available
+    # Fallback format
+    time_data <- results$time
+    infected_data <- results$n_infected
+    latent_data <- results$n_latent
+    active_data <- results$n_active
+    susceptible_data <- results$n_susceptible
+    presymp_data <- results$n_presymp
   }
   
   # Create time series plot
@@ -356,6 +357,14 @@ server <- function(input, output, session) {
     ) %>%
     add_trace(
       x = time_data,
+      y = presymp_data,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Pre-symptomatic',
+      line = list(color = 'purple')
+    ) %>%
+    add_trace(
+      x = time_data,
       y = active_data,
       type = 'scatter',
       mode = 'lines',
@@ -363,7 +372,7 @@ server <- function(input, output, session) {
       line = list(color = 'darkred')
     ) %>%
     layout(
-      title = "TB Simulation Results (TBsim-Inspired Model)",
+      title = "TB Simulation Results (Enhanced TBsim Model)",
       xaxis = list(title = "Time (years)"),
       yaxis = list(title = "Number of Individuals"),
       hovermode = 'x unified'

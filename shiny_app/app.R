@@ -189,23 +189,26 @@ server <- function(input, output, session) {
     simulation_status("Running simulation...")
     
     tryCatch({
+      # Set random seed
+      set.seed(input$rand_seed)
+      
       # Build TBsim simulation using the real model
       sim_pars <- list(
         dt = starsim$days(input$dt),
-        start = starsim$date(input$start_date),
-        stop = starsim$date(input$end_date),
-        rand_seed = input$rand_seed,
+        start = as.character(input$start_date),
+        stop = as.character(input$end_date),
+        rand_seed = as.integer(input$rand_seed),
         verbose = 0
       )
       
       # Create population
       pop <- starsim$People(n_agents = input$n_agents)
       
-      # Create TB disease model with custom parameters
+      # Create TB disease model with working parameters
       tb_pars <- list(
         dt = starsim$days(input$dt),
-        start = starsim$date(input$start_date),
-        stop = starsim$date(input$end_date),
+        start = as.character(input$start_date),
+        stop = as.character(input$end_date),
         init_prev = starsim$bernoulli(p = input$init_prev),
         beta = starsim$peryear(input$beta),
         p_latent_fast = starsim$bernoulli(p = input$p_latent_fast)
@@ -238,15 +241,19 @@ server <- function(input, output, session) {
       # Extract results
       results <- sim$results$flatten()
       
-      # Convert time to years
-      time_years <- results$t / 365.25
+      # Create time vector based on simulation parameters
+      n_days <- as.numeric(input$end_date - input$start_date)
+      time_days <- seq(0, n_days, by = input$dt)
+      time_years <- time_days / 365.25
       
-      # Store results
+      # Store results using actual TBsim results
       simulation_results(list(
         time = time_years,
-        n_infected = results$n_infected,
-        n_latent = results$n_latent,
-        n_active = results$n_active,
+        n_infected = results$tb_n_infected,
+        n_latent = results$tb_n_latent_slow + results$tb_n_latent_fast,
+        n_active = results$tb_n_active,
+        n_susceptible = results$tb_n_susceptible,
+        n_presymp = results$tb_n_active_presymp,
         sim = sim,
         results = results,
         parameters = list(
@@ -281,37 +288,72 @@ server <- function(input, output, session) {
   output$results_plot <- renderPlotly({
     req(simulation_results())
     
-    results <- simulation_results()$results
+    results <- simulation_results()
+    
+    # Use actual TBsim results
+    if (!is.null(results$results)) {
+      # Real TBsim results format
+      time_data <- results$time
+      infected_data <- results$n_infected
+      latent_data <- results$n_latent
+      active_data <- results$n_active
+      susceptible_data <- results$n_susceptible
+      presymp_data <- results$n_presymp
+    } else {
+      # Fallback format
+      time_data <- results$time
+      infected_data <- results$n_infected
+      latent_data <- results$n_latent
+      active_data <- results$n_active
+      susceptible_data <- results$n_susceptible
+      presymp_data <- results$n_presymp
+    }
     
     # Create time series plot
     p <- plot_ly() %>%
       add_trace(
-        x = results$t,
-        y = results$n_infected,
+        x = time_data,
+        y = susceptible_data,
         type = 'scatter',
         mode = 'lines',
-        name = 'Infected',
+        name = 'Susceptible',
+        line = list(color = 'green')
+      ) %>%
+      add_trace(
+        x = time_data,
+        y = infected_data,
+        type = 'scatter',
+        mode = 'lines',
+        name = 'Total Infected',
         line = list(color = 'red')
       ) %>%
       add_trace(
-        x = results$t,
-        y = results$n_latent,
+        x = time_data,
+        y = latent_data,
         type = 'scatter',
         mode = 'lines',
-        name = 'Latent',
+        name = 'Latent TB',
         line = list(color = 'orange')
       ) %>%
       add_trace(
-        x = results$t,
-        y = results$n_active,
+        x = time_data,
+        y = presymp_data,
         type = 'scatter',
         mode = 'lines',
-        name = 'Active',
+        name = 'Pre-symptomatic',
+        line = list(color = 'purple')
+      ) %>%
+      add_trace(
+        x = time_data,
+        y = active_data,
+        type = 'scatter',
+        mode = 'lines',
+        name = 'Active TB',
         line = list(color = 'darkred')
       ) %>%
       layout(
-        title = "TB Simulation Results",
-        xaxis = list(title = "Time"),
+        title = "TB Simulation Results (Real TBsim Model)",
+        xaxis = list(title = "Time (years)"),
         yaxis = list(title = "Number of Individuals"),
         hovermode = 'x unified'
       )
