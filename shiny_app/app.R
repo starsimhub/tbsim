@@ -35,16 +35,52 @@ ui <- fluidPage(
       # Basic simulation parameters
       h4("Basic Settings"),
       sliderInput("n_agents", "Population Size", value = 1000, min = 100, max = 10000, step = 100),
-      dateInput("start_date", "Start Date", value = "1940-01-01"),
-      dateInput("end_date", "End Date", value = "2010-12-31"),
+      fluidRow(
+        column(4, dateInput("start_date", "Start Date", value = "1940-01-01")),
+        column(4, dateInput("end_date", "End Date", value = "2010-12-31", max = Sys.Date() + 365*50)),
+        column(4, numericInput("rand_seed", "Random Seed", value = 1, min = 1, max = 10000, step = 1))
+      ),
       sliderInput("dt", "Time Step (days)", value = 7, min = 1, max = 30, step = 1),
-      sliderInput("rand_seed", "Random Seed", value = 1, min = 1, max = 10000, step = 1),
       
       # TB-specific parameters
       h4("TB Disease Parameters"),
       sliderInput("init_prev", "Initial Prevalence", value = 0.01, min = 0, max = 1, step = 0.001),
       sliderInput("beta", "Transmission Rate (per year)", value = 0.0025, min = 0, max = 0.1, step = 0.0001),
       sliderInput("p_latent_fast", "Probability of Fast Latent TB", value = 0.1, min = 0, max = 1, step = 0.01),
+      
+      # TB State Transition Rates
+      h4("TB State Transition Rates"),
+      sliderInput("rate_LS_to_presym", "Latent Slow → Pre-symptomatic (per day)", value = 3e-5, min = 0, max = 1e-3, step = 1e-6),
+      sliderInput("rate_LF_to_presym", "Latent Fast → Pre-symptomatic (per day)", value = 6e-3, min = 0, max = 0.1, step = 1e-4),
+      sliderInput("rate_presym_to_active", "Pre-symptomatic → Active (per day)", value = 3e-2, min = 0, max = 1, step = 1e-3),
+      sliderInput("rate_active_to_clear", "Active → Clearance (per day)", value = 2.4e-4, min = 0, max = 1e-2, step = 1e-5),
+      sliderInput("rate_treatment_to_clear", "Treatment → Clearance (per year)", value = 6, min = 0, max = 50, step = 1),
+      
+      # TB Mortality Rates
+      h4("TB Mortality Rates"),
+      sliderInput("rate_exptb_to_dead", "Extra-Pulmonary TB → Death (per day)", value = 0.15 * 4.5e-4, min = 0, max = 1e-3, step = 1e-6),
+      sliderInput("rate_smpos_to_dead", "Smear Positive → Death (per day)", value = 4.5e-4, min = 0, max = 1e-3, step = 1e-6),
+      sliderInput("rate_smneg_to_dead", "Smear Negative → Death (per day)", value = 0.3 * 4.5e-4, min = 0, max = 1e-3, step = 1e-6),
+      
+      # TB Transmissibility
+      h4("TB Transmissibility"),
+      sliderInput("rel_trans_presymp", "Pre-symptomatic Relative Transmissibility", value = 0.1, min = 0, max = 1, step = 0.01),
+      sliderInput("rel_trans_smpos", "Smear Positive Relative Transmissibility", value = 1.0, min = 0, max = 2, step = 0.1),
+      sliderInput("rel_trans_smneg", "Smear Negative Relative Transmissibility", value = 0.3, min = 0, max = 1, step = 0.01),
+      sliderInput("rel_trans_exptb", "Extra-Pulmonary Relative Transmissibility", value = 0.05, min = 0, max = 1, step = 0.01),
+      sliderInput("rel_trans_treatment", "Treatment Effect on Transmissibility", value = 0.5, min = 0, max = 1, step = 0.01),
+      
+      # TB Susceptibility
+      h4("TB Susceptibility"),
+      sliderInput("rel_sus_latentslow", "Latent Slow Relative Susceptibility", value = 0.20, min = 0, max = 1, step = 0.01),
+      
+      # TB Diagnostics
+      h4("TB Diagnostics"),
+      sliderInput("cxr_asymp_sens", "Chest X-ray Sensitivity (asymptomatic)", value = 1.0, min = 0, max = 1, step = 0.01),
+      
+      # TB Heterogeneity
+      h4("TB Heterogeneity"),
+      sliderInput("reltrans_het", "Transmission Heterogeneity", value = 1.0, min = 0.1, max = 5, step = 0.1),
       
       # Demographics
       h4("Demographics"),
@@ -139,7 +175,7 @@ server <- function(input, output, session) {
     updateDateInput(session, "start_date", value = as.Date("1940-01-01"))
     updateDateInput(session, "end_date", value = as.Date("2010-12-31"))
     updateSliderInput(session, "dt", value = 7)
-    updateSliderInput(session, "rand_seed", value = 1)
+    updateNumericInput(session, "rand_seed", value = 1)
     updateSliderInput(session, "init_prev", value = 0.01)
     updateSliderInput(session, "beta", value = 0.0025)
     updateSliderInput(session, "p_latent_fast", value = 0.1)
@@ -148,17 +184,16 @@ server <- function(input, output, session) {
     updateSliderInput(session, "n_contacts", value = 5)
   })
   
-  # Run simulation
+  # Run simulation using real TBsim model
   observeEvent(input$run_simulation, {
     simulation_status("Running simulation...")
     
     tryCatch({
-      # Build simulation parameters
-      spars <- list(
-        unit = 'day',
-        dt = input$dt,
-        start = sciris$date(input$start_date),
-        stop = sciris$date(input$end_date),
+      # Build TBsim simulation using the real model
+      sim_pars <- list(
+        dt = starsim$days(input$dt),
+        start = starsim$date(input$start_date),
+        stop = starsim$date(input$end_date),
         rand_seed = input$rand_seed,
         verbose = 0
       )
@@ -166,15 +201,17 @@ server <- function(input, output, session) {
       # Create population
       pop <- starsim$People(n_agents = input$n_agents)
       
-      # Create TB disease model
+      # Create TB disease model with custom parameters
       tb_pars <- list(
-        unit = 'day',
-        dt = input$dt,
-        beta = starsim$rate_prob(input$beta, unit = 'year'),
+        dt = starsim$days(input$dt),
+        start = starsim$date(input$start_date),
+        stop = starsim$date(input$end_date),
         init_prev = starsim$bernoulli(p = input$init_prev),
+        beta = starsim$peryear(input$beta),
         p_latent_fast = starsim$bernoulli(p = input$p_latent_fast)
       )
-      tb <- tbsim$TB(tb_pars)
+      
+      tb <- tbsim$TB(pars = tb_pars)
       
       # Create social network
       net <- starsim$RandomNet(list(
@@ -192,7 +229,7 @@ server <- function(input, output, session) {
         networks = net,
         diseases = tb,
         demographics = list(deaths, births),
-        pars = spars
+        pars = sim_pars
       )
       
       # Run simulation
@@ -201,8 +238,15 @@ server <- function(input, output, session) {
       # Extract results
       results <- sim$results$flatten()
       
+      # Convert time to years
+      time_years <- results$t / 365.25
+      
       # Store results
       simulation_results(list(
+        time = time_years,
+        n_infected = results$n_infected,
+        n_latent = results$n_latent,
+        n_active = results$n_active,
         sim = sim,
         results = results,
         parameters = list(
