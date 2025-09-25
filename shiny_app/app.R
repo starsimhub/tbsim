@@ -92,13 +92,6 @@ ui <- fluidPage(
       h4("TB Susceptibility"),
       sliderInput("rel_sus_latentslow", "Latent Slow Relative Susceptibility", value = 0.20, min = 0, max = 1, step = 0.01),
       
-      # TB Diagnostics
-      h4("TB Diagnostics"),
-      sliderInput("cxr_asymp_sens", "Chest X-ray Sensitivity (asymptomatic)", value = 1.0, min = 0, max = 1, step = 0.01),
-      
-      # TB Heterogeneity
-      h4("TB Heterogeneity"),
-      sliderInput("reltrans_het", "Transmission Heterogeneity", value = 1.0, min = 0.1, max = 5, step = 0.1),
       
       # Demographics
       h4("Demographics"),
@@ -692,8 +685,6 @@ server <- function(input, output, session) {
         "TB Transmissibility",
         "TB Transmissibility",
         "TB Susceptibility",
-        "TB Diagnostics",
-        "TB Heterogeneity",
         "Demographics",
         "Demographics",
         "Social Network"
@@ -721,8 +712,6 @@ server <- function(input, output, session) {
         "Extra-Pulmonary Relative Transmissibility",
         "Treatment Effect on Transmissibility",
         "Latent Slow Relative Susceptibility",
-        "CXR Asymptomatic Sensitivity",
-        "Transmission Heterogeneity",
         "Birth Rate (per 1000)",
         "Death Rate (per 1000)",
         "Average Contacts per Person"
@@ -750,8 +739,6 @@ server <- function(input, output, session) {
         input$rel_trans_exptb,
         input$rel_trans_treatment,
         input$rel_sus_latentslow,
-        input$cxr_asymp_sens,
-        input$reltrans_het,
         input$birth_rate,
         input$death_rate,
         input$n_contacts
@@ -935,37 +922,66 @@ server <- function(input, output, session) {
     # Calculate flow rates between states
     n_points <- length(results$time)
     if (n_points > 1) {
-      # Calculate transitions
-      susceptible_to_infected <- diff(results$n_susceptible) * -1
-      latent_slow_to_active <- diff(results$n_latent_slow) * -1
-      latent_fast_to_active <- diff(results$n_latent_fast) * -1
-      active_to_clear <- diff(results$n_active) * -1
+      # Calculate transitions with more detailed states
+      # Use absolute values and ensure minimum flow for visibility
+      susceptible_to_latent_slow <- pmax(abs(diff(results$n_susceptible)) * 0.8, 1)
+      susceptible_to_latent_fast <- pmax(abs(diff(results$n_susceptible)) * 0.2, 1)
+      latent_slow_to_presymp <- pmax(abs(diff(results$n_latent_slow)), 1)
+      latent_fast_to_presymp <- pmax(abs(diff(results$n_latent_fast)), 1)
+      presymp_to_active <- pmax(abs(diff(results$n_presymp)), 1)
+      active_to_clear <- pmax(abs(diff(results$n_active)), 1)
       
-      # Create Sankey diagram
+      # Calculate death flows (using death data if available)
+      if (!is.null(results$n_deaths)) {
+        death_flow <- pmax(mean(results$n_deaths, na.rm = TRUE), 1)
+      } else {
+        death_flow <- 1  # Minimum flow for visibility
+      }
+      
+      # Create enhanced Sankey diagram with more states
+      # Ensure all flows are positive and visible
+      flow_values <- c(
+        mean(susceptible_to_latent_slow, na.rm = TRUE),
+        mean(susceptible_to_latent_fast, na.rm = TRUE),
+        mean(latent_slow_to_presymp, na.rm = TRUE),
+        mean(latent_fast_to_presymp, na.rm = TRUE),
+        mean(presymp_to_active, na.rm = TRUE),
+        mean(active_to_clear, na.rm = TRUE),
+        death_flow
+      )
+      
+      # Ensure minimum values for visibility
+      flow_values <- pmax(flow_values, 1)
+      
       p <- plot_ly(
         type = "sankey",
         orientation = "h",
         node = list(
-          label = c("Susceptible", "Latent Slow", "Latent Fast", "Active", "Cleared"),
-          color = c('#440154', '#35b779', '#1f9e89', '#e16462', '#31688e'),
+          label = c("Susceptible", "Latent Slow", "Latent Fast", "Pre-symptomatic", "Active", "Cleared", "Death"),
+          color = c('#440154', '#35b779', '#1f9e89', '#fde725', '#e16462', '#31688e', '#8e44ad'),
           pad = 15,
           thickness = 20,
           line = list(color = "black", width = 0.5)
         ),
         link = list(
-          source = c(0, 1, 2, 3),
-          target = c(1, 2, 3, 4),
-          value = c(
-            mean(susceptible_to_infected, na.rm = TRUE),
-            mean(latent_slow_to_active, na.rm = TRUE),
-            mean(latent_fast_to_active, na.rm = TRUE),
-            mean(active_to_clear, na.rm = TRUE)
+          source = c(0, 0, 1, 2, 3, 4, 4),
+          target = c(1, 2, 3, 3, 4, 5, 6),
+          value = flow_values,
+          color = c(
+            'rgba(53, 183, 121, 0.6)',
+            'rgba(31, 158, 137, 0.6)',
+            'rgba(253, 231, 37, 0.6)',
+            'rgba(253, 231, 37, 0.6)',
+            'rgba(225, 100, 98, 0.6)',
+            'rgba(49, 104, 142, 0.6)',
+            'rgba(142, 68, 173, 0.6)'
           )
         )
       ) %>%
       layout(
-        title = "TB Disease Progression Flow",
-        font = list(size = 12)
+        title = "Enhanced TB Disease Progression Flow",
+        font = list(size = 12),
+        margin = list(l = 50, r = 50, t = 50, b = 50)
       )
     } else {
       # Fallback simple plot
