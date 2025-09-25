@@ -26,10 +26,28 @@ pd <- import("pandas")
 
 # Define UI
 ui <- fluidPage(
-  titlePanel("TBsim - Tuberculosis Simulation Web Interface"),
+  # Custom header with logo
+  div(
+    style = "display: flex; align-items: center; margin-bottom: 20px; 
+             padding: 10px; background-color: #f8f9fa; border-radius: 5px;",
+    img(src = "logo.png", height = 60, style = "margin-right: 15px; vertical-align: middle;"),
+    h2("TBsim - Tuberculosis Simulation Web Interface", style = "margin: 0; color: #333;")
+  ),
   
   sidebarLayout(
     sidebarPanel(
+        # Action buttons at the top - side by side
+        div(
+          div(
+            actionButton("run_simulation", "Run Simulation", class = "btn-primary btn-lg"),
+            style = "display: inline-block; margin-right: 10px;"
+          ),
+          div(
+            actionButton("reset_params", "Reset to Defaults", class = "btn-secondary"),
+            style = "display: inline-block;"
+          )
+        ),
+        br(), br(),
       h3("Simulation Parameters"),
       
       # Basic simulation parameters
@@ -91,11 +109,6 @@ ui <- fluidPage(
       h4("Social Network"),
       sliderInput("n_contacts", "Average Contacts per Person", value = 5, min = 1, max = 50, step = 1),
       
-      # Action buttons
-      br(),
-      actionButton("run_simulation", "Run Simulation", class = "btn-primary btn-lg"),
-      br(), br(),
-      actionButton("reset_params", "Reset to Defaults", class = "btn-secondary"),
       
       # Status
       br(), br(),
@@ -109,10 +122,17 @@ ui <- fluidPage(
         # Results tab
         tabPanel("Results", 
           h3("Simulation Results"),
+          uiOutput("loading_spinner"),
           plotlyOutput("results_plot", height = "600px"),
           br(),
           h4("Summary Statistics"),
-          DT::dataTableOutput("summary_table")
+          DT::dataTableOutput("summary_table"),
+          br(),
+          h4("Simulation Parameters Used"),
+          DT::dataTableOutput("parameters_table"),
+          br(),
+          h4("Raw Simulation Parameters (my_pars)"),
+          verbatimTextOutput("my_pars_output")
         ),
         
         # Plots tab
@@ -168,6 +188,8 @@ server <- function(input, output, session) {
   # Reactive values to store simulation results
   simulation_results <- reactiveVal(NULL)
   simulation_status <- reactiveVal("Ready to run simulation")
+  simulation_running <- reactiveVal(FALSE)
+  my_pars <- reactiveVal(NULL)
   
   # Reset parameters to defaults
   observeEvent(input$reset_params, {
@@ -186,6 +208,7 @@ server <- function(input, output, session) {
   
   # Run simulation using real TBsim model
   observeEvent(input$run_simulation, {
+    simulation_running(TRUE)
     simulation_status("Running simulation...")
     
     tryCatch({
@@ -237,23 +260,25 @@ server <- function(input, output, session) {
       
       # Run simulation
       sim$run()
-      
+      my_pars_value <- sim$pars
+      my_pars(my_pars_value)
+
       # Extract results
       results <- sim$results$flatten()
       
       # Create time vector based on simulation parameters
       n_days <- as.numeric(input$end_date - input$start_date)
       time_days <- seq(0, n_days, by = input$dt)
-      time_years <- time_days / 365.25
+      time_years <- time_days / 365.25  # Convert days to years
       
-      # Store results using actual TBsim results
+      # Store results using actual TBsim results with proper data conversion
       simulation_results(list(
         time = time_years,
-        n_infected = results$tb_n_infected,
-        n_latent = results$tb_n_latent_slow + results$tb_n_latent_fast,
-        n_active = results$tb_n_active,
-        n_susceptible = results$tb_n_susceptible,
-        n_presymp = results$tb_n_active_presymp,
+        n_infected = as.numeric(results$tb_n_infected$tolist()),
+        n_latent = as.numeric(results$tb_n_latent_slow$tolist()) + as.numeric(results$tb_n_latent_fast$tolist()),
+        n_active = as.numeric(results$tb_n_active$tolist()),
+        n_susceptible = as.numeric(results$tb_n_susceptible$tolist()),
+        n_presymp = as.numeric(results$tb_n_active_presymp$tolist()),
         sim = sim,
         results = results,
         parameters = list(
@@ -273,15 +298,30 @@ server <- function(input, output, session) {
       
       simulation_status("Simulation completed successfully!")
       
+      simulation_running(FALSE)
+      
     }, error = function(e) {
       simulation_status(paste("Error:", e$message))
       simulation_results(NULL)
+      simulation_running(FALSE)
     })
   })
   
   # Status output
   output$status <- renderText({
     simulation_status()
+  })
+  
+  # Loading spinner output
+  output$loading_spinner <- renderUI({
+    if (simulation_running()) {
+      div(
+        style = "text-align: center; padding: 20px; color: #007bff; font-size: 18px; font-weight: bold;",
+        "🔄 Running simulation... Please wait"
+      )
+    } else {
+      NULL
+    }
   })
   
   # Main results plot
@@ -311,52 +351,52 @@ server <- function(input, output, session) {
     
     # Create time series plot
     p <- plot_ly() %>%
-      add_trace(
-        x = time_data,
-        y = susceptible_data,
-        type = 'scatter',
-        mode = 'lines',
-        name = 'Susceptible',
-        line = list(color = 'green')
-      ) %>%
-      add_trace(
-        x = time_data,
-        y = infected_data,
-        type = 'scatter',
-        mode = 'lines',
-        name = 'Total Infected',
-        line = list(color = 'red')
-      ) %>%
-      add_trace(
-        x = time_data,
-        y = latent_data,
-        type = 'scatter',
-        mode = 'lines',
-        name = 'Latent TB',
-        line = list(color = 'orange')
-      ) %>%
-      add_trace(
-        x = time_data,
-        y = presymp_data,
-        type = 'scatter',
-        mode = 'lines',
-        name = 'Pre-symptomatic',
-        line = list(color = 'purple')
-      ) %>%
-      add_trace(
-        x = time_data,
-        y = active_data,
-        type = 'scatter',
-        mode = 'lines',
-        name = 'Active TB',
-        line = list(color = 'darkred')
-      ) %>%
-      layout(
-        title = "TB Simulation Results (Real TBsim Model)",
-        xaxis = list(title = "Time (years)"),
-        yaxis = list(title = "Number of Individuals"),
-        hovermode = 'x unified'
-      )
+    add_trace(
+      x = time_data,
+      y = susceptible_data,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Susceptible',
+      line = list(color = '#440154')
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = infected_data,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Total Infected',
+      line = list(color = '#31688e')
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = latent_data,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent TB',
+      line = list(color = '#35b779')
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = presymp_data,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Pre-symptomatic',
+      line = list(color = '#fde725')
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = active_data,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Active TB',
+      line = list(color = '#e16462')
+    ) %>%
+    layout(
+      title = "TB Simulation Results (Real TBsim Model)",
+      xaxis = list(title = "Time (years)"),
+      yaxis = list(title = "Number of Individuals"),
+      hovermode = 'x unified'
+    )
     
     p
   })
@@ -465,10 +505,11 @@ server <- function(input, output, session) {
         round((params$end_date - params$start_date) / 365.25, 2),
         params$init_prev,
         params$beta,
-        max(results$n_infected, na.rm = TRUE),
-        max(results$n_infected, na.rm = TRUE),
-        max(results$n_latent, na.rm = TRUE),
-        max(results$n_active, na.rm = TRUE)
+        max(as.numeric(results$tb_n_infected$tolist()), na.rm = TRUE),
+        max(as.numeric(results$tb_n_infected$tolist()), na.rm = TRUE),
+        max(as.numeric(results$tb_n_latent_slow$tolist()) + 
+            as.numeric(results$tb_n_latent_fast$tolist()), na.rm = TRUE),
+        max(as.numeric(results$tb_n_active$tolist()), na.rm = TRUE)
       )
     )
     
@@ -481,6 +522,154 @@ server <- function(input, output, session) {
       ),
       rownames = FALSE
     )
+  })
+  
+  # Parameters table
+  output$parameters_table <- DT::renderDataTable({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    params <- results$parameters
+    
+    # Create comprehensive parameters table
+    parameters_data <- data.frame(
+      Category = c(
+        "Basic Settings",
+        "Basic Settings", 
+        "Basic Settings",
+        "Basic Settings",
+        "Basic Settings",
+        "TB Disease Parameters",
+        "TB Disease Parameters",
+        "TB Disease Parameters",
+        "TB State Transition Rates",
+        "TB State Transition Rates",
+        "TB State Transition Rates",
+        "TB State Transition Rates",
+        "TB State Transition Rates",
+        "TB Mortality Rates",
+        "TB Mortality Rates",
+        "TB Mortality Rates",
+        "TB Transmissibility",
+        "TB Transmissibility",
+        "TB Transmissibility",
+        "TB Transmissibility",
+        "TB Transmissibility",
+        "TB Susceptibility",
+        "TB Diagnostics",
+        "TB Heterogeneity",
+        "Demographics",
+        "Demographics",
+        "Social Network"
+      ),
+      Parameter = c(
+        "Population Size",
+        "Start Date",
+        "End Date", 
+        "Time Step (days)",
+        "Random Seed",
+        "Initial Prevalence",
+        "Transmission Rate (per year)",
+        "Probability of Fast Latent TB",
+        "Latent Slow → Pre-symptomatic (per day)",
+        "Latent Fast → Pre-symptomatic (per day)",
+        "Pre-symptomatic → Active (per day)",
+        "Active → Clearance (per day)",
+        "Treatment → Clearance (per year)",
+        "Extra-Pulmonary TB → Death (per day)",
+        "Smear Positive → Death (per day)",
+        "Smear Negative → Death (per day)",
+        "Pre-symptomatic Relative Transmissibility",
+        "Smear Positive Relative Transmissibility",
+        "Smear Negative Relative Transmissibility",
+        "Extra-Pulmonary Relative Transmissibility",
+        "Treatment Effect on Transmissibility",
+        "Latent Slow Relative Susceptibility",
+        "CXR Asymptomatic Sensitivity",
+        "Transmission Heterogeneity",
+        "Birth Rate (per 1000)",
+        "Death Rate (per 1000)",
+        "Average Contacts per Person"
+      ),
+      Value = c(
+        params$n_agents,
+        as.character(params$start_date),
+        as.character(params$end_date),
+        params$dt,
+        params$rand_seed,
+        params$init_prev,
+        params$beta,
+        params$p_latent_fast,
+        input$rate_LS_to_presym,
+        input$rate_LF_to_presym,
+        input$rate_presym_to_active,
+        input$rate_active_to_clear,
+        input$rate_treatment_to_clear,
+        input$rate_exptb_to_dead,
+        input$rate_smpos_to_dead,
+        input$rate_smneg_to_dead,
+        input$rel_trans_presymp,
+        input$rel_trans_smpos,
+        input$rel_trans_smneg,
+        input$rel_trans_exptb,
+        input$rel_trans_treatment,
+        input$rel_sus_latentslow,
+        input$cxr_asymp_sens,
+        input$reltrans_het,
+        input$birth_rate,
+        input$death_rate,
+        input$n_contacts
+      )
+    )
+    
+    DT::datatable(
+      parameters_data,
+      options = list(
+        pageLength = 15,
+        scrollY = "400px",
+        searching = TRUE,
+        ordering = TRUE
+      ),
+      rownames = FALSE,
+      filter = 'top'
+    )
+  })
+  
+  # Raw simulation parameters output
+  output$my_pars_output <- renderText({
+    req(my_pars())
+    
+    tryCatch({
+      # Convert SimPars object to dictionary first, then to R list
+      pars_dict <- my_pars()$to_dict()
+      pars_list <- py_to_r(pars_dict)
+      
+      # Create a detailed string representation
+      output_lines <- c()
+      output_lines <- c(output_lines, "=== SIMULATION PARAMETERS (my_pars) ===")
+      output_lines <- c(output_lines, paste("Type:", class(pars_list)))
+      output_lines <- c(output_lines, paste("Length:", length(pars_list)))
+      output_lines <- c(output_lines, "")
+      
+      # Add each parameter with its value
+      for (i in seq_along(pars_list)) {
+        param_name <- names(pars_list)[i]
+        param_value <- pars_list[[i]]
+        
+        output_lines <- c(output_lines, paste("Parameter", i, ":", param_name))
+        output_lines <- c(output_lines, paste("  Type:", class(param_value)))
+        output_lines <- c(output_lines, paste("  Value:", toString(param_value)))
+        output_lines <- c(output_lines, "")
+      }
+      
+      paste(output_lines, collapse = "\n")
+    }, error = function(e) {
+      # Fallback: try to get basic info about the object
+      paste("Error converting my_pars:", e$message, "\n",
+            "Object type:", class(my_pars()), "\n",
+            "Object length:", length(my_pars()), "\n",
+            "Note: sim.pars is a SimPars object, not a regular dictionary")
+    })
   })
   
   # Raw data table
