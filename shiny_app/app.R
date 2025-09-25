@@ -129,10 +129,7 @@ ui <- fluidPage(
           DT::dataTableOutput("summary_table"),
           br(),
           h4("Simulation Parameters Used"),
-          DT::dataTableOutput("parameters_table"),
-          br(),
-          h4("Raw Simulation Parameters (my_pars)"),
-          verbatimTextOutput("my_pars_output")
+          DT::dataTableOutput("parameters_table")
         ),
         
         # Plots tab
@@ -181,6 +178,14 @@ ui <- fluidPage(
         tabPanel("Raw Data",
           h3("Raw Simulation Data"),
           DT::dataTableOutput("raw_data_table")
+        ),
+        
+        # Simulation Parameters tab
+        tabPanel("Simulation Parameters",
+          h3("Detailed Simulation Parameters"),
+          p("This tab shows the complete simulation parameters object (my_pars) with all 24+ parameters used in the TBsim model."),
+          br(),
+          verbatimTextOutput("my_pars_output")
         ),
         
         # About tab
@@ -295,6 +300,20 @@ server <- function(input, output, session) {
       sim$run()
       my_pars_value <- sim$pars
       my_pars(my_pars_value)
+
+      # Print my_pars to console for debugging
+      cat("=== MY_PARS OBJECT ===\n")
+      cat("Object type:", my_pars_value, "\n")
+      # cat("Object type:", class(my_pars_value), "\n")
+      # cat("Object length:", length(my_pars_value), "\n")
+      # cat("Available methods/attributes:\n")
+      # tryCatch({
+      #   cat("String representation:\n")
+      #   print(my_pars_value$`__str__`())
+      # }, error = function(e) {
+      #   cat("Error getting string representation:", e$message, "\n")
+      # })
+      cat("=== END MY_PARS ===\n")
 
       # Extract results
       results <- sim$results$flatten()
@@ -1137,6 +1156,277 @@ server <- function(input, output, session) {
           x = max(time_data) * 0.7,
           y = mean(mortality_rate, na.rm = TRUE) * 1.1,
           text = paste("Average:", round(mean(mortality_rate, na.rm = TRUE), 2), "%"),
+          showarrow = FALSE,
+          font = list(size = 12, color = "red")
+        )
+      )
+    )
+    
+    p
+  })
+  
+  # TB Death Metrics
+  
+  # Death trends over time
+  output$death_trends_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Extract death metrics from results using correct key names
+    if ("tb_new_deaths" %in% names(results$results)) {
+      new_deaths <- as.numeric(results$results$tb_new_deaths$tolist())
+      new_deaths_15plus <- as.numeric(results$results$`tb_new_deaths_15+`$tolist())
+    } else {
+      # Fallback if death data not available
+      new_deaths <- rep(0, length(time_data))
+      new_deaths_15plus <- rep(0, length(time_data))
+    }
+    
+    p <- plot_ly() %>%
+      add_trace(
+        x = time_data,
+        y = new_deaths,
+        type = 'scatter',
+        mode = 'lines+markers',
+        name = 'All Ages',
+        line = list(color = '#e74c3c', width = 3),
+        marker = list(size = 4, color = '#e74c3c'),
+        hovertemplate = '<b>All Ages Deaths</b><br>Time: %{x:.2f} years<br>Deaths: %{y:,.0f}<extra></extra>'
+      ) %>%
+      add_trace(
+        x = time_data,
+        y = new_deaths_15plus,
+        type = 'scatter',
+        mode = 'lines+markers',
+        name = '15+ Years',
+        line = list(color = '#c0392b', width = 3),
+        marker = list(size = 4, color = '#c0392b'),
+        hovertemplate = '<b>15+ Years Deaths</b><br>Time: %{x:.2f} years<br>Deaths: %{y:,.0f}<extra></extra>'
+      ) %>%
+      layout(
+        title = "TB Deaths Over Time",
+        xaxis = list(title = "Time (years)"),
+        yaxis = list(title = "Number of Deaths", type = "log"),
+        hovermode = 'x unified',
+        legend = list(orientation = "v", x = 1.02, y = 1)
+      )
+    
+    p
+  })
+  
+  # Cumulative deaths plot
+  output$cumulative_deaths_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Extract cumulative death metrics using correct key names
+    if ("tb_cum_deaths" %in% names(results$results)) {
+      cum_deaths <- as.numeric(results$results$tb_cum_deaths$tolist())
+      cum_deaths_15plus <- as.numeric(results$results$`tb_cum_deaths_15+`$tolist())
+    } else {
+      # Fallback if death data not available
+      cum_deaths <- rep(0, length(time_data))
+      cum_deaths_15plus <- rep(0, length(time_data))
+    }
+    
+    p <- plot_ly() %>%
+      add_trace(
+        x = time_data,
+        y = cum_deaths,
+        type = 'scatter',
+        mode = 'lines',
+        name = 'All Ages (Cumulative)',
+        line = list(color = '#8e44ad', width = 3),
+        fill = 'tonexty',
+        fillcolor = 'rgba(142, 68, 173, 0.1)',
+        hovertemplate = '<b>All Ages Cumulative</b><br>Time: %{x:.2f} years<br>Total Deaths: %{y:,.0f}<extra></extra>'
+      ) %>%
+      add_trace(
+        x = time_data,
+        y = cum_deaths_15plus,
+        type = 'scatter',
+        mode = 'lines',
+        name = '15+ Years (Cumulative)',
+        line = list(color = '#9b59b6', width = 3),
+        fill = 'tonexty',
+        fillcolor = 'rgba(155, 89, 182, 0.1)',
+        hovertemplate = '<b>15+ Years Cumulative</b><br>Time: %{x:.2f} years<br>Total Deaths: %{y:,.0f}<extra></extra>'
+      ) %>%
+      layout(
+        title = "Cumulative TB Deaths",
+        xaxis = list(title = "Time (years)"),
+        yaxis = list(title = "Cumulative Deaths"),
+        hovermode = 'x unified',
+        legend = list(orientation = "v", x = 1.02, y = 1)
+      )
+    
+    p
+  })
+  
+  # Death summary statistics table
+  output$death_summary_table <- DT::renderDataTable({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    
+    # Extract death metrics using correct key names
+    if ("tb_new_deaths" %in% names(results$results)) {
+      new_deaths <- as.numeric(results$results$tb_new_deaths$tolist())
+      new_deaths_15plus <- as.numeric(results$results$`tb_new_deaths_15+`$tolist())
+      cum_deaths <- as.numeric(results$results$tb_cum_deaths$tolist())
+      cum_deaths_15plus <- as.numeric(results$results$`tb_cum_deaths_15+`$tolist())
+      deaths_ppy <- as.numeric(results$results$tb_deaths_ppy$tolist())
+    } else {
+      # Fallback if death data not available
+      new_deaths <- rep(0, length(results$time))
+      new_deaths_15plus <- rep(0, length(results$time))
+      cum_deaths <- rep(0, length(results$time))
+      cum_deaths_15plus <- rep(0, length(results$time))
+      deaths_ppy <- rep(0, length(results$time))
+    }
+    
+    # Calculate summary statistics
+    total_deaths <- max(cum_deaths, na.rm = TRUE)
+    total_deaths_15plus <- max(cum_deaths_15plus, na.rm = TRUE)
+    peak_daily_deaths <- max(new_deaths, na.rm = TRUE)
+    peak_daily_deaths_15plus <- max(new_deaths_15plus, na.rm = TRUE)
+    avg_death_rate <- mean(deaths_ppy, na.rm = TRUE)
+    max_death_rate <- max(deaths_ppy, na.rm = TRUE)
+    
+    # Create summary table
+    death_summary <- data.frame(
+      Metric = c(
+        "Total TB Deaths (All Ages)",
+        "Total TB Deaths (15+ Years)",
+        "Peak Daily Deaths (All Ages)",
+        "Peak Daily Deaths (15+ Years)",
+        "Average Death Rate (per person-year)",
+        "Maximum Death Rate (per person-year)",
+        "Death Rate (15+ Years as % of Total)",
+        "Simulation Duration (years)"
+      ),
+      Value = c(
+        format(total_deaths, big.mark = ","),
+        format(total_deaths_15plus, big.mark = ","),
+        format(peak_daily_deaths, big.mark = ","),
+        format(peak_daily_deaths_15plus, big.mark = ","),
+        sprintf("%.6f", avg_death_rate),
+        sprintf("%.6f", max_death_rate),
+        sprintf("%.1f%%", if(total_deaths > 0) (total_deaths_15plus / total_deaths * 100) else 0),
+        sprintf("%.1f", max(results$time, na.rm = TRUE))
+      )
+    )
+    
+    DT::datatable(
+      death_summary,
+      options = list(
+        pageLength = 10,
+        searching = FALSE,
+        ordering = FALSE
+      ),
+      rownames = FALSE
+    )
+  })
+  
+  # Age-specific deaths plot
+  output$age_specific_deaths_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Extract age-specific death data using correct key names
+    if ("tb_new_deaths" %in% names(results$results)) {
+      new_deaths_all <- as.numeric(results$results$tb_new_deaths$tolist())
+      new_deaths_15plus <- as.numeric(results$results$`tb_new_deaths_15+`$tolist())
+      new_deaths_under15 <- new_deaths_all - new_deaths_15plus
+    } else {
+      # Fallback if death data not available
+      new_deaths_all <- rep(0, length(time_data))
+      new_deaths_15plus <- rep(0, length(time_data))
+      new_deaths_under15 <- rep(0, length(time_data))
+    }
+    
+    # Create stacked area chart
+    p <- plot_ly(
+      x = time_data,
+      y = new_deaths_under15,
+      type = 'scatter',
+      mode = 'lines',
+      fill = 'tonexty',
+      name = 'Under 15 Years',
+      line = list(color = '#f39c12', width = 0),
+      fillcolor = 'rgba(243, 156, 18, 0.6)',
+      hovertemplate = '<b>Under 15 Years</b><br>Time: %{x:.2f} years<br>Deaths: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = new_deaths_15plus,
+      type = 'scatter',
+      mode = 'lines',
+      fill = 'tonexty',
+      name = '15+ Years',
+      line = list(color = '#e67e22', width = 0),
+      fillcolor = 'rgba(230, 126, 34, 0.6)',
+      hovertemplate = '<b>15+ Years</b><br>Time: %{x:.2f} years<br>Deaths: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(
+      title = "Age-Specific TB Deaths",
+      xaxis = list(title = "Time (years)"),
+      yaxis = list(title = "Number of Deaths"),
+      hovermode = 'x unified',
+      legend = list(orientation = "v", x = 1.02, y = 1)
+    )
+    
+    p
+  })
+  
+  # Death rate analysis plot
+  output$death_rate_analysis_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Extract death rate data
+    if ("tb_deaths_ppy" %in% names(results$results)) {
+      deaths_ppy <- as.numeric(results$results$tb_deaths_ppy$tolist())
+    } else {
+      # Fallback if death rate data not available
+      deaths_ppy <- rep(0, length(time_data))
+    }
+    
+    p <- plot_ly(
+      x = time_data,
+      y = deaths_ppy,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Death Rate',
+      line = list(color = '#e74c3c', width = 3),
+      marker = list(size = 4, color = '#e74c3c'),
+      hovertemplate = '<b>Death Rate</b><br>Time: %{x:.2f} years<br>Rate: %{y:.6f} per person-year<extra></extra>'
+    ) %>%
+    layout(
+      title = "TB Death Rate Over Time",
+      xaxis = list(title = "Time (years)"),
+      yaxis = list(title = "Death Rate (per person-year)", type = "log"),
+      shapes = list(
+        list(
+          type = "line",
+          x0 = min(time_data), x1 = max(time_data),
+          y0 = mean(deaths_ppy, na.rm = TRUE), y1 = mean(deaths_ppy, na.rm = TRUE),
+          line = list(color = "red", width = 2, dash = "dash")
+        )
+      ),
+      annotations = list(
+        list(
+          x = max(time_data) * 0.7,
+          y = mean(deaths_ppy, na.rm = TRUE) * 1.1,
+          text = paste("Average:", sprintf("%.6f", mean(deaths_ppy, na.rm = TRUE))),
           showarrow = FALSE,
           font = list(size = 12, color = "red")
         )
