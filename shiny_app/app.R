@@ -302,18 +302,7 @@ server <- function(input, output, session) {
       my_pars(my_pars_value)
 
       # Print my_pars to console for debugging
-      cat("=== MY_PARS OBJECT ===\n")
-      cat("Object type:", my_pars_value, "\n")
-      # cat("Object type:", class(my_pars_value), "\n")
-      # cat("Object length:", length(my_pars_value), "\n")
-      # cat("Available methods/attributes:\n")
-      # tryCatch({
-      #   cat("String representation:\n")
-      #   print(my_pars_value$`__str__`())
-      # }, error = function(e) {
-      #   cat("Error getting string representation:", e$message, "\n")
-      # })
-      cat("=== END MY_PARS ===\n")
+      print(my_pars_value)
 
       # Extract results
       results <- sim$results$flatten()
@@ -784,7 +773,9 @@ server <- function(input, output, session) {
   
   # Raw simulation parameters output
   output$my_pars_output <- renderText({
-    req(my_pars())
+    if (is.null(my_pars())) {
+      return("No simulation has been run yet. Please run a simulation first to see the parameters.")
+    }
     
     tryCatch({
       # Use Python's built-in dict() conversion to avoid sciris issues
