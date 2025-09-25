@@ -768,35 +768,56 @@ server <- function(input, output, session) {
     req(my_pars())
     
     tryCatch({
-      # Convert SimPars object to dictionary first, then to R list
-      pars_dict <- my_pars()$to_dict()
+      # Use Python's built-in dict() conversion to avoid sciris issues
+      pars_dict <- my_pars()$dict()
       pars_list <- py_to_r(pars_dict)
       
-      # Create a detailed string representation
       output_lines <- c()
       output_lines <- c(output_lines, "=== SIMULATION PARAMETERS (my_pars) ===")
-      output_lines <- c(output_lines, paste("Type:", class(pars_list)))
-      output_lines <- c(output_lines, paste("Length:", length(pars_list)))
+      output_lines <- c(output_lines, paste("Object type:", class(my_pars())))
+      output_lines <- c(output_lines, paste("Number of parameters:", length(pars_list)))
+      output_lines <- c(output_lines, "")
+      output_lines <- c(output_lines, "Detailed Parameters:")
       output_lines <- c(output_lines, "")
       
-      # Add each parameter with its value
-      for (i in seq_along(pars_list)) {
-        param_name <- names(pars_list)[i]
-        param_value <- pars_list[[i]]
-        
-        output_lines <- c(output_lines, paste("Parameter", i, ":", param_name))
-        output_lines <- c(output_lines, paste("  Type:", class(param_value)))
-        output_lines <- c(output_lines, paste("  Value:", toString(param_value)))
-        output_lines <- c(output_lines, "")
+      # Show each parameter with its value - use safe iteration
+      param_names <- names(pars_list)
+      if (is.null(param_names)) {
+        # If no names, use indices
+        for (i in seq_along(pars_list)) {
+          param_name <- paste("Parameter", i)
+          param_value <- pars_list[[i]]
+          value_str <- toString(param_value)
+          output_lines <- c(output_lines, paste(param_name, ":", value_str))
+        }
+      } else {
+        # Use names if available
+        for (i in seq_along(pars_list)) {
+          param_name <- param_names[i]
+          if (is.na(param_name) || param_name == "") {
+            param_name <- paste("Parameter", i)
+          }
+          param_value <- pars_list[[i]]
+          value_str <- toString(param_value)
+          output_lines <- c(output_lines, paste(param_name, ":", value_str))
+        }
       }
       
       paste(output_lines, collapse = "\n")
     }, error = function(e) {
-      # Fallback: try to get basic info about the object
-      paste("Error converting my_pars:", e$message, "\n",
-            "Object type:", class(my_pars()), "\n",
-            "Object length:", length(my_pars()), "\n",
-            "Note: sim.pars is a SimPars object, not a regular dictionary")
+      # Fallback: try simple string representation
+      tryCatch({
+        simple_repr <- my_pars()$`__str__`()
+        paste("=== SIMULATION PARAMETERS (my_pars) ===\n",
+              "Object type:", class(my_pars()), "\n",
+              "String representation:\n", 
+              py_to_r(simple_repr))
+      }, error = function(e2) {
+        paste("Error accessing my_pars:", e$message, "\n",
+              "Fallback error:", e2$message, "\n",
+              "Object type:", class(my_pars()), "\n",
+              "Object length:", length(my_pars()))
+      })
     })
   })
   
@@ -806,9 +827,12 @@ server <- function(input, output, session) {
     
     results <- simulation_results()
     
+    # Use the calculated time vector from simulation_results
+    time_data <- results$time
+    
     # Convert results to data frame
     df <- data.frame(
-      Time = results$time,
+      Time = time_data,
       Infected = results$n_infected,
       Latent_Slow = results$n_latent_slow,
       Latent_Fast = results$n_latent_fast,
