@@ -308,7 +308,8 @@ server <- function(input, output, session) {
       simulation_results(list(
         time = time_years,
         n_infected = as.numeric(results$tb_n_infected$tolist()),
-        n_latent = as.numeric(results$tb_n_latent_slow$tolist()) + as.numeric(results$tb_n_latent_fast$tolist()),
+        n_latent_slow = as.numeric(results$tb_n_latent_slow$tolist()),
+        n_latent_fast = as.numeric(results$tb_n_latent_fast$tolist()),
         n_active = as.numeric(results$tb_n_active$tolist()),
         n_susceptible = as.numeric(results$tb_n_susceptible$tolist()),
         n_presymp = as.numeric(results$tb_n_active_presymp$tolist()),
@@ -368,7 +369,8 @@ server <- function(input, output, session) {
       # Real TBsim results format
       time_data <- results$time
       infected_data <- results$n_infected
-      latent_data <- results$n_latent
+      latent_slow_data <- results$n_latent_slow
+      latent_fast_data <- results$n_latent_fast
       active_data <- results$n_active
       susceptible_data <- results$n_susceptible
       presymp_data <- results$n_presymp
@@ -376,7 +378,8 @@ server <- function(input, output, session) {
       # Fallback format
       time_data <- results$time
       infected_data <- results$n_infected
-      latent_data <- results$n_latent
+      latent_slow_data <- results$n_latent_slow
+      latent_fast_data <- results$n_latent_fast
       active_data <- results$n_active
       susceptible_data <- results$n_susceptible
       presymp_data <- results$n_presymp
@@ -410,15 +413,27 @@ server <- function(input, output, session) {
     ) %>%
     add_trace(
       x = time_data,
-      y = latent_data,
+      y = latent_slow_data,
       type = 'scatter',
       mode = 'lines+markers',
-      name = 'Latent TB',
+      name = 'Latent Slow TB',
       line = list(color = '#35b779', width = 3, shape = 'spline'),
       marker = list(size = 4, color = '#35b779', opacity = 0.7),
-      hovertemplate = '<b>Latent TB</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      hovertemplate = '<b>Latent Slow TB</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
       fill = 'tonexty',
       fillcolor = 'rgba(53, 183, 121, 0.1)'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = latent_fast_data,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Latent Fast TB',
+      line = list(color = '#1f9e89', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#1f9e89', opacity = 0.7),
+      hovertemplate = '<b>Latent Fast TB</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(31, 158, 137, 0.1)'
     ) %>%
     add_trace(
       x = time_data,
@@ -521,10 +536,19 @@ server <- function(input, output, session) {
     
     p2 <- plot_ly(
       x = time_data,
-      y = results$n_latent,
+      y = results$n_latent_slow,
       type = 'scatter',
       mode = 'lines',
-      name = 'Latent TB'
+      name = 'Latent Slow TB'
+    ) %>%
+      layout(yaxis = list(title = "Count", type = "log"))
+    
+    p2_fast <- plot_ly(
+      x = time_data,
+      y = results$n_latent_fast,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Fast TB'
     ) %>%
       layout(yaxis = list(title = "Count", type = "log"))
     
@@ -537,7 +561,7 @@ server <- function(input, output, session) {
     ) %>%
       layout(yaxis = list(title = "Count", type = "log"))
     
-    subplot(p1, p2, p3, nrows = 3, shareX = TRUE) %>%
+    subplot(p1, p2, p2_fast, p3, nrows = 4, shareX = TRUE) %>%
       layout(
         title = "Detailed TB Simulation Metrics",
         showlegend = TRUE
@@ -600,7 +624,8 @@ server <- function(input, output, session) {
         "Transmission Rate",
         "Final Infected Count",
         "Peak Infected Count",
-        "Final Latent Count",
+        "Final Latent Slow Count",
+        "Final Latent Fast Count",
         "Final Active Count"
       ),
       Value = c(
@@ -610,8 +635,8 @@ server <- function(input, output, session) {
         params$beta,
         max(as.numeric(results$tb_n_infected$tolist()), na.rm = TRUE),
         max(as.numeric(results$tb_n_infected$tolist()), na.rm = TRUE),
-        max(as.numeric(results$tb_n_latent_slow$tolist()) + 
-            as.numeric(results$tb_n_latent_fast$tolist()), na.rm = TRUE),
+        max(as.numeric(results$tb_n_latent_slow$tolist()), na.rm = TRUE),
+        max(as.numeric(results$tb_n_latent_fast$tolist()), na.rm = TRUE),
         max(as.numeric(results$tb_n_active$tolist()), na.rm = TRUE)
       )
     )
@@ -785,7 +810,8 @@ server <- function(input, output, session) {
     df <- data.frame(
       Time = results$time,
       Infected = results$n_infected,
-      Latent = results$n_latent,
+      Latent_Slow = results$n_latent_slow,
+      Latent_Fast = results$n_latent_fast,
       Active = results$n_active
     )
     
@@ -811,7 +837,8 @@ server <- function(input, output, session) {
     total_pop <- results$n_susceptible + results$n_infected
     prevalence_infected <- (results$n_infected / total_pop) * 100
     prevalence_active <- (results$n_active / total_pop) * 100
-    prevalence_latent <- (results$n_latent / total_pop) * 100
+    prevalence_latent_slow <- (results$n_latent_slow / total_pop) * 100
+    prevalence_latent_fast <- (results$n_latent_fast / total_pop) * 100
     
     p <- plot_ly() %>%
     add_trace(
@@ -836,13 +863,23 @@ server <- function(input, output, session) {
     ) %>%
     add_trace(
       x = time_data,
-      y = prevalence_latent,
+      y = prevalence_latent_slow,
       type = 'scatter',
       mode = 'lines+markers',
-      name = 'Latent TB %',
+      name = 'Latent Slow TB %',
       line = list(color = '#35b779', width = 3),
       marker = list(size = 4, color = '#35b779'),
-      hovertemplate = '<b>Latent TB</b><br>Time: %{x:.2f} years<br>Prevalence: %{y:.2f}%<extra></extra>'
+      hovertemplate = '<b>Latent Slow TB</b><br>Time: %{x:.2f} years<br>Prevalence: %{y:.2f}%<extra></extra>'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = prevalence_latent_fast,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Latent Fast TB %',
+      line = list(color = '#1f9e89', width = 3),
+      marker = list(size = 4, color = '#1f9e89'),
+      hovertemplate = '<b>Latent Fast TB</b><br>Time: %{x:.2f} years<br>Prevalence: %{y:.2f}%<extra></extra>'
     ) %>%
     layout(
       title = "TB Disease Prevalence Over Time",
@@ -866,7 +903,8 @@ server <- function(input, output, session) {
     if (n_points > 1) {
       # Calculate transitions
       susceptible_to_infected <- diff(results$n_susceptible) * -1
-      latent_to_active <- diff(results$n_latent) * -1
+      latent_slow_to_active <- diff(results$n_latent_slow) * -1
+      latent_fast_to_active <- diff(results$n_latent_fast) * -1
       active_to_clear <- diff(results$n_active) * -1
       
       # Create Sankey diagram
@@ -874,18 +912,19 @@ server <- function(input, output, session) {
         type = "sankey",
         orientation = "h",
         node = list(
-          label = c("Susceptible", "Latent", "Active", "Cleared"),
-          color = c('#440154', '#35b779', '#e16462', '#31688e'),
+          label = c("Susceptible", "Latent Slow", "Latent Fast", "Active", "Cleared"),
+          color = c('#440154', '#35b779', '#1f9e89', '#e16462', '#31688e'),
           pad = 15,
           thickness = 20,
           line = list(color = "black", width = 0.5)
         ),
         link = list(
-          source = c(0, 1, 2),
-          target = c(1, 2, 3),
+          source = c(0, 1, 2, 3),
+          target = c(1, 2, 3, 4),
           value = c(
             mean(susceptible_to_infected, na.rm = TRUE),
-            mean(latent_to_active, na.rm = TRUE),
+            mean(latent_slow_to_active, na.rm = TRUE),
+            mean(latent_fast_to_active, na.rm = TRUE),
             mean(active_to_clear, na.rm = TRUE)
           )
         )
@@ -984,13 +1023,23 @@ server <- function(input, output, session) {
     ) %>%
     add_trace(
       x = time_data,
-      y = results$n_latent,
+      y = results$n_latent_slow,
       type = 'scatter',
       mode = 'lines',
       fill = 'tonexty',
-      name = 'Latent',
+      name = 'Latent Slow',
       line = list(color = '#35b779', width = 0),
       fillcolor = 'rgba(53, 183, 121, 0.6)'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = results$n_latent_fast,
+      type = 'scatter',
+      mode = 'lines',
+      fill = 'tonexty',
+      name = 'Latent Fast',
+      line = list(color = '#1f9e89', width = 0),
+      fillcolor = 'rgba(31, 158, 137, 0.6)'
     ) %>%
     add_trace(
       x = time_data,
