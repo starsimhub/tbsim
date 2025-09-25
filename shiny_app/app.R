@@ -506,11 +506,12 @@ server <- function(input, output, session) {
   output$detailed_plot <- renderPlotly({
     req(simulation_results())
     
-    results <- simulation_results()$results
+    results <- simulation_results()
+    time_data <- results$time
     
     # Create subplot with multiple metrics
     p1 <- plot_ly(
-      x = results$t,
+      x = time_data,
       y = results$n_infected,
       type = 'scatter',
       mode = 'lines',
@@ -519,7 +520,7 @@ server <- function(input, output, session) {
       layout(yaxis = list(title = "Count", type = "log"))
     
     p2 <- plot_ly(
-      x = results$t,
+      x = time_data,
       y = results$n_latent,
       type = 'scatter',
       mode = 'lines',
@@ -528,7 +529,7 @@ server <- function(input, output, session) {
       layout(yaxis = list(title = "Count", type = "log"))
     
     p3 <- plot_ly(
-      x = results$t,
+      x = time_data,
       y = results$n_active,
       type = 'scatter',
       mode = 'lines',
@@ -547,13 +548,14 @@ server <- function(input, output, session) {
   output$transitions_plot <- renderPlotly({
     req(simulation_results())
     
-    results <- simulation_results()$results
+    results <- simulation_results()
+    time_data <- results$time
     
     # Calculate transition rates if available
-    if ("n_new_infections" %in% names(results)) {
+    if ("tb_new_infections" %in% names(results$results)) {
       p <- plot_ly(
-        x = results$t,
-        y = results$n_new_infections,
+        x = time_data,
+        y = as.numeric(results$results$tb_new_infections$tolist()),
         type = 'scatter',
         mode = 'lines',
         name = 'New Infections'
@@ -566,7 +568,7 @@ server <- function(input, output, session) {
     } else {
       # Fallback plot
       p <- plot_ly(
-        x = results$t,
+        x = time_data,
         y = results$n_infected,
         type = 'scatter',
         mode = 'lines',
@@ -777,11 +779,11 @@ server <- function(input, output, session) {
   output$raw_data_table <- DT::renderDataTable({
     req(simulation_results())
     
-    results <- simulation_results()$results
+    results <- simulation_results()
     
     # Convert results to data frame
     df <- data.frame(
-      Time = results$t,
+      Time = results$time,
       Infected = results$n_infected,
       Latent = results$n_latent,
       Active = results$n_active
