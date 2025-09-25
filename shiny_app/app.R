@@ -394,7 +394,7 @@ server <- function(input, output, session) {
     layout(
       title = "TB Simulation Results (Real TBsim Model)",
       xaxis = list(title = "Time (years)"),
-      yaxis = list(title = "Number of Individuals"),
+      yaxis = list(title = "Number of Individuals", type = "log"),
       hovermode = 'x unified'
     )
     
@@ -415,7 +415,7 @@ server <- function(input, output, session) {
       mode = 'lines',
       name = 'Total Infected'
     ) %>%
-      layout(yaxis = list(title = "Count"))
+      layout(yaxis = list(title = "Count", type = "log"))
     
     p2 <- plot_ly(
       x = results$t,
@@ -424,7 +424,7 @@ server <- function(input, output, session) {
       mode = 'lines',
       name = 'Latent TB'
     ) %>%
-      layout(yaxis = list(title = "Count"))
+      layout(yaxis = list(title = "Count", type = "log"))
     
     p3 <- plot_ly(
       x = results$t,
@@ -433,7 +433,7 @@ server <- function(input, output, session) {
       mode = 'lines',
       name = 'Active TB'
     ) %>%
-      layout(yaxis = list(title = "Count"))
+      layout(yaxis = list(title = "Count", type = "log"))
     
     subplot(p1, p2, p3, nrows = 3, shareX = TRUE) %>%
       layout(
@@ -460,7 +460,7 @@ server <- function(input, output, session) {
         layout(
           title = "TB State Transitions",
           xaxis = list(title = "Time"),
-          yaxis = list(title = "New Cases per Time Step")
+          yaxis = list(title = "New Cases per Time Step", type = "log")
         )
     } else {
       # Fallback plot
@@ -474,7 +474,7 @@ server <- function(input, output, session) {
         layout(
           title = "TB State Transitions",
           xaxis = list(title = "Time"),
-          yaxis = list(title = "Number of Individuals")
+          yaxis = list(title = "Number of Individuals", type = "log")
         )
     }
     
