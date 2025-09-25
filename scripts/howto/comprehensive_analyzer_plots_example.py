@@ -1,20 +1,16 @@
 import tbsim as mtb
 import starsim as ss
-import sciris as sc 
-import matplotlib.pyplot as plt
-import numpy as np
-import scipy.stats as stats
+
 
 TBS = mtb.TBS
 
 def build_tbsim(sim_pars=None):
     """Build a TB simulation with dwell time analyzer"""
     sim_params = dict(
-        start = sc.date('2013-01-01'),      
-        stop = sc.date('2016-12-31'), 
+        start = ss.date('2013-01-01'),      
+        stop = ss.date('2016-12-31'), 
         rand_seed=123,
-        unit='day',
-        dt=7,
+        dt=ss.days(7),
     )
     if sim_pars is not None:
         sim_params.update(sim_pars)
@@ -22,16 +18,15 @@ def build_tbsim(sim_pars=None):
     pop = ss.People(n_agents=1000)
 
     tb_params = dict(
-        beta=ss.rate_prob(0.0025),
+        beta=ss.per(0.0025),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
-        unit='day'
-    )
+        )
     tb = mtb.TB(tb_params)
     
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
 
-    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True, unit=1.0, scenario_name='comprehensive_plots_example')
+    dwell_analyzer = mtb.DwtAnalyzer(adjust_to_unit=True)  # TODO: Check if adjust_to_unit is still needed in v3, dt=1.0, scenario_name='comprehensive_plots_example')
 
     sim = ss.Sim(
         people=pop,

@@ -477,8 +477,7 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
     
     start_year = 1850
     sim_pars = dict(
-        unit='day',
-        dt=30,
+        dt=ss.days(30),
         start=ss.date(f'{start_year}-01-01'),
         stop=ss.date(f'{start_year + years}-01-01'),
         rand_seed=seed,
@@ -487,14 +486,14 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
     
     # Load demographic data
     possible_cbr_paths = [
-        '../data/Vietnam_CBR.csv',
-        'tbsim/data/Vietnam_CBR.csv',
-        'data/Vietnam_CBR.csv',
+        '../data/South_Africa_CBR.csv',
+        'tbsim/data/South_Africa_CBR.csv',
+        'data/South_Africa_CBR.csv',
     ]
     possible_asmr_paths = [
-        '../data/Vietnam_ASMR.csv',
-        'tbsim/data/Vietnam_ASMR.csv',
-        'data/Vietnam_ASMR.csv',
+        '../data/South_Africa_ASMR.csv',
+        'tbsim/data/South_Africa_ASMR.csv',
+        'data/South_Africa_ASMR.csv',
     ]
     
     cbr_path = None
@@ -503,7 +502,7 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
             cbr_path = path
             break
     if cbr_path is None:
-        raise FileNotFoundError(f"Could not find Vietnam_CBR.csv in any of the expected locations")
+        raise FileNotFoundError(f"Could not find South_Africa_CBR.csv in any of the expected locations")
     
     asmr_path = None
     for path in possible_asmr_paths:
@@ -511,13 +510,13 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
             asmr_path = path
             break
     if asmr_path is None:
-        raise FileNotFoundError(f"Could not find Vietnam_ASMR.csv in any of the expected locations")
+        raise FileNotFoundError(f"Could not find South_Africa_ASMR.csv in any of the expected locations")
     
     cbr = pd.read_csv(cbr_path)
     asmr = pd.read_csv(asmr_path)
     demog = [
-        ss.Births(birth_rate=cbr, unit='day', dt=30),
-        ss.Deaths(death_rate=asmr, unit='day', dt=30, rate_units=1),
+        ss.Births(birth_rate=cbr, dt=ss.days(30)),
+        ss.Deaths(death_rate=asmr, dt=ss.days(30), rate_units=1),
     ]
     
     # Create population
@@ -525,7 +524,7 @@ def run_calibration_simulation(beta=0.020, rel_sus_latentslow=0.15, tb_mortality
     
     # TB parameters
     tb_pars = dict(
-        beta=ss.rate_prob(beta, unit='day'),
+        beta=ss.per(beta, ),
         init_prev=ss.bernoulli(p=0.10),
         rel_sus_latentslow=rel_sus_latentslow,
         rate_LS_to_presym=ss.perday(5e-5),

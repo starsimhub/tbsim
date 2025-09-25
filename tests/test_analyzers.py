@@ -3,6 +3,7 @@ import pandas as pd
 from tbsim.analyzers import DwtPlotter
 import os
 import starsim as ss
+from unittest.mock import patch
 
 @pytest.fixture
 def sample_data():
@@ -23,8 +24,8 @@ def sample_data():
     return dataframes
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_sankey_agents_even_age_ranges(sample_data, model_type, mocker):
-    mocker.patch('plotly.graph_objects.Figure.show')
+@patch('plotly.graph_objects.Figure.show')
+def test_sankey_agents_even_age_ranges(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.sankey_agents_even_age_ranges(number_of_plots=3)
@@ -33,8 +34,8 @@ def test_sankey_agents_even_age_ranges(sample_data, model_type, mocker):
         assert plotter.data['age'].dtype in [int, float]
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])   # verify
-def test_sankey_agents(sample_data, model_type, mocker):
-    mocker.patch('plotly.graph_objects.Figure.show')
+@patch('plotly.graph_objects.Figure.show')
+def test_sankey_agents(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.sankey_agents(subtitle="Test Sankey")
@@ -43,8 +44,8 @@ def test_sankey_agents(sample_data, model_type, mocker):
         assert 'going_to_state' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['TBsim']) # ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_sankey_dwelltimes(sample_data, model_type, mocker):
-    mocker.patch('plotly.graph_objects.Figure.show')
+@patch('plotly.graph_objects.Figure.show')
+def test_sankey_dwelltimes(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.sankey_dwelltimes(subtitle="Test Dwell Times")
@@ -52,8 +53,8 @@ def test_sankey_dwelltimes(sample_data, model_type, mocker):
         assert 'dwell_time' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_barchar_all_state_transitions_interactive(sample_data, model_type, mocker):
-    mocker.patch('plotly.graph_objects.Figure.show')
+@patch('plotly.graph_objects.Figure.show')
+def test_barchar_all_state_transitions_interactive(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.barchar_all_state_transitions_interactive(dwell_time_bins=[0, 2, 4, 6])
@@ -61,8 +62,8 @@ def test_barchar_all_state_transitions_interactive(sample_data, model_type, mock
         assert 'dwell_time' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['TBsim'])  # it takes too long to run
-def test_stacked_bars_states_per_agent_static(sample_data, model_type, mocker):
-    mocker.patch('matplotlib.pyplot.show')
+@patch('matplotlib.pyplot.show')
+def test_stacked_bars_states_per_agent_static(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.stacked_bars_states_per_agent_static()
@@ -70,8 +71,8 @@ def test_stacked_bars_states_per_agent_static(sample_data, model_type, mocker):
         assert 'agent_id' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_reinfections_bystates_bars_interactive(sample_data, model_type, mocker):
-    mocker.patch('plotly.graph_objects.Figure.show')
+@patch('plotly.graph_objects.Figure.show')
+def test_reinfections_bystates_bars_interactive(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.reinfections_bystates_bars_interactive(target_states=[-1.0, 0.0, 1.0])
@@ -79,8 +80,8 @@ def test_reinfections_bystates_bars_interactive(sample_data, model_type, mocker)
         assert 'state_name' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_stackedbars_dwelltime_state_interactive(sample_data, model_type, mocker):
-    mocker.patch('plotly.graph_objects.Figure.show')
+@patch('plotly.graph_objects.Figure.show')
+def test_stackedbars_dwelltime_state_interactive(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.stackedbars_dwelltime_state_interactive(bin_size=1, num_bins=6)
@@ -88,8 +89,8 @@ def test_stackedbars_dwelltime_state_interactive(sample_data, model_type, mocker
         assert 'dwell_time' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_subplot_custom_transitions(sample_data, model_type, mocker):
-    mocker.patch('matplotlib.pyplot.show')
+@patch('matplotlib.pyplot.show')
+def test_subplot_custom_transitions(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         transitions_dict = {'A': ['B', 'C'], 'B': ['A', 'C']}
@@ -98,8 +99,8 @@ def test_subplot_custom_transitions(sample_data, model_type, mocker):
         assert 'state_name' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_stackedbars_subplots_state_transitions(sample_data, model_type, mocker):
-    mocker.patch('matplotlib.pyplot.show')
+@patch('matplotlib.pyplot.show')
+def test_stackedbars_subplots_state_transitions(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.stackedbars_subplots_state_transitions(bin_size=1, num_bins=6)
@@ -107,8 +108,8 @@ def test_stackedbars_subplots_state_transitions(sample_data, model_type, mocker)
         assert 'state_name' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_histogram_with_kde(sample_data, model_type, mocker):
-    mocker.patch('matplotlib.pyplot.show')
+@patch('matplotlib.pyplot.show')
+def test_histogram_with_kde(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.histogram_with_kde(subtitle="Test Histogram")
@@ -116,8 +117,8 @@ def test_histogram_with_kde(sample_data, model_type, mocker):
         assert 'dwell_time' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_graph_state_transitions(sample_data, model_type, mocker):
-    mocker.patch('matplotlib.pyplot.show')
+@patch('matplotlib.pyplot.show')
+def test_graph_state_transitions(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.graph_state_transitions(states=['A', 'B'], subtitle="Test Graph")
@@ -125,8 +126,8 @@ def test_graph_state_transitions(sample_data, model_type, mocker):
         assert 'state_name' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_graph_state_transitions_curved(sample_data, model_type, mocker):
-    mocker.patch('matplotlib.pyplot.show')
+@patch('matplotlib.pyplot.show')
+def test_graph_state_transitions_curved(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.graph_state_transitions_curved(states=['A', 'B'], subtitle="Test Curved Graph")
@@ -134,8 +135,8 @@ def test_graph_state_transitions_curved(sample_data, model_type, mocker):
         assert 'state_name' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_plot_dwell_time_validation(sample_data, model_type, mocker):
-    mocker.patch('matplotlib.pyplot.show')
+@patch('matplotlib.pyplot.show')
+def test_plot_dwell_time_validation(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.plot_dwell_time_validation()
@@ -143,8 +144,8 @@ def test_plot_dwell_time_validation(sample_data, model_type, mocker):
         assert 'dwell_time' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_plot_dwell_time_validation_interactive(sample_data, model_type, mocker):
-    mocker.patch('plotly.graph_objects.Figure.show')
+@patch('plotly.graph_objects.Figure.show')
+def test_plot_dwell_time_validation_interactive(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.plot_dwell_time_validation_interactive()
@@ -152,8 +153,8 @@ def test_plot_dwell_time_validation_interactive(sample_data, model_type, mocker)
         assert 'dwell_time' in plotter.data.columns
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-def test_plot_kaplan_meier(sample_data, model_type, mocker):
-    mocker.patch('matplotlib.pyplot.show')
+@patch('matplotlib.pyplot.show')
+def test_plot_kaplan_meier(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
         plotter = DwtPlotter(data=df)
         plotter.plot_kaplan_meier(dwell_time_col='dwell_time')

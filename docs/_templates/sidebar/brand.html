@@ -1,0 +1,11 @@
+{%- extends "furo/sidebar/brand.html" %}
+
+{%- block brand_content %}
+  <div class="sidebar-brand-container">
+    <div class="sidebar-brand-main">
+      <img class="sidebar-brand-logo" src="{{ pathto('_static/logo-light.png', 1) }}" alt="Logo">
+      <span class="sidebar-brand-text">TBSim</span>
+    </div>
+    <div class="sidebar-brand-version">Version {{ release }}</div>
+  </div>
+{%- endblock %}

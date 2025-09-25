@@ -13,7 +13,7 @@ class time_varying_parameter(ss.Intervention):
         super().__init__()
         self.define_pars(
             tb_parameter = 'beta',
-            ti = [sc.date('1995-01-01'),sc.date('2014-01-01')],
+            ti = [ss.date('1995-01-01'),ss.date('2014-01-01')],
             rc = [1, 0.5],
         )
         self.update_pars(pars, **kwargs)
@@ -26,7 +26,7 @@ class time_varying_parameter(ss.Intervention):
  
     def step(self):
         # make simulation and input time of the same type
-        datetime_timevec =  sc.date(self.t.timevec)
+        datetime_timevec =  ss.date(self.t.timevec)
         input_datetime = self.pars.ti
 
         # an ugly solution to find the closest time to the input in timevec
@@ -47,7 +47,7 @@ class time_varying_beta(ss.Intervention):
         super().__init__()
         self.define_pars(
             tb_parameter = 'beta',
-            ti = [sc.date('1995-01-01'),sc.date('2014-01-01')],
+            ti = [ss.date('1995-01-01'),ss.date('2014-01-01')],
             rc = [1, 0.5],
         )
         self.update_pars(pars, **kwargs)
@@ -60,7 +60,7 @@ class time_varying_beta(ss.Intervention):
  
     def step(self):
         # make simulation and input time of the same type
-        datetime_timevec =  sc.date(self.t.timevec)
+        datetime_timevec =  ss.date(self.t.timevec)
         input_datetime = self.pars.ti
 
         # an ugly solution to find the closest time to the input in timevec
@@ -121,7 +121,7 @@ def make_tb():
     # Modify the defaults to if necessary based on the input scenario 
     # for the TB module
     tb_pars = dict(
-        beta=ss.beta(1e-2), #ss.beta(1.0e-3),
+        beta=ss.prob(1e-2), #ss.prob(1.0e-3),
         init_prev=0.05,
         rate_LS_to_presym=ss.perday(3e-6), # needs to be 10x slow
         rate_LF_to_presym=ss.perday(6e-3),
@@ -141,7 +141,7 @@ def make_tb():
     decrease_beta = time_varying_parameter(
         dict(
             tb_parameter = 'beta',
-            ti = [sc.date('1995-01-01'),sc.date('2014-01-01')],
+            ti = [ss.date('1995-01-01'),ss.date('2014-01-01')],
             rc = [1, 0.55]
              ))
         
@@ -151,7 +151,7 @@ def make_tb():
     # for the simulation parameters
     sim_pars = dict(
         # default simulation parameters
-        unit='day', dt=30,
+        dt=ss.days(30),
         start=ss.date('1850-01-01'), stop=ss.date('2013-12-31') 
         )
 

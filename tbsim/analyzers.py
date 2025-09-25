@@ -31,8 +31,8 @@ from tbsim import TB
 from tbsim.analyzers import DwtAnalyzer
 
 # Create simulation with analyzer
-sim = ss.Sim(diseases=[TB()])
-sim.add_analyzer(DwtAnalyzer(scenario_name="Baseline"))
+sim = ss.Sim(diseases=[TB()], analyzers=DwtAnalyzer(scenario_name="Baseline"))
+
 sim.run()
 
 # Access analyzer results
@@ -484,7 +484,7 @@ class DwtPlotter:
         - Interactive hover showing total time
         - Color-coded nodes and links
         - Professional styling and layout
-        - Time unit annotations
+        - Time annotations
         """
         
 
@@ -529,7 +529,7 @@ class DwtPlotter:
                 target=target_indices,
                 color=link_colors,
                 value=value,
-                hovertemplate='%{source.label} → %{target.label}: %{value} step_time_units<br>',
+                hovertemplate='%{source.label} → %{target.label}: %{value}<br>',  #TODO: Add time unit
                 line=dict(color="lightgray", width=0.1),
             )
         ))
@@ -609,14 +609,20 @@ class DwtPlotter:
         if dwell_time_bins is None:
             dwell_time_bins = [0, 50, 100, 150, 200, 250]
 
-        #appemd infinity to the bins
-        dwell_time_bins.append(np.inf)
+        # Append infinity to the bins if not already present
+        if np.inf not in dwell_time_bins:
+            dwell_time_bins.append(np.inf)
 
         # Create bin labels, handling infinity separately
-        dwell_time_labels = [
-            f"{int(b)}-{int(d)} step_time_units" if d != np.inf else f"{int(b)}+ step_time_units"
-            for b, d in zip(dwell_time_bins[:-1], dwell_time_bins[1:])
-        ]
+        dwell_time_labels = []
+        for b, d in zip(dwell_time_bins[:-1], dwell_time_bins[1:]):
+            if b != np.inf and d != np.inf:
+                dwell_time_labels.append(f"{int(b)}-{int(d)} step_time_units")
+            elif b != np.inf and d == np.inf:
+                dwell_time_labels.append(f"{int(b)}+ step_time_units")
+            else:
+                # Handle case where b might be inf (shouldn't happen with normal bins)
+                dwell_time_labels.append(f"{b}-{d} step_time_units")
 
         # Create a dwell time category column
         self.data['dwell_time_category'] = pd.cut(
@@ -637,7 +643,7 @@ class DwtPlotter:
 
         # Group by state transitions and dwell time category
         grouped = filtered_logger.groupby(
-            ['state_name', 'going_to_state', 'dwell_time_category']
+            ['state_name', 'going_to_state', 'dwell_time_category'], observed=True
         ).size().reset_index(name='count')
 
         # Filter out empty ranges
@@ -712,8 +718,8 @@ class DwtPlotter:
         # Calculate cumulative dwell time for each agent and state
         df['cumulative_dwell_time'] = df.groupby(['agent_id', 'state_name'])['dwell_time'].cumsum()
 
-        # Convert dwell time to suplied step_time_units
-        df['cumulative_dwell_time_units'] = df['cumulative_dwell_time']#/24
+        # Use cumulative dwell time directly
+        df['cumulative_dwell_time_units'] = df['cumulative_dwell_time']
 
         # Ensure column order matches color mapping
         state_colors, cmap = Utils.colors()
@@ -727,7 +733,7 @@ class DwtPlotter:
 
         # Plot the data
         # pivot_df.plot(kind='bar', stacked=True, figsize=(15, 7))
-        plt.title('Cumulative Time in step_time_units on Each State for All Agents')
+        plt.title('Cumulative Time on Each State for All Agents')
         plt.annotate('DwtPlotter.stacked_bars_states_per_agent_static()', xy=(0.5, -0.1), xycoords='axes fraction', ha='center', fontsize=12)
         plt.xlabel('Agent ID')
         plt.ylabel('Cumulative Time (step_time_units)')
@@ -797,7 +803,12 @@ class DwtPlotter:
 
         # Define age bins
         age_bins = [0, 5, 16, 30, 40, 50, 60, 70, 80, 90, 100, np.inf]
-        age_labels = [f'{int(b)}-{int(age_bins[i+1])}' if age_bins[i+1] != np.inf else f'{int(b)}+' for i, b in enumerate(age_bins[:-1])]
+        age_labels = []
+        for i, b in enumerate(age_bins[:-1]):
+            if age_bins[i+1] != np.inf:
+                age_labels.append(f'{int(b)}-{int(age_bins[i+1])}')
+            else:
+                age_labels.append(f'{int(b)}+')
         max_reinfections['age_group'] = pd.cut(max_reinfections['age'], bins=age_bins, labels=age_labels, right=False)
 
         # Plot the data
@@ -998,7 +1009,7 @@ class DwtPlotter:
             state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
 
             # Group by dwell time bins and going to state
-            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
+            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state'], observed=True).size().unstack(fill_value=0)
 
             for going_to_state in grouped.columns:
                 fig.add_trace(go.Bar(
@@ -1154,19 +1165,34 @@ class DwtPlotter:
         axes = axes.flatten()
         fig.suptitle(f'State Transitions by Dwell Time Bins)', fontsize=16)
         for ax, state in zip(axes, states):
-            state_data = self.data[self.data['state_name'] == state]
+            state_data = self.data[self.data['state_name'] == state].copy()
             state_data['dwell_time_bin'] = pd.cut(state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True)
 
             # Group by dwell time bins and going to state
-            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state']).size().unstack(fill_value=0)
+            grouped = state_data.groupby(['dwell_time_bin', 'going_to_state'], observed=True).size().unstack(fill_value=0)
+
+            # Check if there's any data to plot
+            if grouped.empty or grouped.shape[1] == 0:
+                ax.text(0.5, 0.5, f'No data for {state}', ha='center', va='center', transform=ax.transAxes)
+                ax.set_title(f'State: {state}')
+                continue
 
             # Ensure column order matches color mapping
             state_colors, cmap = Utils.colors()
             matching_colors = [state_colors[state] for state in grouped.columns if state in state_colors]
-            cmap = mcolors.ListedColormap(matching_colors)
+            if matching_colors:
+                cmap = mcolors.ListedColormap(matching_colors)
+            else:
+                cmap = 'tab10'  # fallback colormap
 
             # Plot stacked bar chart
-            grouped.plot(kind='bar', stacked=True, ax=ax, colormap=cmap) #'tab20')
+            try:
+                grouped.plot(kind='bar', stacked=True, ax=ax, colormap=cmap) #'tab20')
+            except TypeError as e:
+                # Handle case where there's no numeric data to plot
+                ax.text(0.5, 0.5, f'No numeric data for {state}', ha='center', va='center', transform=ax.transAxes)
+                ax.set_title(f'State: {state}')
+                continue
             ax.set_title(f'State: {state}')
             ax.set_xlabel('Dwell Time Bins')
             ax.set_ylabel('Count')
@@ -1243,7 +1269,7 @@ class DwtPlotter:
         fig.suptitle(f'State Transitions by Dwell Time Bins {subtitle}', fontsize=16)
 
         for ax, state in zip(axes, states):
-            state_data = df[df['state_name'] == state]
+            state_data = df[df['state_name'] == state].copy()
 
             # Automatically define the number of bins and bin size based on the data
             max_dwell_time = state_data['dwell_time'].max()
@@ -1254,11 +1280,25 @@ class DwtPlotter:
             state_data['dwell_time_bin'] = pd.cut(
             state_data['dwell_time'], bins=bins, labels=bin_labels, include_lowest=True,
             )
+            
+            # Check if we have enough data points for KDE
+            # KDE requires at least 2 unique values per group
+            has_enough_data = True
+            
+            # Check each group defined by 'going_to_state'
+            for group_name, group_data in state_data.groupby('going_to_state'):
+                if group_data['dwell_time'].nunique() < 2:
+                    has_enough_data = False
+                    break
+            
+            # Only use KDE if we have enough data points
+            kde_param = has_enough_data
+            
             sns.histplot(data=state_data, 
                  x='dwell_time', 
                  bins=bins,
                  hue='going_to_state', 
-                 kde=True, 
+                 kde=kde_param, 
                  palette='tab10',
                  multiple='stack',
                  legend=True,
@@ -1288,7 +1328,7 @@ class DwtPlotter:
         dwell times and agent counts for each transition.
         
         Mathematical Model:
-            For each transition (state_i → state_j):
+            For each transition (state_i → state_j): 
             - Calculate statistics: mean_ij, mode_ij, count_ij
             - Create edge: node_i → node_j
             - Annotate edge: "Mean: mean_ij, Mode: mode_ij, Agents: count_ij"
@@ -1361,10 +1401,15 @@ class DwtPlotter:
             G.add_edge(from_state, to_state,
                 label=f"Mean: {mean_dwell}\nMo: {mode_dwell}\nAgents: {num_agents}")
 
-        pos = nx.spring_layout(G, seed=42)  # Fixed layout for consistency
-        colors =plt.colormaps.get_cmap(colormap) 
-        node_colors = [colors(i) for i in range(len(G.nodes))]
-        edge_colors = [node_colors[list(G.nodes).index(edge[0])] for edge in G.edges]
+        # Choose layout based on parameter
+        if layout is not None:
+            pos = self.__select_graph_pos__(G, layout, seed=42)
+        else:
+            pos = nx.spring_layout(G, seed=42)  # Default spring layout
+        # Enhanced color handling
+        colors = plt.colormaps.get_cmap(colormap)
+        node_colors = [colors(i / max(1, len(G.nodes) - 1)) for i in range(len(G.nodes))]
+        edge_colors = [colors(i / max(1, len(G.edges) - 1)) for i in range(len(G.edges))]
         edge_labels = nx.get_edge_attributes(G, 'label')
 
         nx.draw_networkx_nodes(G, pos, node_size=300, node_color=node_colors, edgecolors= "lightgray", alpha=0.9)
@@ -1475,13 +1520,16 @@ class DwtPlotter:
                 label=f"{fs_id},  μ:{mean_dwell},  Mo: {mode_dwell}\nAgents:{num_agents}",
                 weight=edge_thickness)
 
-        # Choose layout
-        pos = nx.spring_layout(G, seed=graphseed)  
+        # Choose layout based on parameter
+        if layout is not None:
+            pos = self.__select_graph_pos__(G, layout, seed=graphseed)
+        else:
+            pos = nx.spring_layout(G, seed=graphseed)  # Default spring layout  
 
-        # Color nodes and edges
-        colors = plt.get_cmap(colormap)
-        node_colors = [colors(i / max(1, len(G.nodes))) for i in range(len(G.nodes))]
-        edge_colors = [node_colors[list(G.nodes).index(edge[0])] for edge in G.edges]
+        # Enhanced color handling
+        colors = plt.colormaps.get_cmap(colormap)
+        node_colors = [colors(i / max(1, len(G.nodes) - 1)) for i in range(len(G.nodes))]
+        edge_colors = [colors(i / max(1, len(G.edges) - 1)) for i in range(len(G.edges))]
 
         # Get edge attributes
         edge_labels = nx.get_edge_attributes(G, 'label')
@@ -1498,6 +1546,233 @@ class DwtPlotter:
         # Display the graph
         plt.title(f"State Transition Graph - By Agents Count: {subtitle}", color='white')
         plt.annotate(text='DwtPlotter.graph_state_transitions_curved()', xy=(0.5, -0.2), xycoords='axes fraction', ha='center', fontsize=12)
+        plt.tight_layout()
+        plt.show()
+        
+        return
+
+    def graph_state_transitions_enhanced(self, states=None, subtitle="", layout=None, colormap='viridis', 
+                                       onlymodel=True, graphseed=42, figsize=(16, 12), 
+                                       node_size_scale=1000, edge_width_scale=8, font_size=10):
+        """
+        Create an enhanced network graph visualization of state transitions with improved styling.
+        
+        This enhanced version provides:
+        - Better color schemes and visual hierarchy
+        - Clearer edge annotations with better formatting
+        - Improved node sizing based on transition importance
+        - Enhanced readability with better fonts and spacing
+        - Professional styling suitable for publications
+        
+        Mathematical Model:
+            For each transition (state_i → state_j):
+            - Calculate statistics: mean_ij, mode_ij, count_ij
+            - Node importance: importance_i = Σ(count_ij for all j) + Σ(count_ji for all i)
+            - Node size: size_i = node_size_scale * (importance_i / max_importance)
+            - Edge thickness: thickness_ij = edge_width_scale * (count_ij / max_count)
+            - Color intensity: intensity_ij = count_ij / max_count
+            
+        Args:
+            states (list, optional): Specific states to include. If None, includes all states
+            subtitle (str): Additional subtitle for the plot
+            layout (int, optional): Layout algorithm (0-9). Default uses spring layout
+            colormap (str): Matplotlib colormap name. Default 'viridis'
+            onlymodel (bool): If True, exclude certain non-model states
+            graphseed (int): Random seed for layout consistency. Default 42
+            figsize (tuple): Figure size (width, height). Default (16, 12)
+            node_size_scale (int): Scaling factor for node sizes. Default 1000
+            edge_width_scale (int): Scaling factor for edge widths. Default 8
+            font_size (int): Base font size. Default 10
+                           
+        Returns:
+            None: Displays matplotlib network graph
+            
+        Example:
+        ```python
+        plotter = DwtPlotter(file_path='data.csv')
+        
+        # Create enhanced state transition network
+        plotter.graph_state_transitions_enhanced(
+            subtitle="Enhanced TB State Transitions",
+            colormap='plasma',
+            figsize=(18, 14),
+            node_size_scale=1200,
+            edge_width_scale=10
+        )
+        ```
+        
+        Features:
+        - Enhanced directed graph visualization
+        - Professional statistical annotations on edges
+        - Node size proportional to transition importance
+        - Edge thickness proportional to agent count
+        - Color-coded nodes and edges with improved schemes
+        - Publication-ready styling
+        - Better spacing and typography
+        """
+        if self.__data_error__():  
+            return
+            
+        df = self.data
+        if states is not None: 
+            df = df[df['going_to_state'].isin(states)]
+            df = df[df['state_name'].isin(states)]
+        
+        if onlymodel: 
+            df = df[~df['going_to_state_id'].isin([-3.0, -2.0])]
+
+        # Compute transition statistics
+        transitions = df.groupby(['state_name', 'going_to_state'])['dwell_time']
+        
+        stats_df = transitions.agg([
+            'mean',
+            lambda x: stats.mode(x, keepdims=True).mode[0] if len(x) > 0 else np.nan,
+            'count'
+        ]).reset_index()
+        
+        stats_df.columns = ['state_name', 'going_to_state', 'mean', 'mode', 'count']
+        
+        # Create directed graph
+        G = nx.DiGraph()
+        
+        # Calculate node importance (total transitions in + out)
+        node_importance = {}
+        for _, row in stats_df.iterrows():
+            from_state = row['state_name']
+            to_state = row['going_to_state']
+            count = row['count']
+            
+            # Add to importance calculations
+            node_importance[from_state] = node_importance.get(from_state, 0) + count
+            node_importance[to_state] = node_importance.get(to_state, 0) + count
+            
+            # Add edge to graph
+            G.add_edge(from_state, to_state, weight=count)
+        
+        # Find scaling factors
+        max_importance = max(node_importance.values()) if node_importance else 1
+        max_count = stats_df['count'].max() if not stats_df['count'].isna().all() else 1
+        
+        # Set up the figure with enhanced styling
+        plt.figure(figsize=figsize, facecolor='white')
+        
+        # Choose layout
+        if layout is not None:
+            pos = self.__select_graph_pos__(G, layout, seed=graphseed)
+        else:
+            pos = nx.spring_layout(G, seed=graphseed, k=3, iterations=50)
+        
+        # Enhanced color scheme
+        colors = plt.colormaps.get_cmap(colormap)
+        node_colors = [colors(i / max(1, len(G.nodes) - 1)) for i in range(len(G.nodes))]
+        
+        # Calculate node sizes based on importance
+        node_sizes = [node_size_scale * (node_importance.get(node, 0) / max_importance) for node in G.nodes]
+        node_sizes = [max(size, 300) for size in node_sizes]  # Minimum size
+        
+        # Calculate edge widths based on agent count
+        edge_weights = [edge_width_scale * (G[u][v]['weight'] / max_count) for u, v in G.edges]
+        edge_weights = [max(weight, 0.5) for weight in edge_weights]  # Minimum width
+        
+        # Edge colors based on transition intensity
+        edge_colors = []
+        for u, v in G.edges:
+            intensity = G[u][v]['weight'] / max_count
+            edge_colors.append(colors(intensity))
+        
+        # Draw nodes with enhanced styling
+        nx.draw_networkx_nodes(
+            G, pos, 
+            node_size=node_sizes,
+            node_color=node_colors,
+            edgecolors='black',
+            linewidths=2,
+            alpha=0.9
+        )
+        
+        # Draw edges with enhanced styling
+        nx.draw_networkx_edges(
+            G, pos,
+            width=edge_weights,
+            edge_color=edge_colors,
+            alpha=0.8,
+            arrowstyle='-|>',
+            arrowsize=25,
+            connectionstyle='arc3,rad=0.1',
+            min_source_margin=15,
+            min_target_margin=15
+        )
+        
+        # Enhanced node labels
+        nx.draw_networkx_labels(
+            G, pos,
+            font_size=font_size,
+            font_color='black',
+            font_weight='bold',
+            bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.8, edgecolor='gray')
+        )
+        
+        # Enhanced edge labels with better formatting
+        edge_labels = {}
+        for _, row in stats_df.iterrows():
+            from_state = row['state_name']
+            to_state = row['going_to_state']
+            mean_dwell = row['mean']
+            mode_dwell = row['mode']
+            num_agents = row['count']
+            
+            # Format the label with better spacing and alignment
+            if pd.isna(mean_dwell) or pd.isna(mode_dwell):
+                label = f"Agents: {num_agents}"
+            else:
+                label = f"μ: {mean_dwell:.1f}\nMo: {mode_dwell:.1f}\nN: {num_agents}"
+            
+            edge_labels[(from_state, to_state)] = label
+        
+        # Draw edge labels with enhanced styling
+        nx.draw_networkx_edge_labels(
+            G, pos,
+            edge_labels=edge_labels,
+            font_size=font_size-2,
+            font_color='darkblue',
+            font_weight='bold',
+            bbox=dict(boxstyle="round,pad=0.2", facecolor='lightblue', alpha=0.7, edgecolor='blue')
+        )
+        
+        # Enhanced title and annotations
+        plt.title(
+            f"Enhanced State Transition Network\n{subtitle}",
+            fontsize=font_size+4,
+            fontweight='bold',
+            pad=20,
+            color='darkblue'
+        )
+        
+        # Add informative subtitle
+        total_transitions = stats_df['count'].sum()
+        unique_states = len(G.nodes)
+        plt.figtext(
+            0.5, 0.02,
+            f'Total Transitions: {total_transitions} | States: {unique_states} | '
+            f'Node size ∝ transition importance | Edge thickness ∝ agent count',
+            ha='center',
+            fontsize=font_size-1,
+            style='italic',
+            color='gray'
+        )
+        
+        # Add method attribution
+        plt.figtext(
+            0.5, -0.02,
+            'DwtPlotter.graph_state_transitions_enhanced()',
+            ha='center',
+            fontsize=font_size-2,
+            style='italic',
+            color='lightgray'
+        )
+        
+        # Remove axes for cleaner look
+        plt.axis('off')
         plt.tight_layout()
         plt.show()
         
@@ -1828,7 +2103,7 @@ class DwtPlotter:
         return df_cleaned
 
     @staticmethod
-    def __select_graph_pos__(G, layout, seed=42):
+    def __select_graph_pos__(G, layout=4, seed=42):
         """
         Select graph layout algorithm for network visualizations.
         
@@ -2126,37 +2401,30 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         from tbsim.analyzers import DwtAnalyzer
         
         # Create simulation with analyzer
-        sim = ss.Sim(diseases=[TB()])
-        sim.add_analyzer(DwtAnalyzer(scenario_name="Baseline"))
+        sim = ss.Sim(diseases=mtb.TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
         sim.run()
-        
         # Access analyzer results
         analyzer = sim.analyzers[0]
+        analyzer.sankey_agents()
         analyzer.plot_dwell_time_validation()
         analyzer.sankey_agents()
         ```
     
     Attributes:
         eSTATES (IntEnum): State enumeration system (e.g., TBS, TBSL)
-        adjust_to_unit (bool): Whether to adjust dwell times to specific units
-        unit (float): Time unit multiplier for dwell time adjustment
         scenario_name (str): Name of the simulation scenario
         data (pd.DataFrame): Collected dwell time data
         __latest_sts_df__ (pd.DataFrame): Internal state tracking
     """
     
-    def __init__(self, adjust_to_unit=False, unit=1.0, states_ennumerator=mtb.TBS, scenario_name=''):
+    def __init__(self, states_ennumerator=mtb.TBS, scenario_name=''):
         """
         Initialize the dwell time analyzer.
         
-        Sets up the analyzer to track dwell times during simulation execution,
-        with options for unit adjustment and state enumeration system selection.
+        Sets up the analyzer to track dwell times during simulation execution
+        with state enumeration system selection.
         
         Args:
-            adjust_to_unit (bool): If True, adjusts dwell times by multiplying by unit.
-                                 Default False
-            unit (float | ss.t): Time unit multiplier for dwell time adjustment.
-                               Default 1.0
             states_ennumerator (IntEnum): State enumeration class (e.g., TBS, TBSL).
                                         Default mtb.TBS
             scenario_name (str): Name for the simulation scenario. Default ''
@@ -2165,13 +2433,6 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             ```python
             # Basic analyzer
             analyzer = DwtAnalyzer()
-            
-            # Analyzer with unit adjustment
-            analyzer = DwtAnalyzer(
-                adjust_to_unit=True,
-                unit=24.0,  # Convert to days
-                scenario_name="Baseline_TB_Model"
-            )
             
             # Analyzer with custom state enumeration
             from tb_acf import TBSL
@@ -2186,8 +2447,6 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         """
         ss.Analyzer.__init__(self)
         self.eSTATES = states_ennumerator
-        self.adjust_to_unit = adjust_to_unit
-        self.unit = unit
         self.file_path = None
         self.scenario_name = scenario_name
         self.data = pd.DataFrame(columns=['agent_id', 'state', 'entry_time', 'exit_time', 'dwell_time', 'state_name', 'going_to_state_id','going_to_state'])
@@ -2213,12 +2472,9 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
             - Creates DataFrame with columns: agent_id, last_state, last_state_time
             - Initializes all agents to state -1 (default/susceptible)
             - Sets all entry times to 0 (simulation start)
-            - Handles unit configuration for time scaling
         """
         # Initialize the latest state dataframe
         # NOTE: This module assumes the default state is '-1'
-        if self.unit is None:
-            self.unit = self.sim.pars.unit
         agent_ids = self.sim.people.auids.copy()
         population = len(agent_ids)
         new_logs = pd.DataFrame({
@@ -2253,8 +2509,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         Example:
         ```python
         # The step method is called automatically during simulation
-        sim = ss.Sim(diseases=[TB()])
-        sim.add_analyzer(DwtAnalyzer())
+        sim = ss.Sim(diseases=mtb.TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
         sim.run()  # step() is called internally at each time step
         ```
         """
@@ -2413,8 +2668,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         1. Record agents who never changed states (never infected)
         2. Detect and use appropriate state enumeration system
         3. Map state IDs to human-readable names
-        4. Apply unit adjustments if configured
-        5. Save results to CSV and metadata files
+        4. Save results to CSV and metadata files
         
         Mathematical Model:
             For agents who never changed states:
@@ -2467,13 +2721,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         self.data['state_name'] = self.data.apply(lambda row: f"{row['state']}.{row['state_name']}", axis=1 )        
         self.data['state_name'] = self.data['state_name'].replace('None', 'Susceptible')
         # self.data['compartment'] = 'tbd'
-        if self.adjust_to_unit:
-            self.data['dwell_time_raw'] = self.data['dwell_time']   # Save the original recorded values for comparison or later use
-            if isinstance(self.unit, (float, int)):
-                self.data['dwell_time'] = self.data['dwell_time'] * self.unit   
-            elif isinstance(self.unit, str):
-                self.data['dwell_time'] = self.data['dwell_time'] * (self.sim.pars.dt / ss.rate(self.unit))
-                # self.data['dwell_time'] = self.data['dwell_time'].apply(lambda x: eval(f"{x} {self.unit}"))
+        
+        
         self.file_path = self.__save_to_file__()
         return
 
@@ -2619,6 +2868,8 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
                 print(f"WARNING: Dwell times for state {state} deviate significantly from expectations.")
         return
 
+
+
 class Utils:
     """
     Utility functions for dwell time analysis.
@@ -2724,9 +2975,7 @@ if __name__ == '__main__':
     if debug == 0:
         # # # Initialize the DwtAnalyzer
         import starsim as ss
-        sim = ss.Sim()
-        
-        sim.add_analyzer(DwtAnalyzer())
+        sim = ss.Sim(diseases=mtb.TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
         sim.run()
 
         # # # Initialize the DwtPostProcessor

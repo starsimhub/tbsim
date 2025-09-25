@@ -96,8 +96,8 @@ class TPTInitiation(ss.Intervention):
         if not hasattr(tb, 'protected_from_tb'):
             tb.define_states(
                 ss.BoolArr('protected_from_tb', default=False),
-                ss.Arr('tpt_treatment_until', default=None),
-                ss.Arr('tpt_protection_until', default=None),
+                ss.Arr('tpt_treatment_until', dtype=ss.date),
+                ss.Arr('tpt_protection_until', dtype=ss.date),
             )
 
         # --- Remove protection if expired ---
@@ -119,6 +119,11 @@ class TPTInitiation(ss.Intervention):
 
         # Households with TB cases
         treated = tb.on_treatment
+        
+        # Safety check: ensure hhid array is properly initialized
+        if not hasattr(ppl, 'hhid') or len(ppl.hhid) == 0:
+            return
+            
         eligible_hhids = np.unique(ppl['hhid'][treated])
 
         # Eligibility screening
@@ -165,6 +170,7 @@ class TPTInitiation(ss.Intervention):
             self.results['n_tpt_initiated'][self.ti] = len(tpt_candidates)
 
     def init_results(self):
+        super().init_results()
         self.define_results(
             ss.Result('n_eligible', dtype=int),
             ss.Result('n_tpt_initiated', dtype=int),

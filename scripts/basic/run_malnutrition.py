@@ -14,11 +14,12 @@ def make_malnutrition():
     
     # -------- simulation -------
     sim_pars = dict(
-        dt=7/365,
-        start=1990,
-        stop=2020,  # we dont use dur, as duration gets calculated internally.
+        dt=ss.days(7),
+        start=ss.date('1990-01-01'),
+        stop=ss.date('2020-12-31'),  # we dont use dur, as duration gets calculated internally.
     )
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    
     births = ss.Births(pars=dict(birth_rate=5))
     deaths = ss.Deaths(pars=dict(death_rate=5))
     sim = ss.Sim(people=pop, 
@@ -33,6 +34,7 @@ if __name__ == '__main__':
     # Make Malnutrition simulation
     sim_n = make_malnutrition()
     sim_n.run()
-    sim_n.diseases['malnutrition'].plot()
-    plt.show()
+    results = {'malnutrition': sim_n.results.flatten()}
+    mtb.plot_combined(results, n_cols=3, dark=True)
+    
     

@@ -33,10 +33,12 @@ def make_hiv(include:bool=True, hiv_pars=None):
 def make_tb(include:bool=True, tb_pars=None):
     if tb_pars is None:
         pars = dict(
-            beta=ss.beta(0.1),
+            beta=ss.peryear(0.025),
             init_prev=ss.bernoulli(p=0.25),
-            rel_sus_latentslow=0.1,
+            rel_sus_latentslow=0.1,             # 10% reduction in susceptibility to latent slow TB
         )
+    else:
+        pars = tb_pars
     return mtb.TB(pars=pars)
 
 # - - - - - - - MAKE TB-HIV CONNECTOR - - - - - -
@@ -180,4 +182,3 @@ def uncertanty_plot():
 
     plt.tight_layout()
     plt.show()
-

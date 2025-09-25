@@ -3,15 +3,10 @@ name: Build and Deploy Documentation
 on:
   workflow_dispatch:  # Manual trigger
   push:
-    branches:
-      - main
-      - docs-pages
     paths:
       - 'docs/**'
       - 'tbsim/**'
-      - 'scripts/**'
       - '.github/workflows/deploy-docs.yml'
-      - 'binder/**'
   pull_request:
     branches:
       - main
@@ -19,8 +14,6 @@ on:
     paths:
       - 'docs/**'
       - 'tbsim/**'
-      - 'scripts/**'
-      - 'binder/**'
 
 permissions:
   contents: read
@@ -60,13 +53,33 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip freeze
-
+      
+      - name: Clean existing build
+        working-directory: ./docs
+        run: |
+          rm -rf _build
+          rm -rf _site
+          find . -name "*.pyc" -delete
+          find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+  
+      - name: Setup Python kernel for notebooks
+        working-directory: ./docs
+        run: |
+          python -c "import tbsim; print('TBSim imported successfully')"
+      
+      - name: Verify Furo theme configuration
+        run: python .github/scripts/verify_docs.py
+  
+      - name: Build documentation with Sphinx
+        working-directory: ./docs
+        run: |
+          # First try to build with warnings as errors
+          make html SPHINXOPTS="-W --keep-going" || {
+            echo "Build with warnings as errors failed, attempting to build without warnings as errors..."
+            make html SPHINXOPTS="--keep-going"
+          }
       - name: Verify Binder configuration
         run: python .github/scripts/verify_binder.py
-
-      - name: Build documentation
-        working-directory: ./docs
-        run: make html
 
       - name: Verify build output
         working-directory: ./docs
@@ -90,7 +103,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build-docs
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/docs-pages'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/docs-pages' || contains(github.event.head_commit.message, 'build-docs')
     steps:
       - name: Download documentation artifacts
         uses: actions/download-artifact@v4
@@ -137,7 +150,7 @@ jobs:
   build-preview:
     runs-on: ubuntu-latest
     needs: build-docs
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || contains(github.event.head_commit.message, 'build-docs')
     steps:
       - name: Download documentation artifacts
         uses: actions/download-artifact@v4

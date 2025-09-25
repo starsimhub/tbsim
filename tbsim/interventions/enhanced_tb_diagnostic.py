@@ -234,6 +234,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         self.diagnostic_method_used = diagnostic_methods
 
     def init_results(self):
+        super().init_results()
         self.define_results(
             ss.Result('n_tested', dtype=int),
             ss.Result('n_test_positive', dtype=int),
@@ -337,7 +338,7 @@ if __name__ == '__main__':
             }),
         ],
         networks=ss.RandomNet({'n_contacts': ss.poisson(lam=2), 'dur': 0}),
-        pars=dict(start=2000, stop=2010, dt=1/12),
+        pars=dict(start=ss.date(2000), stop=ss.date(2010), dt=ss.months(1)),
     )
     sim.run()
 

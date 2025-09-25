@@ -61,6 +61,7 @@ class HealthSeekingBehavior(ss.Intervention):
 
     def init_results(self):
         """Define metrics to track over time."""
+        super().init_results()
         self.define_results(
             ss.Result('n_sought_care', dtype=int),
             ss.Result('n_eligible', dtype=int),
@@ -90,7 +91,7 @@ if __name__ == '__main__':
         diseases=mtb.TB({'init_prev': ss.bernoulli(0.25)}),
         interventions=[mtb.HealthSeekingBehavior(pars={'prob': ss.bernoulli(p=0.2, strict=False)})],
         networks=ss.RandomNet({'n_contacts': ss.poisson(lam=2), 'dur': 0}),
-        pars=dict(start=2000, stop=2020, dt=1),
+        pars=dict(start=2000, stop=2020, dt=ss.days(1)),
     )
     sim.run()
 

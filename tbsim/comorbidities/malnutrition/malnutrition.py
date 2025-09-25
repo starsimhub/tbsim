@@ -331,9 +331,9 @@ class Malnutrition(ss.Disease):
 
             # Internal state
             # PROBLEM: Correlation between weight and height
-            ss.FloatArr('height_percentile', default=ss.uniform(name='height_percentile')), # Percentile, stays fixed
-            ss.FloatArr('weight_percentile', default=ss.uniform(name='weight_percentile')), # Percentile, increases when receiving micro, then declines?
-            ss.FloatArr('micro', default=ss.uniform(name='micro')), # Continuous? Normal distribution around zero. Z-score, sigmoid thing. Half-life.
+            ss.FloatArr('height_percentile', default=ss.uniform(0.0, 1.0)), # Percentile, stays fixed
+            ss.FloatArr('weight_percentile', default=ss.uniform(0.0, 1.0)), # Percentile, increases when receiving micro, then declines?
+            ss.FloatArr('micro', default=ss.uniform(0.0, 1.0)), # Continuous? Normal distribution around zero. Z-score, sigmoid thing. Half-life.
         )
         self.dweight = ss.normal(loc=self.dweight_loc, scale=self.dweight_scale)
 
@@ -496,5 +496,5 @@ class Malnutrition(ss.Disease):
         ti = self.sim.ti            # Current time index (step)
         alive = self.sim.people.alive    # People alive at current time index
         n_agents = self.sim.pars['n_agents']
-        self.results.people_alive[ti] = alive.count()/n_agents
+        self.results.people_alive[ti] = np.count_nonzero(alive)/n_agents
         return

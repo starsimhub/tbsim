@@ -11,10 +11,9 @@ def make_tb(pars = None):
     # Define simulation parameters
     if pars is None: 
         pars = dict(
-            beta = ss.rate_prob(0.1),
+            beta = ss.per(0.1),
             init_prev = ss.bernoulli(p=0.25),
-            unit = 'day'
-        )
+            )
     return mtb.TB(pars=pars)
 
 
