@@ -6,6 +6,7 @@ library(plotly)
 library(DT)
 library(reticulate)
 library(shinydashboard)
+library(shinyBS)
 
 # Set up Python environment for tbsim
 venv_python <- "/Users/mine/gitweb/FORK-tbsim/venv/bin/python"
@@ -186,6 +187,37 @@ ui <- fluidPage(
         color: #ffffff !important;
         text-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
       }
+      .dark-theme #header .theme-toggle-container {
+        background: linear-gradient(135deg, #1a1a2e 0%, #2d2d3e 100%) !important;
+        border: 1px solid #4a4a5a !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3) !important;
+      }
+      .theme-toggle-container {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+      }
+      .theme-toggle-container:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      }
+      .dark-theme .theme-toggle-container:hover {
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      }
+      .theme-toggle-container input[type='checkbox'] {
+        cursor: pointer;
+        z-index: 10;
+      }
+      .theme-toggle-container div {
+        transition: all 0.3s ease;
+      }
+      .theme-toggle-container span {
+        transition: all 0.3s ease;
+        pointer-events: none;
+      }
+      .theme-toggle-container:hover {
+        transform: translateY(-1px) scale(1.02);
+      }
       .dark-theme .well {
         background: rgba(30, 30, 46, 0.8) !important;
         border: 1px solid #3a3a4a !important;
@@ -242,6 +274,39 @@ ui <- fluidPage(
         border-color: #dc3545 !important;
         color: #f8d7da !important;
       }
+      .dark-theme .panel-group .panel {
+        background: rgba(30, 30, 46, 0.8) !important;
+        border: 1px solid #3a3a4a !important;
+        border-radius: 8px !important;
+        margin-bottom: 10px !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+      }
+      .dark-theme .panel-group .panel-heading {
+        background: linear-gradient(135deg, #2d2d3e 0%, #3a3a4a 100%) !important;
+        border-bottom: 1px solid #4a4a5a !important;
+        border-radius: 8px 8px 0 0 !important;
+        color: #e8e8e8 !important;
+        transition: all 0.3s ease !important;
+      }
+      .dark-theme .panel-group .panel-heading:hover {
+        background: linear-gradient(135deg, #3a3a4a 0%, #4a4a5a 100%) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .panel-group .panel-title {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .panel-group .panel-body {
+        background: rgba(45, 45, 62, 0.6) !important;
+        color: #e8e8e8 !important;
+        border-radius: 0 0 8px 8px !important;
+        padding: 15px !important;
+      }
+      .dark-theme .panel-group .panel-collapse {
+        border-radius: 0 0 8px 8px !important;
+      }
     "))
   ),
   
@@ -253,18 +318,71 @@ ui <- fluidPage(
       if (savedTheme === 'true') {
         $('body').addClass('dark-theme');
         $('#dark_theme').prop('checked', true);
+        updateThemeToggle(true);
+      } else {
+        updateThemeToggle(false);
       }
       
       // Theme toggle functionality
       $('#dark_theme').on('change', function() {
-        if ($(this).is(':checked')) {
+        var isDark = $(this).is(':checked');
+        if (isDark) {
           $('body').addClass('dark-theme');
           localStorage.setItem('darkTheme', 'true');
         } else {
           $('body').removeClass('dark-theme');
           localStorage.setItem('darkTheme', 'false');
         }
+        updateThemeToggle(isDark);
       });
+      
+      // Function to update toggle appearance
+      function updateThemeToggle(isDark) {
+        var slider = $('#theme-slider');
+        var container = $('.theme-toggle-container');
+        var lightSection = container.find('div:first-child');
+        var darkSection = container.find('div:last-child');
+        
+        if (isDark) {
+          // Dark theme active
+          slider.css({
+            'left': '28px',
+            'background': 'linear-gradient(135deg, #2d2d3e 0%, #3a3a4a 100%)'
+          });
+          container.css({
+            'background': 'linear-gradient(135deg, #1a1a2e 0%, #2d2d3e 100%)',
+            'border-color': '#4a4a5a'
+          });
+          lightSection.css({
+            'background': 'transparent',
+            'color': '#6c757d'
+          });
+          darkSection.css({
+            'background': '#ffffff',
+            'box-shadow': '0 1px 3px rgba(0,0,0,0.1)'
+          });
+          darkSection.find('span:last-child').css('color', '#495057');
+        } else {
+          // Light theme active
+          slider.css({
+            'left': '2px',
+            'background': '#ffffff'
+          });
+          container.css({
+            'background': 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+            'border-color': '#dee2e6'
+          });
+          lightSection.css({
+            'background': '#ffffff',
+            'box-shadow': '0 1px 3px rgba(0,0,0,0.1)'
+          });
+          darkSection.css({
+            'background': 'transparent'
+          });
+          lightSection.find('span:last-child').css('color', '#495057');
+          darkSection.find('span:last-child').css('color', '#6c757d');
+        }
+      }
     });
   ")),
   
@@ -284,15 +402,39 @@ ui <- fluidPage(
                   text-shadow: 0 1px 2px rgba(0,0,0,0.1);")
     ),
     div(
-      style = "display: flex; align-items: center; gap: 15px; padding: 8px 15px; 
-               background: rgba(255,255,255,0.8); border-radius: 25px; 
-               border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
-      span("🌙", style = "font-size: 20px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));"),
+      class = "theme-toggle-container",
+      style = "display: flex; align-items: center; gap: 8px; padding: 4px; 
+               background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+               border-radius: 25px; border: 1px solid #dee2e6; 
+               box-shadow: 0 2px 10px rgba(0,0,0,0.1); transition: all 0.3s ease;",
       div(
-        checkboxInput("dark_theme", "Dark Theme", value = FALSE),
-        style = "margin: 0; transform: scale(1.1);"
+        style = "display: flex; align-items: center; gap: 6px; padding: 8px 12px; 
+                 border-radius: 20px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+                 transition: all 0.3s ease;",
+        span("☀️", style = "font-size: 16px;"),
+        span("Light", style = "font-size: 12px; font-weight: 600; color: #495057;")
       ),
-      span("☀️", style = "font-size: 20px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));")
+      div(
+        style = "position: relative; width: 50px; height: 24px; 
+                 background: #6c757d; border-radius: 12px; cursor: pointer; 
+                 transition: all 0.3s ease; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);",
+        div(
+          style = "position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; 
+                   background: #ffffff; border-radius: 50%; transition: all 0.3s ease; 
+                   box-shadow: 0 2px 4px rgba(0,0,0,0.2);",
+          id = "theme-slider"
+        ),
+        div(
+          checkboxInput("dark_theme", "", value = FALSE, width = "50px"),
+          style = "position: absolute; opacity: 0; width: 50px; height: 24px; margin: 0; cursor: pointer;"
+        )
+      ),
+      div(
+        style = "display: flex; align-items: center; gap: 6px; padding: 8px 12px; 
+                 border-radius: 20px; background: transparent; transition: all 0.3s ease;",
+        span("🌙", style = "font-size: 16px;"),
+        span("Dark", style = "font-size: 12px; font-weight: 600; color: #6c757d;")
+      )
     )
   ),
   
@@ -310,64 +452,100 @@ ui <- fluidPage(
           )
         ),
         br(), br(),
-      h3("Simulation Parameters"),
-      
-      # Basic simulation parameters
-      h4("Basic Settings"),
-      sliderInput("n_agents", "Population Size", value = 1000, min = 100, max = 10000, step = 100),
-      fluidRow(
-        column(4, dateInput("start_date", "Start Date", value = "1940-01-01")),
-        column(4, dateInput("end_date", "End Date", value = "2010-12-31", max = Sys.Date() + 365*50)),
-        column(4, numericInput("rand_seed", "Random Seed", value = 1, min = 1, max = 10000, step = 1))
-      ),
-      sliderInput("dt", "Time Step (days)", value = 7, min = 1, max = 30, step = 1),
-      
-      # TB-specific parameters
-      h4("TB Disease Parameters"),
-      sliderInput("init_prev", "Initial Prevalence", value = 0.05, min = 0, max = 1, step = 0.001),
-      sliderInput("beta", "Transmission Rate (per year)", value = 0.1, min = 0, max = 1, step = 0.01),
-      sliderInput("p_latent_fast", "Probability of Fast Latent TB", value = 0.1, min = 0, max = 1, step = 0.01),
-      
-      # TB State Transition Rates
-      h4("TB State Transition Rates"),
-      sliderInput("rate_LS_to_presym", "Latent Slow → Pre-symptomatic (per day)", value = 0.001, min = 0, max = 0.1, step = 0.0001),
-      sliderInput("rate_LF_to_presym", "Latent Fast → Pre-symptomatic (per day)", value = 0.01, min = 0, max = 0.1, step = 0.001),
-      sliderInput("rate_presym_to_active", "Pre-symptomatic → Active (per day)", value = 0.1, min = 0, max = 1, step = 0.01),
-      sliderInput("rate_active_to_clear", "Active → Clearance (per day)", value = 0.01, min = 0, max = 0.1, step = 0.001),
-      sliderInput("rate_treatment_to_clear", "Treatment → Clearance (per year)", value = 6, min = 0, max = 50, step = 1),
-      
-      # TB Mortality Rates
-      h4("TB Mortality Rates"),
-      sliderInput("rate_exptb_to_dead", "Extra-Pulmonary TB → Death (per day)", value = 0.15 * 4.5e-4, min = 0, max = 1e-3, step = 1e-6),
-      sliderInput("rate_smpos_to_dead", "Smear Positive → Death (per day)", value = 4.5e-4, min = 0, max = 1e-3, step = 1e-6),
-      sliderInput("rate_smneg_to_dead", "Smear Negative → Death (per day)", value = 0.3 * 4.5e-4, min = 0, max = 1e-3, step = 1e-6),
-      
-      # TB Transmissibility
-      h4("TB Transmissibility"),
-      sliderInput("rel_trans_presymp", "Pre-symptomatic Relative Transmissibility", value = 0.1, min = 0, max = 1, step = 0.01),
-      sliderInput("rel_trans_smpos", "Smear Positive Relative Transmissibility", value = 1.0, min = 0, max = 2, step = 0.1),
-      sliderInput("rel_trans_smneg", "Smear Negative Relative Transmissibility", value = 0.3, min = 0, max = 1, step = 0.01),
-      sliderInput("rel_trans_exptb", "Extra-Pulmonary Relative Transmissibility", value = 0.05, min = 0, max = 1, step = 0.01),
-      sliderInput("rel_trans_treatment", "Treatment Effect on Transmissibility", value = 0.5, min = 0, max = 1, step = 0.01),
-      
-      # TB Susceptibility
-      h4("TB Susceptibility"),
-      sliderInput("rel_sus_latentslow", "Latent Slow Relative Susceptibility", value = 0.20, min = 0, max = 1, step = 0.01),
-      
-      
-      # Demographics
-      h4("Demographics"),
-      sliderInput("birth_rate", "Birth Rate (per 1000)", value = 20, min = 0, max = 100, step = 1),
-      sliderInput("death_rate", "Death Rate (per 1000)", value = 15, min = 0, max = 100, step = 1),
-      
-      # Network parameters
-      h4("Social Network"),
-      sliderInput("n_contacts", "Average Contacts per Person", value = 5, min = 1, max = 50, step = 1),
-      
-      
-      # Status
-      br(), br(),
-      verbatimTextOutput("status")
+        
+        # Collapsible parameters sections
+        bsCollapse(
+          id = "parameters_collapse",
+          multiple = TRUE,
+          open = c("basic_settings", "tb_disease_params"),
+          
+          # Basic Settings
+          bsCollapsePanel(
+            title = "Basic Settings",
+            value = "basic_settings",
+            style = "info",
+            sliderInput("n_agents", "Population Size", value = 1000, min = 100, max = 10000, step = 100),
+            fluidRow(
+              column(4, dateInput("start_date", "Start Date", value = "1940-01-01")),
+              column(4, dateInput("end_date", "End Date", value = "2010-12-31", max = Sys.Date() + 365*50)),
+              column(4, numericInput("rand_seed", "Random Seed", value = 1, min = 1, max = 10000, step = 1))
+            ),
+            sliderInput("dt", "Time Step (days)", value = 7, min = 1, max = 30, step = 1)
+          ),
+          
+          # TB Disease Parameters
+          bsCollapsePanel(
+            title = "TB Disease Parameters",
+            value = "tb_disease_params",
+            style = "info",
+            sliderInput("init_prev", "Initial Prevalence", value = 0.05, min = 0, max = 1, step = 0.001),
+            sliderInput("beta", "Transmission Rate (per year)", value = 0.1, min = 0, max = 1, step = 0.01),
+            sliderInput("p_latent_fast", "Probability of Fast Latent TB", value = 0.1, min = 0, max = 1, step = 0.01)
+          ),
+          
+          # TB State Transition Rates
+          bsCollapsePanel(
+            title = "TB State Transition Rates",
+            value = "tb_transition_rates",
+            style = "info",
+            sliderInput("rate_LS_to_presym", "Latent Slow → Pre-symptomatic (per day)", value = 0.001, min = 0, max = 0.1, step = 0.0001),
+            sliderInput("rate_LF_to_presym", "Latent Fast → Pre-symptomatic (per day)", value = 0.01, min = 0, max = 0.1, step = 0.001),
+            sliderInput("rate_presym_to_active", "Pre-symptomatic → Active (per day)", value = 0.1, min = 0, max = 1, step = 0.01),
+            sliderInput("rate_active_to_clear", "Active → Clearance (per day)", value = 0.01, min = 0, max = 0.1, step = 0.001),
+            sliderInput("rate_treatment_to_clear", "Treatment → Clearance (per year)", value = 6, min = 0, max = 50, step = 1)
+          ),
+          
+          # TB Mortality Rates
+          bsCollapsePanel(
+            title = "TB Mortality Rates",
+            value = "tb_mortality_rates",
+            style = "info",
+            sliderInput("rate_exptb_to_dead", "Extra-Pulmonary TB → Death (per day)", value = 0.15 * 4.5e-4, min = 0, max = 1e-3, step = 1e-6),
+            sliderInput("rate_smpos_to_dead", "Smear Positive → Death (per day)", value = 4.5e-4, min = 0, max = 1e-3, step = 1e-6),
+            sliderInput("rate_smneg_to_dead", "Smear Negative → Death (per day)", value = 0.3 * 4.5e-4, min = 0, max = 1e-3, step = 1e-6)
+          ),
+          
+          # TB Transmissibility
+          bsCollapsePanel(
+            title = "TB Transmissibility",
+            value = "tb_transmissibility",
+            style = "primary",
+            sliderInput("rel_trans_presymp", "Pre-symptomatic Relative Transmissibility", value = 0.1, min = 0, max = 1, step = 0.01),
+            sliderInput("rel_trans_smpos", "Smear Positive Relative Transmissibility", value = 1.0, min = 0, max = 2, step = 0.1),
+            sliderInput("rel_trans_smneg", "Smear Negative Relative Transmissibility", value = 0.3, min = 0, max = 1, step = 0.01),
+            sliderInput("rel_trans_exptb", "Extra-Pulmonary Relative Transmissibility", value = 0.05, min = 0, max = 1, step = 0.01),
+            sliderInput("rel_trans_treatment", "Treatment Effect on Transmissibility", value = 0.5, min = 0, max = 1, step = 0.01)
+          ),
+          
+          # TB Susceptibility
+          bsCollapsePanel(
+            title = "TB Susceptibility",
+            value = "tb_susceptibility",
+            style = "info",
+            sliderInput("rel_sus_latentslow", "Latent Slow Relative Susceptibility", value = 0.20, min = 0, max = 1, step = 0.01)
+          ),
+          
+          # Demographics
+          bsCollapsePanel(
+            title = "👥 Demographics",
+            value = "demographics",
+            style = "default",
+            sliderInput("birth_rate", "Birth Rate (per 1000)", value = 20, min = 0, max = 100, step = 1),
+            sliderInput("death_rate", "Death Rate (per 1000)", value = 15, min = 0, max = 100, step = 1)
+          ),
+          
+          # Social Network
+          bsCollapsePanel(
+            title = "🌐 Social Network",
+            value = "social_network",
+            style = "default",
+            sliderInput("n_contacts", "Average Contacts per Person", value = 5, min = 1, max = 50, step = 1)
+          )
+        ),
+        
+        # Status
+        br(), br(),
+        verbatimTextOutput("status")
     ),
     
     mainPanel(
