@@ -5,6 +5,7 @@ library(shiny)
 library(plotly)
 library(DT)
 library(reticulate)
+library(shinydashboard)
 
 # Set up Python environment for tbsim
 venv_python <- "/Users/mine/gitweb/FORK-tbsim/venv/bin/python"
@@ -26,12 +27,273 @@ pd <- import("pandas")
 
 # Define UI
 ui <- fluidPage(
-  # Custom header with logo
+  # Enhanced Dark theme CSS
+  tags$head(
+    tags$style(HTML("
+      .dark-theme {
+        background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%) !important;
+        color: #e8e8e8 !important;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+      }
+      .dark-theme .sidebar {
+        background: linear-gradient(180deg, #1e1e2e 0%, #2d2d3e 100%) !important;
+        color: #e8e8e8 !important;
+        border-right: 1px solid #3a3a4a !important;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .main-panel {
+        background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%) !important;
+        color: #e8e8e8 !important;
+      }
+      .dark-theme .panel {
+        background: rgba(30, 30, 46, 0.8) !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #3a3a4a !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+        backdrop-filter: blur(10px) !important;
+      }
+      .dark-theme .form-control {
+        background: rgba(45, 45, 62, 0.8) !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #4a4a5a !important;
+        border-radius: 6px !important;
+        transition: all 0.3s ease !important;
+      }
+      .dark-theme .form-control:focus {
+        background: rgba(55, 55, 72, 0.9) !important;
+        border-color: #007bff !important;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+      }
+      .dark-theme .btn {
+        background: linear-gradient(45deg, #4a4a5a, #5a5a6a) !important;
+        color: #ffffff !important;
+        border: 1px solid #6a6a7a !important;
+        border-radius: 6px !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+      }
+      .dark-theme .btn:hover {
+        background: linear-gradient(45deg, #5a5a6a, #6a6a7a) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .btn-primary {
+        background: linear-gradient(45deg, #007bff, #0056b3) !important;
+        border-color: #007bff !important;
+      }
+      .dark-theme .btn-primary:hover {
+        background: linear-gradient(45deg, #0056b3, #004085) !important;
+      }
+      .dark-theme .btn-secondary {
+        background: linear-gradient(45deg, #6c757d, #5a6268) !important;
+        border-color: #6c757d !important;
+      }
+      .dark-theme .btn-secondary:hover {
+        background: linear-gradient(45deg, #5a6268, #495057) !important;
+      }
+      .dark-theme .table {
+        background: rgba(30, 30, 46, 0.8) !important;
+        color: #e8e8e8 !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+      }
+      .dark-theme .table-striped > tbody > tr:nth-of-type(odd) {
+        background: rgba(45, 45, 62, 0.6) !important;
+      }
+      .dark-theme .table-striped > tbody > tr:hover {
+        background: rgba(0, 123, 255, 0.1) !important;
+        transition: background 0.3s ease !important;
+      }
+      .dark-theme .dataTables_wrapper {
+        background: rgba(30, 30, 46, 0.8) !important;
+        color: #e8e8e8 !important;
+        border-radius: 8px !important;
+        padding: 15px !important;
+      }
+      .dark-theme .dataTables_filter input {
+        background: rgba(45, 45, 62, 0.8) !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #4a4a5a !important;
+        border-radius: 6px !important;
+      }
+      .dark-theme .dataTables_length select {
+        background: rgba(45, 45, 62, 0.8) !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #4a4a5a !important;
+        border-radius: 6px !important;
+      }
+      .dark-theme .dataTables_info {
+        color: #b8b8c8 !important;
+      }
+      .dark-theme .dataTables_paginate .paginate_button {
+        background: rgba(45, 45, 62, 0.8) !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #4a4a5a !important;
+        border-radius: 6px !important;
+        margin: 0 2px !important;
+        transition: all 0.3s ease !important;
+      }
+      .dark-theme .dataTables_paginate .paginate_button:hover {
+        background: rgba(0, 123, 255, 0.2) !important;
+        color: #ffffff !important;
+        transform: translateY(-1px) !important;
+      }
+      .dark-theme .dataTables_paginate .paginate_button.current {
+        background: linear-gradient(45deg, #007bff, #0056b3) !important;
+        color: #ffffff !important;
+        border-color: #007bff !important;
+      }
+      .dark-theme .tab-content {
+        background: rgba(15, 15, 35, 0.5) !important;
+        color: #e8e8e8 !important;
+        border-radius: 8px !important;
+        padding: 20px !important;
+      }
+      .dark-theme .nav-tabs {
+        border-bottom: 2px solid #3a3a4a !important;
+        background: rgba(30, 30, 46, 0.8) !important;
+        border-radius: 8px 8px 0 0 !important;
+      }
+      .dark-theme .nav-tabs .nav-link {
+        color: #b8b8c8 !important;
+        background: rgba(45, 45, 62, 0.6) !important;
+        border: 1px solid #4a4a5a !important;
+        border-radius: 6px 6px 0 0 !important;
+        margin-right: 5px !important;
+        transition: all 0.3s ease !important;
+      }
+      .dark-theme .nav-tabs .nav-link:hover {
+        background: rgba(0, 123, 255, 0.1) !important;
+        color: #ffffff !important;
+        border-color: #007bff !important;
+        transform: translateY(-2px) !important;
+      }
+      .dark-theme .nav-tabs .nav-link.active {
+        background: linear-gradient(45deg, #007bff, #0056b3) !important;
+        color: #ffffff !important;
+        border-color: #007bff !important;
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3) !important;
+      }
+      .dark-theme #header {
+        background: linear-gradient(135deg, #1e1e2e 0%, #2d2d3e 100%) !important;
+        color: #ffffff !important;
+        border-radius: 12px !important;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3) !important;
+        border: 1px solid #3a3a4a !important;
+      }
+      .dark-theme #header h2 {
+        color: #ffffff !important;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .well {
+        background: rgba(30, 30, 46, 0.8) !important;
+        border: 1px solid #3a3a4a !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+      }
+      .dark-theme .slider-selection {
+        background: linear-gradient(45deg, #007bff, #0056b3) !important;
+      }
+      .dark-theme .slider-track-high {
+        background: rgba(45, 45, 62, 0.8) !important;
+      }
+      .dark-theme .slider-handle {
+        background: linear-gradient(45deg, #007bff, #0056b3) !important;
+        border: 2px solid #ffffff !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .checkbox {
+        color: #e8e8e8 !important;
+      }
+      .dark-theme .checkbox input[type='checkbox']:checked + span {
+        color: #007bff !important;
+      }
+      .dark-theme h1, .dark-theme h2, .dark-theme h3, .dark-theme h4 {
+        color: #ffffff !important;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .text-muted {
+        color: #b8b8c8 !important;
+      }
+      .dark-theme .alert {
+        background: rgba(30, 30, 46, 0.9) !important;
+        border: 1px solid #3a3a4a !important;
+        color: #e8e8e8 !important;
+        border-radius: 8px !important;
+      }
+      .dark-theme .alert-info {
+        background: rgba(0, 123, 255, 0.1) !important;
+        border-color: #007bff !important;
+        color: #b8d4ff !important;
+      }
+      .dark-theme .alert-success {
+        background: rgba(40, 167, 69, 0.1) !important;
+        border-color: #28a745 !important;
+        color: #b8e6c1 !important;
+      }
+      .dark-theme .alert-warning {
+        background: rgba(255, 193, 7, 0.1) !important;
+        border-color: #ffc107 !important;
+        color: #fff3cd !important;
+      }
+      .dark-theme .alert-danger {
+        background: rgba(220, 53, 69, 0.1) !important;
+        border-color: #dc3545 !important;
+        color: #f8d7da !important;
+      }
+    "))
+  ),
+  
+  # JavaScript for theme switching
+  tags$script(HTML("
+    $(document).ready(function() {
+      // Check for saved theme preference
+      var savedTheme = localStorage.getItem('darkTheme');
+      if (savedTheme === 'true') {
+        $('body').addClass('dark-theme');
+        $('#dark_theme').prop('checked', true);
+      }
+      
+      // Theme toggle functionality
+      $('#dark_theme').on('change', function() {
+        if ($(this).is(':checked')) {
+          $('body').addClass('dark-theme');
+          localStorage.setItem('darkTheme', 'true');
+        } else {
+          $('body').removeClass('dark-theme');
+          localStorage.setItem('darkTheme', 'false');
+        }
+      });
+    });
+  ")),
+  
+  # Enhanced header with logo and theme toggle
   div(
-    style = "display: flex; align-items: center; margin-bottom: 20px; 
-             padding: 10px; background-color: #f8f9fa; border-radius: 5px;",
-    img(src = "logo.png", height = 60, style = "margin-right: 15px; vertical-align: middle;"),
-    h2("TBsim - Tuberculosis Simulation Web Interface", style = "margin: 0; color: #333;")
+    id = "header",
+    style = "display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; 
+             padding: 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+             border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+             border: 1px solid #dee2e6; transition: all 0.3s ease;",
+    div(
+      style = "display: flex; align-items: center;",
+      img(src = "logo.png", height = 60, style = "margin-right: 20px; vertical-align: middle; 
+           border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"),
+      h2("TBsim - Tuberculosis Simulation Web Interface", 
+         style = "margin: 0; color: #2c3e50; font-weight: 600; 
+                  text-shadow: 0 1px 2px rgba(0,0,0,0.1);")
+    ),
+    div(
+      style = "display: flex; align-items: center; gap: 15px; padding: 8px 15px; 
+               background: rgba(255,255,255,0.8); border-radius: 25px; 
+               border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+      span("🌙", style = "font-size: 20px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));"),
+      div(
+        checkboxInput("dark_theme", "Dark Theme", value = FALSE),
+        style = "margin: 0; transform: scale(1.1);"
+      ),
+      span("☀️", style = "font-size: 20px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));")
+    )
   ),
   
   sidebarLayout(
@@ -226,6 +488,14 @@ server <- function(input, output, session) {
   simulation_status <- reactiveVal("Ready to run simulation")
   simulation_running <- reactiveVal(FALSE)
   my_pars <- reactiveVal(NULL)
+  
+  # Dark theme reactive value
+  dark_theme <- reactiveVal(FALSE)
+  
+  # Observe dark theme toggle
+  observeEvent(input$dark_theme, {
+    dark_theme(input$dark_theme)
+  })
   
   # Reset parameters to defaults
   observeEvent(input$reset_params, {
@@ -503,10 +773,11 @@ server <- function(input, output, session) {
         borderwidth = 1,
         font = list(size = 12)
       ),
-      plot_bgcolor = 'rgba(248,249,250,0.8)',
-      paper_bgcolor = 'rgba(255,255,255,0.9)',
+      plot_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.8)' else 'rgba(248,249,250,0.8)',
+      paper_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.9)' else 'rgba(255,255,255,0.9)',
       margin = list(l = 60, r = 60, t = 80, b = 60),
-      showlegend = TRUE
+      showlegend = TRUE,
+      font = list(color = if(dark_theme()) '#ffffff' else '#2c3e50')
     ) %>%
     config(
       displayModeBar = TRUE,
@@ -919,7 +1190,7 @@ server <- function(input, output, session) {
     p
   })
   
-  # Transmission Sankey Diagram
+  # Enhanced Transmission Sankey Diagram
   output$transmission_sankey <- renderPlotly({
     req(simulation_results())
     
@@ -929,10 +1200,10 @@ server <- function(input, output, session) {
     n_points <- length(results$time)
     if (n_points > 1) {
       # Calculate transitions between states using actual simulation parameters
-      # Get the actual p_latent_fast parameter from the simulation
       p_latent_fast <- results$parameters$p_latent_fast
-      p_latent_slow <- 1 - p_latent_fast  # Remaining goes to latent slow
+      p_latent_slow <- 1 - p_latent_fast
       
+      # Calculate flow rates with better statistical methods
       susceptible_to_latent_slow <- abs(diff(results$n_susceptible)) * p_latent_slow
       susceptible_to_latent_fast <- abs(diff(results$n_susceptible)) * p_latent_fast
       latent_slow_to_presymp <- abs(diff(results$n_latent_slow))
@@ -947,65 +1218,143 @@ server <- function(input, output, session) {
         death_flow <- 0
       }
       
-      # Calculate mean flow rates
+      # Calculate flow rates based on actual simulation population
+      # Use real population values, not scaled to millions
       flow_values <- c(
-        mean(susceptible_to_latent_slow, na.rm = TRUE),
-        mean(susceptible_to_latent_fast, na.rm = TRUE),
-        mean(latent_slow_to_presymp, na.rm = TRUE),
-        mean(latent_fast_to_presymp, na.rm = TRUE),
-        mean(presymp_to_active, na.rm = TRUE),
-        mean(active_to_clear, na.rm = TRUE),
-        death_flow
+        max(mean(susceptible_to_latent_slow, na.rm = TRUE), 0.1),
+        max(mean(susceptible_to_latent_fast, na.rm = TRUE), 0.1),
+        max(mean(latent_slow_to_presymp, na.rm = TRUE), 0.1),
+        max(mean(latent_fast_to_presymp, na.rm = TRUE), 0.1),
+        max(mean(presymp_to_active, na.rm = TRUE), 0.1),
+        max(mean(active_to_clear, na.rm = TRUE), 0.1),
+        max(death_flow, 0.1)
       )
       
-      # Ensure minimum values for visibility (but use actual data)
-      flow_values <- pmax(flow_values, 0.1)
+      # Get actual population size from simulation parameters
+      actual_population <- results$parameters$n_agents
       
-      # Create Sankey diagram with calculated values
+      # Enhanced Sankey diagram with premium styling
       p <- plot_ly(
         type = "sankey",
         orientation = "h",
+        arrangement = "snap",
         node = list(
           label = c("Susceptible", "Latent Slow", "Latent Fast", "Pre-symptomatic", "Active", "Cleared", "Death"),
-          color = c('#440154', '#35b779', '#1f9e89', '#fde725', '#e16462', '#31688e', '#8e44ad'),
-          pad = 15,
-          thickness = 20,
-          line = list(color = "black", width = 0.5)
+          color = c(
+            'rgba(68, 1, 84, 0.9)',      # Deep purple for Susceptible
+            'rgba(53, 183, 121, 0.9)',   # Green for Latent Slow
+            'rgba(31, 158, 137, 0.9)',   # Teal for Latent Fast
+            'rgba(253, 231, 37, 0.9)',   # Yellow for Pre-symptomatic
+            'rgba(225, 100, 98, 0.9)',   # Red for Active
+            'rgba(49, 104, 142, 0.9)',   # Blue for Cleared
+            'rgba(142, 68, 173, 0.9)'    # Purple for Death
+          ),
+          pad = 25,
+          thickness = 30,
+          line = list(
+            color = "rgba(255, 255, 255, 0.8)",
+            width = 2
+          ),
+          hovertemplate = paste0('<b>%{label}</b><br>Population: %{value:,.0f} individuals<br>Total Population: ', actual_population, '<br><extra></extra>')
         ),
         link = list(
           source = c(0, 0, 1, 2, 3, 4, 4),
           target = c(1, 2, 3, 3, 4, 5, 6),
           value = flow_values,
           color = c(
-            'rgba(53, 183, 121, 0.6)',
-            'rgba(31, 158, 137, 0.6)',
-            'rgba(253, 231, 37, 0.6)',
-            'rgba(253, 231, 37, 0.6)',
-            'rgba(225, 100, 98, 0.6)',
-            'rgba(49, 104, 142, 0.6)',
-            'rgba(142, 68, 173, 0.6)'
-          )
+            'rgba(53, 183, 121, 0.7)',   # Green flow
+            'rgba(31, 158, 137, 0.7)',   # Teal flow
+            'rgba(253, 231, 37, 0.7)',   # Yellow flow
+            'rgba(253, 231, 37, 0.7)',   # Yellow flow
+            'rgba(225, 100, 98, 0.7)',   # Red flow
+            'rgba(49, 104, 142, 0.7)',   # Blue flow
+            'rgba(142, 68, 173, 0.7)'    # Purple flow
+          ),
+          hovertemplate = paste0('<b>%{source.label} → %{target.label}</b><br>Flow: %{value:,.0f} individuals<br>Total Population: ', actual_population, '<br><extra></extra>')
         )
       ) %>%
       layout(
-        title = "TB Disease Progression Flow - Calculated from Simulation Data",
-        font = list(size = 12),
-        margin = list(l = 50, r = 50, t = 50, b = 50)
+        title = list(
+          text = paste0("🔄 TB Disease Progression Flow - Population: ", format(actual_population, big.mark = ","), " individuals"),
+          font = list(
+            size = 20,
+            color = if(dark_theme()) '#ffffff' else '#2c3e50',
+            family = "Arial, sans-serif"
+          ),
+          x = 0.5,
+          xanchor = 'center'
+        ),
+        font = list(
+          size = 14,
+          color = if(dark_theme()) '#e8e8e8' else '#2c3e50',
+          family = "Arial, sans-serif"
+        ),
+        margin = list(l = 80, r = 80, t = 80, b = 80),
+        plot_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.8)' else 'rgba(248, 249, 250, 0.8)',
+        paper_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.9)' else 'rgba(255, 255, 255, 0.9)',
+        annotations = list(
+          list(
+            x = 0.5, y = -0.1,
+            xref = "paper", yref = "paper",
+            text = paste0("💡 Hover over nodes and links for detailed information | Simulation Population: ", format(actual_population, big.mark = ","), " individuals"),
+            showarrow = FALSE,
+            font = list(
+              size = 12,
+              color = if(dark_theme()) '#b8b8c8' else '#6c757d'
+            )
+          )
+        )
+      ) %>%
+      config(
+        displayModeBar = TRUE,
+        modeBarButtonsToRemove = c('pan2d', 'lasso2d', 'select2d', 'autoScale2d'),
+        displaylogo = FALSE,
+        toImageButtonOptions = list(
+          format = "png",
+          filename = "tb_disease_flow",
+          height = 800,
+          width = 1200,
+          scale = 2
+        )
       )
     } else {
-      # Fallback for insufficient data
+      # Enhanced fallback for insufficient data
+      actual_population <- results$parameters$n_agents
       p <- plot_ly() %>%
       add_annotation(
-        text = "Run a simulation to see the transmission flow",
+        text = "🚀 Run a simulation to see the enhanced transmission flow visualization",
         x = 0.5, y = 0.5,
         xref = "paper", yref = "paper",
         showarrow = FALSE,
-        font = list(size = 16)
+        font = list(
+          size = 18,
+          color = if(dark_theme()) '#e8e8e8' else '#2c3e50',
+          family = "Arial, sans-serif"
+        )
+      ) %>%
+      add_annotation(
+        text = paste0("This interactive Sankey diagram will show disease progression flows for population of ", format(actual_population, big.mark = ","), " individuals"),
+        x = 0.5, y = 0.4,
+        xref = "paper", yref = "paper",
+        showarrow = FALSE,
+        font = list(
+          size = 14,
+          color = if(dark_theme()) '#b8b8c8' else '#6c757d',
+          family = "Arial, sans-serif"
+        )
       ) %>%
       layout(
-        title = "TB Disease Progression Flow",
+        title = list(
+          text = paste0("🔄 TB Disease Progression Flow - Population: ", format(actual_population, big.mark = ","), " individuals"),
+          font = list(
+            size = 20,
+            color = if(dark_theme()) '#ffffff' else '#2c3e50'
+          )
+        ),
         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-        yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)
+        yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+        plot_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.8)' else 'rgba(248, 249, 250, 0.8)',
+        paper_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.9)' else 'rgba(255, 255, 255, 0.9)'
       )
     }
     
@@ -1061,69 +1410,151 @@ server <- function(input, output, session) {
     )
   })
   
-  # Disease Progression
+  # Enhanced Disease Progression
   output$disease_progression <- renderPlotly({
     req(simulation_results())
     
     results <- simulation_results()
     time_data <- results$time
     
-    # Create stacked area chart
+    # Enhanced percent-stacked area chart with premium styling
     p <- plot_ly(
       x = time_data,
       y = results$n_susceptible,
       type = 'scatter',
       mode = 'lines',
-      fill = 'tonexty',
-      name = 'Susceptible',
-      line = list(color = '#440154', width = 0),
-      fillcolor = 'rgba(68, 1, 84, 0.6)'
+      stackgroup = 'population',
+      groupnorm = 'percent',
+      name = '🟣 Susceptible',
+      line = list(color = '#440154', width = 2, shape = 'spline'),
+      fillcolor = 'rgba(68, 1, 84, 0.6)',
+      hovertemplate = '<b>🟣 Susceptible</b><br>Time: %{x:.2f} years<br>Percentage: %{y:.2f}%<br>Count: %{customdata:,.0f}<extra></extra>',
+      customdata = results$n_susceptible
     ) %>%
     add_trace(
       x = time_data,
       y = results$n_latent_slow,
       type = 'scatter',
       mode = 'lines',
-      fill = 'tonexty',
-      name = 'Latent Slow',
-      line = list(color = '#35b779', width = 0),
-      fillcolor = 'rgba(53, 183, 121, 0.6)'
+      stackgroup = 'population',
+      name = '🟢 Latent Slow',
+      line = list(color = '#35b779', width = 2, shape = 'spline'),
+      fillcolor = 'rgba(53, 183, 121, 0.6)',
+      hovertemplate = '<b>🟢 Latent Slow</b><br>Time: %{x:.2f} years<br>Percentage: %{y:.2f}%<br>Count: %{customdata:,.0f}<extra></extra>',
+      customdata = results$n_latent_slow
     ) %>%
     add_trace(
       x = time_data,
       y = results$n_latent_fast,
       type = 'scatter',
       mode = 'lines',
-      fill = 'tonexty',
-      name = 'Latent Fast',
-      line = list(color = '#1f9e89', width = 0),
-      fillcolor = 'rgba(31, 158, 137, 0.6)'
+      stackgroup = 'population',
+      name = '🔵 Latent Fast',
+      line = list(color = '#1f9e89', width = 2, shape = 'spline'),
+      fillcolor = 'rgba(31, 158, 137, 0.6)',
+      hovertemplate = '<b>🔵 Latent Fast</b><br>Time: %{x:.2f} years<br>Percentage: %{y:.2f}%<br>Count: %{customdata:,.0f}<extra></extra>',
+      customdata = results$n_latent_fast
     ) %>%
     add_trace(
       x = time_data,
       y = results$n_presymp,
       type = 'scatter',
       mode = 'lines',
-      fill = 'tonexty',
-      name = 'Pre-symptomatic',
-      line = list(color = '#fde725', width = 0),
-      fillcolor = 'rgba(253, 231, 37, 0.6)'
+      stackgroup = 'population',
+      name = '🟡 Pre-symptomatic',
+      line = list(color = '#fde725', width = 2, shape = 'spline'),
+      fillcolor = 'rgba(253, 231, 37, 0.6)',
+      hovertemplate = '<b>🟡 Pre-symptomatic</b><br>Time: %{x:.2f} years<br>Percentage: %{y:.2f}%<br>Count: %{customdata:,.0f}<extra></extra>',
+      customdata = results$n_presymp
     ) %>%
     add_trace(
       x = time_data,
       y = results$n_active,
       type = 'scatter',
       mode = 'lines',
-      fill = 'tonexty',
-      name = 'Active',
-      line = list(color = '#e16462', width = 0),
-      fillcolor = 'rgba(225, 100, 98, 0.6)'
+      stackgroup = 'population',
+      name = '🔴 Active',
+      line = list(color = '#e16462', width = 2, shape = 'spline'),
+      fillcolor = 'rgba(225, 100, 98, 0.6)',
+      hovertemplate = '<b>🔴 Active</b><br>Time: %{x:.2f} years<br>Percentage: %{y:.2f}%<br>Count: %{customdata:,.0f}<extra></extra>',
+      customdata = results$n_active
     ) %>%
     layout(
-      title = "Disease Progression Stacked View",
-      xaxis = list(title = "Time (years)"),
-      yaxis = list(title = "Population Count"),
-      hovermode = 'x unified'
+      title = list(
+        text = "📊 Disease Progression - Population Distribution Over Time",
+        font = list(
+          size = 18,
+          color = if(dark_theme()) '#ffffff' else '#2c3e50',
+          family = "Arial, sans-serif"
+        ),
+        x = 0.5,
+        xanchor = 'center'
+      ),
+      xaxis = list(
+        title = list(
+          text = "Time (years)",
+          font = list(size = 14, color = if(dark_theme()) '#e8e8e8' else '#2c3e50')
+        ),
+        gridcolor = if(dark_theme()) 'rgba(255,255,255,0.1)' else 'rgba(0,0,0,0.1)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12, color = if(dark_theme()) '#b8b8c8' else '#6c757d')
+      ),
+      yaxis = list(
+        title = list(
+          text = "Population (%)",
+          font = list(size = 14, color = if(dark_theme()) '#e8e8e8' else '#2c3e50')
+        ),
+        range = c(0, 100),
+        gridcolor = if(dark_theme()) 'rgba(255,255,255,0.1)' else 'rgba(0,0,0,0.1)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12, color = if(dark_theme()) '#b8b8c8' else '#6c757d')
+      ),
+      hovermode = 'x unified',
+      hoverlabel = list(
+        bgcolor = if(dark_theme()) 'rgba(30, 30, 46, 0.9)' else 'rgba(255,255,255,0.9)',
+        bordercolor = if(dark_theme()) '#3a3a4a' else '#dee2e6',
+        font = list(size = 12, color = if(dark_theme()) '#e8e8e8' else '#2c3e50')
+      ),
+      legend = list(
+        orientation = "v",
+        x = 1.02,
+        y = 1,
+        bgcolor = if(dark_theme()) 'rgba(30, 30, 46, 0.8)' else 'rgba(255,255,255,0.8)',
+        bordercolor = if(dark_theme()) '#3a3a4a' else '#dee2e6',
+        borderwidth = 1,
+        font = list(size = 12, color = if(dark_theme()) '#e8e8e8' else '#2c3e50')
+      ),
+      plot_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.8)' else 'rgba(248,249,250,0.8)',
+      paper_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.9)' else 'rgba(255,255,255,0.9)',
+      margin = list(l = 60, r = 60, t = 80, b = 60),
+      showlegend = TRUE,
+      font = list(color = if(dark_theme()) '#e8e8e8' else '#2c3e50'),
+      annotations = list(
+        list(
+          x = 0.5, y = -0.15,
+          xref = "paper", yref = "paper",
+          text = "💡 Hover over the chart to see detailed population percentages and counts",
+          showarrow = FALSE,
+          font = list(
+            size = 12,
+            color = if(dark_theme()) '#b8b8c8' else '#6c757d'
+          )
+        )
+      )
+    ) %>%
+    config(
+      displayModeBar = TRUE,
+      modeBarButtonsToRemove = c('pan2d', 'lasso2d', 'select2d'),
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = "png",
+        filename = "tb_disease_progression",
+        height = 600,
+        width = 1000,
+        scale = 2
+      )
     )
     
     p
