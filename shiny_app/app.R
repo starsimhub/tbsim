@@ -116,6 +116,11 @@ ui <- fluidPage(
         tabPanel("Results", 
           h3("Simulation Results"),
           uiOutput("loading_spinner"),
+          div(style = "margin-bottom: 10px;",
+            selectInput("plot_scale", "Y-Axis Scale", 
+                       choices = list("Linear Scale" = "linear", "Logarithmic Scale" = "log"),
+                       selected = "log", width = "200px")
+          ),
           plotlyOutput("results_plot", height = "600px"),
           br(),
           h4("Summary Statistics"),
@@ -144,7 +149,7 @@ ui <- fluidPage(
             ),
             column(6,
               h4("🔄 Transmission Flow"),
-              plotlyOutput("transmission_sankey", height = "400px")
+              plotlyOutput("transmission_sankey", height = "600px")
             )
           ),
           br(),
@@ -235,6 +240,7 @@ server <- function(input, output, session) {
     updateSliderInput(session, "birth_rate", value = 20)
     updateSliderInput(session, "death_rate", value = 15)
     updateSliderInput(session, "n_contacts", value = 5)
+    updateSelectInput(session, "plot_scale", selected = "log")
   })
   
   # Run simulation using real TBsim model
@@ -476,7 +482,7 @@ server <- function(input, output, session) {
       ),
       yaxis = list(
         title = list(text = "Number of Individuals", font = list(size = 14, color = '#34495e')),
-        type = "log",
+        type = input$plot_scale,
         gridcolor = 'rgba(128,128,128,0.2)',
         showgrid = TRUE,
         zeroline = FALSE,
@@ -919,27 +925,29 @@ server <- function(input, output, session) {
     
     results <- simulation_results()
     
-    # Calculate flow rates between states
+    # Calculate actual flow rates from simulation data
     n_points <- length(results$time)
     if (n_points > 1) {
-      # Calculate transitions with more detailed states
-      # Use absolute values and ensure minimum flow for visibility
-      susceptible_to_latent_slow <- pmax(abs(diff(results$n_susceptible)) * 0.8, 1)
-      susceptible_to_latent_fast <- pmax(abs(diff(results$n_susceptible)) * 0.2, 1)
-      latent_slow_to_presymp <- pmax(abs(diff(results$n_latent_slow)), 1)
-      latent_fast_to_presymp <- pmax(abs(diff(results$n_latent_fast)), 1)
-      presymp_to_active <- pmax(abs(diff(results$n_presymp)), 1)
-      active_to_clear <- pmax(abs(diff(results$n_active)), 1)
+      # Calculate transitions between states using actual simulation parameters
+      # Get the actual p_latent_fast parameter from the simulation
+      p_latent_fast <- results$parameters$p_latent_fast
+      p_latent_slow <- 1 - p_latent_fast  # Remaining goes to latent slow
       
-      # Calculate death flows (using death data if available)
+      susceptible_to_latent_slow <- abs(diff(results$n_susceptible)) * p_latent_slow
+      susceptible_to_latent_fast <- abs(diff(results$n_susceptible)) * p_latent_fast
+      latent_slow_to_presymp <- abs(diff(results$n_latent_slow))
+      latent_fast_to_presymp <- abs(diff(results$n_latent_fast))
+      presymp_to_active <- abs(diff(results$n_presymp))
+      active_to_clear <- abs(diff(results$n_active))
+      
+      # Calculate death flows from actual death data
       if (!is.null(results$n_deaths)) {
-        death_flow <- pmax(mean(results$n_deaths, na.rm = TRUE), 1)
+        death_flow <- mean(results$n_deaths, na.rm = TRUE)
       } else {
-        death_flow <- 1  # Minimum flow for visibility
+        death_flow <- 0
       }
       
-      # Create enhanced Sankey diagram with more states
-      # Ensure all flows are positive and visible
+      # Calculate mean flow rates
       flow_values <- c(
         mean(susceptible_to_latent_slow, na.rm = TRUE),
         mean(susceptible_to_latent_fast, na.rm = TRUE),
@@ -950,9 +958,10 @@ server <- function(input, output, session) {
         death_flow
       )
       
-      # Ensure minimum values for visibility
-      flow_values <- pmax(flow_values, 1)
+      # Ensure minimum values for visibility (but use actual data)
+      flow_values <- pmax(flow_values, 0.1)
       
+      # Create Sankey diagram with calculated values
       p <- plot_ly(
         type = "sankey",
         orientation = "h",
@@ -979,25 +988,24 @@ server <- function(input, output, session) {
         )
       ) %>%
       layout(
-        title = "Enhanced TB Disease Progression Flow",
+        title = "TB Disease Progression Flow - Calculated from Simulation Data",
         font = list(size = 12),
         margin = list(l = 50, r = 50, t = 50, b = 50)
       )
     } else {
-      # Fallback simple plot
+      # Fallback for insufficient data
       p <- plot_ly() %>%
       add_annotation(
-        text = "Insufficient data for Sankey diagram",
+        text = "Run a simulation to see the transmission flow",
         x = 0.5, y = 0.5,
         xref = "paper", yref = "paper",
         showarrow = FALSE,
         font = list(size = 16)
       ) %>%
       layout(
+        title = "TB Disease Progression Flow",
         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-        yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-        plot_bgcolor = 'rgba(0,0,0,0)',
-        paper_bgcolor = 'rgba(0,0,0,0)'
+        yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)
       )
     }
     
