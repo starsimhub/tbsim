@@ -312,77 +312,18 @@ ui <- fluidPage(
   
   # JavaScript for theme switching
   tags$script(HTML("
-    $(document).ready(function() {
-      // Check for saved theme preference
+    $(function() {
       var savedTheme = localStorage.getItem('darkTheme');
       if (savedTheme === 'true') {
         $('body').addClass('dark-theme');
         $('#dark_theme').prop('checked', true);
-        updateThemeToggle(true);
-      } else {
-        updateThemeToggle(false);
       }
-      
-      // Theme toggle functionality
+
       $('#dark_theme').on('change', function() {
         var isDark = $(this).is(':checked');
-        if (isDark) {
-          $('body').addClass('dark-theme');
-          localStorage.setItem('darkTheme', 'true');
-        } else {
-          $('body').removeClass('dark-theme');
-          localStorage.setItem('darkTheme', 'false');
-        }
-        updateThemeToggle(isDark);
+        $('body').toggleClass('dark-theme', isDark);
+        localStorage.setItem('darkTheme', isDark ? 'true' : 'false');
       });
-      
-      // Function to update toggle appearance
-      function updateThemeToggle(isDark) {
-        var slider = $('#theme-slider');
-        var container = $('.theme-toggle-container');
-        var lightSection = container.find('div:first-child');
-        var darkSection = container.find('div:last-child');
-        
-        if (isDark) {
-          // Dark theme active
-          slider.css({
-            'left': '28px',
-            'background': 'linear-gradient(135deg, #2d2d3e 0%, #3a3a4a 100%)'
-          });
-          container.css({
-            'background': 'linear-gradient(135deg, #1a1a2e 0%, #2d2d3e 100%)',
-            'border-color': '#4a4a5a'
-          });
-          lightSection.css({
-            'background': 'transparent',
-            'color': '#6c757d'
-          });
-          darkSection.css({
-            'background': '#ffffff',
-            'box-shadow': '0 1px 3px rgba(0,0,0,0.1)'
-          });
-          darkSection.find('span:last-child').css('color', '#495057');
-        } else {
-          // Light theme active
-          slider.css({
-            'left': '2px',
-            'background': '#ffffff'
-          });
-          container.css({
-            'background': 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
-            'border-color': '#dee2e6'
-          });
-          lightSection.css({
-            'background': '#ffffff',
-            'box-shadow': '0 1px 3px rgba(0,0,0,0.1)'
-          });
-          darkSection.css({
-            'background': 'transparent'
-          });
-          lightSection.find('span:last-child').css('color', '#495057');
-          darkSection.find('span:last-child').css('color', '#6c757d');
-        }
-      }
     });
   ")),
   
@@ -403,38 +344,10 @@ ui <- fluidPage(
     ),
     div(
       class = "theme-toggle-container",
-      style = "display: flex; align-items: center; gap: 8px; padding: 4px; 
-               background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
-               border-radius: 25px; border: 1px solid #dee2e6; 
-               box-shadow: 0 2px 10px rgba(0,0,0,0.1); transition: all 0.3s ease;",
-      div(
-        style = "display: flex; align-items: center; gap: 6px; padding: 8px 12px; 
-                 border-radius: 20px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
-                 transition: all 0.3s ease;",
-        span("☀️", style = "font-size: 16px;"),
-        span("Light", style = "font-size: 12px; font-weight: 600; color: #495057;")
-      ),
-      div(
-        style = "position: relative; width: 50px; height: 24px; 
-                 background: #6c757d; border-radius: 12px; cursor: pointer; 
-                 transition: all 0.3s ease; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);",
-        div(
-          style = "position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; 
-                   background: #ffffff; border-radius: 50%; transition: all 0.3s ease; 
-                   box-shadow: 0 2px 4px rgba(0,0,0,0.2);",
-          id = "theme-slider"
-        ),
-        div(
-          checkboxInput("dark_theme", "", value = FALSE, width = "50px"),
-          style = "position: absolute; opacity: 0; width: 50px; height: 24px; margin: 0; cursor: pointer;"
-        )
-      ),
-      div(
-        style = "display: flex; align-items: center; gap: 6px; padding: 8px 12px; 
-                 border-radius: 20px; background: transparent; transition: all 0.3s ease;",
-        span("🌙", style = "font-size: 16px;"),
-        span("Dark", style = "font-size: 12px; font-weight: 600; color: #6c757d;")
-      )
+      style = "display: flex; align-items: center; gap: 10px;",
+      span("☀️ Light", style = "font-weight: 600; color: #495057;"),
+      checkboxInput("dark_theme", label = NULL, value = FALSE, width = "60px"),
+      span("🌙 Dark", style = "font-weight: 600; color: #6c757d;")
     )
   ),
   
@@ -457,7 +370,7 @@ ui <- fluidPage(
         bsCollapse(
           id = "parameters_collapse",
           multiple = TRUE,
-          open = c("basic_settings", "tb_disease_params"),
+          open = c("basic_settings", "tb_disease_params", "bcg_intervention"),
           
           # Basic Settings
           bsCollapsePanel(
@@ -466,8 +379,8 @@ ui <- fluidPage(
             style = "info",
             sliderInput("n_agents", "Population Size", value = 1000, min = 100, max = 10000, step = 100),
             fluidRow(
-              column(4, dateInput("start_date", "Start Date", value = "1940-01-01")),
-              column(4, dateInput("end_date", "End Date", value = "2010-12-31", max = Sys.Date() + 365*50)),
+              column(4, dateInput("start_date", "Start Date", value = as.Date("1940-01-01"))),
+              column(4, dateInput("end_date", "End Date", value = as.Date("2050-12-31"))),
               column(4, numericInput("rand_seed", "Random Seed", value = 1, min = 1, max = 10000, step = 1))
             ),
             sliderInput("dt", "Time Step (days)", value = 7, min = 1, max = 30, step = 1)
@@ -540,6 +453,26 @@ ui <- fluidPage(
             value = "social_network",
             style = "default",
             sliderInput("n_contacts", "Average Contacts per Person", value = 5, min = 1, max = 50, step = 1)
+          ),
+          
+          # BCG Intervention
+          bsCollapsePanel(
+            title = "💉 BCG Vaccination",
+            value = "bcg_intervention",
+            style = "success",
+            checkboxInput("enable_bcg", "Enable BCG Vaccination", value = FALSE),
+            conditionalPanel(
+              condition = "input.enable_bcg == true",
+              sliderInput("bcg_coverage", "BCG Coverage (%)", value = 80, min = 0, max = 100, step = 5),
+                fluidRow(
+                  column(6, dateInput("bcg_start", "BCG Start Date", value = as.Date("1980-01-01"))),
+                  column(6, dateInput("bcg_stop", "BCG End Date", value = as.Date("2020-12-31")))
+                ),
+              fluidRow(
+                column(6, sliderInput("bcg_age_min", "Minimum Age (years)", value = 1, min = 0, max = 10, step = 1)),
+                column(6, sliderInput("bcg_age_max", "Maximum Age (years)", value = 5, min = 1, max = 20, step = 1))
+              )
+            )
           )
         ),
         
@@ -559,7 +492,7 @@ ui <- fluidPage(
           div(style = "margin-bottom: 10px;",
             selectInput("plot_scale", "Y-Axis Scale", 
                        choices = list("Linear Scale" = "linear", "Logarithmic Scale" = "log"),
-                       selected = "log", width = "200px")
+                       selected = "linear", width = "200px")
           ),
           plotlyOutput("results_plot", height = "600px"),
           br(),
@@ -577,6 +510,30 @@ ui <- fluidPage(
           br(),
           h4("State Transitions"),
           plotlyOutput("transitions_plot", height = "400px")
+        ),
+        
+        # BCG Intervention tab
+        tabPanel("💉 BCG Analysis",
+          h3("BCG Vaccination Analysis"),
+          conditionalPanel(
+            condition = "input.enable_bcg == true",
+            h4("BCG Coverage and Protection Over Time"),
+            plotlyOutput("bcg_plot", height = "500px"),
+            br(),
+            h4("BCG Impact on TB Prevalence"),
+            plotlyOutput("bcg_impact_plot", height = "500px"),
+            br(),
+            h4("BCG Summary Statistics"),
+            DT::dataTableOutput("bcg_summary_table")
+          ),
+          conditionalPanel(
+            condition = "input.enable_bcg == false",
+            div(
+              style = "text-align: center; padding: 50px; color: #666;",
+              h4("BCG Vaccination Not Enabled"),
+              p("Enable BCG vaccination in the parameters panel to see BCG analysis results.")
+            )
+          )
         ),
         
         # Advanced Visualizations tab
@@ -679,7 +636,7 @@ server <- function(input, output, session) {
   observeEvent(input$reset_params, {
     updateSliderInput(session, "n_agents", value = 1000)
     updateDateInput(session, "start_date", value = as.Date("1940-01-01"))
-    updateDateInput(session, "end_date", value = as.Date("2010-12-31"))
+    updateDateInput(session, "end_date", value = as.Date("2050-12-31"))
     updateSliderInput(session, "dt", value = 7)
     updateNumericInput(session, "rand_seed", value = 1)
     updateSliderInput(session, "init_prev", value = 0.05)
@@ -689,6 +646,14 @@ server <- function(input, output, session) {
     updateSliderInput(session, "death_rate", value = 15)
     updateSliderInput(session, "n_contacts", value = 5)
     updateSelectInput(session, "plot_scale", selected = "log")
+    
+    # Reset BCG parameters
+    updateCheckboxInput(session, "enable_bcg", value = FALSE)
+    updateSliderInput(session, "bcg_coverage", value = 80)
+    updateDateInput(session, "bcg_start", value = as.Date("1980-01-01"))
+    updateDateInput(session, "bcg_stop", value = as.Date("2020-12-31"))
+    updateSliderInput(session, "bcg_age_min", value = 1)
+    updateSliderInput(session, "bcg_age_max", value = 5)
   })
   
   # Run simulation using real TBsim model
@@ -734,12 +699,54 @@ server <- function(input, output, session) {
       births <- starsim$Births(pars = list(birth_rate = input$birth_rate))
       deaths <- starsim$Deaths(pars = list(death_rate = input$death_rate))
       
+      # Create interventions list
+      interventions <- list()
+      
+      # Add BCG intervention if enabled
+      if (input$enable_bcg) {
+        # Define BCG date strings for later use
+        bcg_start_str <- format(as.Date(input$bcg_start), "%Y-%m-%d")
+        bcg_stop_str <- format(as.Date(input$bcg_stop), "%Y-%m-%d")
+        
+        # Use Python to create the BCG intervention with proper date objects
+        reticulate::py_run_string("
+import starsim as ss
+import tbsim as mtb
+        ")
+        
+        # Pass parameters to Python and create BCG there
+        reticulate::py_run_string(sprintf("
+bcg_pars = dict(
+    coverage=%f,
+    start=ss.date('%s'),
+    stop=ss.date('%s'),
+    age_range=[%d, %d]
+)
+bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
+        ", 
+        input$bcg_coverage / 100,
+        bcg_start_str,
+        bcg_stop_str,
+        input$bcg_age_min,
+        input$bcg_age_max
+        ))
+        
+        # Get the intervention from Python
+        bcg_intervention <- reticulate::py$bcg_intervention
+        interventions <- append(interventions, list(bcg_intervention))
+      } else {
+        # Define empty strings when BCG is not enabled
+        bcg_start_str <- NULL
+        bcg_stop_str <- NULL
+      }
+
       # Create simulation
       sim <- starsim$Sim(
         people = pop,
         networks = net,
         diseases = tb,
         demographics = list(deaths, births),
+        interventions = interventions,
         pars = sim_pars
       )
       
@@ -755,7 +762,9 @@ server <- function(input, output, session) {
       results <- sim$results$flatten()
       
       # Create time vector based on simulation parameters
-      n_days <- as.numeric(input$end_date - input$start_date)
+      start_date_obj <- as.Date(input$start_date)
+      end_date_obj <- as.Date(input$end_date)
+      n_days <- as.numeric(end_date_obj - start_date_obj)
       time_days <- seq(0, n_days, by = input$dt)
       time_years <- time_days / 365.25  # Convert days to years
       
@@ -772,8 +781,8 @@ server <- function(input, output, session) {
         results = results,
         parameters = list(
           n_agents = input$n_agents,
-          start_date = input$start_date,
-          end_date = input$end_date,
+          start_date = as.character(input$start_date),
+          end_date = as.character(input$end_date),
           dt = input$dt,
           rand_seed = input$rand_seed,
           init_prev = input$init_prev,
@@ -781,7 +790,13 @@ server <- function(input, output, session) {
           p_latent_fast = input$p_latent_fast,
           birth_rate = input$birth_rate,
           death_rate = input$death_rate,
-          n_contacts = input$n_contacts
+          n_contacts = input$n_contacts,
+          enable_bcg = input$enable_bcg,
+          bcg_coverage = if(input$enable_bcg) input$bcg_coverage else NULL,
+          bcg_start = if (input$enable_bcg) bcg_start_str else NULL,
+          bcg_stop  = if (input$enable_bcg) bcg_stop_str  else NULL,
+          bcg_age_min = if(input$enable_bcg) input$bcg_age_min else NULL,
+          bcg_age_max = if(input$enable_bcg) input$bcg_age_max else NULL
         )
       ))
       
@@ -1062,6 +1077,99 @@ server <- function(input, output, session) {
     }
     
     p
+  })
+  
+  # BCG Coverage and Protection plot
+  output$bcg_plot <- renderPlotly({
+    req(simulation_results())
+    req(input$enable_bcg)
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Try to get BCG results from simulation
+    bcg_results <- results$results
+    
+    p <- plot_ly(
+      x = time_data,
+      y = rep(input$bcg_coverage, length(time_data)),
+      type = 'scatter',
+      mode = 'lines',
+      name = 'BCG Coverage (%)',
+      line = list(color = '#2ecc71', width = 3)
+    ) %>%
+      layout(
+        title = "💉 BCG Vaccination Coverage Over Time",
+        xaxis = list(title = "Time (years)"),
+        yaxis = list(title = "Coverage (%)", range = c(0, 100)),
+        hovermode = 'x unified'
+      )
+    
+    p
+  })
+  
+  # BCG Impact on TB Prevalence plot
+  output$bcg_impact_plot <- renderPlotly({
+    req(simulation_results())
+    req(input$enable_bcg)
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Calculate TB prevalence
+    total_pop <- results$n_susceptible + results$n_infected
+    prevalence <- (results$n_infected / total_pop) * 100
+    
+    p <- plot_ly(
+      x = time_data,
+      y = prevalence,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'TB Prevalence (%)',
+      line = list(color = '#e67e22', width = 3)
+    ) %>%
+      layout(
+        title = "🦠 TB Prevalence with BCG Vaccination",
+        xaxis = list(title = "Time (years)"),
+        yaxis = list(title = "TB Prevalence (%)"),
+        hovermode = 'x unified'
+      )
+    
+    p
+  })
+  
+  # BCG Summary table
+  output$bcg_summary_table <- DT::renderDataTable({
+    req(simulation_results())
+    req(input$enable_bcg)
+    
+    params <- simulation_results()$parameters
+    
+    # Create BCG summary data
+    bcg_data <- data.frame(
+      Parameter = c(
+        "BCG Coverage (%)",
+        "BCG Start Date",
+        "BCG End Date", 
+        "Target Age Range (years)"
+      ),
+      Value = c(
+        paste0(params$bcg_coverage, "%"),
+        as.character(params$bcg_start),
+        as.character(params$bcg_stop),
+        paste0(params$bcg_age_min, "-", params$bcg_age_max)
+      )
+    )
+    
+    DT::datatable(
+      bcg_data,
+      options = list(
+        pageLength = 10,
+        searching = FALSE,
+        ordering = FALSE
+      ),
+      rownames = FALSE
+    )
   })
   
   # Summary table
