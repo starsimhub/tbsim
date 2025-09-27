@@ -1194,7 +1194,7 @@ bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
       ),
       Value = c(
         params$n_agents,
-        round((params$end_date - params$start_date) / 365.25, 2),
+        round((as.Date(params$end_date) - as.Date(params$start_date)) / 365.25, 2),
         params$init_prev,
         params$beta,
         max(as.numeric(results$tb_n_infected$tolist()), na.rm = TRUE),
