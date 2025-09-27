@@ -35,6 +35,7 @@ __all__ = [
     'HealthSeekingBehavior',
     'TBDiagnostic',
     'EnhancedTBDiagnostic',
+    'TBDiagnosticErrors',  # Export the error class
     'HealthSeeking',
     'TBVaccinationCampaign',
 ] 
