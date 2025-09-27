@@ -360,6 +360,10 @@ ui <- fluidPage(
             style = "display: inline-block; margin-right: 10px;"
           ),
           div(
+            actionButton("run_comparison", "Run Comparison", class = "btn-success btn-lg"),
+            style = "display: inline-block; margin-right: 10px;"
+          ),
+          div(
             actionButton("reset_params", "Reset to Defaults", class = "btn-secondary"),
             style = "display: inline-block;"
           )
@@ -583,6 +587,36 @@ ui <- fluidPage(
           verbatimTextOutput("my_pars_output")
         ),
         
+        # Comparison tab
+        tabPanel("📊 Comparison",
+          h3("Simulation Comparison"),
+          p("Compare results between simulations with and without interventions."),
+          br(),
+          uiOutput("comparison_loading_spinner"),
+          conditionalPanel(
+            condition = "output.comparison_results_available",
+            h4("Comparison Results"),
+            plotlyOutput("comparison_plot", height = "600px"),
+            br(),
+            h4("Difference Analysis"),
+            plotlyOutput("difference_plot", height = "400px"),
+            br(),
+            h4("Comparison Summary"),
+            DT::dataTableOutput("comparison_summary_table"),
+            br(),
+            h4("Intervention Impact"),
+            DT::dataTableOutput("intervention_impact_table")
+          ),
+          conditionalPanel(
+            condition = "!output.comparison_results_available",
+            div(
+              style = "text-align: center; padding: 50px; color: #666;",
+              h4("No Comparison Results Available"),
+              p("Click 'Run Comparison' to compare simulations with and without interventions.")
+            )
+          )
+        ),
+        
         # About tab
         tabPanel("About",
           h3("About TBsim"),
@@ -623,6 +657,11 @@ server <- function(input, output, session) {
   simulation_status <- reactiveVal("Ready to run simulation")
   simulation_running <- reactiveVal(FALSE)
   my_pars <- reactiveVal(NULL)
+  
+  # Comparison simulation reactive values
+  comparison_results <- reactiveVal(NULL)
+  comparison_running <- reactiveVal(FALSE)
+  comparison_status <- reactiveVal("Ready to run comparison")
   
   # Dark theme reactive value
   dark_theme <- reactiveVal(FALSE)
@@ -811,6 +850,169 @@ bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
     })
   })
   
+  # Run comparison simulation (with and without interventions)
+  observeEvent(input$run_comparison, {
+    comparison_running(TRUE)
+    comparison_status("Running comparison simulations...")
+    
+    tryCatch({
+      # Set random seed for reproducibility
+      set.seed(input$rand_seed)
+      
+      # Function to run a single simulation
+      run_single_sim <- function(use_interventions = TRUE) {
+        # Build TBsim simulation using the real model
+        sim_pars <- list(
+          dt = starsim$days(input$dt),
+          start = as.character(input$start_date),
+          stop = as.character(input$end_date),
+          rand_seed = as.integer(input$rand_seed),
+          verbose = 0
+        )
+        
+        # Create population
+        pop <- starsim$People(n_agents = input$n_agents)
+        
+        # Create TB disease model with working parameters
+        tb_pars <- list(
+          dt = starsim$days(input$dt),
+          start = as.character(input$start_date),
+          stop = as.character(input$end_date),
+          init_prev = starsim$bernoulli(p = input$init_prev),
+          beta = starsim$peryear(input$beta),
+          p_latent_fast = starsim$bernoulli(p = input$p_latent_fast)
+        )
+        
+        tb <- tbsim$TB(pars = tb_pars)
+        
+        # Create social network
+        net <- starsim$RandomNet(list(
+          n_contacts = starsim$poisson(lam = input$n_contacts),
+          dur = 0
+        ))
+        
+        # Create demographic processes
+        births <- starsim$Births(pars = list(birth_rate = input$birth_rate))
+        deaths <- starsim$Deaths(pars = list(death_rate = input$death_rate))
+        
+        # Create interventions list
+        interventions <- list()
+        
+        # Add BCG intervention if enabled and use_interventions is TRUE
+        if (input$enable_bcg && use_interventions) {
+          # Define BCG date strings for later use
+          bcg_start_str <- format(as.Date(input$bcg_start), "%Y-%m-%d")
+          bcg_stop_str <- format(as.Date(input$bcg_stop), "%Y-%m-%d")
+          
+          # Use Python to create the BCG intervention with proper date objects
+          reticulate::py_run_string("
+import starsim as ss
+import tbsim as mtb
+          ")
+          
+          # Pass parameters to Python and create BCG there
+          reticulate::py_run_string(sprintf("
+bcg_pars = dict(
+    coverage=%f,
+    start=ss.date('%s'),
+    stop=ss.date('%s'),
+    age_range=[%d, %d]
+)
+bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
+          ", 
+          input$bcg_coverage / 100,
+          bcg_start_str,
+          bcg_stop_str,
+          input$bcg_age_min,
+          input$bcg_age_max
+          ))
+          
+          # Get the intervention from Python
+          bcg_intervention <- reticulate::py$bcg_intervention
+          interventions <- append(interventions, list(bcg_intervention))
+        }
+        
+        # Create simulation
+        sim <- starsim$Sim(
+          people = pop,
+          networks = net,
+          diseases = tb,
+          demographics = list(deaths, births),
+          interventions = interventions,
+          pars = sim_pars
+        )
+        
+        # Run simulation
+        sim$run()
+        
+        # Extract results
+        results <- sim$results$flatten()
+        
+        # Create time vector based on simulation parameters
+        start_date_obj <- as.Date(input$start_date)
+        end_date_obj <- as.Date(input$end_date)
+        n_days <- as.numeric(end_date_obj - start_date_obj)
+        time_days <- seq(0, n_days, by = input$dt)
+        time_years <- time_days / 365.25  # Convert days to years
+        
+        # Return results
+        list(
+          time = time_years,
+          n_infected = as.numeric(results$tb_n_infected$tolist()),
+          n_latent_slow = as.numeric(results$tb_n_latent_slow$tolist()),
+          n_latent_fast = as.numeric(results$tb_n_latent_fast$tolist()),
+          n_active = as.numeric(results$tb_n_active$tolist()),
+          n_susceptible = as.numeric(results$tb_n_susceptible$tolist()),
+          n_presymp = as.numeric(results$tb_n_active_presymp$tolist()),
+          sim = sim,
+          results = results,
+          interventions_used = use_interventions
+        )
+      }
+      
+      # Run simulation without interventions
+      comparison_status("Running simulation without interventions...")
+      sim_without <- run_single_sim(use_interventions = FALSE)
+      
+      # Run simulation with interventions
+      comparison_status("Running simulation with interventions...")
+      sim_with <- run_single_sim(use_interventions = TRUE)
+      
+      # Store comparison results
+      comparison_results(list(
+        without_interventions = sim_without,
+        with_interventions = sim_with,
+        parameters = list(
+          n_agents = input$n_agents,
+          start_date = as.character(input$start_date),
+          end_date = as.character(input$end_date),
+          dt = input$dt,
+          rand_seed = input$rand_seed,
+          init_prev = input$init_prev,
+          beta = input$beta,
+          p_latent_fast = input$p_latent_fast,
+          birth_rate = input$birth_rate,
+          death_rate = input$death_rate,
+          n_contacts = input$n_contacts,
+          enable_bcg = input$enable_bcg,
+          bcg_coverage = if(input$enable_bcg) input$bcg_coverage else NULL,
+          bcg_start = if(input$enable_bcg) format(as.Date(input$bcg_start), "%Y-%m-%d") else NULL,
+          bcg_stop = if(input$enable_bcg) format(as.Date(input$bcg_stop), "%Y-%m-%d") else NULL,
+          bcg_age_min = if(input$enable_bcg) input$bcg_age_min else NULL,
+          bcg_age_max = if(input$enable_bcg) input$bcg_age_max else NULL
+        )
+      ))
+      
+      comparison_status("Comparison completed successfully!")
+      comparison_running(FALSE)
+      
+    }, error = function(e) {
+      comparison_status(paste("Error:", e$message))
+      comparison_results(NULL)
+      comparison_running(FALSE)
+    })
+  })
+  
   # Status output
   output$status <- renderText({
     simulation_status()
@@ -827,6 +1029,24 @@ bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
       NULL
     }
   })
+  
+  # Comparison loading spinner output
+  output$comparison_loading_spinner <- renderUI({
+    if (comparison_running()) {
+      div(
+        style = "text-align: center; padding: 20px; color: #28a745; font-size: 18px; font-weight: bold;",
+        "🔄 Running comparison simulations... Please wait"
+      )
+    } else {
+      NULL
+    }
+  })
+  
+  # Check if comparison results are available
+  output$comparison_results_available <- reactive({
+    !is.null(comparison_results())
+  })
+  outputOptions(output, "comparison_results_available", suspendWhenHidden = FALSE)
   
   # Main results plot
   output$results_plot <- renderPlotly({
@@ -980,6 +1200,313 @@ bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
         format = "png",
         filename = "tb_simulation",
         height = 600,
+        width = 1000,
+        scale = 2
+      )
+    )
+    
+    p
+  })
+  
+  # Comparison plot
+  output$comparison_plot <- renderPlotly({
+    req(comparison_results())
+    
+    comp <- comparison_results()
+    without <- comp$without_interventions
+    with_int <- comp$with_interventions
+    
+    # Create comparison plot with both simulations
+    p <- plot_ly() %>%
+    # Without interventions - dashed lines
+    add_trace(
+      x = without$time,
+      y = without$n_susceptible,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Susceptible (No Intervention)',
+      line = list(color = '#440154', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Susceptible (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = without$time,
+      y = without$n_infected,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Total Infected (No Intervention)',
+      line = list(color = '#31688e', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Total Infected (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = without$time,
+      y = without$n_latent_slow,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Slow (No Intervention)',
+      line = list(color = '#35b779', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Latent Slow (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = without$time,
+      y = without$n_latent_fast,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Fast (No Intervention)',
+      line = list(color = '#1f9e89', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Latent Fast (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = without$time,
+      y = without$n_presymp,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Pre-symptomatic (No Intervention)',
+      line = list(color = '#fde725', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Pre-symptomatic (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = without$time,
+      y = without$n_active,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Active TB (No Intervention)',
+      line = list(color = '#e16462', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Active TB (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    # With interventions - solid lines
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_susceptible,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Susceptible (With Intervention)',
+      line = list(color = '#440154', width = 3),
+      hovertemplate = '<b>Susceptible (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_infected,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Total Infected (With Intervention)',
+      line = list(color = '#31688e', width = 3),
+      hovertemplate = '<b>Total Infected (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_latent_slow,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Slow (With Intervention)',
+      line = list(color = '#35b779', width = 3),
+      hovertemplate = '<b>Latent Slow (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_latent_fast,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Fast (With Intervention)',
+      line = list(color = '#1f9e89', width = 3),
+      hovertemplate = '<b>Latent Fast (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_presymp,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Pre-symptomatic (With Intervention)',
+      line = list(color = '#fde725', width = 3),
+      hovertemplate = '<b>Pre-symptomatic (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_active,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Active TB (With Intervention)',
+      line = list(color = '#e16462', width = 3),
+      hovertemplate = '<b>Active TB (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(
+      title = list(
+        text = "TB Simulation Comparison: With vs Without Interventions",
+        font = list(size = 20, color = '#2c3e50'),
+        x = 0.5,
+        xanchor = 'center'
+      ),
+      xaxis = list(
+        title = list(text = "Time (years)", font = list(size = 14, color = '#34495e')),
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12)
+      ),
+      yaxis = list(
+        title = list(text = "Number of Individuals", font = list(size = 14, color = '#34495e')),
+        type = input$plot_scale,
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12)
+      ),
+      hovermode = 'x unified',
+      hoverlabel = list(
+        bgcolor = 'rgba(255,255,255,0.9)',
+        bordercolor = '#34495e',
+        font = list(size = 12, color = '#2c3e50')
+      ),
+      legend = list(
+        orientation = "v",
+        x = 1.02,
+        y = 1,
+        bgcolor = 'rgba(255,255,255,0.8)',
+        bordercolor = '#bdc3c7',
+        borderwidth = 1,
+        font = list(size = 10)
+      ),
+      plot_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.8)' else 'rgba(248,249,250,0.8)',
+      paper_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.9)' else 'rgba(255,255,255,0.9)',
+      margin = list(l = 60, r = 60, t = 80, b = 60),
+      showlegend = TRUE,
+      font = list(color = if(dark_theme()) '#ffffff' else '#2c3e50')
+    ) %>%
+    config(
+      displayModeBar = TRUE,
+      modeBarButtonsToRemove = c('pan2d', 'lasso2d', 'select2d'),
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = "png",
+        filename = "tb_comparison",
+        height = 600,
+        width = 1000,
+        scale = 2
+      )
+    )
+    
+    p
+  })
+  
+  # Difference plot
+  output$difference_plot <- renderPlotly({
+    req(comparison_results())
+    
+    comp <- comparison_results()
+    without <- comp$without_interventions
+    with_int <- comp$with_interventions
+    
+    # Calculate differences (with - without)
+    diff_infected <- with_int$n_infected - without$n_infected
+    diff_active <- with_int$n_active - without$n_active
+    diff_latent_slow <- with_int$n_latent_slow - without$n_latent_slow
+    diff_latent_fast <- with_int$n_latent_fast - without$n_latent_fast
+    diff_susceptible <- with_int$n_susceptible - without$n_susceptible
+    
+    p <- plot_ly() %>%
+    add_trace(
+      x = with_int$time,
+      y = diff_infected,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Total Infected Difference',
+      line = list(color = '#31688e', width = 3),
+      hovertemplate = '<b>Total Infected Difference</b><br>Time: %{x:.2f} years<br>Difference: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = diff_active,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Active TB Difference',
+      line = list(color = '#e16462', width = 3),
+      hovertemplate = '<b>Active TB Difference</b><br>Time: %{x:.2f} years<br>Difference: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = diff_latent_slow,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Slow Difference',
+      line = list(color = '#35b779', width = 3),
+      hovertemplate = '<b>Latent Slow Difference</b><br>Time: %{x:.2f} years<br>Difference: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = diff_latent_fast,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Fast Difference',
+      line = list(color = '#1f9e89', width = 3),
+      hovertemplate = '<b>Latent Fast Difference</b><br>Time: %{x:.2f} years<br>Difference: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = diff_susceptible,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Susceptible Difference',
+      line = list(color = '#440154', width = 3),
+      hovertemplate = '<b>Susceptible Difference</b><br>Time: %{x:.2f} years<br>Difference: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(
+      title = list(
+        text = "Intervention Impact: Difference (With - Without Interventions)",
+        font = list(size = 18, color = '#2c3e50'),
+        x = 0.5,
+        xanchor = 'center'
+      ),
+      xaxis = list(
+        title = list(text = "Time (years)", font = list(size = 14, color = '#34495e')),
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12)
+      ),
+      yaxis = list(
+        title = list(text = "Difference in Count", font = list(size = 14, color = '#34495e')),
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = TRUE,
+        zerolinecolor = 'rgba(0,0,0,0.5)',
+        tickfont = list(size = 12)
+      ),
+      hovermode = 'x unified',
+      hoverlabel = list(
+        bgcolor = 'rgba(255,255,255,0.9)',
+        bordercolor = '#34495e',
+        font = list(size = 12, color = '#2c3e50')
+      ),
+      legend = list(
+        orientation = "v",
+        x = 1.02,
+        y = 1,
+        bgcolor = 'rgba(255,255,255,0.8)',
+        bordercolor = '#bdc3c7',
+        borderwidth = 1,
+        font = list(size = 12)
+      ),
+      plot_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.8)' else 'rgba(248,249,250,0.8)',
+      paper_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.9)' else 'rgba(255,255,255,0.9)',
+      margin = list(l = 60, r = 60, t = 80, b = 60),
+      showlegend = TRUE,
+      font = list(color = if(dark_theme()) '#ffffff' else '#2c3e50'),
+      shapes = list(
+        list(
+          type = "line",
+          x0 = min(with_int$time), x1 = max(with_int$time),
+          y0 = 0, y1 = 0,
+          line = list(color = "rgba(0,0,0,0.5)", width = 1, dash = "dot")
+        )
+      )
+    ) %>%
+    config(
+      displayModeBar = TRUE,
+      modeBarButtonsToRemove = c('pan2d', 'lasso2d', 'select2d'),
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = "png",
+        filename = "tb_difference",
+        height = 400,
         width = 1000,
         scale = 2
       )
@@ -2115,6 +2642,148 @@ bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
     )
     
     p
+  })
+  
+  # Comparison summary table
+  output$comparison_summary_table <- DT::renderDataTable({
+    req(comparison_results())
+    
+    comp <- comparison_results()
+    without <- comp$without_interventions
+    with_int <- comp$with_interventions
+    params <- comp$parameters
+    
+    # Calculate summary statistics for both simulations
+    summary_data <- data.frame(
+      Metric = c(
+        "Population Size",
+        "Simulation Duration (years)",
+        "Initial Prevalence",
+        "Transmission Rate",
+        "Final Infected Count (No Intervention)",
+        "Final Infected Count (With Intervention)",
+        "Peak Infected Count (No Intervention)",
+        "Peak Infected Count (With Intervention)",
+        "Final Active Count (No Intervention)",
+        "Final Active Count (With Intervention)",
+        "Final Latent Slow Count (No Intervention)",
+        "Final Latent Slow Count (With Intervention)",
+        "Final Latent Fast Count (No Intervention)",
+        "Final Latent Fast Count (With Intervention)"
+      ),
+      Value = c(
+        params$n_agents,
+        round((as.Date(params$end_date) - as.Date(params$start_date)) / 365.25, 2),
+        params$init_prev,
+        params$beta,
+        max(without$n_infected, na.rm = TRUE),
+        max(with_int$n_infected, na.rm = TRUE),
+        max(without$n_infected, na.rm = TRUE),
+        max(with_int$n_infected, na.rm = TRUE),
+        max(without$n_active, na.rm = TRUE),
+        max(with_int$n_active, na.rm = TRUE),
+        max(without$n_latent_slow, na.rm = TRUE),
+        max(with_int$n_latent_slow, na.rm = TRUE),
+        max(without$n_latent_fast, na.rm = TRUE),
+        max(with_int$n_latent_fast, na.rm = TRUE)
+      )
+    )
+    
+    DT::datatable(
+      summary_data,
+      options = list(
+        pageLength = 15,
+        searching = FALSE,
+        ordering = FALSE
+      ),
+      rownames = FALSE
+    )
+  })
+  
+  # Intervention impact table
+  output$intervention_impact_table <- DT::renderDataTable({
+    req(comparison_results())
+    
+    comp <- comparison_results()
+    without <- comp$without_interventions
+    with_int <- comp$with_interventions
+    
+    # Calculate impact metrics
+    final_infected_without <- max(without$n_infected, na.rm = TRUE)
+    final_infected_with <- max(with_int$n_infected, na.rm = TRUE)
+    final_active_without <- max(without$n_active, na.rm = TRUE)
+    final_active_with <- max(with_int$n_active, na.rm = TRUE)
+    final_latent_slow_without <- max(without$n_latent_slow, na.rm = TRUE)
+    final_latent_slow_with <- max(with_int$n_latent_slow, na.rm = TRUE)
+    final_latent_fast_without <- max(without$n_latent_fast, na.rm = TRUE)
+    final_latent_fast_with <- max(with_int$n_latent_fast, na.rm = TRUE)
+    
+    # Calculate absolute and relative differences
+    abs_diff_infected <- final_infected_with - final_infected_without
+    rel_diff_infected <- if(final_infected_without > 0) (abs_diff_infected / final_infected_without) * 100 else 0
+    
+    abs_diff_active <- final_active_with - final_active_without
+    rel_diff_active <- if(final_active_without > 0) (abs_diff_active / final_active_without) * 100 else 0
+    
+    abs_diff_latent_slow <- final_latent_slow_with - final_latent_slow_without
+    rel_diff_latent_slow <- if(final_latent_slow_without > 0) (abs_diff_latent_slow / final_latent_slow_without) * 100 else 0
+    
+    abs_diff_latent_fast <- final_latent_fast_with - final_latent_fast_without
+    rel_diff_latent_fast <- if(final_latent_fast_without > 0) (abs_diff_latent_fast / final_latent_fast_without) * 100 else 0
+    
+    impact_data <- data.frame(
+      Metric = c(
+        "Total Infected - Absolute Difference",
+        "Total Infected - Relative Difference (%)",
+        "Active TB - Absolute Difference",
+        "Active TB - Relative Difference (%)",
+        "Latent Slow TB - Absolute Difference",
+        "Latent Slow TB - Relative Difference (%)",
+        "Latent Fast TB - Absolute Difference",
+        "Latent Fast TB - Relative Difference (%)"
+      ),
+      Value = c(
+        sprintf("%.0f", abs_diff_infected),
+        sprintf("%.2f%%", rel_diff_infected),
+        sprintf("%.0f", abs_diff_active),
+        sprintf("%.2f%%", rel_diff_active),
+        sprintf("%.0f", abs_diff_latent_slow),
+        sprintf("%.2f%%", rel_diff_latent_slow),
+        sprintf("%.0f", abs_diff_latent_fast),
+        sprintf("%.2f%%", rel_diff_latent_fast)
+      ),
+      Interpretation = c(
+        if(abs_diff_infected < 0) "Intervention reduced infections" else if(abs_diff_infected > 0) "Intervention increased infections" else "No change",
+        if(rel_diff_infected < 0) "Beneficial reduction" else if(rel_diff_infected > 0) "Adverse increase" else "No change",
+        if(abs_diff_active < 0) "Intervention reduced active cases" else if(abs_diff_active > 0) "Intervention increased active cases" else "No change",
+        if(rel_diff_active < 0) "Beneficial reduction" else if(rel_diff_active > 0) "Adverse increase" else "No change",
+        if(abs_diff_latent_slow < 0) "Intervention reduced latent slow cases" else if(abs_diff_latent_slow > 0) "Intervention increased latent slow cases" else "No change",
+        if(rel_diff_latent_slow < 0) "Beneficial reduction" else if(rel_diff_latent_slow > 0) "Adverse increase" else "No change",
+        if(abs_diff_latent_fast < 0) "Intervention reduced latent fast cases" else if(abs_diff_latent_fast > 0) "Intervention increased latent fast cases" else "No change",
+        if(rel_diff_latent_fast < 0) "Beneficial reduction" else if(rel_diff_latent_fast > 0) "Adverse increase" else "No change"
+      )
+    )
+    
+    DT::datatable(
+      impact_data,
+      options = list(
+        pageLength = 10,
+        searching = FALSE,
+        ordering = FALSE
+      ),
+      rownames = FALSE
+    ) %>%
+    formatStyle(
+      'Interpretation',
+      backgroundColor = styleEqual(
+        c("Beneficial reduction", "Adverse increase", "No change"),
+        c('#d4edda', '#f8d7da', '#fff3cd')
+      ),
+      color = styleEqual(
+        c("Beneficial reduction", "Adverse increase", "No change"),
+        c('#155724', '#721c24', '#856404')
+      )
+    )
   })
   
   # Death rate analysis plot
