@@ -1,7 +1,7 @@
 import numpy as np
 import starsim as ss
 from tbsim import TBS
-from interventions_eh import TBDiagnosticErrors
+from .interventions_eh import TBDiagnosticErrors
 
 __all__ = ['TBDiagnostic', 'EnhancedTBDiagnostic']
 
