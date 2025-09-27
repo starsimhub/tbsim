@@ -477,6 +477,148 @@ ui <- fluidPage(
                 column(6, sliderInput("bcg_age_max", "Maximum Age (years)", value = 5, min = 1, max = 20, step = 1))
               )
             )
+          ),
+          
+          # Simulation Components
+          bsCollapsePanel(
+            title = "🧩 Simulation Components",
+            value = "simulation_components",
+            style = "info",
+            h5("Add custom components to your simulation"),
+            br(),
+            
+            # Component Type Selection
+            fluidRow(
+              column(6, 
+                selectInput("component_type", "Component Type",
+                  choices = list(
+                    "Intervention" = "intervention",
+                    "Analyzer" = "analyzer",
+                    "Connector" = "connector",
+                    "Network" = "network"
+                  ),
+                  selected = "intervention"
+                )
+              ),
+              column(6,
+                actionButton("add_component", "Add Component", class = "btn-primary btn-sm")
+              )
+            ),
+            
+            # Component Configuration
+            conditionalPanel(
+              condition = "input.component_type == 'intervention'",
+              h6("Intervention Configuration"),
+              fluidRow(
+                column(6, textInput("intervention_name", "Name", value = "Custom Intervention")),
+                column(6, selectInput("intervention_type", "Type",
+                  choices = list(
+                    "BCG Protection" = "BCGProtection",
+                    "Enhanced TB Treatment" = "EnhancedTBTreatment",
+                    "Enhanced TB Diagnostic" = "EnhancedTBDiagnostic",
+                    "Health Seeking Behavior" = "HealthSeekingBehavior",
+                    "TB Diagnostic" = "TBDiagnostic",
+                    "TB Treatment" = "TBTreatment",
+                    "TB Vaccination Campaign" = "TBVaccinationCampaign",
+                    "TPT Initiation" = "TPTInitiation"
+                  ),
+                  selected = "BCGProtection"
+                ))
+              ),
+              fluidRow(
+                column(6, sliderInput("intervention_coverage", "Coverage (%)", value = 50, min = 0, max = 100, step = 5)),
+                column(6, dateInput("intervention_start", "Start Date", value = as.Date("1990-01-01")))
+              ),
+              fluidRow(
+                column(6, dateInput("intervention_stop", "End Date", value = as.Date("2030-12-31"))),
+                column(6, sliderInput("intervention_effectiveness", "Effectiveness", value = 0.7, min = 0, max = 1, step = 0.1))
+              )
+            ),
+            
+            conditionalPanel(
+              condition = "input.component_type == 'analyzer'",
+              h6("Analyzer Configuration"),
+              fluidRow(
+                column(6, textInput("analyzer_name", "Name", value = "Custom Analyzer")),
+                column(6, selectInput("analyzer_type", "Type",
+                  choices = list(
+                    "Dwell Time Analyzer" = "DwtAnalyzer"
+                  ),
+                  selected = "DwtAnalyzer"
+                ))
+              ),
+              fluidRow(
+                column(6, textInput("analyzer_scenario_name", "Scenario Name", value = "Baseline")),
+                column(6, selectInput("analyzer_states_enum", "States Enumeration",
+                  choices = list(
+                    "TBS (TB States)" = "TBS",
+                    "TBSL (TB States Long)" = "TBSL"
+                  ),
+                  selected = "TBS"
+                ))
+              )
+            ),
+            
+            conditionalPanel(
+              condition = "input.component_type == 'connector'",
+              h6("Connector Configuration"),
+              fluidRow(
+                column(6, textInput("connector_name", "Name", value = "Custom Connector")),
+                column(6, selectInput("connector_type", "Type",
+                  choices = list(
+                    "TB-HIV Connector" = "TB_HIV_Connector",
+                    "TB-Nutrition Connector" = "TB_Nutrition_Connector"
+                  ),
+                  selected = "TB_HIV_Connector"
+                ))
+              ),
+              fluidRow(
+                column(6, sliderInput("connector_acute_multiplier", "Acute Multiplier", value = 1.22, min = 0.5, max = 3.0, step = 0.01)),
+                column(6, sliderInput("connector_latent_multiplier", "Latent Multiplier", value = 1.90, min = 0.5, max = 3.0, step = 0.01))
+              ),
+              fluidRow(
+                column(6, sliderInput("connector_aids_multiplier", "AIDS Multiplier", value = 2.60, min = 0.5, max = 3.0, step = 0.01)),
+                column(6, checkboxInput("connector_enabled", "Enable Connector", value = TRUE))
+              )
+            ),
+            
+            conditionalPanel(
+              condition = "input.component_type == 'network'",
+              h6("Network Configuration"),
+              fluidRow(
+                column(6, textInput("network_name", "Name", value = "Custom Network")),
+                column(6, selectInput("network_type", "Type",
+                  choices = list(
+                    "Household Network" = "HouseholdNet",
+                    "Household Network (RATIONS Trial)" = "HouseholdNetRationsTrial"
+                  ),
+                  selected = "HouseholdNet"
+                ))
+              ),
+              fluidRow(
+                column(6, checkboxInput("network_add_newborns", "Add Newborns", value = FALSE)),
+                column(6, textInput("network_hhs", "Households (JSON)", value = "[]", placeholder = "[[1,2,3],[4,5,6]]"))
+              )
+            ),
+            
+            
+            br(),
+            
+            # Active Components List
+            h6("Active Components"),
+            div(id = "components_list", 
+              style = "max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9;",
+              uiOutput("active_components_list")
+            ),
+            
+            br(),
+            
+            # Component Actions
+            fluidRow(
+              column(4, actionButton("clear_components", "Clear All", class = "btn-warning btn-sm")),
+              column(4, actionButton("export_components", "Export Config", class = "btn-info btn-sm")),
+              column(4, actionButton("import_components", "Import Config", class = "btn-success btn-sm"))
+            )
           )
         ),
         
@@ -663,6 +805,10 @@ server <- function(input, output, session) {
   comparison_running <- reactiveVal(FALSE)
   comparison_status <- reactiveVal("Ready to run comparison")
   
+  # Simulation components reactive values
+  simulation_components <- reactiveVal(list())
+  component_counter <- reactiveVal(0)
+  
   # Dark theme reactive value
   dark_theme <- reactiveVal(FALSE)
   
@@ -738,6 +884,62 @@ server <- function(input, output, session) {
       births <- starsim$Births(pars = list(birth_rate = input$birth_rate))
       deaths <- starsim$Deaths(pars = list(death_rate = input$death_rate))
       
+      # Add custom networks and demographics
+      custom_networks <- list(net)
+      custom_demographics <- list(deaths, births)
+      
+      components <- simulation_components()
+      if (length(components) > 0) {
+        for (comp in components) {
+          if (comp$type == "network") {
+            # Create custom network
+            tryCatch({
+              if (comp$config$type == "HouseholdNet") {
+                # Parse households JSON
+                hhs <- tryCatch({
+                  jsonlite::fromJSON(comp$config$hhs)
+                }, error = function(e) {
+                  list()  # Default to empty list
+                })
+                
+                custom_net <- reticulate::py_run_string(sprintf("
+import tbsim.networks as networks
+custom_net = networks.HouseholdNet(
+    hhs=%s,
+    pars={'add_newborns': %s}
+)
+                ", 
+                jsonlite::toJSON(hhs, auto_unbox = TRUE),
+                tolower(comp$config$add_newborns)
+                ))
+                custom_networks <- append(custom_networks, list(reticulate::py$custom_net))
+              } else if (comp$config$type == "HouseholdNetRationsTrial") {
+                # Parse households JSON
+                hhs <- tryCatch({
+                  jsonlite::fromJSON(comp$config$hhs)
+                }, error = function(e) {
+                  list()  # Default to empty list
+                })
+                
+                custom_net <- reticulate::py_run_string(sprintf("
+import tbsim.networks as networks
+custom_net = networks.HouseholdNetRationsTrial(
+    hhs=%s,
+    pars={'add_newborns': %s}
+)
+                ", 
+                jsonlite::toJSON(hhs, auto_unbox = TRUE),
+                tolower(comp$config$add_newborns)
+                ))
+                custom_networks <- append(custom_networks, list(reticulate::py$custom_net))
+              }
+            }, error = function(e) {
+              simulation_status(paste("Error creating custom network:", e$message))
+            })
+          }
+        }
+      }
+      
       # Create interventions list
       interventions <- list()
       
@@ -778,14 +980,140 @@ bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
         bcg_start_str <- NULL
         bcg_stop_str <- NULL
       }
+      
+      # Add custom components
+      components <- simulation_components()
+      if (length(components) > 0) {
+        for (comp in components) {
+          if (comp$type == "intervention") {
+            # Create custom intervention
+            tryCatch({
+              if (comp$config$type == "BCGProtection") {
+                # Create BCG intervention
+                reticulate::py_run_string(sprintf("
+import tbsim.interventions.bcg as bcg
+custom_intervention = bcg.BCGProtection(pars=dict(
+    coverage=%f,
+    start=ss.date('%s'),
+    stop=ss.date('%s'),
+    efficacy=%f
+))
+                ", 
+                comp$config$coverage / 100,
+                comp$config$start_date,
+                comp$config$stop_date,
+                comp$config$effectiveness
+                ))
+                custom_intervention <- reticulate::py$custom_intervention
+                interventions <- append(interventions, list(custom_intervention))
+              } else if (comp$config$type == "EnhancedTBTreatment") {
+                # Create Enhanced TB Treatment
+                reticulate::py_run_string("
+import tbsim.interventions.enhanced_tb_treatment as treatment
+custom_intervention = treatment.EnhancedTBTreatment()
+                ")
+                custom_intervention <- reticulate::py$custom_intervention
+                interventions <- append(interventions, list(custom_intervention))
+              } else if (comp$config$type == "TBDiagnostic") {
+                # Create TB Diagnostic
+                reticulate::py_run_string("
+import tbsim.interventions.tb_diagnostic as diagnostic
+custom_intervention = diagnostic.TBDiagnostic()
+                ")
+                custom_intervention <- reticulate::py$custom_intervention
+                interventions <- append(interventions, list(custom_intervention))
+              } else if (comp$config$type == "TBTreatment") {
+                # Create TB Treatment
+                reticulate::py_run_string("
+import tbsim.interventions.tb_treatment as treatment
+custom_intervention = treatment.TBTreatment()
+                ")
+                custom_intervention <- reticulate::py$custom_intervention
+                interventions <- append(interventions, list(custom_intervention))
+              } else if (comp$config$type == "HealthSeekingBehavior") {
+                # Create Health Seeking Behavior
+                reticulate::py_run_string("
+import tbsim.interventions.tb_health_seeking as healthseeking
+custom_intervention = healthseeking.HealthSeekingBehavior()
+                ")
+                custom_intervention <- reticulate::py$custom_intervention
+                interventions <- append(interventions, list(custom_intervention))
+              }
+            }, error = function(e) {
+              simulation_status(paste("Error creating custom intervention:", e$message))
+            })
+          }
+        }
+      }
+
+      # Create analyzers and connectors lists
+      analyzers <- list()
+      connectors <- list()
+      
+      # Add custom analyzers and connectors
+      components <- simulation_components()
+      if (length(components) > 0) {
+        for (comp in components) {
+          if (comp$type == "analyzer") {
+            tryCatch({
+              if (comp$config$type == "DwtAnalyzer") {
+                # Create Dwell Time Analyzer
+                reticulate::py_run_string(sprintf("
+import tbsim.analyzers as analyzers
+custom_analyzer = analyzers.DwtAnalyzer(
+    states_ennumerator=mtb.TBS,
+    scenario_name='%s'
+)
+                ", comp$config$scenario_name))
+                custom_analyzer <- reticulate::py$custom_analyzer
+                analyzers <- append(analyzers, list(custom_analyzer))
+              }
+            }, error = function(e) {
+              simulation_status(paste("Error creating custom analyzer:", e$message))
+            })
+          } else if (comp$type == "connector") {
+            tryCatch({
+              if (comp$config$type == "TB_HIV_Connector") {
+                # Create TB-HIV Connector
+                reticulate::py_run_string(sprintf("
+import tbsim.comorbidities.hiv.tb_hiv_cnn as tb_hiv
+custom_connector = tb_hiv.TB_HIV_Connector(pars=dict(
+    acute_multiplier=%f,
+    latent_multiplier=%f,
+    aids_multiplier=%f
+))
+                ", 
+                comp$config$acute_multiplier,
+                comp$config$latent_multiplier,
+                comp$config$aids_multiplier
+                ))
+                custom_connector <- reticulate::py$custom_connector
+                connectors <- append(connectors, list(custom_connector))
+              } else if (comp$config$type == "TB_Nutrition_Connector") {
+                # Create TB-Nutrition Connector
+                reticulate::py_run_string("
+import tbsim.comorbidities.malnutrition.tb_malnut_cnn as tb_nutrition
+custom_connector = tb_nutrition.TB_Nutrition_Connector()
+                ")
+                custom_connector <- reticulate::py$custom_connector
+                connectors <- append(connectors, list(custom_connector))
+              }
+            }, error = function(e) {
+              simulation_status(paste("Error creating custom connector:", e$message))
+            })
+          }
+        }
+      }
 
       # Create simulation
       sim <- starsim$Sim(
         people = pop,
-        networks = net,
+        networks = custom_networks,
         diseases = tb,
-        demographics = list(deaths, births),
+        demographics = custom_demographics,
         interventions = interventions,
+        analyzers = analyzers,
+        connectors = connectors,
         pars = sim_pars
       )
       
@@ -895,6 +1223,62 @@ bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
         births <- starsim$Births(pars = list(birth_rate = input$birth_rate))
         deaths <- starsim$Deaths(pars = list(death_rate = input$death_rate))
         
+        # Add custom networks and demographics
+        custom_networks <- list(net)
+        custom_demographics <- list(deaths, births)
+        
+        components <- simulation_components()
+        if (length(components) > 0) {
+          for (comp in components) {
+            if (comp$type == "network") {
+              # Create custom network
+              tryCatch({
+                if (comp$config$type == "HouseholdNet") {
+                  # Parse households JSON
+                  hhs <- tryCatch({
+                    jsonlite::fromJSON(comp$config$hhs)
+                  }, error = function(e) {
+                    list()  # Default to empty list
+                  })
+                  
+                  custom_net <- reticulate::py_run_string(sprintf("
+import tbsim.networks as networks
+custom_net = networks.HouseholdNet(
+    hhs=%s,
+    pars={'add_newborns': %s}
+)
+                  ", 
+                  jsonlite::toJSON(hhs, auto_unbox = TRUE),
+                  tolower(comp$config$add_newborns)
+                  ))
+                  custom_networks <- append(custom_networks, list(reticulate::py$custom_net))
+                } else if (comp$config$type == "HouseholdNetRationsTrial") {
+                  # Parse households JSON
+                  hhs <- tryCatch({
+                    jsonlite::fromJSON(comp$config$hhs)
+                  }, error = function(e) {
+                    list()  # Default to empty list
+                  })
+                  
+                  custom_net <- reticulate::py_run_string(sprintf("
+import tbsim.networks as networks
+custom_net = networks.HouseholdNetRationsTrial(
+    hhs=%s,
+    pars={'add_newborns': %s}
+)
+                  ", 
+                  jsonlite::toJSON(hhs, auto_unbox = TRUE),
+                  tolower(comp$config$add_newborns)
+                  ))
+                  custom_networks <- append(custom_networks, list(reticulate::py$custom_net))
+                }
+              }, error = function(e) {
+                comparison_status(paste("Error creating custom network:", e$message))
+              })
+            }
+          }
+        }
+        
         # Create interventions list
         interventions <- list()
         
@@ -932,13 +1316,138 @@ bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
           interventions <- append(interventions, list(bcg_intervention))
         }
         
+        # Add custom components
+        if (length(components) > 0) {
+          for (comp in components) {
+            if (comp$type == "intervention" && use_interventions) {
+              # Create custom intervention
+              tryCatch({
+                if (comp$config$type == "BCGProtection") {
+                  # Create BCG intervention
+                  reticulate::py_run_string(sprintf("
+import tbsim.interventions.bcg as bcg
+custom_intervention = bcg.BCGProtection(pars=dict(
+    coverage=%f,
+    start=ss.date('%s'),
+    stop=ss.date('%s'),
+    efficacy=%f
+))
+                  ", 
+                  comp$config$coverage / 100,
+                  comp$config$start_date,
+                  comp$config$stop_date,
+                  comp$config$effectiveness
+                  ))
+                  custom_intervention <- reticulate::py$custom_intervention
+                  interventions <- append(interventions, list(custom_intervention))
+                } else if (comp$config$type == "EnhancedTBTreatment") {
+                  # Create Enhanced TB Treatment
+                  reticulate::py_run_string("
+import tbsim.interventions.enhanced_tb_treatment as treatment
+custom_intervention = treatment.EnhancedTBTreatment()
+                  ")
+                  custom_intervention <- reticulate::py$custom_intervention
+                  interventions <- append(interventions, list(custom_intervention))
+                } else if (comp$config$type == "TBDiagnostic") {
+                  # Create TB Diagnostic
+                  reticulate::py_run_string("
+import tbsim.interventions.tb_diagnostic as diagnostic
+custom_intervention = diagnostic.TBDiagnostic()
+                  ")
+                  custom_intervention <- reticulate::py$custom_intervention
+                  interventions <- append(interventions, list(custom_intervention))
+                } else if (comp$config$type == "TBTreatment") {
+                  # Create TB Treatment
+                  reticulate::py_run_string("
+import tbsim.interventions.tb_treatment as treatment
+custom_intervention = treatment.TBTreatment()
+                  ")
+                  custom_intervention <- reticulate::py$custom_intervention
+                  interventions <- append(interventions, list(custom_intervention))
+                } else if (comp$config$type == "HealthSeekingBehavior") {
+                  # Create Health Seeking Behavior
+                  reticulate::py_run_string("
+import tbsim.interventions.tb_health_seeking as healthseeking
+custom_intervention = healthseeking.HealthSeekingBehavior()
+                  ")
+                  custom_intervention <- reticulate::py$custom_intervention
+                  interventions <- append(interventions, list(custom_intervention))
+                }
+              }, error = function(e) {
+                comparison_status(paste("Error creating custom intervention:", e$message))
+              })
+            }
+          }
+        }
+        
+        # Create analyzers and connectors lists
+        analyzers <- list()
+        connectors <- list()
+        
+        # Add custom analyzers and connectors
+        components <- simulation_components()
+        if (length(components) > 0) {
+          for (comp in components) {
+            if (comp$type == "analyzer") {
+              tryCatch({
+                if (comp$config$type == "DwtAnalyzer") {
+                  # Create Dwell Time Analyzer
+                  reticulate::py_run_string(sprintf("
+import tbsim.analyzers as analyzers
+custom_analyzer = analyzers.DwtAnalyzer(
+    states_ennumerator=mtb.TBS,
+    scenario_name='%s'
+)
+                  ", comp$config$scenario_name))
+                  custom_analyzer <- reticulate::py$custom_analyzer
+                  analyzers <- append(analyzers, list(custom_analyzer))
+                }
+              }, error = function(e) {
+                comparison_status(paste("Error creating custom analyzer:", e$message))
+              })
+            } else if (comp$type == "connector") {
+              tryCatch({
+                if (comp$config$type == "TB_HIV_Connector") {
+                  # Create TB-HIV Connector
+                  reticulate::py_run_string(sprintf("
+import tbsim.comorbidities.hiv.tb_hiv_cnn as tb_hiv
+custom_connector = tb_hiv.TB_HIV_Connector(pars=dict(
+    acute_multiplier=%f,
+    latent_multiplier=%f,
+    aids_multiplier=%f
+))
+                  ", 
+                  comp$config$acute_multiplier,
+                  comp$config$latent_multiplier,
+                  comp$config$aids_multiplier
+                  ))
+                  custom_connector <- reticulate::py$custom_connector
+                  connectors <- append(connectors, list(custom_connector))
+                } else if (comp$config$type == "TB_Nutrition_Connector") {
+                  # Create TB-Nutrition Connector
+                  reticulate::py_run_string("
+import tbsim.comorbidities.malnutrition.tb_malnut_cnn as tb_nutrition
+custom_connector = tb_nutrition.TB_Nutrition_Connector()
+                  ")
+                  custom_connector <- reticulate::py$custom_connector
+                  connectors <- append(connectors, list(custom_connector))
+                }
+              }, error = function(e) {
+                comparison_status(paste("Error creating custom connector:", e$message))
+              })
+            }
+          }
+        }
+
         # Create simulation
         sim <- starsim$Sim(
           people = pop,
-          networks = net,
+          networks = custom_networks,
           diseases = tb,
-          demographics = list(deaths, births),
+          demographics = custom_demographics,
           interventions = interventions,
+          analyzers = analyzers,
+          connectors = connectors,
           pars = sim_pars
         )
         
@@ -1011,6 +1520,219 @@ bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
       comparison_results(NULL)
       comparison_running(FALSE)
     })
+  })
+  
+  # Add component to simulation
+  observeEvent(input$add_component, {
+    # Validate component name
+    component_name <- switch(input$component_type,
+      "intervention" = input$intervention_name,
+      "analyzer" = input$analyzer_name,
+      "connector" = input$connector_name,
+      "network" = input$network_name
+    )
+    
+    if (is.null(component_name) || component_name == "") {
+      showNotification("Please enter a component name", type = "error")
+      return()
+    }
+    
+    # Check for duplicate names
+    current_components <- simulation_components()
+    existing_names <- sapply(current_components, function(x) x$name)
+    if (component_name %in% existing_names) {
+      showNotification("Component name already exists. Please choose a different name.", type = "error")
+      return()
+    }
+    
+    # Validate dates for interventions
+    if (input$component_type == "intervention") {
+      if (input$intervention_start >= input$intervention_stop) {
+        showNotification("Start date must be before end date", type = "error")
+        return()
+      }
+    }
+    
+    component_counter(component_counter() + 1)
+    
+    # Create component based on type
+    new_component <- list(
+      id = component_counter(),
+      type = input$component_type,
+      name = component_name,
+      config = switch(input$component_type,
+        "intervention" = list(
+          type = input$intervention_type,
+          coverage = input$intervention_coverage,
+          start_date = as.character(input$intervention_start),
+          stop_date = as.character(input$intervention_stop),
+          effectiveness = input$intervention_effectiveness
+        ),
+        "analyzer" = list(
+          type = input$analyzer_type,
+          scenario_name = input$analyzer_scenario_name,
+          states_enum = input$analyzer_states_enum
+        ),
+        "connector" = list(
+          type = input$connector_type,
+          acute_multiplier = input$connector_acute_multiplier,
+          latent_multiplier = input$connector_latent_multiplier,
+          aids_multiplier = input$connector_aids_multiplier,
+          enabled = input$connector_enabled
+        ),
+        "network" = list(
+          type = input$network_type,
+          add_newborns = input$network_add_newborns,
+          hhs = input$network_hhs
+        )
+      )
+    )
+    
+    # Add to components list
+    current_components[[length(current_components) + 1]] <- new_component
+    simulation_components(current_components)
+    
+    showNotification(paste("Component", component_name, "added successfully!"), type = "success")
+  })
+  
+  # Remove component from simulation
+  observeEvent(input$remove_component, {
+    if (!is.null(input$remove_component)) {
+      component_id <- as.numeric(input$remove_component)
+      current_components <- simulation_components()
+      
+      # Find component to remove
+      component_to_remove <- current_components[sapply(current_components, function(x) x$id == component_id)]
+      if (length(component_to_remove) > 0) {
+        component_name <- component_to_remove[[1]]$name
+        
+        # Remove component with matching ID
+        current_components <- current_components[sapply(current_components, function(x) x$id != component_id)]
+        simulation_components(current_components)
+        
+        showNotification(paste("Component", component_name, "removed successfully!"), type = "success")
+      }
+    }
+  })
+  
+  # Clear all components
+  observeEvent(input$clear_components, {
+    current_components <- simulation_components()
+    if (length(current_components) > 0) {
+      simulation_components(list())
+      component_counter(0)
+      showNotification("All components cleared successfully!", type = "success")
+    } else {
+      showNotification("No components to clear", type = "warning")
+    }
+  })
+  
+  # Export components configuration
+  observeEvent(input$export_components, {
+    components <- simulation_components()
+    if (length(components) > 0) {
+      # Create JSON configuration
+      config <- jsonlite::toJSON(components, pretty = TRUE)
+      
+      # Show modal with configuration
+      showModal(modalDialog(
+        title = "Components Configuration",
+        tags$pre(config),
+        size = "l",
+        easyClose = TRUE,
+        footer = tagList(
+          downloadButton("download_config", "Download Config"),
+          modalButton("Close")
+        )
+      ))
+    } else {
+      showNotification("No components to export", type = "warning")
+    }
+  })
+  
+  # Download configuration file
+  output$download_config <- downloadHandler(
+    filename = function() {
+      paste0("tb_simulation_components_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".json")
+    },
+    content = function(file) {
+      components <- simulation_components()
+      config <- jsonlite::toJSON(components, pretty = TRUE)
+      writeLines(config, file)
+    }
+  )
+  
+  # Import components configuration
+  observeEvent(input$import_components, {
+    showModal(modalDialog(
+      title = "Import Components Configuration",
+      fileInput("import_config_file", "Choose JSON file",
+                accept = c(".json", ".txt")),
+      size = "m",
+      easyClose = TRUE,
+      footer = tagList(
+        actionButton("confirm_import", "Import", class = "btn-primary"),
+        modalButton("Cancel")
+      )
+    ))
+  })
+  
+  # Confirm import
+  observeEvent(input$confirm_import, {
+    if (!is.null(input$import_config_file)) {
+      tryCatch({
+        # Read and parse JSON file
+        config_text <- readLines(input$import_config_file$datapath)
+        components <- jsonlite::fromJSON(paste(config_text, collapse = "\n"))
+        
+        # Validate and set components
+        if (is.list(components) && length(components) > 0) {
+          # Reset counter to max ID + 1
+          max_id <- max(sapply(components, function(x) x$id), na.rm = TRUE)
+          component_counter(max_id + 1)
+          
+          simulation_components(components)
+          removeModal()
+          showNotification("Components imported successfully!", type = "success")
+        } else {
+          showNotification("Invalid configuration file", type = "error")
+        }
+      }, error = function(e) {
+        showNotification(paste("Error importing configuration:", e$message), type = "error")
+      })
+    }
+  })
+  
+  # Render active components list
+  output$active_components_list <- renderUI({
+    components <- simulation_components()
+    
+    if (length(components) == 0) {
+      return(div(
+        style = "text-align: center; color: #666; font-style: italic;",
+        "No components added yet"
+      ))
+    }
+    
+    component_ui <- lapply(components, function(comp) {
+      div(
+        style = "display: flex; justify-content: space-between; align-items: center; padding: 8px; margin: 4px 0; background: white; border: 1px solid #ddd; border-radius: 4px;",
+        div(
+          style = "flex-grow: 1;",
+          tags$strong(paste0(comp$name, " (", comp$type, ")")),
+          br(),
+          tags$small(paste("ID:", comp$id, "| Config:", paste(names(comp$config), collapse = ", ")))
+        ),
+        actionButton(
+          inputId = paste0("remove_component_", comp$id),
+          label = "Remove",
+          class = "btn-danger btn-xs",
+          onclick = paste0("Shiny.setInputValue('remove_component', ", comp$id, ", {priority: 'event'})")
+        )
+      )
+    })
+    
+    return(component_ui)
   })
   
   # Status output
