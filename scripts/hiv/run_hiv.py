@@ -2,7 +2,7 @@ import tbsim as mtb
 import starsim as ss
 import matplotlib.pyplot as plt
 import numpy as np
-from shared_functions import make_interventions, make_demographics, plot_results
+from shared_functions import make_hiv_interventions, make_demographics, plot_results
 
 
 # Main Simulation Setup
@@ -13,20 +13,18 @@ def sim_setup( n_agents=10_000,
         ) -> ss.Sim:
 
     sim_pars = dict(
-        unit='day',
-        dt=7,
+        dt=ss.days(7),
         start=ss.date('1980-01-01'),
         stop=ss.date('2035-12-31'),
         verbose=verbose_log
     )
 
-    extra_states = [ss.Arr(name="CustomField", dtype=str, default="Any Value"),]
-    people = ss.People(n_agents=n_agents, extra_states=extra_states)
+    people = ss.People(n_agents=n_agents)
 
     hiv = mtb.HIV(pars=dict(
         init_prev=ss.bernoulli(p=0.30),
         init_onart=ss.bernoulli(p=0.50),
-        dt=7,
+        dt=ss.days(7),
     ))
     
     network = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
@@ -36,7 +34,7 @@ def sim_setup( n_agents=10_000,
         diseases=hiv,
         pars=sim_pars,
         networks=network,
-        interventions=make_interventions(Intvs),    
+        interventions=make_hiv_interventions(Intvs),    
         demographics=make_demographics(Demgs),      
     )
 

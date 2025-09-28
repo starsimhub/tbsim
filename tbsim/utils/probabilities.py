@@ -1,6 +1,7 @@
 import json
 import csv
 import numpy as np
+import starsim as ss
 from dataclasses import dataclass, asdict
 from typing import Optional, Union, Dict
 
@@ -42,14 +43,13 @@ class Range:
             float or np.ndarray: Sampled value(s).
         """
         
-        # TODO: change this to use Starsim distributions
         self.validate()
         if self.dist == "uniform":
-            return np.random.uniform(self.min, self.max, size=size)
+            return ss.uniform(self.min, self.max).rvs(size=size)
         elif self.dist == "normal":
-            return np.random.normal(loc=self.min, scale=self.max, size=size)
+            return ss.normal(loc=self.min, scale=self.max).rvs(size=size)
         elif self.dist == "lognormal":
-            return np.random.lognormal(mean=self.min, sigma=self.max, size=size)
+            return ss.lognormal(mean=self.min, sigma=self.max).rvs(size=size)
         else:
             raise ValueError(f"Unsupported distribution type: {self.dist}")
 

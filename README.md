@@ -40,7 +40,7 @@ Available tutorials:
 
 #### Prerequisites
 
-- Python 3.x
+- Python 3.11 or higher
 - Starsim package
 - Other dependencies (listed in `requirements.txt`)
 
@@ -68,7 +68,7 @@ The steps described below will allow you to use the latest unreleased features o
 
 ### Running a sample simulation
 
-1. Navigate to the directory **_scripts_**
+1. Navigate to the directory **_scripts/basic_**
 2. Run the script:
    ```bash
    python run_tb.py

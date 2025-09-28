@@ -55,7 +55,7 @@ def make_tb_nut():
 
     # --------- simulation ---------
     sim_pars = dict(
-        dt = 7/365,
+        dt=ss.days(7)/365,
         start = 1980,
         stop = 1995
         )

@@ -74,9 +74,7 @@ import tbsim as mtb
 import starsim as ss
 
 # 1. Create simulation with analyzer
-sim = ss.Sim(diseases=[mtb.TB()])
-analyzer = mtb.DwtAnalyzer(scenario_name="MyAnalysis")
-sim.add_analyzer(analyzer)
+sim = ss.Sim(diseases=mtb.TB(), analyzers=DwtAnalyzer(scenario_name="My Analysis"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
 sim.run()
 
 # 2. Generate plots

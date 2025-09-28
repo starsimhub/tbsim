@@ -3,18 +3,18 @@ import numpy as np
 import starsim as ss
 import tbsim as mtb
 
-def make_tb_simplified(agents=20, start=2000, stop=2020, dt=7/365):
+def make_tb_simplified(agents=20, start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'), dt=ss.days(7)):
     pop = ss.People(n_agents=agents)
-    tb = mtb.TB(pars={'beta': ss.beta(0.01), 'init_prev': 0.25})
+    tb = mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))]
     sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start, stop=stop), demographics=dems)
-    sim.pars.verbose = sim.pars.dt / 5
+    sim.pars.verbose = 0.1
     return sim
 
 def test_initial_states():
     tb = mtb.TB()
-    print(tb.states)
+    print(tb.state)
     assert isinstance(tb.susceptible, ss.BoolArr)
     assert isinstance(tb.infected, ss.BoolArr)
     assert isinstance(tb.rel_sus, ss.FloatArr)
@@ -33,13 +33,13 @@ def test_initial_states():
 def test_tb_initialization():
     tb = mtb.TB()
     assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_presym_to_active'], ss.rate)
-    assert isinstance(tb.pars['rate_active_to_clear'], ss.rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.rate)
+    assert isinstance(tb.pars['rate_LS_to_presym'], ss.Rate)
+    assert isinstance(tb.pars['rate_LF_to_presym'], ss.Rate)
+    assert isinstance(tb.pars['rate_presym_to_active'], ss.Rate)
+    assert isinstance(tb.pars['rate_active_to_clear'], ss.Rate)
+    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.Rate)
+    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.Rate)
+    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.Rate)
     assert isinstance(tb.pars['rel_trans_presymp'], float)
     assert isinstance(tb.pars['rel_trans_smpos'], float)
     assert isinstance(tb.pars['rel_trans_smneg'], float)
@@ -50,12 +50,12 @@ def test_default_parameters():
     tb = mtb.TB()
     print(tb)
     assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.rate)
-    # assert isinstance(tb.pars['rate_active_to_cure'], ss.rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.rate)
+    assert isinstance(tb.pars['rate_LS_to_presym'], ss.Rate)
+    assert isinstance(tb.pars['rate_LF_to_presym'], ss.Rate)
+    # assert isinstance(tb.pars['rate_active_to_cure'], ss.Rate)
+    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.Rate)
+    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.Rate)
+    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.Rate)
     assert isinstance(tb.pars['rel_trans_smpos'], float)
 
 def test_tb_infectious():
@@ -132,7 +132,7 @@ def test_step_die_no_uids():
 
 @pytest.fixture
 def tb():
-    sim = make_tb_simplified(agents=300)
+    sim = make_tb_simplified(agents=1000)
     sim.init()
     tb = sim.diseases['tb']
     return tb
@@ -218,6 +218,9 @@ def test_set_prognoses_active_tb_state(tb):
 # Updating the result count of new infections.
 def test_set_prognoses_new_infections_count(tb):
     uids = ss.uids([1, 2, 3])
+    # Ensure all UIDs are initially uninfected to test new infection counting
+    tb.infected[uids] = False
+    tb.state[uids] = mtb.TBS.NONE
     initial_count = np.count_nonzero(tb.infected)
     
     tb.set_prognoses(uids)
@@ -229,7 +232,10 @@ def test_p_latent_to_presym():
     sim = make_tb_simplified(agents=10)
     sim.init()
     tb = sim.diseases['tb']
-    tb.state = np.full(tb.state.shape, mtb.TBS.LATENT_SLOW)  # Assuming all agents are in the latent slow TB state
+    
+    # Temporarily unlock attributes for testing
+    tb._lock_attrs = False
+    tb.state[:] = mtb.TBS.LATENT_SLOW  # Assuming all agents are in the latent slow TB state
 
     # Initialize unique IDs for testing; choose IDs such that some are in latent fast and some in latent slow
     latent_slow_uids = ss.uids([1, 2, 3])  # Latent slow TB
@@ -257,7 +263,10 @@ def test_p_presym_to_active():
     sim = make_tb_simplified(agents=10)
     sim.init()
     tb = sim.diseases['tb']
-    tb.state = np.full(tb.state.shape, mtb.TBS.ACTIVE_PRESYMP)  # Assuming all agents are in the pre-symptomatic active TB state
+    
+    # Temporarily unlock attributes for testing
+    tb._lock_attrs = False
+    tb.state[:] = mtb.TBS.ACTIVE_PRESYMP  # Assuming all agents are in the pre-symptomatic active TB state
 
     # Initialize unique IDs for testing; all are in pre-symptomatic state
     presym_uids = ss.uids([1, 2, 3, 4, 5])
@@ -266,7 +275,7 @@ def test_p_presym_to_active():
     probabilities = mtb.TB.p_presym_to_active(tb, sim, presym_uids)
 
     # Assert that all probabilities are the same if rate is constant across all individuals
-    expected_rate = np.full(len(presym_uids), fill_value=tb.pars.rate_presym_to_active)
+    expected_rate = np.full(len(presym_uids), fill_value=tb.pars.rate_presym_to_active.rate)
     expected_prob = 1 - np.exp(-expected_rate)
     assert np.allclose(probabilities, expected_prob), "Probabilities should match expected values calculated from the rate"
 
@@ -281,6 +290,9 @@ def test_p_active_to_clear():
     sim = make_tb_simplified(agents=10)
     sim.init()
     tb = sim.diseases['tb']
+    
+    # Temporarily unlock attributes for testing
+    tb._lock_attrs = False
 
     # Set some individuals to active TB states
     active_uids = ss.uids([1, 2, 3, 4, 5])
@@ -296,15 +308,19 @@ def test_p_active_to_clear():
     assert np.all(0 <= probabilities) and np.all(probabilities <= 1)
 
     # Check that the rates for those on treatment are correctly applied
-    expected_rate = np.full(len(active_uids), fill_value=tb.pars.rate_active_to_clear)
-    expected_rate[:2] = tb.pars.rate_treatment_to_clear  # Adjust for treatment
+    # Use the actual rate values instead of trying to do math on rate objects
+    base_rate = tb.pars.rate_active_to_clear.rate
+    treatment_rate = tb.pars.rate_treatment_to_clear.rate
+    
+    expected_rate = np.full(len(active_uids), fill_value=base_rate)
+    expected_rate[:2] = treatment_rate  # Adjust for treatment
     expected_rate *= tb.rr_clearance[active_uids]  # Adjust for relative clearance
 
     expected_prob = 1 - np.exp(-expected_rate)
     assert np.allclose(probabilities, expected_prob), "Probabilities should match expected values calculated from the adjusted rates"
 
     # Additional check for correct handling of treatment effects
-    treatment_effect = tb.pars.rate_treatment_to_clear > tb.pars.rate_active_to_clear
+    treatment_effect = treatment_rate > base_rate
     assert treatment_effect, "Treatment should generally provide a higher clearance rate"
 
 def test_p_active_to_death( ):
@@ -323,9 +339,9 @@ def test_p_active_to_death( ):
     assert np.all(0 <= probabilities) and np.all(probabilities <= 1)
 
     # Expected rates based on TB state and individual death rate adjustments
-    expected_rate = np.full(len(active_uids), fill_value=tb.pars.rate_exptb_to_dead)
-    expected_rate[tb.state[active_uids] == mtb.TBS.ACTIVE_SMPOS] = tb.pars.rate_smpos_to_dead
-    expected_rate[tb.state[active_uids] == mtb.TBS.ACTIVE_SMNEG] = tb.pars.rate_smneg_to_dead
+    expected_rate = np.full(len(active_uids), fill_value=tb.pars.rate_exptb_to_dead.rate)
+    expected_rate[tb.state[active_uids] == mtb.TBS.ACTIVE_SMPOS] = tb.pars.rate_smpos_to_dead.rate
+    expected_rate[tb.state[active_uids] == mtb.TBS.ACTIVE_SMNEG] = tb.pars.rate_smneg_to_dead.rate
     expected_rate *= tb.rr_death[active_uids]
 
     expected_prob = 1 - np.exp(-expected_rate)
@@ -336,11 +352,11 @@ def test_p_active_to_death( ):
 
 
 def test_latent_to_active_presymptomatic_transition():
-    sim = make_tb_simplified(agents=500)
+    sim = make_tb_simplified(agents=10000)
     sim.init()
     tb = sim.diseases['tb']
     # Setup individuals in latent states
-    latent_uids = ss.uids(np.arange(50)) 
+    latent_uids = ss.uids(np.arange(5000)) 
     tb.state[latent_uids] = np.random.choice([mtb.TBS.LATENT_SLOW, mtb.TBS.LATENT_FAST], size=len(latent_uids))
 
     # Manually execute the transition step
@@ -375,11 +391,11 @@ def test_presymptomatic_to_active_transition():
 
 def test_active_to_cleared_transition():
     # Increasing number of agents even higher as the clearance rate is very low
-    sim = make_tb_simplified(agents=5000)
+    sim = make_tb_simplified(agents=20000)
     sim.init()
     tb = sim.diseases['tb']
     # Setup individuals in active TB states
-    active_uids = ss.uids(np.arange(4000))  # Also test with a large number of agents
+    active_uids = ss.uids(np.arange(15000))  # Also test with a large number of agents
     
     tb.state[active_uids] = np.random.choice(
         [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB],
@@ -395,10 +411,10 @@ def test_active_to_cleared_transition():
     
 def test_active_to_death_transition():
     # Setup individuals in active TB states
-    sim = make_tb_simplified(agents=5000)
+    sim = make_tb_simplified(agents=20000)
     sim.init()
     tb = sim.diseases['tb']
-    active_uids = ss.uids(np.arange(4000))  # Also test with a large number of agents
+    active_uids = ss.uids(np.arange(15000))  # Also test with a large number of agents
     tb.state[active_uids] = np.random.choice(
         [mtb.TBS.ACTIVE_SMPOS, mtb.TBS.ACTIVE_SMNEG, mtb.TBS.ACTIVE_EXPTB],
         size=len(active_uids),

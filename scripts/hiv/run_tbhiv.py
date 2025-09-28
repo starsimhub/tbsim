@@ -11,18 +11,13 @@ def build_tbhiv_sim(Intvs=True, tb=True, includehiv = True, Demgs= True, simpars
 
     # --- Simulation Parameters ---
     default_simpars = dict(
-        unit='day',
-        dt=7,
+        dt=ss.days(7),
         start=ss.date('1980-01-01'),
         stop=ss.date('2035-12-31'),
         rand_seed=123,
     )
-    extra_states = [ss.Arr(name="CustomField", dtype=str, default="Any Value"),]
-    people = ss.People(n_agents=1000, extra_states=extra_states)
-    
-    
+    people = ss.People(n_agents=1000)
 
-  
     # --- HIV Disease Model ---
     hiv_pars = dict(
         init_prev=ss.bernoulli(p=0.00),     # 10% of the population is infected (in case not using intervention)
@@ -33,12 +28,11 @@ def build_tbhiv_sim(Intvs=True, tb=True, includehiv = True, Demgs= True, simpars
     # --- Network ---
     network = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
 
-
     # --- Assemble Simulation ---
     sim = ss.Sim(
         people=people,
         diseases=[sf.make_tb(include=tb), hiv],
-        interventions=sf.make_interventions(include=Intvs),
+        interventions=sf.make_hiv_interventions(include=Intvs),
         # demographics=demographics,
         networks=network,
         connectors=sf.make_tb_hiv_connector(include=tb),
@@ -49,10 +43,6 @@ def build_tbhiv_sim(Intvs=True, tb=True, includehiv = True, Demgs= True, simpars
 
 
 if __name__ == '__main__':
-
-    
-
-
     args = []
     args.append(dict(Intvs=False,Demgs=False))
     args.append(dict(Intvs=True,Demgs=False))
