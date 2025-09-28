@@ -25,15 +25,28 @@ for (pkg in required_packages) {
 cat("Setting up Python environment...\n")
 library(reticulate)
 
-# Try to use the virtual environment Python first
-venv_python <- "/Users/mine/gitweb/FORK-tbsim/venv/bin/python"
-if (file.exists(venv_python)) {
-  cat("Using virtual environment Python:", venv_python, "\n")
-  use_python(venv_python, required = TRUE)
+# Try to use environment variable or common virtual environment Python locations
+python_path <- Sys.getenv("TBSIM_PYTHON_PATH", unset = NA)
+if (!is.na(python_path) && file.exists(python_path)) {
+  cat("Using Python from TBSIM_PYTHON_PATH environment variable:", python_path, "\n")
+  use_python(python_path, required = TRUE)
 } else {
-  # Fall back to system Python
-  cat("Virtual environment not found, using system Python\n")
-  use_python("python3", required = TRUE)
+  # Check for common virtual environment locations
+  venv_paths <- c("venv/bin/python", ".venv/bin/python")
+  found_venv <- FALSE
+  for (venv in venv_paths) {
+    if (file.exists(venv)) {
+      cat("Using detected virtual environment Python:", venv, "\n")
+      use_python(venv, required = TRUE)
+      found_venv <- TRUE
+      break
+    }
+  }
+  if (!found_venv) {
+    # Fall back to system Python
+    cat("No virtual environment found, using system Python\n")
+    use_python("python3", required = TRUE)
+  }
 }
 
 # Check if Python is available
