@@ -4,8 +4,8 @@
 library(reticulate)
 
 # Set up Python environment for tbsim
-venv_python <- "/Users/mine/gitweb/FORK-tbsim/venv/bin/python"
-if (file.exists(venv_python)) {
+venv_python <- Sys.getenv("TBSIM_PYTHON", unset = NA)
+if (!is.na(venv_python) && file.exists(venv_python)) {
   use_python(venv_python, required = TRUE)
 } else {
   use_python("python3", required = TRUE)
