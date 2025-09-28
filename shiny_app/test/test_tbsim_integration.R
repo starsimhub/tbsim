@@ -3,14 +3,34 @@
 
 library(reticulate)
 
-# Set up Python environment for tbsim
-venv_python <- "/Users/mine/gitweb/FORK-tbsim/venv/bin/python"
-if (file.exists(venv_python)) {
-  use_python(venv_python, required = TRUE)
-} else {
+# Shared function to configure Python environment
+configure_python_env <- function() {
+  # 1. Check for VIRTUAL_ENV environment variable
+  venv <- Sys.getenv("VIRTUAL_ENV", unset = NA)
+  if (!is.na(venv) && nzchar(venv)) {
+    python_bin <- file.path(venv, "bin", "python")
+    if (file.exists(python_bin)) {
+      use_python(python_bin, required = TRUE)
+      return(invisible())
+    }
+  }
+  # 2. Check for .venv/bin/python or venv/bin/python in current directory
+  local_venv <- file.path(getwd(), ".venv", "bin", "python")
+  if (file.exists(local_venv)) {
+    use_python(local_venv, required = TRUE)
+    return(invisible())
+  }
+  alt_venv <- file.path(getwd(), "venv", "bin", "python")
+  if (file.exists(alt_venv)) {
+    use_python(alt_venv, required = TRUE)
+    return(invisible())
+  }
+  # 3. Fallback to system python3
   use_python("python3", required = TRUE)
 }
 
+# Set up Python environment for tbsim
+configure_python_env()
 cat("Testing TBsim integration...\n")
 
 tryCatch({
