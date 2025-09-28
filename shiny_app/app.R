@@ -1,0 +1,3564 @@
+# TBsim Shiny Web Application
+# A web interface for running tuberculosis simulations using the tbsim package
+
+library(shiny)
+library(plotly)
+library(DT)
+library(reticulate)
+library(shinydashboard)
+library(shinyBS)
+
+# Set up Python environment for tbsim
+venv_python <- "/Users/mine/gitweb/FORK-tbsim/venv/bin/python"
+if (file.exists(venv_python)) {
+  use_python(venv_python, required = TRUE)
+} else {
+  use_python("python3", required = TRUE)
+}
+
+# Import required Python modules
+tbsim <- import("tbsim")
+starsim <- import("starsim")
+sciris <- import("sciris")
+matplotlib <- import("matplotlib")
+matplotlib$use("Agg")  # Use non-interactive backend for web
+plt <- import("matplotlib.pyplot")
+np <- import("numpy")
+pd <- import("pandas")
+
+# Define UI
+ui <- fluidPage(
+  # Enhanced Dark theme CSS
+  tags$head(
+    tags$style(HTML("
+      .dark-theme {
+        background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%) !important;
+        color: #e8e8e8 !important;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+      }
+      .dark-theme .sidebar {
+        background: linear-gradient(180deg, #1e1e2e 0%, #2d2d3e 100%) !important;
+        color: #e8e8e8 !important;
+        border-right: 1px solid #3a3a4a !important;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .main-panel {
+        background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%) !important;
+        color: #e8e8e8 !important;
+      }
+      .dark-theme .panel {
+        background: rgba(30, 30, 46, 0.8) !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #3a3a4a !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+        backdrop-filter: blur(10px) !important;
+      }
+      .dark-theme .form-control {
+        background: rgba(45, 45, 62, 0.8) !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #4a4a5a !important;
+        border-radius: 6px !important;
+        transition: all 0.3s ease !important;
+      }
+      .dark-theme .form-control:focus {
+        background: rgba(55, 55, 72, 0.9) !important;
+        border-color: #007bff !important;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+      }
+      .dark-theme .btn {
+        background: linear-gradient(45deg, #4a4a5a, #5a5a6a) !important;
+        color: #ffffff !important;
+        border: 1px solid #6a6a7a !important;
+        border-radius: 6px !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+      }
+      .dark-theme .btn:hover {
+        background: linear-gradient(45deg, #5a5a6a, #6a6a7a) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .btn-primary {
+        background: linear-gradient(45deg, #007bff, #0056b3) !important;
+        border-color: #007bff !important;
+      }
+      .dark-theme .btn-primary:hover {
+        background: linear-gradient(45deg, #0056b3, #004085) !important;
+      }
+      .dark-theme .btn-secondary {
+        background: linear-gradient(45deg, #6c757d, #5a6268) !important;
+        border-color: #6c757d !important;
+      }
+      .dark-theme .btn-secondary:hover {
+        background: linear-gradient(45deg, #5a6268, #495057) !important;
+      }
+      .dark-theme .table {
+        background: rgba(30, 30, 46, 0.8) !important;
+        color: #e8e8e8 !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+      }
+      .dark-theme .table-striped > tbody > tr:nth-of-type(odd) {
+        background: rgba(45, 45, 62, 0.6) !important;
+      }
+      .dark-theme .table-striped > tbody > tr:hover {
+        background: rgba(0, 123, 255, 0.1) !important;
+        transition: background 0.3s ease !important;
+      }
+      .dark-theme .dataTables_wrapper {
+        background: rgba(30, 30, 46, 0.8) !important;
+        color: #e8e8e8 !important;
+        border-radius: 8px !important;
+        padding: 15px !important;
+      }
+      .dark-theme .dataTables_filter input {
+        background: rgba(45, 45, 62, 0.8) !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #4a4a5a !important;
+        border-radius: 6px !important;
+      }
+      .dark-theme .dataTables_length select {
+        background: rgba(45, 45, 62, 0.8) !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #4a4a5a !important;
+        border-radius: 6px !important;
+      }
+      .dark-theme .dataTables_info {
+        color: #b8b8c8 !important;
+      }
+      .dark-theme .dataTables_paginate .paginate_button {
+        background: rgba(45, 45, 62, 0.8) !important;
+        color: #e8e8e8 !important;
+        border: 1px solid #4a4a5a !important;
+        border-radius: 6px !important;
+        margin: 0 2px !important;
+        transition: all 0.3s ease !important;
+      }
+      .dark-theme .dataTables_paginate .paginate_button:hover {
+        background: rgba(0, 123, 255, 0.2) !important;
+        color: #ffffff !important;
+        transform: translateY(-1px) !important;
+      }
+      .dark-theme .dataTables_paginate .paginate_button.current {
+        background: linear-gradient(45deg, #007bff, #0056b3) !important;
+        color: #ffffff !important;
+        border-color: #007bff !important;
+      }
+      .dark-theme .tab-content {
+        background: rgba(15, 15, 35, 0.5) !important;
+        color: #e8e8e8 !important;
+        border-radius: 8px !important;
+        padding: 20px !important;
+      }
+      .dark-theme .nav-tabs {
+        border-bottom: 2px solid #3a3a4a !important;
+        background: rgba(30, 30, 46, 0.8) !important;
+        border-radius: 8px 8px 0 0 !important;
+      }
+      .dark-theme .nav-tabs .nav-link {
+        color: #b8b8c8 !important;
+        background: rgba(45, 45, 62, 0.6) !important;
+        border: 1px solid #4a4a5a !important;
+        border-radius: 6px 6px 0 0 !important;
+        margin-right: 5px !important;
+        transition: all 0.3s ease !important;
+      }
+      .dark-theme .nav-tabs .nav-link:hover {
+        background: rgba(0, 123, 255, 0.1) !important;
+        color: #ffffff !important;
+        border-color: #007bff !important;
+        transform: translateY(-2px) !important;
+      }
+      .dark-theme .nav-tabs .nav-link.active {
+        background: linear-gradient(45deg, #007bff, #0056b3) !important;
+        color: #ffffff !important;
+        border-color: #007bff !important;
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3) !important;
+      }
+      .dark-theme #header {
+        background: linear-gradient(135deg, #1e1e2e 0%, #2d2d3e 100%) !important;
+        color: #ffffff !important;
+        border-radius: 12px !important;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3) !important;
+        border: 1px solid #3a3a4a !important;
+      }
+      .dark-theme #header h2 {
+        color: #ffffff !important;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme #header .theme-toggle-container {
+        background: linear-gradient(135deg, #1a1a2e 0%, #2d2d3e 100%) !important;
+        border: 1px solid #4a4a5a !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3) !important;
+      }
+      .theme-toggle-container {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+      }
+      .theme-toggle-container:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      }
+      .dark-theme .theme-toggle-container:hover {
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      }
+      .theme-toggle-container input[type='checkbox'] {
+        cursor: pointer;
+        z-index: 10;
+      }
+      .theme-toggle-container div {
+        transition: all 0.3s ease;
+      }
+      .theme-toggle-container span {
+        transition: all 0.3s ease;
+        pointer-events: none;
+      }
+      .theme-toggle-container:hover {
+        transform: translateY(-1px) scale(1.02);
+      }
+      .dark-theme .well {
+        background: rgba(30, 30, 46, 0.8) !important;
+        border: 1px solid #3a3a4a !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+      }
+      .dark-theme .slider-selection {
+        background: linear-gradient(45deg, #007bff, #0056b3) !important;
+      }
+      .dark-theme .slider-track-high {
+        background: rgba(45, 45, 62, 0.8) !important;
+      }
+      .dark-theme .slider-handle {
+        background: linear-gradient(45deg, #007bff, #0056b3) !important;
+        border: 2px solid #ffffff !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .checkbox {
+        color: #e8e8e8 !important;
+      }
+      .dark-theme .checkbox input[type='checkbox']:checked + span {
+        color: #007bff !important;
+      }
+      .dark-theme h1, .dark-theme h2, .dark-theme h3, .dark-theme h4 {
+        color: #ffffff !important;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .text-muted {
+        color: #b8b8c8 !important;
+      }
+      .dark-theme .alert {
+        background: rgba(30, 30, 46, 0.9) !important;
+        border: 1px solid #3a3a4a !important;
+        color: #e8e8e8 !important;
+        border-radius: 8px !important;
+      }
+      .dark-theme .alert-info {
+        background: rgba(0, 123, 255, 0.1) !important;
+        border-color: #007bff !important;
+        color: #b8d4ff !important;
+      }
+      .dark-theme .alert-success {
+        background: rgba(40, 167, 69, 0.1) !important;
+        border-color: #28a745 !important;
+        color: #b8e6c1 !important;
+      }
+      .dark-theme .alert-warning {
+        background: rgba(255, 193, 7, 0.1) !important;
+        border-color: #ffc107 !important;
+        color: #fff3cd !important;
+      }
+      .dark-theme .alert-danger {
+        background: rgba(220, 53, 69, 0.1) !important;
+        border-color: #dc3545 !important;
+        color: #f8d7da !important;
+      }
+      .dark-theme .panel-group .panel {
+        background: rgba(30, 30, 46, 0.8) !important;
+        border: 1px solid #3a3a4a !important;
+        border-radius: 8px !important;
+        margin-bottom: 10px !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+      }
+      .dark-theme .panel-group .panel-heading {
+        background: linear-gradient(135deg, #2d2d3e 0%, #3a3a4a 100%) !important;
+        border-bottom: 1px solid #4a4a5a !important;
+        border-radius: 8px 8px 0 0 !important;
+        color: #e8e8e8 !important;
+        transition: all 0.3s ease !important;
+      }
+      .dark-theme .panel-group .panel-heading:hover {
+        background: linear-gradient(135deg, #3a3a4a 0%, #4a4a5a 100%) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .panel-group .panel-title {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3) !important;
+      }
+      .dark-theme .panel-group .panel-body {
+        background: rgba(45, 45, 62, 0.6) !important;
+        color: #e8e8e8 !important;
+        border-radius: 0 0 8px 8px !important;
+        padding: 15px !important;
+      }
+      .dark-theme .panel-group .panel-collapse {
+        border-radius: 0 0 8px 8px !important;
+      }
+    "))
+  ),
+  
+  # JavaScript for theme switching
+  tags$script(HTML("
+    $(function() {
+      var savedTheme = localStorage.getItem('darkTheme');
+      if (savedTheme === 'true') {
+        $('body').addClass('dark-theme');
+        $('#dark_theme').prop('checked', true);
+      }
+
+      $('#dark_theme').on('change', function() {
+        var isDark = $(this).is(':checked');
+        $('body').toggleClass('dark-theme', isDark);
+        localStorage.setItem('darkTheme', isDark ? 'true' : 'false');
+      });
+    });
+  ")),
+  
+  # Enhanced header with logo and theme toggle
+  div(
+    id = "header",
+    style = "display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; 
+             padding: 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+             border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+             border: 1px solid #dee2e6; transition: all 0.3s ease;",
+    div(
+      style = "display: flex; align-items: center;",
+      img(src = "logo.png", height = 60, style = "margin-right: 20px; vertical-align: middle; 
+           border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"),
+      h2("TBsim - Tuberculosis Simulation Web Interface", 
+         style = "margin: 0; color: #2c3e50; font-weight: 600; 
+                  text-shadow: 0 1px 2px rgba(0,0,0,0.1);")
+    ),
+    div(
+      class = "theme-toggle-container",
+      style = "display: flex; align-items: center; gap: 10px;",
+      span("☀️ Light", style = "font-weight: 600; color: #495057;"),
+      checkboxInput("dark_theme", label = NULL, value = FALSE, width = "60px"),
+      span("🌙 Dark", style = "font-weight: 600; color: #6c757d;")
+    )
+  ),
+  
+  sidebarLayout(
+    sidebarPanel(
+        # Action buttons at the top - side by side
+        div(
+          div(
+            actionButton("run_simulation", "Run Simulation", class = "btn-primary btn-lg"),
+            style = "display: inline-block; margin-right: 10px;"
+          ),
+          div(
+            actionButton("run_comparison", "Run Comparison", class = "btn-success btn-lg"),
+            style = "display: inline-block; margin-right: 10px;"
+          ),
+          div(
+            actionButton("reset_params", "Reset to Defaults", class = "btn-secondary"),
+            style = "display: inline-block;"
+          )
+        ),
+        br(), br(),
+        
+        # Collapsible parameters sections
+        bsCollapse(
+          id = "parameters_collapse",
+          multiple = TRUE,
+          open = c("basic_settings", "tb_disease_params", "bcg_intervention"),
+          
+          # Basic Settings
+          bsCollapsePanel(
+            title = "Basic Settings",
+            value = "basic_settings",
+            style = "info",
+            sliderInput("n_agents", "Population Size", value = 1000, min = 100, max = 10000, step = 100),
+            fluidRow(
+              column(4, dateInput("start_date", "Start Date", value = as.Date("1940-01-01"))),
+              column(4, dateInput("end_date", "End Date", value = as.Date("2050-12-31"))),
+              column(4, numericInput("rand_seed", "Random Seed", value = 1, min = 1, max = 10000, step = 1))
+            ),
+            sliderInput("dt", "Time Step (days)", value = 7, min = 1, max = 30, step = 1)
+          ),
+          
+          # TB Disease Parameters
+          bsCollapsePanel(
+            title = "TB Disease Parameters",
+            value = "tb_disease_params",
+            style = "info",
+            sliderInput("init_prev", "Initial Prevalence", value = 0.05, min = 0, max = 1, step = 0.001),
+            sliderInput("beta", "Transmission Rate (per year)", value = 0.1, min = 0, max = 1, step = 0.01),
+            sliderInput("p_latent_fast", "Probability of Fast Latent TB", value = 0.1, min = 0, max = 1, step = 0.01)
+          ),
+          
+          # TB State Transition Rates
+          bsCollapsePanel(
+            title = "TB State Transition Rates",
+            value = "tb_transition_rates",
+            style = "info",
+            sliderInput("rate_LS_to_presym", "Latent Slow → Pre-symptomatic (per day)", value = 0.001, min = 0, max = 0.1, step = 0.0001),
+            sliderInput("rate_LF_to_presym", "Latent Fast → Pre-symptomatic (per day)", value = 0.01, min = 0, max = 0.1, step = 0.001),
+            sliderInput("rate_presym_to_active", "Pre-symptomatic → Active (per day)", value = 0.1, min = 0, max = 1, step = 0.01),
+            sliderInput("rate_active_to_clear", "Active → Clearance (per day)", value = 0.01, min = 0, max = 0.1, step = 0.001),
+            sliderInput("rate_treatment_to_clear", "Treatment → Clearance (per year)", value = 6, min = 0, max = 50, step = 1)
+          ),
+          
+          # TB Mortality Rates
+          bsCollapsePanel(
+            title = "TB Mortality Rates",
+            value = "tb_mortality_rates",
+            style = "info",
+            sliderInput("rate_exptb_to_dead", "Extra-Pulmonary TB → Death (per day)", value = 0.15 * 4.5e-4, min = 0, max = 1e-3, step = 1e-6),
+            sliderInput("rate_smpos_to_dead", "Smear Positive → Death (per day)", value = 4.5e-4, min = 0, max = 1e-3, step = 1e-6),
+            sliderInput("rate_smneg_to_dead", "Smear Negative → Death (per day)", value = 0.3 * 4.5e-4, min = 0, max = 1e-3, step = 1e-6)
+          ),
+          
+          # TB Transmissibility
+          bsCollapsePanel(
+            title = "TB Transmissibility",
+            value = "tb_transmissibility",
+            style = "primary",
+            sliderInput("rel_trans_presymp", "Pre-symptomatic Relative Transmissibility", value = 0.1, min = 0, max = 1, step = 0.01),
+            sliderInput("rel_trans_smpos", "Smear Positive Relative Transmissibility", value = 1.0, min = 0, max = 2, step = 0.1),
+            sliderInput("rel_trans_smneg", "Smear Negative Relative Transmissibility", value = 0.3, min = 0, max = 1, step = 0.01),
+            sliderInput("rel_trans_exptb", "Extra-Pulmonary Relative Transmissibility", value = 0.05, min = 0, max = 1, step = 0.01),
+            sliderInput("rel_trans_treatment", "Treatment Effect on Transmissibility", value = 0.5, min = 0, max = 1, step = 0.01)
+          ),
+          
+          # TB Susceptibility
+          bsCollapsePanel(
+            title = "TB Susceptibility",
+            value = "tb_susceptibility",
+            style = "info",
+            sliderInput("rel_sus_latentslow", "Latent Slow Relative Susceptibility", value = 0.20, min = 0, max = 1, step = 0.01)
+          ),
+          
+          # Demographics
+          bsCollapsePanel(
+            title = "👥 Demographics",
+            value = "demographics",
+            style = "default",
+            sliderInput("birth_rate", "Birth Rate (per 1000)", value = 20, min = 0, max = 100, step = 1),
+            sliderInput("death_rate", "Death Rate (per 1000)", value = 15, min = 0, max = 100, step = 1)
+          ),
+          
+          # Social Network
+          bsCollapsePanel(
+            title = "🌐 Social Network",
+            value = "social_network",
+            style = "default",
+            sliderInput("n_contacts", "Average Contacts per Person", value = 5, min = 1, max = 50, step = 1)
+          ),
+          
+          # BCG Intervention
+          bsCollapsePanel(
+            title = "💉 BCG Vaccination",
+            value = "bcg_intervention",
+            style = "success",
+            checkboxInput("enable_bcg", "Enable BCG Vaccination", value = FALSE),
+            conditionalPanel(
+              condition = "input.enable_bcg == true",
+              sliderInput("bcg_coverage", "BCG Coverage (%)", value = 80, min = 0, max = 100, step = 5),
+                fluidRow(
+                  column(6, dateInput("bcg_start", "BCG Start Date", value = as.Date("1980-01-01"))),
+                  column(6, dateInput("bcg_stop", "BCG End Date", value = as.Date("2020-12-31")))
+                ),
+              fluidRow(
+                column(6, sliderInput("bcg_age_min", "Minimum Age (years)", value = 1, min = 0, max = 10, step = 1)),
+                column(6, sliderInput("bcg_age_max", "Maximum Age (years)", value = 5, min = 1, max = 20, step = 1))
+              )
+            )
+          ),
+          
+          # Simulation Components
+          bsCollapsePanel(
+            title = "🧩 Simulation Components",
+            value = "simulation_components",
+            style = "info",
+            h5("Add custom components to your simulation"),
+            br(),
+            
+            # Component Type Selection
+            fluidRow(
+              column(6, 
+                selectInput("component_type", "Component Type",
+                  choices = list(
+                    "Intervention" = "intervention",
+                    "Analyzer" = "analyzer",
+                    "Connector" = "connector",
+                    "Network" = "network"
+                  ),
+                  selected = "intervention"
+                )
+              ),
+              column(6,
+                actionButton("add_component", "Add Component", class = "btn-primary btn-sm")
+              )
+            ),
+            
+            # Component Configuration
+            conditionalPanel(
+              condition = "input.component_type == 'intervention'",
+              h6("Intervention Configuration"),
+              fluidRow(
+                column(6, textInput("intervention_name", "Name", value = "Custom Intervention")),
+                column(6, selectInput("intervention_type", "Type",
+                  choices = list(
+                    "BCG Protection" = "BCGProtection",
+                    "Enhanced TB Treatment" = "EnhancedTBTreatment",
+                    "Enhanced TB Diagnostic" = "EnhancedTBDiagnostic",
+                    "Health Seeking Behavior" = "HealthSeekingBehavior",
+                    "TB Diagnostic" = "TBDiagnostic",
+                    "TB Treatment" = "TBTreatment",
+                    "TB Vaccination Campaign" = "TBVaccinationCampaign",
+                    "TPT Initiation" = "TPTInitiation"
+                  ),
+                  selected = "BCGProtection"
+                ))
+              ),
+              fluidRow(
+                column(6, sliderInput("intervention_coverage", "Coverage (%)", value = 50, min = 0, max = 100, step = 5)),
+                column(6, dateInput("intervention_start", "Start Date", value = as.Date("1990-01-01")))
+              ),
+              fluidRow(
+                column(6, dateInput("intervention_stop", "End Date", value = as.Date("2030-12-31"))),
+                column(6, sliderInput("intervention_effectiveness", "Effectiveness", value = 0.7, min = 0, max = 1, step = 0.1))
+              )
+            ),
+            
+            conditionalPanel(
+              condition = "input.component_type == 'analyzer'",
+              h6("Analyzer Configuration"),
+              fluidRow(
+                column(6, textInput("analyzer_name", "Name", value = "Custom Analyzer")),
+                column(6, selectInput("analyzer_type", "Type",
+                  choices = list(
+                    "Dwell Time Analyzer" = "DwtAnalyzer"
+                  ),
+                  selected = "DwtAnalyzer"
+                ))
+              ),
+              fluidRow(
+                column(6, textInput("analyzer_scenario_name", "Scenario Name", value = "Baseline")),
+                column(6, selectInput("analyzer_states_enum", "States Enumeration",
+                  choices = list(
+                    "TBS (TB States)" = "TBS",
+                    "TBSL (TB States Long)" = "TBSL"
+                  ),
+                  selected = "TBS"
+                ))
+              )
+            ),
+            
+            conditionalPanel(
+              condition = "input.component_type == 'connector'",
+              h6("Connector Configuration"),
+              fluidRow(
+                column(6, textInput("connector_name", "Name", value = "Custom Connector")),
+                column(6, selectInput("connector_type", "Type",
+                  choices = list(
+                    "TB-HIV Connector" = "TB_HIV_Connector",
+                    "TB-Nutrition Connector" = "TB_Nutrition_Connector"
+                  ),
+                  selected = "TB_HIV_Connector"
+                ))
+              ),
+              fluidRow(
+                column(6, sliderInput("connector_acute_multiplier", "Acute Multiplier", value = 1.22, min = 0.5, max = 3.0, step = 0.01)),
+                column(6, sliderInput("connector_latent_multiplier", "Latent Multiplier", value = 1.90, min = 0.5, max = 3.0, step = 0.01))
+              ),
+              fluidRow(
+                column(6, sliderInput("connector_aids_multiplier", "AIDS Multiplier", value = 2.60, min = 0.5, max = 3.0, step = 0.01)),
+                column(6, checkboxInput("connector_enabled", "Enable Connector", value = TRUE))
+              )
+            ),
+            
+            conditionalPanel(
+              condition = "input.component_type == 'network'",
+              h6("Network Configuration"),
+              fluidRow(
+                column(6, textInput("network_name", "Name", value = "Custom Network")),
+                column(6, selectInput("network_type", "Type",
+                  choices = list(
+                    "Household Network" = "HouseholdNet",
+                    "Household Network (RATIONS Trial)" = "HouseholdNetRationsTrial"
+                  ),
+                  selected = "HouseholdNet"
+                ))
+              ),
+              fluidRow(
+                column(6, checkboxInput("network_add_newborns", "Add Newborns", value = FALSE)),
+                column(6, textInput("network_hhs", "Households (JSON)", value = "[]", placeholder = "[[1,2,3],[4,5,6]]"))
+              )
+            ),
+            
+            
+            br(),
+            
+            # Active Components List
+            h6("Active Components"),
+            div(id = "components_list", 
+              style = "max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9;",
+              uiOutput("active_components_list")
+            ),
+            
+            br(),
+            
+            # Component Actions
+            fluidRow(
+              column(4, actionButton("clear_components", "Clear All", class = "btn-warning btn-sm")),
+              column(4, actionButton("export_components", "Export Config", class = "btn-info btn-sm")),
+              column(4, actionButton("import_components", "Import Config", class = "btn-success btn-sm"))
+            )
+          )
+        ),
+        
+        # Status
+        br(), br(),
+        verbatimTextOutput("status")
+    ),
+    
+    mainPanel(
+      tabsetPanel(
+        id = "main_tabs",
+        
+        # Results tab
+        tabPanel("Results", 
+          h3("Simulation Results"),
+          uiOutput("loading_spinner"),
+          div(style = "margin-bottom: 10px;",
+            selectInput("plot_scale", "Y-Axis Scale", 
+                       choices = list("Linear Scale" = "linear", "Logarithmic Scale" = "log"),
+                       selected = "linear", width = "200px")
+          ),
+          plotlyOutput("results_plot", height = "600px"),
+          br(),
+          h4("Summary Statistics"),
+          DT::dataTableOutput("summary_table"),
+          br(),
+          h4("Simulation Parameters Used"),
+          DT::dataTableOutput("parameters_table")
+        ),
+        
+        # Plots tab
+        tabPanel("Detailed Plots",
+          h3("Detailed Analysis"),
+          plotlyOutput("detailed_plot", height = "600px"),
+          br(),
+          h4("State Transitions"),
+          plotlyOutput("transitions_plot", height = "400px")
+        ),
+        
+        # BCG Intervention tab
+        tabPanel("💉 BCG Analysis",
+          h3("BCG Vaccination Analysis"),
+          conditionalPanel(
+            condition = "input.enable_bcg == true",
+            h4("BCG Coverage and Protection Over Time"),
+            plotlyOutput("bcg_plot", height = "500px"),
+            br(),
+            h4("BCG Impact on TB Prevalence"),
+            plotlyOutput("bcg_impact_plot", height = "500px"),
+            br(),
+            h4("BCG Summary Statistics"),
+            DT::dataTableOutput("bcg_summary_table")
+          ),
+          conditionalPanel(
+            condition = "input.enable_bcg == false",
+            div(
+              style = "text-align: center; padding: 50px; color: #666;",
+              h4("BCG Vaccination Not Enabled"),
+              p("Enable BCG vaccination in the parameters panel to see BCG analysis results.")
+            )
+          )
+        ),
+        
+        # Advanced Visualizations tab
+        tabPanel("Advanced Visualizations",
+          h3("Advanced TB Analysis"),
+          fluidRow(
+            column(6,
+              h4("📊 Disease Prevalence Over Time"),
+              plotlyOutput("prevalence_plot", height = "400px")
+            ),
+            column(6,
+              h4("🔄 Transmission Flow"),
+              plotlyOutput("transmission_sankey", height = "600px")
+            )
+          ),
+          br(),
+          fluidRow(
+            column(12,
+              h4("📈 Interactive Time Series"),
+              plotlyOutput("interactive_timeseries", height = "500px")
+            )
+          ),
+          br(),
+          fluidRow(
+            column(6,
+              h4("🎯 Disease Progression"),
+              plotlyOutput("disease_progression", height = "400px")
+            ),
+            column(6,
+              h4("📉 Mortality Analysis"),
+              plotlyOutput("mortality_analysis", height = "400px")
+            )
+          )
+        ),
+        
+        # Data tab
+        tabPanel("Raw Data",
+          h3("Raw Simulation Data"),
+          DT::dataTableOutput("raw_data_table")
+        ),
+        
+        # Simulation Parameters tab
+        tabPanel("Simulation Parameters",
+          h3("Detailed Simulation Parameters"),
+          p("This tab shows the complete simulation parameters object (my_pars) with all 24+ parameters used in the TBsim model."),
+          br(),
+          verbatimTextOutput("my_pars_output")
+        ),
+        
+        # Comparison tab
+        tabPanel("📊 Comparison",
+          h3("Simulation Comparison"),
+          p("Compare results between simulations with and without interventions."),
+          br(),
+          uiOutput("comparison_loading_spinner"),
+          conditionalPanel(
+            condition = "output.comparison_results_available",
+            h4("Comparison Results"),
+            plotlyOutput("comparison_plot", height = "600px"),
+            br(),
+            h4("Difference Analysis"),
+            plotlyOutput("difference_plot", height = "400px"),
+            br(),
+            h4("Comparison Summary"),
+            DT::dataTableOutput("comparison_summary_table"),
+            br(),
+            h4("Intervention Impact"),
+            DT::dataTableOutput("intervention_impact_table")
+          ),
+          conditionalPanel(
+            condition = "!output.comparison_results_available",
+            div(
+              style = "text-align: center; padding: 50px; color: #666;",
+              h4("No Comparison Results Available"),
+              p("Click 'Run Comparison' to compare simulations with and without interventions.")
+            )
+          )
+        ),
+        
+        # About tab
+        tabPanel("About",
+          h3("About TBsim"),
+          p("TBsim is a tuberculosis simulation framework built on the Starsim package."),
+          p("This web interface allows you to:"),
+          tags$ul(
+            tags$li("Configure simulation parameters"),
+            tags$li("Run TB transmission simulations"),
+            tags$li("Visualize results interactively"),
+            tags$li("Export data for further analysis")
+          ),
+          br(),
+          h4("Key Features"),
+          tags$ul(
+            tags$li("Individual-based modeling"),
+            tags$li("Network-based transmission"),
+            tags$li("Multiple TB states (latent, active, etc.)"),
+            tags$li("Demographic processes"),
+            tags$li("Intervention modeling")
+          ),
+          br(),
+          h4("Citation"),
+          p("If you use TBsim in your research, please cite the original paper and repository."),
+          br(),
+          h4("Links"),
+          tags$a(href = "https://github.com/starsimhub/tbsim", "GitHub Repository", target = "_blank")
+        )
+      )
+    )
+  )
+)
+
+# Define server logic
+server <- function(input, output, session) {
+  
+  # Reactive values to store simulation results
+  simulation_results <- reactiveVal(NULL)
+  simulation_status <- reactiveVal("Ready to run simulation")
+  simulation_running <- reactiveVal(FALSE)
+  my_pars <- reactiveVal(NULL)
+  
+  # Comparison simulation reactive values
+  comparison_results <- reactiveVal(NULL)
+  comparison_running <- reactiveVal(FALSE)
+  comparison_status <- reactiveVal("Ready to run comparison")
+  
+  # Simulation components reactive values
+  simulation_components <- reactiveVal(list())
+  component_counter <- reactiveVal(0)
+  
+  # Dark theme reactive value
+  dark_theme <- reactiveVal(FALSE)
+  
+  # Observe dark theme toggle
+  observeEvent(input$dark_theme, {
+    dark_theme(input$dark_theme)
+  })
+  
+  # Reset parameters to defaults
+  observeEvent(input$reset_params, {
+    updateSliderInput(session, "n_agents", value = 1000)
+    updateDateInput(session, "start_date", value = as.Date("1940-01-01"))
+    updateDateInput(session, "end_date", value = as.Date("2050-12-31"))
+    updateSliderInput(session, "dt", value = 7)
+    updateNumericInput(session, "rand_seed", value = 1)
+    updateSliderInput(session, "init_prev", value = 0.05)
+    updateSliderInput(session, "beta", value = 0.1)
+    updateSliderInput(session, "p_latent_fast", value = 0.1)
+    updateSliderInput(session, "birth_rate", value = 20)
+    updateSliderInput(session, "death_rate", value = 15)
+    updateSliderInput(session, "n_contacts", value = 5)
+    updateSelectInput(session, "plot_scale", selected = "log")
+    
+    # Reset BCG parameters
+    updateCheckboxInput(session, "enable_bcg", value = FALSE)
+    updateSliderInput(session, "bcg_coverage", value = 80)
+    updateDateInput(session, "bcg_start", value = as.Date("1980-01-01"))
+    updateDateInput(session, "bcg_stop", value = as.Date("2020-12-31"))
+    updateSliderInput(session, "bcg_age_min", value = 1)
+    updateSliderInput(session, "bcg_age_max", value = 5)
+  })
+  
+  # Run simulation using real TBsim model
+  observeEvent(input$run_simulation, {
+    simulation_running(TRUE)
+    simulation_status("Running simulation...")
+    
+    tryCatch({
+      # Set random seed
+      set.seed(input$rand_seed)
+      
+      # Build TBsim simulation using the real model
+      sim_pars <- list(
+        dt = starsim$days(input$dt),
+        start = as.character(input$start_date),
+        stop = as.character(input$end_date),
+        rand_seed = as.integer(input$rand_seed),
+        verbose = 0
+      )
+      
+      # Create population
+      pop <- starsim$People(n_agents = input$n_agents)
+      
+      # Create TB disease model with working parameters
+      tb_pars <- list(
+        dt = starsim$days(input$dt),
+        start = as.character(input$start_date),
+        stop = as.character(input$end_date),
+        init_prev = starsim$bernoulli(p = input$init_prev),
+        beta = starsim$peryear(input$beta),
+        p_latent_fast = starsim$bernoulli(p = input$p_latent_fast)
+      )
+      
+      tb <- tbsim$TB(pars = tb_pars)
+      
+      # Create social network
+      net <- starsim$RandomNet(list(
+        n_contacts = starsim$poisson(lam = input$n_contacts),
+        dur = 0
+      ))
+      
+      # Create demographic processes
+      births <- starsim$Births(pars = list(birth_rate = input$birth_rate))
+      deaths <- starsim$Deaths(pars = list(death_rate = input$death_rate))
+      
+      # Add custom networks and demographics
+      custom_networks <- list(net)
+      custom_demographics <- list(deaths, births)
+      
+      components <- simulation_components()
+      if (length(components) > 0) {
+        for (comp in components) {
+          if (comp$type == "network") {
+            # Create custom network
+            tryCatch({
+              if (comp$config$type == "HouseholdNet") {
+                # Parse households JSON
+                hhs <- tryCatch({
+                  jsonlite::fromJSON(comp$config$hhs)
+                }, error = function(e) {
+                  list()  # Default to empty list
+                })
+                
+                custom_net <- reticulate::py_run_string(sprintf("
+import tbsim.networks as networks
+custom_net = networks.HouseholdNet(
+    hhs=%s,
+    pars={'add_newborns': %s}
+)
+                ", 
+                jsonlite::toJSON(hhs, auto_unbox = TRUE),
+                tolower(comp$config$add_newborns)
+                ))
+                custom_networks <- append(custom_networks, list(reticulate::py$custom_net))
+              } else if (comp$config$type == "HouseholdNetRationsTrial") {
+                # Parse households JSON
+                hhs <- tryCatch({
+                  jsonlite::fromJSON(comp$config$hhs)
+                }, error = function(e) {
+                  list()  # Default to empty list
+                })
+                
+                custom_net <- reticulate::py_run_string(sprintf("
+import tbsim.networks as networks
+custom_net = networks.HouseholdNetRationsTrial(
+    hhs=%s,
+    pars={'add_newborns': %s}
+)
+                ", 
+                jsonlite::toJSON(hhs, auto_unbox = TRUE),
+                tolower(comp$config$add_newborns)
+                ))
+                custom_networks <- append(custom_networks, list(reticulate::py$custom_net))
+              }
+            }, error = function(e) {
+              simulation_status(paste("Error creating custom network:", e$message))
+            })
+          }
+        }
+      }
+      
+      # Create interventions list
+      interventions <- list()
+      
+      # Add BCG intervention if enabled
+      if (input$enable_bcg) {
+        # Define BCG date strings for later use
+        bcg_start_str <- format(as.Date(input$bcg_start), "%Y-%m-%d")
+        bcg_stop_str <- format(as.Date(input$bcg_stop), "%Y-%m-%d")
+        
+        # Use Python to create the BCG intervention with proper date objects
+        reticulate::py_run_string("
+import starsim as ss
+import tbsim as mtb
+        ")
+        
+        # Pass parameters to Python and create BCG there
+        reticulate::py_run_string(sprintf("
+bcg_pars = dict(
+    coverage=%f,
+    start=ss.date('%s'),
+    stop=ss.date('%s'),
+    age_range=[%d, %d]
+)
+bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
+        ", 
+        input$bcg_coverage / 100,
+        bcg_start_str,
+        bcg_stop_str,
+        input$bcg_age_min,
+        input$bcg_age_max
+        ))
+        
+        # Get the intervention from Python
+        bcg_intervention <- reticulate::py$bcg_intervention
+        interventions <- append(interventions, list(bcg_intervention))
+      } else {
+        # Define empty strings when BCG is not enabled
+        bcg_start_str <- NULL
+        bcg_stop_str <- NULL
+      }
+      
+      # Add custom components
+      components <- simulation_components()
+      if (length(components) > 0) {
+        for (comp in components) {
+          if (comp$type == "intervention") {
+            # Create custom intervention
+            tryCatch({
+              if (comp$config$type == "BCGProtection") {
+                # Create BCG intervention
+                reticulate::py_run_string(sprintf("
+import tbsim.interventions.bcg as bcg
+custom_intervention = bcg.BCGProtection(pars=dict(
+    coverage=%f,
+    start=ss.date('%s'),
+    stop=ss.date('%s'),
+    efficacy=%f
+))
+                ", 
+                comp$config$coverage / 100,
+                comp$config$start_date,
+                comp$config$stop_date,
+                comp$config$effectiveness
+                ))
+                custom_intervention <- reticulate::py$custom_intervention
+                interventions <- append(interventions, list(custom_intervention))
+              } else if (comp$config$type == "EnhancedTBTreatment") {
+                # Create Enhanced TB Treatment
+                reticulate::py_run_string("
+import tbsim.interventions.enhanced_tb_treatment as treatment
+custom_intervention = treatment.EnhancedTBTreatment()
+                ")
+                custom_intervention <- reticulate::py$custom_intervention
+                interventions <- append(interventions, list(custom_intervention))
+              } else if (comp$config$type == "TBDiagnostic") {
+                # Create TB Diagnostic
+                reticulate::py_run_string("
+import tbsim.interventions.tb_diagnostic as diagnostic
+custom_intervention = diagnostic.TBDiagnostic()
+                ")
+                custom_intervention <- reticulate::py$custom_intervention
+                interventions <- append(interventions, list(custom_intervention))
+              } else if (comp$config$type == "TBTreatment") {
+                # Create TB Treatment
+                reticulate::py_run_string("
+import tbsim.interventions.tb_treatment as treatment
+custom_intervention = treatment.TBTreatment()
+                ")
+                custom_intervention <- reticulate::py$custom_intervention
+                interventions <- append(interventions, list(custom_intervention))
+              } else if (comp$config$type == "HealthSeekingBehavior") {
+                # Create Health Seeking Behavior
+                reticulate::py_run_string("
+import tbsim.interventions.tb_health_seeking as healthseeking
+custom_intervention = healthseeking.HealthSeekingBehavior()
+                ")
+                custom_intervention <- reticulate::py$custom_intervention
+                interventions <- append(interventions, list(custom_intervention))
+              }
+            }, error = function(e) {
+              simulation_status(paste("Error creating custom intervention:", e$message))
+            })
+          }
+        }
+      }
+
+      # Create analyzers and connectors lists
+      analyzers <- list()
+      connectors <- list()
+      
+      # Add custom analyzers and connectors
+      components <- simulation_components()
+      if (length(components) > 0) {
+        for (comp in components) {
+          if (comp$type == "analyzer") {
+            tryCatch({
+              if (comp$config$type == "DwtAnalyzer") {
+                # Create Dwell Time Analyzer
+                reticulate::py_run_string(sprintf("
+import tbsim.analyzers as analyzers
+custom_analyzer = analyzers.DwtAnalyzer(
+    states_ennumerator=mtb.TBS,
+    scenario_name='%s'
+)
+                ", comp$config$scenario_name))
+                custom_analyzer <- reticulate::py$custom_analyzer
+                analyzers <- append(analyzers, list(custom_analyzer))
+              }
+            }, error = function(e) {
+              simulation_status(paste("Error creating custom analyzer:", e$message))
+            })
+          } else if (comp$type == "connector") {
+            tryCatch({
+              if (comp$config$type == "TB_HIV_Connector") {
+                # Create TB-HIV Connector
+                reticulate::py_run_string(sprintf("
+import tbsim.comorbidities.hiv.tb_hiv_cnn as tb_hiv
+custom_connector = tb_hiv.TB_HIV_Connector(pars=dict(
+    acute_multiplier=%f,
+    latent_multiplier=%f,
+    aids_multiplier=%f
+))
+                ", 
+                comp$config$acute_multiplier,
+                comp$config$latent_multiplier,
+                comp$config$aids_multiplier
+                ))
+                custom_connector <- reticulate::py$custom_connector
+                connectors <- append(connectors, list(custom_connector))
+              } else if (comp$config$type == "TB_Nutrition_Connector") {
+                # Create TB-Nutrition Connector
+                reticulate::py_run_string("
+import tbsim.comorbidities.malnutrition.tb_malnut_cnn as tb_nutrition
+custom_connector = tb_nutrition.TB_Nutrition_Connector()
+                ")
+                custom_connector <- reticulate::py$custom_connector
+                connectors <- append(connectors, list(custom_connector))
+              }
+            }, error = function(e) {
+              simulation_status(paste("Error creating custom connector:", e$message))
+            })
+          }
+        }
+      }
+
+      # Create simulation
+      sim <- starsim$Sim(
+        people = pop,
+        networks = custom_networks,
+        diseases = tb,
+        demographics = custom_demographics,
+        interventions = interventions,
+        analyzers = analyzers,
+        connectors = connectors,
+        pars = sim_pars
+      )
+      
+      # Run simulation
+      sim$run()
+      my_pars_value <- sim$pars
+      my_pars(my_pars_value)
+
+      # Print my_pars to console for debugging
+      print(my_pars_value)
+
+      # Extract results
+      results <- sim$results$flatten()
+      
+      # Create time vector based on simulation parameters
+      start_date_obj <- as.Date(input$start_date)
+      end_date_obj <- as.Date(input$end_date)
+      n_days <- as.numeric(end_date_obj - start_date_obj)
+      time_days <- seq(0, n_days, by = input$dt)
+      time_years <- time_days / 365.25  # Convert days to years
+      
+      # Store results using actual TBsim results with proper data conversion
+      simulation_results(list(
+        time = time_years,
+        n_infected = as.numeric(results$tb_n_infected$tolist()),
+        n_latent_slow = as.numeric(results$tb_n_latent_slow$tolist()),
+        n_latent_fast = as.numeric(results$tb_n_latent_fast$tolist()),
+        n_active = as.numeric(results$tb_n_active$tolist()),
+        n_susceptible = as.numeric(results$tb_n_susceptible$tolist()),
+        n_presymp = as.numeric(results$tb_n_active_presymp$tolist()),
+        sim = sim,
+        results = results,
+        parameters = list(
+          n_agents = input$n_agents,
+          start_date = as.character(input$start_date),
+          end_date = as.character(input$end_date),
+          dt = input$dt,
+          rand_seed = input$rand_seed,
+          init_prev = input$init_prev,
+          beta = input$beta,
+          p_latent_fast = input$p_latent_fast,
+          birth_rate = input$birth_rate,
+          death_rate = input$death_rate,
+          n_contacts = input$n_contacts,
+          enable_bcg = input$enable_bcg,
+          bcg_coverage = if(input$enable_bcg) input$bcg_coverage else NULL,
+          bcg_start = if (input$enable_bcg) bcg_start_str else NULL,
+          bcg_stop  = if (input$enable_bcg) bcg_stop_str  else NULL,
+          bcg_age_min = if(input$enable_bcg) input$bcg_age_min else NULL,
+          bcg_age_max = if(input$enable_bcg) input$bcg_age_max else NULL
+        )
+      ))
+      
+      simulation_status("Simulation completed successfully!")
+      
+      simulation_running(FALSE)
+      
+    }, error = function(e) {
+      simulation_status(paste("Error:", e$message))
+      simulation_results(NULL)
+      simulation_running(FALSE)
+    })
+  })
+  
+  # Run comparison simulation (with and without interventions)
+  observeEvent(input$run_comparison, {
+    comparison_running(TRUE)
+    comparison_status("Running comparison simulations...")
+    
+    tryCatch({
+      # Set random seed for reproducibility
+      set.seed(input$rand_seed)
+      
+      # Function to run a single simulation
+      run_single_sim <- function(use_interventions = TRUE) {
+        # Build TBsim simulation using the real model
+        sim_pars <- list(
+          dt = starsim$days(input$dt),
+          start = as.character(input$start_date),
+          stop = as.character(input$end_date),
+          rand_seed = as.integer(input$rand_seed),
+          verbose = 0
+        )
+        
+        # Create population
+        pop <- starsim$People(n_agents = input$n_agents)
+        
+        # Create TB disease model with working parameters
+        tb_pars <- list(
+          dt = starsim$days(input$dt),
+          start = as.character(input$start_date),
+          stop = as.character(input$end_date),
+          init_prev = starsim$bernoulli(p = input$init_prev),
+          beta = starsim$peryear(input$beta),
+          p_latent_fast = starsim$bernoulli(p = input$p_latent_fast)
+        )
+        
+        tb <- tbsim$TB(pars = tb_pars)
+        
+        # Create social network
+        net <- starsim$RandomNet(list(
+          n_contacts = starsim$poisson(lam = input$n_contacts),
+          dur = 0
+        ))
+        
+        # Create demographic processes
+        births <- starsim$Births(pars = list(birth_rate = input$birth_rate))
+        deaths <- starsim$Deaths(pars = list(death_rate = input$death_rate))
+        
+        # Add custom networks and demographics
+        custom_networks <- list(net)
+        custom_demographics <- list(deaths, births)
+        
+        components <- simulation_components()
+        if (length(components) > 0) {
+          for (comp in components) {
+            if (comp$type == "network") {
+              # Create custom network
+              tryCatch({
+                if (comp$config$type == "HouseholdNet") {
+                  # Parse households JSON
+                  hhs <- tryCatch({
+                    jsonlite::fromJSON(comp$config$hhs)
+                  }, error = function(e) {
+                    list()  # Default to empty list
+                  })
+                  
+                  custom_net <- reticulate::py_run_string(sprintf("
+import tbsim.networks as networks
+custom_net = networks.HouseholdNet(
+    hhs=%s,
+    pars={'add_newborns': %s}
+)
+                  ", 
+                  jsonlite::toJSON(hhs, auto_unbox = TRUE),
+                  tolower(comp$config$add_newborns)
+                  ))
+                  custom_networks <- append(custom_networks, list(reticulate::py$custom_net))
+                } else if (comp$config$type == "HouseholdNetRationsTrial") {
+                  # Parse households JSON
+                  hhs <- tryCatch({
+                    jsonlite::fromJSON(comp$config$hhs)
+                  }, error = function(e) {
+                    list()  # Default to empty list
+                  })
+                  
+                  custom_net <- reticulate::py_run_string(sprintf("
+import tbsim.networks as networks
+custom_net = networks.HouseholdNetRationsTrial(
+    hhs=%s,
+    pars={'add_newborns': %s}
+)
+                  ", 
+                  jsonlite::toJSON(hhs, auto_unbox = TRUE),
+                  tolower(comp$config$add_newborns)
+                  ))
+                  custom_networks <- append(custom_networks, list(reticulate::py$custom_net))
+                }
+              }, error = function(e) {
+                comparison_status(paste("Error creating custom network:", e$message))
+              })
+            }
+          }
+        }
+        
+        # Create interventions list
+        interventions <- list()
+        
+        # Add BCG intervention if enabled and use_interventions is TRUE
+        if (input$enable_bcg && use_interventions) {
+          # Define BCG date strings for later use
+          bcg_start_str <- format(as.Date(input$bcg_start), "%Y-%m-%d")
+          bcg_stop_str <- format(as.Date(input$bcg_stop), "%Y-%m-%d")
+          
+          # Use Python to create the BCG intervention with proper date objects
+          reticulate::py_run_string("
+import starsim as ss
+import tbsim as mtb
+          ")
+          
+          # Pass parameters to Python and create BCG there
+          reticulate::py_run_string(sprintf("
+bcg_pars = dict(
+    coverage=%f,
+    start=ss.date('%s'),
+    stop=ss.date('%s'),
+    age_range=[%d, %d]
+)
+bcg_intervention = mtb.BCGProtection(pars=bcg_pars)
+          ", 
+          input$bcg_coverage / 100,
+          bcg_start_str,
+          bcg_stop_str,
+          input$bcg_age_min,
+          input$bcg_age_max
+          ))
+          
+          # Get the intervention from Python
+          bcg_intervention <- reticulate::py$bcg_intervention
+          interventions <- append(interventions, list(bcg_intervention))
+        }
+        
+        # Add custom components
+        if (length(components) > 0) {
+          for (comp in components) {
+            if (comp$type == "intervention" && use_interventions) {
+              # Create custom intervention
+              tryCatch({
+                if (comp$config$type == "BCGProtection") {
+                  # Create BCG intervention
+                  reticulate::py_run_string(sprintf("
+import tbsim.interventions.bcg as bcg
+custom_intervention = bcg.BCGProtection(pars=dict(
+    coverage=%f,
+    start=ss.date('%s'),
+    stop=ss.date('%s'),
+    efficacy=%f
+))
+                  ", 
+                  comp$config$coverage / 100,
+                  comp$config$start_date,
+                  comp$config$stop_date,
+                  comp$config$effectiveness
+                  ))
+                  custom_intervention <- reticulate::py$custom_intervention
+                  interventions <- append(interventions, list(custom_intervention))
+                } else if (comp$config$type == "EnhancedTBTreatment") {
+                  # Create Enhanced TB Treatment
+                  reticulate::py_run_string("
+import tbsim.interventions.enhanced_tb_treatment as treatment
+custom_intervention = treatment.EnhancedTBTreatment()
+                  ")
+                  custom_intervention <- reticulate::py$custom_intervention
+                  interventions <- append(interventions, list(custom_intervention))
+                } else if (comp$config$type == "TBDiagnostic") {
+                  # Create TB Diagnostic
+                  reticulate::py_run_string("
+import tbsim.interventions.tb_diagnostic as diagnostic
+custom_intervention = diagnostic.TBDiagnostic()
+                  ")
+                  custom_intervention <- reticulate::py$custom_intervention
+                  interventions <- append(interventions, list(custom_intervention))
+                } else if (comp$config$type == "TBTreatment") {
+                  # Create TB Treatment
+                  reticulate::py_run_string("
+import tbsim.interventions.tb_treatment as treatment
+custom_intervention = treatment.TBTreatment()
+                  ")
+                  custom_intervention <- reticulate::py$custom_intervention
+                  interventions <- append(interventions, list(custom_intervention))
+                } else if (comp$config$type == "HealthSeekingBehavior") {
+                  # Create Health Seeking Behavior
+                  reticulate::py_run_string("
+import tbsim.interventions.tb_health_seeking as healthseeking
+custom_intervention = healthseeking.HealthSeekingBehavior()
+                  ")
+                  custom_intervention <- reticulate::py$custom_intervention
+                  interventions <- append(interventions, list(custom_intervention))
+                }
+              }, error = function(e) {
+                comparison_status(paste("Error creating custom intervention:", e$message))
+              })
+            }
+          }
+        }
+        
+        # Create analyzers and connectors lists
+        analyzers <- list()
+        connectors <- list()
+        
+        # Add custom analyzers and connectors
+        components <- simulation_components()
+        if (length(components) > 0) {
+          for (comp in components) {
+            if (comp$type == "analyzer") {
+              tryCatch({
+                if (comp$config$type == "DwtAnalyzer") {
+                  # Create Dwell Time Analyzer
+                  reticulate::py_run_string(sprintf("
+import tbsim.analyzers as analyzers
+custom_analyzer = analyzers.DwtAnalyzer(
+    states_ennumerator=mtb.TBS,
+    scenario_name='%s'
+)
+                  ", comp$config$scenario_name))
+                  custom_analyzer <- reticulate::py$custom_analyzer
+                  analyzers <- append(analyzers, list(custom_analyzer))
+                }
+              }, error = function(e) {
+                comparison_status(paste("Error creating custom analyzer:", e$message))
+              })
+            } else if (comp$type == "connector") {
+              tryCatch({
+                if (comp$config$type == "TB_HIV_Connector") {
+                  # Create TB-HIV Connector
+                  reticulate::py_run_string(sprintf("
+import tbsim.comorbidities.hiv.tb_hiv_cnn as tb_hiv
+custom_connector = tb_hiv.TB_HIV_Connector(pars=dict(
+    acute_multiplier=%f,
+    latent_multiplier=%f,
+    aids_multiplier=%f
+))
+                  ", 
+                  comp$config$acute_multiplier,
+                  comp$config$latent_multiplier,
+                  comp$config$aids_multiplier
+                  ))
+                  custom_connector <- reticulate::py$custom_connector
+                  connectors <- append(connectors, list(custom_connector))
+                } else if (comp$config$type == "TB_Nutrition_Connector") {
+                  # Create TB-Nutrition Connector
+                  reticulate::py_run_string("
+import tbsim.comorbidities.malnutrition.tb_malnut_cnn as tb_nutrition
+custom_connector = tb_nutrition.TB_Nutrition_Connector()
+                  ")
+                  custom_connector <- reticulate::py$custom_connector
+                  connectors <- append(connectors, list(custom_connector))
+                }
+              }, error = function(e) {
+                comparison_status(paste("Error creating custom connector:", e$message))
+              })
+            }
+          }
+        }
+
+        # Create simulation
+        sim <- starsim$Sim(
+          people = pop,
+          networks = custom_networks,
+          diseases = tb,
+          demographics = custom_demographics,
+          interventions = interventions,
+          analyzers = analyzers,
+          connectors = connectors,
+          pars = sim_pars
+        )
+        
+        # Run simulation
+        sim$run()
+        
+        # Extract results
+        results <- sim$results$flatten()
+        
+        # Create time vector based on simulation parameters
+        start_date_obj <- as.Date(input$start_date)
+        end_date_obj <- as.Date(input$end_date)
+        n_days <- as.numeric(end_date_obj - start_date_obj)
+        time_days <- seq(0, n_days, by = input$dt)
+        time_years <- time_days / 365.25  # Convert days to years
+        
+        # Return results
+        list(
+          time = time_years,
+          n_infected = as.numeric(results$tb_n_infected$tolist()),
+          n_latent_slow = as.numeric(results$tb_n_latent_slow$tolist()),
+          n_latent_fast = as.numeric(results$tb_n_latent_fast$tolist()),
+          n_active = as.numeric(results$tb_n_active$tolist()),
+          n_susceptible = as.numeric(results$tb_n_susceptible$tolist()),
+          n_presymp = as.numeric(results$tb_n_active_presymp$tolist()),
+          sim = sim,
+          results = results,
+          interventions_used = use_interventions
+        )
+      }
+      
+      # Run simulation without interventions
+      comparison_status("Running simulation without interventions...")
+      sim_without <- run_single_sim(use_interventions = FALSE)
+      
+      # Run simulation with interventions
+      comparison_status("Running simulation with interventions...")
+      sim_with <- run_single_sim(use_interventions = TRUE)
+      
+      # Store comparison results
+      comparison_results(list(
+        without_interventions = sim_without,
+        with_interventions = sim_with,
+        parameters = list(
+          n_agents = input$n_agents,
+          start_date = as.character(input$start_date),
+          end_date = as.character(input$end_date),
+          dt = input$dt,
+          rand_seed = input$rand_seed,
+          init_prev = input$init_prev,
+          beta = input$beta,
+          p_latent_fast = input$p_latent_fast,
+          birth_rate = input$birth_rate,
+          death_rate = input$death_rate,
+          n_contacts = input$n_contacts,
+          enable_bcg = input$enable_bcg,
+          bcg_coverage = if(input$enable_bcg) input$bcg_coverage else NULL,
+          bcg_start = if(input$enable_bcg) format(as.Date(input$bcg_start), "%Y-%m-%d") else NULL,
+          bcg_stop = if(input$enable_bcg) format(as.Date(input$bcg_stop), "%Y-%m-%d") else NULL,
+          bcg_age_min = if(input$enable_bcg) input$bcg_age_min else NULL,
+          bcg_age_max = if(input$enable_bcg) input$bcg_age_max else NULL
+        )
+      ))
+      
+      comparison_status("Comparison completed successfully!")
+      comparison_running(FALSE)
+      
+    }, error = function(e) {
+      comparison_status(paste("Error:", e$message))
+      comparison_results(NULL)
+      comparison_running(FALSE)
+    })
+  })
+  
+  # Add component to simulation
+  observeEvent(input$add_component, {
+    # Validate component name
+    component_name <- switch(input$component_type,
+      "intervention" = input$intervention_name,
+      "analyzer" = input$analyzer_name,
+      "connector" = input$connector_name,
+      "network" = input$network_name
+    )
+    
+    if (is.null(component_name) || component_name == "") {
+      showNotification("Please enter a component name", type = "error")
+      return()
+    }
+    
+    # Check for duplicate names
+    current_components <- simulation_components()
+    existing_names <- sapply(current_components, function(x) x$name)
+    if (component_name %in% existing_names) {
+      showNotification("Component name already exists. Please choose a different name.", type = "error")
+      return()
+    }
+    
+    # Validate dates for interventions
+    if (input$component_type == "intervention") {
+      if (input$intervention_start >= input$intervention_stop) {
+        showNotification("Start date must be before end date", type = "error")
+        return()
+      }
+    }
+    
+    component_counter(component_counter() + 1)
+    
+    # Create component based on type
+    new_component <- list(
+      id = component_counter(),
+      type = input$component_type,
+      name = component_name,
+      config = switch(input$component_type,
+        "intervention" = list(
+          type = input$intervention_type,
+          coverage = input$intervention_coverage,
+          start_date = as.character(input$intervention_start),
+          stop_date = as.character(input$intervention_stop),
+          effectiveness = input$intervention_effectiveness
+        ),
+        "analyzer" = list(
+          type = input$analyzer_type,
+          scenario_name = input$analyzer_scenario_name,
+          states_enum = input$analyzer_states_enum
+        ),
+        "connector" = list(
+          type = input$connector_type,
+          acute_multiplier = input$connector_acute_multiplier,
+          latent_multiplier = input$connector_latent_multiplier,
+          aids_multiplier = input$connector_aids_multiplier,
+          enabled = input$connector_enabled
+        ),
+        "network" = list(
+          type = input$network_type,
+          add_newborns = input$network_add_newborns,
+          hhs = input$network_hhs
+        )
+      )
+    )
+    
+    # Add to components list
+    current_components[[length(current_components) + 1]] <- new_component
+    simulation_components(current_components)
+    
+    showNotification(paste("Component", component_name, "added successfully!"), type = "success")
+  })
+  
+  # Remove component from simulation
+  observeEvent(input$remove_component, {
+    if (!is.null(input$remove_component)) {
+      component_id <- as.numeric(input$remove_component)
+      current_components <- simulation_components()
+      
+      # Find component to remove
+      component_to_remove <- current_components[sapply(current_components, function(x) x$id == component_id)]
+      if (length(component_to_remove) > 0) {
+        component_name <- component_to_remove[[1]]$name
+        
+        # Remove component with matching ID
+        current_components <- current_components[sapply(current_components, function(x) x$id != component_id)]
+        simulation_components(current_components)
+        
+        showNotification(paste("Component", component_name, "removed successfully!"), type = "success")
+      }
+    }
+  })
+  
+  # Clear all components
+  observeEvent(input$clear_components, {
+    current_components <- simulation_components()
+    if (length(current_components) > 0) {
+      simulation_components(list())
+      component_counter(0)
+      showNotification("All components cleared successfully!", type = "success")
+    } else {
+      showNotification("No components to clear", type = "warning")
+    }
+  })
+  
+  # Export components configuration
+  observeEvent(input$export_components, {
+    components <- simulation_components()
+    if (length(components) > 0) {
+      # Create JSON configuration
+      config <- jsonlite::toJSON(components, pretty = TRUE)
+      
+      # Show modal with configuration
+      showModal(modalDialog(
+        title = "Components Configuration",
+        tags$pre(config),
+        size = "l",
+        easyClose = TRUE,
+        footer = tagList(
+          downloadButton("download_config", "Download Config"),
+          modalButton("Close")
+        )
+      ))
+    } else {
+      showNotification("No components to export", type = "warning")
+    }
+  })
+  
+  # Download configuration file
+  output$download_config <- downloadHandler(
+    filename = function() {
+      paste0("tb_simulation_components_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".json")
+    },
+    content = function(file) {
+      components <- simulation_components()
+      config <- jsonlite::toJSON(components, pretty = TRUE)
+      writeLines(config, file)
+    }
+  )
+  
+  # Import components configuration
+  observeEvent(input$import_components, {
+    showModal(modalDialog(
+      title = "Import Components Configuration",
+      fileInput("import_config_file", "Choose JSON file",
+                accept = c(".json", ".txt")),
+      size = "m",
+      easyClose = TRUE,
+      footer = tagList(
+        actionButton("confirm_import", "Import", class = "btn-primary"),
+        modalButton("Cancel")
+      )
+    ))
+  })
+  
+  # Confirm import
+  observeEvent(input$confirm_import, {
+    if (!is.null(input$import_config_file)) {
+      tryCatch({
+        # Read and parse JSON file
+        config_text <- readLines(input$import_config_file$datapath)
+        components <- jsonlite::fromJSON(paste(config_text, collapse = "\n"))
+        
+        # Validate and set components
+        if (is.list(components) && length(components) > 0) {
+          # Reset counter to max ID + 1
+          max_id <- max(sapply(components, function(x) x$id), na.rm = TRUE)
+          component_counter(max_id + 1)
+          
+          simulation_components(components)
+          removeModal()
+          showNotification("Components imported successfully!", type = "success")
+        } else {
+          showNotification("Invalid configuration file", type = "error")
+        }
+      }, error = function(e) {
+        showNotification(paste("Error importing configuration:", e$message), type = "error")
+      })
+    }
+  })
+  
+  # Render active components list
+  output$active_components_list <- renderUI({
+    components <- simulation_components()
+    
+    if (length(components) == 0) {
+      return(div(
+        style = "text-align: center; color: #666; font-style: italic;",
+        "No components added yet"
+      ))
+    }
+    
+    component_ui <- lapply(components, function(comp) {
+      div(
+        style = "display: flex; justify-content: space-between; align-items: center; padding: 8px; margin: 4px 0; background: white; border: 1px solid #ddd; border-radius: 4px;",
+        div(
+          style = "flex-grow: 1;",
+          tags$strong(paste0(comp$name, " (", comp$type, ")")),
+          br(),
+          tags$small(paste("ID:", comp$id, "| Config:", paste(names(comp$config), collapse = ", ")))
+        ),
+        actionButton(
+          inputId = paste0("remove_component_", comp$id),
+          label = "Remove",
+          class = "btn-danger btn-xs",
+          onclick = paste0("Shiny.setInputValue('remove_component', ", comp$id, ", {priority: 'event'})")
+        )
+      )
+    })
+    
+    return(component_ui)
+  })
+  
+  # Status output
+  output$status <- renderText({
+    simulation_status()
+  })
+  
+  # Loading spinner output
+  output$loading_spinner <- renderUI({
+    if (simulation_running()) {
+      div(
+        style = "text-align: center; padding: 20px; color: #007bff; font-size: 18px; font-weight: bold;",
+        "🔄 Running simulation... Please wait"
+      )
+    } else {
+      NULL
+    }
+  })
+  
+  # Comparison loading spinner output
+  output$comparison_loading_spinner <- renderUI({
+    if (comparison_running()) {
+      div(
+        style = "text-align: center; padding: 20px; color: #28a745; font-size: 18px; font-weight: bold;",
+        "🔄 Running comparison simulations... Please wait"
+      )
+    } else {
+      NULL
+    }
+  })
+  
+  # Check if comparison results are available
+  output$comparison_results_available <- reactive({
+    !is.null(comparison_results())
+  })
+  outputOptions(output, "comparison_results_available", suspendWhenHidden = FALSE)
+  
+  # Main results plot
+  output$results_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    
+    # Use actual TBsim results
+    if (!is.null(results$results)) {
+      # Real TBsim results format
+      time_data <- results$time
+      infected_data <- results$n_infected
+      latent_slow_data <- results$n_latent_slow
+      latent_fast_data <- results$n_latent_fast
+      active_data <- results$n_active
+      susceptible_data <- results$n_susceptible
+      presymp_data <- results$n_presymp
+    } else {
+      # Fallback format
+      time_data <- results$time
+      infected_data <- results$n_infected
+      latent_slow_data <- results$n_latent_slow
+      latent_fast_data <- results$n_latent_fast
+      active_data <- results$n_active
+      susceptible_data <- results$n_susceptible
+      presymp_data <- results$n_presymp
+    }
+    
+    # Create fancy interactive time series plot
+    p <- plot_ly() %>%
+    add_trace(
+      x = time_data,
+      y = susceptible_data,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Susceptible',
+      line = list(color = '#440154', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#440154', opacity = 0.7),
+      hovertemplate = '<b>Susceptible</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(68, 1, 84, 0.1)'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = infected_data,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Total Infected',
+      line = list(color = '#31688e', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#31688e', opacity = 0.7),
+      hovertemplate = '<b>Total Infected</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(49, 104, 142, 0.1)'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = latent_slow_data,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Latent Slow TB',
+      line = list(color = '#35b779', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#35b779', opacity = 0.7),
+      hovertemplate = '<b>Latent Slow TB</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(53, 183, 121, 0.1)'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = latent_fast_data,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Latent Fast TB',
+      line = list(color = '#1f9e89', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#1f9e89', opacity = 0.7),
+      hovertemplate = '<b>Latent Fast TB</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(31, 158, 137, 0.1)'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = presymp_data,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Pre-symptomatic',
+      line = list(color = '#fde725', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#fde725', opacity = 0.7),
+      hovertemplate = '<b>Pre-symptomatic</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(253, 231, 37, 0.1)'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = active_data,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Active TB',
+      line = list(color = '#e16462', width = 3, shape = 'spline'),
+      marker = list(size = 4, color = '#e16462', opacity = 0.7),
+      hovertemplate = '<b>Active TB</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>',
+      fill = 'tonexty',
+      fillcolor = 'rgba(225, 100, 98, 0.1)'
+    ) %>%
+    layout(
+      title = list(
+        text = "TB Simulation Results (Real TBsim Model)",
+        font = list(size = 20, color = '#2c3e50'),
+        x = 0.5,
+        xanchor = 'center'
+      ),
+      xaxis = list(
+        title = list(text = "Time (years)", font = list(size = 14, color = '#34495e')),
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12)
+      ),
+      yaxis = list(
+        title = list(text = "Number of Individuals", font = list(size = 14, color = '#34495e')),
+        type = input$plot_scale,
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12)
+      ),
+      hovermode = 'x unified',
+      hoverlabel = list(
+        bgcolor = 'rgba(255,255,255,0.9)',
+        bordercolor = '#34495e',
+        font = list(size = 12, color = '#2c3e50')
+      ),
+      legend = list(
+        orientation = "v",
+        x = 1.02,
+        y = 1,
+        bgcolor = 'rgba(255,255,255,0.8)',
+        bordercolor = '#bdc3c7',
+        borderwidth = 1,
+        font = list(size = 12)
+      ),
+      plot_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.8)' else 'rgba(248,249,250,0.8)',
+      paper_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.9)' else 'rgba(255,255,255,0.9)',
+      margin = list(l = 60, r = 60, t = 80, b = 60),
+      showlegend = TRUE,
+      font = list(color = if(dark_theme()) '#ffffff' else '#2c3e50')
+    ) %>%
+    config(
+      displayModeBar = TRUE,
+      modeBarButtonsToRemove = c('pan2d', 'lasso2d', 'select2d'),
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = "png",
+        filename = "tb_simulation",
+        height = 600,
+        width = 1000,
+        scale = 2
+      )
+    )
+    
+    p
+  })
+  
+  # Comparison plot
+  output$comparison_plot <- renderPlotly({
+    req(comparison_results())
+    
+    comp <- comparison_results()
+    without <- comp$without_interventions
+    with_int <- comp$with_interventions
+    
+    # Create comparison plot with both simulations
+    p <- plot_ly() %>%
+    # Without interventions - dashed lines
+    add_trace(
+      x = without$time,
+      y = without$n_susceptible,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Susceptible (No Intervention)',
+      line = list(color = '#440154', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Susceptible (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = without$time,
+      y = without$n_infected,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Total Infected (No Intervention)',
+      line = list(color = '#31688e', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Total Infected (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = without$time,
+      y = without$n_latent_slow,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Slow (No Intervention)',
+      line = list(color = '#35b779', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Latent Slow (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = without$time,
+      y = without$n_latent_fast,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Fast (No Intervention)',
+      line = list(color = '#1f9e89', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Latent Fast (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = without$time,
+      y = without$n_presymp,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Pre-symptomatic (No Intervention)',
+      line = list(color = '#fde725', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Pre-symptomatic (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = without$time,
+      y = without$n_active,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Active TB (No Intervention)',
+      line = list(color = '#e16462', width = 2, dash = 'dash'),
+      hovertemplate = '<b>Active TB (No Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    # With interventions - solid lines
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_susceptible,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Susceptible (With Intervention)',
+      line = list(color = '#440154', width = 3),
+      hovertemplate = '<b>Susceptible (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_infected,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Total Infected (With Intervention)',
+      line = list(color = '#31688e', width = 3),
+      hovertemplate = '<b>Total Infected (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_latent_slow,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Slow (With Intervention)',
+      line = list(color = '#35b779', width = 3),
+      hovertemplate = '<b>Latent Slow (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_latent_fast,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Fast (With Intervention)',
+      line = list(color = '#1f9e89', width = 3),
+      hovertemplate = '<b>Latent Fast (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_presymp,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Pre-symptomatic (With Intervention)',
+      line = list(color = '#fde725', width = 3),
+      hovertemplate = '<b>Pre-symptomatic (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = with_int$n_active,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Active TB (With Intervention)',
+      line = list(color = '#e16462', width = 3),
+      hovertemplate = '<b>Active TB (With Intervention)</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(
+      title = list(
+        text = "TB Simulation Comparison: With vs Without Interventions",
+        font = list(size = 20, color = '#2c3e50'),
+        x = 0.5,
+        xanchor = 'center'
+      ),
+      xaxis = list(
+        title = list(text = "Time (years)", font = list(size = 14, color = '#34495e')),
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12)
+      ),
+      yaxis = list(
+        title = list(text = "Number of Individuals", font = list(size = 14, color = '#34495e')),
+        type = input$plot_scale,
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12)
+      ),
+      hovermode = 'x unified',
+      hoverlabel = list(
+        bgcolor = 'rgba(255,255,255,0.9)',
+        bordercolor = '#34495e',
+        font = list(size = 12, color = '#2c3e50')
+      ),
+      legend = list(
+        orientation = "v",
+        x = 1.02,
+        y = 1,
+        bgcolor = 'rgba(255,255,255,0.8)',
+        bordercolor = '#bdc3c7',
+        borderwidth = 1,
+        font = list(size = 10)
+      ),
+      plot_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.8)' else 'rgba(248,249,250,0.8)',
+      paper_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.9)' else 'rgba(255,255,255,0.9)',
+      margin = list(l = 60, r = 60, t = 80, b = 60),
+      showlegend = TRUE,
+      font = list(color = if(dark_theme()) '#ffffff' else '#2c3e50')
+    ) %>%
+    config(
+      displayModeBar = TRUE,
+      modeBarButtonsToRemove = c('pan2d', 'lasso2d', 'select2d'),
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = "png",
+        filename = "tb_comparison",
+        height = 600,
+        width = 1000,
+        scale = 2
+      )
+    )
+    
+    p
+  })
+  
+  # Difference plot
+  output$difference_plot <- renderPlotly({
+    req(comparison_results())
+    
+    comp <- comparison_results()
+    without <- comp$without_interventions
+    with_int <- comp$with_interventions
+    
+    # Calculate differences (with - without)
+    diff_infected <- with_int$n_infected - without$n_infected
+    diff_active <- with_int$n_active - without$n_active
+    diff_latent_slow <- with_int$n_latent_slow - without$n_latent_slow
+    diff_latent_fast <- with_int$n_latent_fast - without$n_latent_fast
+    diff_susceptible <- with_int$n_susceptible - without$n_susceptible
+    
+    p <- plot_ly() %>%
+    add_trace(
+      x = with_int$time,
+      y = diff_infected,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Total Infected Difference',
+      line = list(color = '#31688e', width = 3),
+      hovertemplate = '<b>Total Infected Difference</b><br>Time: %{x:.2f} years<br>Difference: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = diff_active,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Active TB Difference',
+      line = list(color = '#e16462', width = 3),
+      hovertemplate = '<b>Active TB Difference</b><br>Time: %{x:.2f} years<br>Difference: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = diff_latent_slow,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Slow Difference',
+      line = list(color = '#35b779', width = 3),
+      hovertemplate = '<b>Latent Slow Difference</b><br>Time: %{x:.2f} years<br>Difference: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = diff_latent_fast,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Fast Difference',
+      line = list(color = '#1f9e89', width = 3),
+      hovertemplate = '<b>Latent Fast Difference</b><br>Time: %{x:.2f} years<br>Difference: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = with_int$time,
+      y = diff_susceptible,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Susceptible Difference',
+      line = list(color = '#440154', width = 3),
+      hovertemplate = '<b>Susceptible Difference</b><br>Time: %{x:.2f} years<br>Difference: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(
+      title = list(
+        text = "Intervention Impact: Difference (With - Without Interventions)",
+        font = list(size = 18, color = '#2c3e50'),
+        x = 0.5,
+        xanchor = 'center'
+      ),
+      xaxis = list(
+        title = list(text = "Time (years)", font = list(size = 14, color = '#34495e')),
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12)
+      ),
+      yaxis = list(
+        title = list(text = "Difference in Count", font = list(size = 14, color = '#34495e')),
+        gridcolor = 'rgba(128,128,128,0.2)',
+        showgrid = TRUE,
+        zeroline = TRUE,
+        zerolinecolor = 'rgba(0,0,0,0.5)',
+        tickfont = list(size = 12)
+      ),
+      hovermode = 'x unified',
+      hoverlabel = list(
+        bgcolor = 'rgba(255,255,255,0.9)',
+        bordercolor = '#34495e',
+        font = list(size = 12, color = '#2c3e50')
+      ),
+      legend = list(
+        orientation = "v",
+        x = 1.02,
+        y = 1,
+        bgcolor = 'rgba(255,255,255,0.8)',
+        bordercolor = '#bdc3c7',
+        borderwidth = 1,
+        font = list(size = 12)
+      ),
+      plot_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.8)' else 'rgba(248,249,250,0.8)',
+      paper_bgcolor = if(dark_theme()) 'rgba(26,26,26,0.9)' else 'rgba(255,255,255,0.9)',
+      margin = list(l = 60, r = 60, t = 80, b = 60),
+      showlegend = TRUE,
+      font = list(color = if(dark_theme()) '#ffffff' else '#2c3e50'),
+      shapes = list(
+        list(
+          type = "line",
+          x0 = min(with_int$time), x1 = max(with_int$time),
+          y0 = 0, y1 = 0,
+          line = list(color = "rgba(0,0,0,0.5)", width = 1, dash = "dot")
+        )
+      )
+    ) %>%
+    config(
+      displayModeBar = TRUE,
+      modeBarButtonsToRemove = c('pan2d', 'lasso2d', 'select2d'),
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = "png",
+        filename = "tb_difference",
+        height = 400,
+        width = 1000,
+        scale = 2
+      )
+    )
+    
+    p
+  })
+  
+  # Detailed plot
+  output$detailed_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Create subplot with multiple metrics
+    p1 <- plot_ly(
+      x = time_data,
+      y = results$n_infected,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Total Infected'
+    ) %>%
+      layout(yaxis = list(title = "Count", type = "log"))
+    
+    p2 <- plot_ly(
+      x = time_data,
+      y = results$n_latent_slow,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Slow TB'
+    ) %>%
+      layout(yaxis = list(title = "Count", type = "log"))
+    
+    p2_fast <- plot_ly(
+      x = time_data,
+      y = results$n_latent_fast,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Latent Fast TB'
+    ) %>%
+      layout(yaxis = list(title = "Count", type = "log"))
+    
+    p3 <- plot_ly(
+      x = time_data,
+      y = results$n_active,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Active TB'
+    ) %>%
+      layout(yaxis = list(title = "Count", type = "log"))
+    
+    subplot(p1, p2, p2_fast, p3, nrows = 4, shareX = TRUE) %>%
+      layout(
+        title = "Detailed TB Simulation Metrics",
+        showlegend = TRUE
+      )
+  })
+  
+  # Transitions plot
+  output$transitions_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Calculate transition rates if available
+    if ("tb_new_infections" %in% names(results$results)) {
+      p <- plot_ly(
+        x = time_data,
+        y = as.numeric(results$results$tb_new_infections$tolist()),
+        type = 'scatter',
+        mode = 'lines',
+        name = 'New Infections'
+      ) %>%
+        layout(
+          title = "TB State Transitions",
+          xaxis = list(title = "Time"),
+          yaxis = list(title = "New Cases per Time Step", type = "log")
+        )
+    } else {
+      # Fallback plot
+      p <- plot_ly(
+        x = time_data,
+        y = results$n_infected,
+        type = 'scatter',
+        mode = 'lines',
+        name = 'Total Infected'
+      ) %>%
+        layout(
+          title = "TB State Transitions",
+          xaxis = list(title = "Time"),
+          yaxis = list(title = "Number of Individuals", type = "log")
+        )
+    }
+    
+    p
+  })
+  
+  # BCG Coverage and Protection plot
+  output$bcg_plot <- renderPlotly({
+    req(simulation_results())
+    req(input$enable_bcg)
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Try to get BCG results from simulation
+    bcg_results <- results$results
+    
+    p <- plot_ly(
+      x = time_data,
+      y = rep(input$bcg_coverage, length(time_data)),
+      type = 'scatter',
+      mode = 'lines',
+      name = 'BCG Coverage (%)',
+      line = list(color = '#2ecc71', width = 3)
+    ) %>%
+      layout(
+        title = "💉 BCG Vaccination Coverage Over Time",
+        xaxis = list(title = "Time (years)"),
+        yaxis = list(title = "Coverage (%)", range = c(0, 100)),
+        hovermode = 'x unified'
+      )
+    
+    p
+  })
+  
+  # BCG Impact on TB Prevalence plot
+  output$bcg_impact_plot <- renderPlotly({
+    req(simulation_results())
+    req(input$enable_bcg)
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Calculate TB prevalence
+    total_pop <- results$n_susceptible + results$n_infected
+    prevalence <- (results$n_infected / total_pop) * 100
+    
+    p <- plot_ly(
+      x = time_data,
+      y = prevalence,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'TB Prevalence (%)',
+      line = list(color = '#e67e22', width = 3)
+    ) %>%
+      layout(
+        title = "🦠 TB Prevalence with BCG Vaccination",
+        xaxis = list(title = "Time (years)"),
+        yaxis = list(title = "TB Prevalence (%)"),
+        hovermode = 'x unified'
+      )
+    
+    p
+  })
+  
+  # BCG Summary table
+  output$bcg_summary_table <- DT::renderDataTable({
+    req(simulation_results())
+    req(input$enable_bcg)
+    
+    params <- simulation_results()$parameters
+    
+    # Create BCG summary data
+    bcg_data <- data.frame(
+      Parameter = c(
+        "BCG Coverage (%)",
+        "BCG Start Date",
+        "BCG End Date", 
+        "Target Age Range (years)"
+      ),
+      Value = c(
+        paste0(params$bcg_coverage, "%"),
+        as.character(params$bcg_start),
+        as.character(params$bcg_stop),
+        paste0(params$bcg_age_min, "-", params$bcg_age_max)
+      )
+    )
+    
+    DT::datatable(
+      bcg_data,
+      options = list(
+        pageLength = 10,
+        searching = FALSE,
+        ordering = FALSE
+      ),
+      rownames = FALSE
+    )
+  })
+  
+  # Summary table
+  output$summary_table <- DT::renderDataTable({
+    req(simulation_results())
+    
+    results <- simulation_results()$results
+    params <- simulation_results()$parameters
+    
+    # Calculate summary statistics
+    summary_data <- data.frame(
+      Metric = c(
+        "Population Size",
+        "Simulation Duration (years)",
+        "Initial Prevalence",
+        "Transmission Rate",
+        "Final Infected Count",
+        "Peak Infected Count",
+        "Final Latent Slow Count",
+        "Final Latent Fast Count",
+        "Final Active Count"
+      ),
+      Value = c(
+        params$n_agents,
+        round((as.Date(params$end_date) - as.Date(params$start_date)) / 365.25, 2),
+        params$init_prev,
+        params$beta,
+        max(as.numeric(results$tb_n_infected$tolist()), na.rm = TRUE),
+        max(as.numeric(results$tb_n_infected$tolist()), na.rm = TRUE),
+        max(as.numeric(results$tb_n_latent_slow$tolist()), na.rm = TRUE),
+        max(as.numeric(results$tb_n_latent_fast$tolist()), na.rm = TRUE),
+        max(as.numeric(results$tb_n_active$tolist()), na.rm = TRUE)
+      )
+    )
+    
+    DT::datatable(
+      summary_data,
+      options = list(
+        pageLength = 10,
+        searching = FALSE,
+        ordering = FALSE
+      ),
+      rownames = FALSE
+    )
+  })
+  
+  # Parameters table
+  output$parameters_table <- DT::renderDataTable({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    params <- results$parameters
+    
+    # Create comprehensive parameters table
+    parameters_data <- data.frame(
+      Category = c(
+        "Basic Settings",
+        "Basic Settings", 
+        "Basic Settings",
+        "Basic Settings",
+        "Basic Settings",
+        "TB Disease Parameters",
+        "TB Disease Parameters",
+        "TB Disease Parameters",
+        "TB State Transition Rates",
+        "TB State Transition Rates",
+        "TB State Transition Rates",
+        "TB State Transition Rates",
+        "TB State Transition Rates",
+        "TB Mortality Rates",
+        "TB Mortality Rates",
+        "TB Mortality Rates",
+        "TB Transmissibility",
+        "TB Transmissibility",
+        "TB Transmissibility",
+        "TB Transmissibility",
+        "TB Transmissibility",
+        "TB Susceptibility",
+        "Demographics",
+        "Demographics",
+        "Social Network"
+      ),
+      Parameter = c(
+        "Population Size",
+        "Start Date",
+        "End Date", 
+        "Time Step (days)",
+        "Random Seed",
+        "Initial Prevalence",
+        "Transmission Rate (per year)",
+        "Probability of Fast Latent TB",
+        "Latent Slow → Pre-symptomatic (per day)",
+        "Latent Fast → Pre-symptomatic (per day)",
+        "Pre-symptomatic → Active (per day)",
+        "Active → Clearance (per day)",
+        "Treatment → Clearance (per year)",
+        "Extra-Pulmonary TB → Death (per day)",
+        "Smear Positive → Death (per day)",
+        "Smear Negative → Death (per day)",
+        "Pre-symptomatic Relative Transmissibility",
+        "Smear Positive Relative Transmissibility",
+        "Smear Negative Relative Transmissibility",
+        "Extra-Pulmonary Relative Transmissibility",
+        "Treatment Effect on Transmissibility",
+        "Latent Slow Relative Susceptibility",
+        "Birth Rate (per 1000)",
+        "Death Rate (per 1000)",
+        "Average Contacts per Person"
+      ),
+      Value = c(
+        params$n_agents,
+        as.character(params$start_date),
+        as.character(params$end_date),
+        params$dt,
+        params$rand_seed,
+        params$init_prev,
+        params$beta,
+        params$p_latent_fast,
+        input$rate_LS_to_presym,
+        input$rate_LF_to_presym,
+        input$rate_presym_to_active,
+        input$rate_active_to_clear,
+        input$rate_treatment_to_clear,
+        input$rate_exptb_to_dead,
+        input$rate_smpos_to_dead,
+        input$rate_smneg_to_dead,
+        input$rel_trans_presymp,
+        input$rel_trans_smpos,
+        input$rel_trans_smneg,
+        input$rel_trans_exptb,
+        input$rel_trans_treatment,
+        input$rel_sus_latentslow,
+        input$birth_rate,
+        input$death_rate,
+        input$n_contacts
+      )
+    )
+    
+    DT::datatable(
+      parameters_data,
+      options = list(
+        pageLength = 15,
+        scrollY = "400px",
+        searching = TRUE,
+        ordering = TRUE
+      ),
+      rownames = FALSE,
+      filter = 'top'
+    )
+  })
+  
+  # Raw simulation parameters output
+  output$my_pars_output <- renderText({
+    if (is.null(my_pars())) {
+      return("No simulation has been run yet. Please run a simulation first to see the parameters.")
+    }
+    
+    tryCatch({
+      # Use Python's built-in dict() conversion to avoid sciris issues
+      pars_dict <- my_pars()$dict()
+      pars_list <- py_to_r(pars_dict)
+      
+      output_lines <- c()
+      output_lines <- c(output_lines, "=== SIMULATION PARAMETERS (my_pars) ===")
+      output_lines <- c(output_lines, paste("Object type:", class(my_pars())))
+      output_lines <- c(output_lines, paste("Number of parameters:", length(pars_list)))
+      output_lines <- c(output_lines, "")
+      output_lines <- c(output_lines, "Detailed Parameters:")
+      output_lines <- c(output_lines, "")
+      
+      # Show each parameter with its value - use safe iteration
+      param_names <- names(pars_list)
+      if (is.null(param_names)) {
+        # If no names, use indices
+        for (i in seq_along(pars_list)) {
+          param_name <- paste("Parameter", i)
+          param_value <- pars_list[[i]]
+          value_str <- toString(param_value)
+          output_lines <- c(output_lines, paste(param_name, ":", value_str))
+        }
+      } else {
+        # Use names if available
+        for (i in seq_along(pars_list)) {
+          param_name <- param_names[i]
+          if (is.na(param_name) || param_name == "") {
+            param_name <- paste("Parameter", i)
+          }
+          param_value <- pars_list[[i]]
+          value_str <- toString(param_value)
+          output_lines <- c(output_lines, paste(param_name, ":", value_str))
+        }
+      }
+      
+      paste(output_lines, collapse = "\n")
+    }, error = function(e) {
+      # Fallback: try simple string representation
+      tryCatch({
+        simple_repr <- my_pars()$`__str__`()
+        paste("=== SIMULATION PARAMETERS (my_pars) ===\n",
+              "Object type:", class(my_pars()), "\n",
+              "String representation:\n", 
+              py_to_r(simple_repr))
+      }, error = function(e2) {
+        paste("Error accessing my_pars:", e$message, "\n",
+              "Fallback error:", e2$message, "\n",
+              "Object type:", class(my_pars()), "\n",
+              "Object length:", length(my_pars()))
+      })
+    })
+  })
+  
+  # Raw data table
+  output$raw_data_table <- DT::renderDataTable({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    
+    # Use the calculated time vector from simulation_results
+    time_data <- results$time
+    
+    # Convert results to data frame
+    df <- data.frame(
+      Time = time_data,
+      Infected = results$n_infected,
+      Latent_Slow = results$n_latent_slow,
+      Latent_Fast = results$n_latent_fast,
+      Active = results$n_active
+    )
+    
+    DT::datatable(
+      df,
+      options = list(
+        pageLength = 20,
+        scrollX = TRUE
+      )
+    )
+  })
+  
+  # Advanced Visualizations
+  
+  # Disease Prevalence Plot
+  output$prevalence_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Calculate prevalence rates
+    total_pop <- results$n_susceptible + results$n_infected
+    prevalence_infected <- (results$n_infected / total_pop) * 100
+    prevalence_active <- (results$n_active / total_pop) * 100
+    prevalence_latent_slow <- (results$n_latent_slow / total_pop) * 100
+    prevalence_latent_fast <- (results$n_latent_fast / total_pop) * 100
+    
+    p <- plot_ly() %>%
+    add_trace(
+      x = time_data,
+      y = prevalence_infected,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Total Infected %',
+      line = list(color = '#31688e', width = 3),
+      marker = list(size = 4, color = '#31688e'),
+      hovertemplate = '<b>Total Infected</b><br>Time: %{x:.2f} years<br>Prevalence: %{y:.2f}%<extra></extra>'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = prevalence_active,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Active TB %',
+      line = list(color = '#e16462', width = 3),
+      marker = list(size = 4, color = '#e16462'),
+      hovertemplate = '<b>Active TB</b><br>Time: %{x:.2f} years<br>Prevalence: %{y:.2f}%<extra></extra>'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = prevalence_latent_slow,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Latent Slow TB %',
+      line = list(color = '#35b779', width = 3),
+      marker = list(size = 4, color = '#35b779'),
+      hovertemplate = '<b>Latent Slow TB</b><br>Time: %{x:.2f} years<br>Prevalence: %{y:.2f}%<extra></extra>'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = prevalence_latent_fast,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Latent Fast TB %',
+      line = list(color = '#1f9e89', width = 3),
+      marker = list(size = 4, color = '#1f9e89'),
+      hovertemplate = '<b>Latent Fast TB</b><br>Time: %{x:.2f} years<br>Prevalence: %{y:.2f}%<extra></extra>'
+    ) %>%
+    layout(
+      title = "TB Disease Prevalence Over Time",
+      xaxis = list(title = "Time (years)"),
+      yaxis = list(title = "Prevalence (%)"),
+      hovermode = 'x unified',
+      legend = list(orientation = "v", x = 1.02, y = 1)
+    )
+    
+    p
+  })
+  
+  # Enhanced Transmission Sankey Diagram
+  output$transmission_sankey <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    
+    # Calculate actual flow rates from simulation data
+    n_points <- length(results$time)
+    if (n_points > 1) {
+      # Calculate transitions between states using actual simulation parameters
+      p_latent_fast <- results$parameters$p_latent_fast
+      p_latent_slow <- 1 - p_latent_fast
+      
+      # Calculate flow rates with better statistical methods
+      susceptible_to_latent_slow <- abs(diff(results$n_susceptible)) * p_latent_slow
+      susceptible_to_latent_fast <- abs(diff(results$n_susceptible)) * p_latent_fast
+      latent_slow_to_presymp <- abs(diff(results$n_latent_slow))
+      latent_fast_to_presymp <- abs(diff(results$n_latent_fast))
+      presymp_to_active <- abs(diff(results$n_presymp))
+      active_to_clear <- abs(diff(results$n_active))
+      
+      # Calculate death flows from actual death data
+      if (!is.null(results$n_deaths)) {
+        death_flow <- mean(results$n_deaths, na.rm = TRUE)
+      } else {
+        death_flow <- 0
+      }
+      
+      # Calculate flow rates based on actual simulation population
+      # Use real population values, not scaled to millions
+      flow_values <- c(
+        max(mean(susceptible_to_latent_slow, na.rm = TRUE), 0.1),
+        max(mean(susceptible_to_latent_fast, na.rm = TRUE), 0.1),
+        max(mean(latent_slow_to_presymp, na.rm = TRUE), 0.1),
+        max(mean(latent_fast_to_presymp, na.rm = TRUE), 0.1),
+        max(mean(presymp_to_active, na.rm = TRUE), 0.1),
+        max(mean(active_to_clear, na.rm = TRUE), 0.1),
+        max(death_flow, 0.1)
+      )
+      
+      # Get actual population size from simulation parameters
+      actual_population <- results$parameters$n_agents
+      
+      # Enhanced Sankey diagram with premium styling
+      p <- plot_ly(
+        type = "sankey",
+        orientation = "h",
+        arrangement = "snap",
+        node = list(
+          label = c("Susceptible", "Latent Slow", "Latent Fast", "Pre-symptomatic", "Active", "Cleared", "Death"),
+          color = c(
+            'rgba(68, 1, 84, 0.9)',      # Deep purple for Susceptible
+            'rgba(53, 183, 121, 0.9)',   # Green for Latent Slow
+            'rgba(31, 158, 137, 0.9)',   # Teal for Latent Fast
+            'rgba(253, 231, 37, 0.9)',   # Yellow for Pre-symptomatic
+            'rgba(225, 100, 98, 0.9)',   # Red for Active
+            'rgba(49, 104, 142, 0.9)',   # Blue for Cleared
+            'rgba(142, 68, 173, 0.9)'    # Purple for Death
+          ),
+          pad = 25,
+          thickness = 30,
+          line = list(
+            color = "rgba(255, 255, 255, 0.8)",
+            width = 2
+          ),
+          hovertemplate = paste0('<b>%{label}</b><br>Population: %{value:,.0f} individuals<br>Total Population: ', actual_population, '<br><extra></extra>')
+        ),
+        link = list(
+          source = c(0, 0, 1, 2, 3, 4, 4),
+          target = c(1, 2, 3, 3, 4, 5, 6),
+          value = flow_values,
+          color = c(
+            'rgba(53, 183, 121, 0.7)',   # Green flow
+            'rgba(31, 158, 137, 0.7)',   # Teal flow
+            'rgba(253, 231, 37, 0.7)',   # Yellow flow
+            'rgba(253, 231, 37, 0.7)',   # Yellow flow
+            'rgba(225, 100, 98, 0.7)',   # Red flow
+            'rgba(49, 104, 142, 0.7)',   # Blue flow
+            'rgba(142, 68, 173, 0.7)'    # Purple flow
+          ),
+          hovertemplate = paste0('<b>%{source.label} → %{target.label}</b><br>Flow: %{value:,.0f} individuals<br>Total Population: ', actual_population, '<br><extra></extra>')
+        )
+      ) %>%
+      layout(
+        title = list(
+          text = paste0("🔄 TB Disease Progression Flow - Population: ", format(actual_population, big.mark = ","), " individuals"),
+          font = list(
+            size = 20,
+            color = if(dark_theme()) '#ffffff' else '#2c3e50',
+            family = "Arial, sans-serif"
+          ),
+          x = 0.5,
+          xanchor = 'center'
+        ),
+        font = list(
+          size = 14,
+          color = if(dark_theme()) '#e8e8e8' else '#2c3e50',
+          family = "Arial, sans-serif"
+        ),
+        margin = list(l = 80, r = 80, t = 80, b = 80),
+        plot_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.8)' else 'rgba(248, 249, 250, 0.8)',
+        paper_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.9)' else 'rgba(255, 255, 255, 0.9)',
+        annotations = list(
+          list(
+            x = 0.5, y = -0.1,
+            xref = "paper", yref = "paper",
+            text = paste0("💡 Hover over nodes and links for detailed information | Simulation Population: ", format(actual_population, big.mark = ","), " individuals"),
+            showarrow = FALSE,
+            font = list(
+              size = 12,
+              color = if(dark_theme()) '#b8b8c8' else '#6c757d'
+            )
+          )
+        )
+      ) %>%
+      config(
+        displayModeBar = TRUE,
+        modeBarButtonsToRemove = c('pan2d', 'lasso2d', 'select2d', 'autoScale2d'),
+        displaylogo = FALSE,
+        toImageButtonOptions = list(
+          format = "png",
+          filename = "tb_disease_flow",
+          height = 800,
+          width = 1200,
+          scale = 2
+        )
+      )
+    } else {
+      # Enhanced fallback for insufficient data
+      actual_population <- results$parameters$n_agents
+      p <- plot_ly() %>%
+      add_annotation(
+        text = "🚀 Run a simulation to see the enhanced transmission flow visualization",
+        x = 0.5, y = 0.5,
+        xref = "paper", yref = "paper",
+        showarrow = FALSE,
+        font = list(
+          size = 18,
+          color = if(dark_theme()) '#e8e8e8' else '#2c3e50',
+          family = "Arial, sans-serif"
+        )
+      ) %>%
+      add_annotation(
+        text = paste0("This interactive Sankey diagram will show disease progression flows for population of ", format(actual_population, big.mark = ","), " individuals"),
+        x = 0.5, y = 0.4,
+        xref = "paper", yref = "paper",
+        showarrow = FALSE,
+        font = list(
+          size = 14,
+          color = if(dark_theme()) '#b8b8c8' else '#6c757d',
+          family = "Arial, sans-serif"
+        )
+      ) %>%
+      layout(
+        title = list(
+          text = paste0("🔄 TB Disease Progression Flow - Population: ", format(actual_population, big.mark = ","), " individuals"),
+          font = list(
+            size = 20,
+            color = if(dark_theme()) '#ffffff' else '#2c3e50'
+          )
+        ),
+        xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+        yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+        plot_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.8)' else 'rgba(248, 249, 250, 0.8)',
+        paper_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.9)' else 'rgba(255, 255, 255, 0.9)'
+      )
+    }
+    
+    p
+  })
+  
+  # Interactive Time Series
+  output$interactive_timeseries <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Create interactive subplot
+    p1 <- plot_ly(
+      x = time_data,
+      y = results$n_susceptible,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Susceptible',
+      line = list(color = '#440154', width = 2),
+      hovertemplate = '<b>Susceptible</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(yaxis = list(title = "Susceptible", type = "log"))
+    
+    p2 <- plot_ly(
+      x = time_data,
+      y = results$n_infected,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Total Infected',
+      line = list(color = '#31688e', width = 2),
+      hovertemplate = '<b>Total Infected</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(yaxis = list(title = "Total Infected", type = "log"))
+    
+    p3 <- plot_ly(
+      x = time_data,
+      y = results$n_active,
+      type = 'scatter',
+      mode = 'lines',
+      name = 'Active TB',
+      line = list(color = '#e16462', width = 2),
+      hovertemplate = '<b>Active TB</b><br>Time: %{x:.2f} years<br>Count: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(yaxis = list(title = "Active TB", type = "log"))
+    
+    subplot(p1, p2, p3, nrows = 3, shareX = TRUE) %>%
+    layout(
+      title = "Interactive TB Simulation Time Series",
+      showlegend = FALSE,
+      margin = list(l = 60, r = 30, t = 50, b = 50)
+    )
+  })
+  
+  # Enhanced Disease Progression
+  output$disease_progression <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Enhanced percent-stacked area chart with premium styling
+    p <- plot_ly(
+      x = time_data,
+      y = results$n_susceptible,
+      type = 'scatter',
+      mode = 'lines',
+      stackgroup = 'population',
+      groupnorm = 'percent',
+      name = '🟣 Susceptible',
+      line = list(color = '#440154', width = 2, shape = 'spline'),
+      fillcolor = 'rgba(68, 1, 84, 0.6)',
+      hovertemplate = '<b>🟣 Susceptible</b><br>Time: %{x:.2f} years<br>Percentage: %{y:.2f}%<br>Count: %{customdata:,.0f}<extra></extra>',
+      customdata = results$n_susceptible
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = results$n_latent_slow,
+      type = 'scatter',
+      mode = 'lines',
+      stackgroup = 'population',
+      name = '🟢 Latent Slow',
+      line = list(color = '#35b779', width = 2, shape = 'spline'),
+      fillcolor = 'rgba(53, 183, 121, 0.6)',
+      hovertemplate = '<b>🟢 Latent Slow</b><br>Time: %{x:.2f} years<br>Percentage: %{y:.2f}%<br>Count: %{customdata:,.0f}<extra></extra>',
+      customdata = results$n_latent_slow
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = results$n_latent_fast,
+      type = 'scatter',
+      mode = 'lines',
+      stackgroup = 'population',
+      name = '🔵 Latent Fast',
+      line = list(color = '#1f9e89', width = 2, shape = 'spline'),
+      fillcolor = 'rgba(31, 158, 137, 0.6)',
+      hovertemplate = '<b>🔵 Latent Fast</b><br>Time: %{x:.2f} years<br>Percentage: %{y:.2f}%<br>Count: %{customdata:,.0f}<extra></extra>',
+      customdata = results$n_latent_fast
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = results$n_presymp,
+      type = 'scatter',
+      mode = 'lines',
+      stackgroup = 'population',
+      name = '🟡 Pre-symptomatic',
+      line = list(color = '#fde725', width = 2, shape = 'spline'),
+      fillcolor = 'rgba(253, 231, 37, 0.6)',
+      hovertemplate = '<b>🟡 Pre-symptomatic</b><br>Time: %{x:.2f} years<br>Percentage: %{y:.2f}%<br>Count: %{customdata:,.0f}<extra></extra>',
+      customdata = results$n_presymp
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = results$n_active,
+      type = 'scatter',
+      mode = 'lines',
+      stackgroup = 'population',
+      name = '🔴 Active',
+      line = list(color = '#e16462', width = 2, shape = 'spline'),
+      fillcolor = 'rgba(225, 100, 98, 0.6)',
+      hovertemplate = '<b>🔴 Active</b><br>Time: %{x:.2f} years<br>Percentage: %{y:.2f}%<br>Count: %{customdata:,.0f}<extra></extra>',
+      customdata = results$n_active
+    ) %>%
+    layout(
+      title = list(
+        text = "📊 Disease Progression - Population Distribution Over Time",
+        font = list(
+          size = 18,
+          color = if(dark_theme()) '#ffffff' else '#2c3e50',
+          family = "Arial, sans-serif"
+        ),
+        x = 0.5,
+        xanchor = 'center'
+      ),
+      xaxis = list(
+        title = list(
+          text = "Time (years)",
+          font = list(size = 14, color = if(dark_theme()) '#e8e8e8' else '#2c3e50')
+        ),
+        gridcolor = if(dark_theme()) 'rgba(255,255,255,0.1)' else 'rgba(0,0,0,0.1)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12, color = if(dark_theme()) '#b8b8c8' else '#6c757d')
+      ),
+      yaxis = list(
+        title = list(
+          text = "Population (%)",
+          font = list(size = 14, color = if(dark_theme()) '#e8e8e8' else '#2c3e50')
+        ),
+        range = c(0, 100),
+        gridcolor = if(dark_theme()) 'rgba(255,255,255,0.1)' else 'rgba(0,0,0,0.1)',
+        showgrid = TRUE,
+        zeroline = FALSE,
+        tickfont = list(size = 12, color = if(dark_theme()) '#b8b8c8' else '#6c757d')
+      ),
+      hovermode = 'x unified',
+      hoverlabel = list(
+        bgcolor = if(dark_theme()) 'rgba(30, 30, 46, 0.9)' else 'rgba(255,255,255,0.9)',
+        bordercolor = if(dark_theme()) '#3a3a4a' else '#dee2e6',
+        font = list(size = 12, color = if(dark_theme()) '#e8e8e8' else '#2c3e50')
+      ),
+      legend = list(
+        orientation = "v",
+        x = 1.02,
+        y = 1,
+        bgcolor = if(dark_theme()) 'rgba(30, 30, 46, 0.8)' else 'rgba(255,255,255,0.8)',
+        bordercolor = if(dark_theme()) '#3a3a4a' else '#dee2e6',
+        borderwidth = 1,
+        font = list(size = 12, color = if(dark_theme()) '#e8e8e8' else '#2c3e50')
+      ),
+      plot_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.8)' else 'rgba(248,249,250,0.8)',
+      paper_bgcolor = if(dark_theme()) 'rgba(15, 15, 35, 0.9)' else 'rgba(255,255,255,0.9)',
+      margin = list(l = 60, r = 60, t = 80, b = 60),
+      showlegend = TRUE,
+      font = list(color = if(dark_theme()) '#e8e8e8' else '#2c3e50'),
+      annotations = list(
+        list(
+          x = 0.5, y = -0.15,
+          xref = "paper", yref = "paper",
+          text = "💡 Hover over the chart to see detailed population percentages and counts",
+          showarrow = FALSE,
+          font = list(
+            size = 12,
+            color = if(dark_theme()) '#b8b8c8' else '#6c757d'
+          )
+        )
+      )
+    ) %>%
+    config(
+      displayModeBar = TRUE,
+      modeBarButtonsToRemove = c('pan2d', 'lasso2d', 'select2d'),
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = "png",
+        filename = "tb_disease_progression",
+        height = 600,
+        width = 1000,
+        scale = 2
+      )
+    )
+    
+    p
+  })
+  
+  # Mortality Analysis
+  output$mortality_analysis <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Calculate mortality rate over time
+    if (length(results$n_active) > 1) {
+      mortality_rate <- diff(results$n_active) / results$n_active[-1] * 100
+      mortality_rate <- c(0, mortality_rate) # Add initial value
+    } else {
+      mortality_rate <- rep(0, length(time_data))
+    }
+    
+    p <- plot_ly(
+      x = time_data,
+      y = mortality_rate,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Mortality Rate',
+      line = list(color = '#e74c3c', width = 3),
+      marker = list(size = 6, color = '#e74c3c'),
+      hovertemplate = '<b>Mortality Rate</b><br>Time: %{x:.2f} years<br>Rate: %{y:.2f}%<extra></extra>'
+    ) %>%
+    layout(
+      title = "TB Mortality Rate Over Time",
+      xaxis = list(title = "Time (years)"),
+      yaxis = list(title = "Mortality Rate (%)"),
+      shapes = list(
+        list(
+          type = "line",
+          x0 = min(time_data), x1 = max(time_data),
+          y0 = mean(mortality_rate, na.rm = TRUE), y1 = mean(mortality_rate, na.rm = TRUE),
+          line = list(color = "red", width = 2, dash = "dash")
+        )
+      ),
+      annotations = list(
+        list(
+          x = max(time_data) * 0.7,
+          y = mean(mortality_rate, na.rm = TRUE) * 1.1,
+          text = paste("Average:", round(mean(mortality_rate, na.rm = TRUE), 2), "%"),
+          showarrow = FALSE,
+          font = list(size = 12, color = "red")
+        )
+      )
+    )
+    
+    p
+  })
+  
+  # TB Death Metrics
+  
+  # Death trends over time
+  output$death_trends_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Extract death metrics from results using correct key names
+    if ("tb_new_deaths" %in% names(results$results)) {
+      new_deaths <- as.numeric(results$results$tb_new_deaths$tolist())
+      new_deaths_15plus <- as.numeric(results$results$`tb_new_deaths_15+`$tolist())
+    } else {
+      # Fallback if death data not available
+      new_deaths <- rep(0, length(time_data))
+      new_deaths_15plus <- rep(0, length(time_data))
+    }
+    
+    p <- plot_ly() %>%
+      add_trace(
+        x = time_data,
+        y = new_deaths,
+        type = 'scatter',
+        mode = 'lines+markers',
+        name = 'All Ages',
+        line = list(color = '#e74c3c', width = 3),
+        marker = list(size = 4, color = '#e74c3c'),
+        hovertemplate = '<b>All Ages Deaths</b><br>Time: %{x:.2f} years<br>Deaths: %{y:,.0f}<extra></extra>'
+      ) %>%
+      add_trace(
+        x = time_data,
+        y = new_deaths_15plus,
+        type = 'scatter',
+        mode = 'lines+markers',
+        name = '15+ Years',
+        line = list(color = '#c0392b', width = 3),
+        marker = list(size = 4, color = '#c0392b'),
+        hovertemplate = '<b>15+ Years Deaths</b><br>Time: %{x:.2f} years<br>Deaths: %{y:,.0f}<extra></extra>'
+      ) %>%
+      layout(
+        title = "TB Deaths Over Time",
+        xaxis = list(title = "Time (years)"),
+        yaxis = list(title = "Number of Deaths", type = "log"),
+        hovermode = 'x unified',
+        legend = list(orientation = "v", x = 1.02, y = 1)
+      )
+    
+    p
+  })
+  
+  # Cumulative deaths plot
+  output$cumulative_deaths_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Extract cumulative death metrics using correct key names
+    if ("tb_cum_deaths" %in% names(results$results)) {
+      cum_deaths <- as.numeric(results$results$tb_cum_deaths$tolist())
+      cum_deaths_15plus <- as.numeric(results$results$`tb_cum_deaths_15+`$tolist())
+    } else {
+      # Fallback if death data not available
+      cum_deaths <- rep(0, length(time_data))
+      cum_deaths_15plus <- rep(0, length(time_data))
+    }
+    
+    p <- plot_ly() %>%
+      add_trace(
+        x = time_data,
+        y = cum_deaths,
+        type = 'scatter',
+        mode = 'lines',
+        name = 'All Ages (Cumulative)',
+        line = list(color = '#8e44ad', width = 3),
+        fill = 'tonexty',
+        fillcolor = 'rgba(142, 68, 173, 0.1)',
+        hovertemplate = '<b>All Ages Cumulative</b><br>Time: %{x:.2f} years<br>Total Deaths: %{y:,.0f}<extra></extra>'
+      ) %>%
+      add_trace(
+        x = time_data,
+        y = cum_deaths_15plus,
+        type = 'scatter',
+        mode = 'lines',
+        name = '15+ Years (Cumulative)',
+        line = list(color = '#9b59b6', width = 3),
+        fill = 'tonexty',
+        fillcolor = 'rgba(155, 89, 182, 0.1)',
+        hovertemplate = '<b>15+ Years Cumulative</b><br>Time: %{x:.2f} years<br>Total Deaths: %{y:,.0f}<extra></extra>'
+      ) %>%
+      layout(
+        title = "Cumulative TB Deaths",
+        xaxis = list(title = "Time (years)"),
+        yaxis = list(title = "Cumulative Deaths"),
+        hovermode = 'x unified',
+        legend = list(orientation = "v", x = 1.02, y = 1)
+      )
+    
+    p
+  })
+  
+  # Death summary statistics table
+  output$death_summary_table <- DT::renderDataTable({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    
+    # Extract death metrics using correct key names
+    if ("tb_new_deaths" %in% names(results$results)) {
+      new_deaths <- as.numeric(results$results$tb_new_deaths$tolist())
+      new_deaths_15plus <- as.numeric(results$results$`tb_new_deaths_15+`$tolist())
+      cum_deaths <- as.numeric(results$results$tb_cum_deaths$tolist())
+      cum_deaths_15plus <- as.numeric(results$results$`tb_cum_deaths_15+`$tolist())
+      deaths_ppy <- as.numeric(results$results$tb_deaths_ppy$tolist())
+    } else {
+      # Fallback if death data not available
+      new_deaths <- rep(0, length(results$time))
+      new_deaths_15plus <- rep(0, length(results$time))
+      cum_deaths <- rep(0, length(results$time))
+      cum_deaths_15plus <- rep(0, length(results$time))
+      deaths_ppy <- rep(0, length(results$time))
+    }
+    
+    # Calculate summary statistics
+    total_deaths <- max(cum_deaths, na.rm = TRUE)
+    total_deaths_15plus <- max(cum_deaths_15plus, na.rm = TRUE)
+    peak_daily_deaths <- max(new_deaths, na.rm = TRUE)
+    peak_daily_deaths_15plus <- max(new_deaths_15plus, na.rm = TRUE)
+    avg_death_rate <- mean(deaths_ppy, na.rm = TRUE)
+    max_death_rate <- max(deaths_ppy, na.rm = TRUE)
+    
+    # Create summary table
+    death_summary <- data.frame(
+      Metric = c(
+        "Total TB Deaths (All Ages)",
+        "Total TB Deaths (15+ Years)",
+        "Peak Daily Deaths (All Ages)",
+        "Peak Daily Deaths (15+ Years)",
+        "Average Death Rate (per person-year)",
+        "Maximum Death Rate (per person-year)",
+        "Death Rate (15+ Years as % of Total)",
+        "Simulation Duration (years)"
+      ),
+      Value = c(
+        format(total_deaths, big.mark = ","),
+        format(total_deaths_15plus, big.mark = ","),
+        format(peak_daily_deaths, big.mark = ","),
+        format(peak_daily_deaths_15plus, big.mark = ","),
+        sprintf("%.6f", avg_death_rate),
+        sprintf("%.6f", max_death_rate),
+        sprintf("%.1f%%", if(total_deaths > 0) (total_deaths_15plus / total_deaths * 100) else 0),
+        sprintf("%.1f", max(results$time, na.rm = TRUE))
+      )
+    )
+    
+    DT::datatable(
+      death_summary,
+      options = list(
+        pageLength = 10,
+        searching = FALSE,
+        ordering = FALSE
+      ),
+      rownames = FALSE
+    )
+  })
+  
+  # Age-specific deaths plot
+  output$age_specific_deaths_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Extract age-specific death data using correct key names
+    if ("tb_new_deaths" %in% names(results$results)) {
+      new_deaths_all <- as.numeric(results$results$tb_new_deaths$tolist())
+      new_deaths_15plus <- as.numeric(results$results$`tb_new_deaths_15+`$tolist())
+      new_deaths_under15 <- new_deaths_all - new_deaths_15plus
+    } else {
+      # Fallback if death data not available
+      new_deaths_all <- rep(0, length(time_data))
+      new_deaths_15plus <- rep(0, length(time_data))
+      new_deaths_under15 <- rep(0, length(time_data))
+    }
+    
+    # Create stacked area chart
+    p <- plot_ly(
+      x = time_data,
+      y = new_deaths_under15,
+      type = 'scatter',
+      mode = 'lines',
+      fill = 'tonexty',
+      name = 'Under 15 Years',
+      line = list(color = '#f39c12', width = 0),
+      fillcolor = 'rgba(243, 156, 18, 0.6)',
+      hovertemplate = '<b>Under 15 Years</b><br>Time: %{x:.2f} years<br>Deaths: %{y:,.0f}<extra></extra>'
+    ) %>%
+    add_trace(
+      x = time_data,
+      y = new_deaths_15plus,
+      type = 'scatter',
+      mode = 'lines',
+      fill = 'tonexty',
+      name = '15+ Years',
+      line = list(color = '#e67e22', width = 0),
+      fillcolor = 'rgba(230, 126, 34, 0.6)',
+      hovertemplate = '<b>15+ Years</b><br>Time: %{x:.2f} years<br>Deaths: %{y:,.0f}<extra></extra>'
+    ) %>%
+    layout(
+      title = "Age-Specific TB Deaths",
+      xaxis = list(title = "Time (years)"),
+      yaxis = list(title = "Number of Deaths"),
+      hovermode = 'x unified',
+      legend = list(orientation = "v", x = 1.02, y = 1)
+    )
+    
+    p
+  })
+  
+  # Comparison summary table
+  output$comparison_summary_table <- DT::renderDataTable({
+    req(comparison_results())
+    
+    comp <- comparison_results()
+    without <- comp$without_interventions
+    with_int <- comp$with_interventions
+    params <- comp$parameters
+    
+    # Calculate summary statistics for both simulations
+    summary_data <- data.frame(
+      Metric = c(
+        "Population Size",
+        "Simulation Duration (years)",
+        "Initial Prevalence",
+        "Transmission Rate",
+        "Final Infected Count (No Intervention)",
+        "Final Infected Count (With Intervention)",
+        "Peak Infected Count (No Intervention)",
+        "Peak Infected Count (With Intervention)",
+        "Final Active Count (No Intervention)",
+        "Final Active Count (With Intervention)",
+        "Final Latent Slow Count (No Intervention)",
+        "Final Latent Slow Count (With Intervention)",
+        "Final Latent Fast Count (No Intervention)",
+        "Final Latent Fast Count (With Intervention)"
+      ),
+      Value = c(
+        params$n_agents,
+        round((as.Date(params$end_date) - as.Date(params$start_date)) / 365.25, 2),
+        params$init_prev,
+        params$beta,
+        max(without$n_infected, na.rm = TRUE),
+        max(with_int$n_infected, na.rm = TRUE),
+        max(without$n_infected, na.rm = TRUE),
+        max(with_int$n_infected, na.rm = TRUE),
+        max(without$n_active, na.rm = TRUE),
+        max(with_int$n_active, na.rm = TRUE),
+        max(without$n_latent_slow, na.rm = TRUE),
+        max(with_int$n_latent_slow, na.rm = TRUE),
+        max(without$n_latent_fast, na.rm = TRUE),
+        max(with_int$n_latent_fast, na.rm = TRUE)
+      )
+    )
+    
+    DT::datatable(
+      summary_data,
+      options = list(
+        pageLength = 15,
+        searching = FALSE,
+        ordering = FALSE
+      ),
+      rownames = FALSE
+    )
+  })
+  
+  # Intervention impact table
+  output$intervention_impact_table <- DT::renderDataTable({
+    req(comparison_results())
+    
+    comp <- comparison_results()
+    without <- comp$without_interventions
+    with_int <- comp$with_interventions
+    
+    # Calculate impact metrics
+    final_infected_without <- max(without$n_infected, na.rm = TRUE)
+    final_infected_with <- max(with_int$n_infected, na.rm = TRUE)
+    final_active_without <- max(without$n_active, na.rm = TRUE)
+    final_active_with <- max(with_int$n_active, na.rm = TRUE)
+    final_latent_slow_without <- max(without$n_latent_slow, na.rm = TRUE)
+    final_latent_slow_with <- max(with_int$n_latent_slow, na.rm = TRUE)
+    final_latent_fast_without <- max(without$n_latent_fast, na.rm = TRUE)
+    final_latent_fast_with <- max(with_int$n_latent_fast, na.rm = TRUE)
+    
+    # Calculate absolute and relative differences
+    abs_diff_infected <- final_infected_with - final_infected_without
+    rel_diff_infected <- if(final_infected_without > 0) (abs_diff_infected / final_infected_without) * 100 else 0
+    
+    abs_diff_active <- final_active_with - final_active_without
+    rel_diff_active <- if(final_active_without > 0) (abs_diff_active / final_active_without) * 100 else 0
+    
+    abs_diff_latent_slow <- final_latent_slow_with - final_latent_slow_without
+    rel_diff_latent_slow <- if(final_latent_slow_without > 0) (abs_diff_latent_slow / final_latent_slow_without) * 100 else 0
+    
+    abs_diff_latent_fast <- final_latent_fast_with - final_latent_fast_without
+    rel_diff_latent_fast <- if(final_latent_fast_without > 0) (abs_diff_latent_fast / final_latent_fast_without) * 100 else 0
+    
+    impact_data <- data.frame(
+      Metric = c(
+        "Total Infected - Absolute Difference",
+        "Total Infected - Relative Difference (%)",
+        "Active TB - Absolute Difference",
+        "Active TB - Relative Difference (%)",
+        "Latent Slow TB - Absolute Difference",
+        "Latent Slow TB - Relative Difference (%)",
+        "Latent Fast TB - Absolute Difference",
+        "Latent Fast TB - Relative Difference (%)"
+      ),
+      Value = c(
+        sprintf("%.0f", abs_diff_infected),
+        sprintf("%.2f%%", rel_diff_infected),
+        sprintf("%.0f", abs_diff_active),
+        sprintf("%.2f%%", rel_diff_active),
+        sprintf("%.0f", abs_diff_latent_slow),
+        sprintf("%.2f%%", rel_diff_latent_slow),
+        sprintf("%.0f", abs_diff_latent_fast),
+        sprintf("%.2f%%", rel_diff_latent_fast)
+      ),
+      Interpretation = c(
+        if(abs_diff_infected < 0) "Intervention reduced infections" else if(abs_diff_infected > 0) "Intervention increased infections" else "No change",
+        if(rel_diff_infected < 0) "Beneficial reduction" else if(rel_diff_infected > 0) "Adverse increase" else "No change",
+        if(abs_diff_active < 0) "Intervention reduced active cases" else if(abs_diff_active > 0) "Intervention increased active cases" else "No change",
+        if(rel_diff_active < 0) "Beneficial reduction" else if(rel_diff_active > 0) "Adverse increase" else "No change",
+        if(abs_diff_latent_slow < 0) "Intervention reduced latent slow cases" else if(abs_diff_latent_slow > 0) "Intervention increased latent slow cases" else "No change",
+        if(rel_diff_latent_slow < 0) "Beneficial reduction" else if(rel_diff_latent_slow > 0) "Adverse increase" else "No change",
+        if(abs_diff_latent_fast < 0) "Intervention reduced latent fast cases" else if(abs_diff_latent_fast > 0) "Intervention increased latent fast cases" else "No change",
+        if(rel_diff_latent_fast < 0) "Beneficial reduction" else if(rel_diff_latent_fast > 0) "Adverse increase" else "No change"
+      )
+    )
+    
+    DT::datatable(
+      impact_data,
+      options = list(
+        pageLength = 10,
+        searching = FALSE,
+        ordering = FALSE
+      ),
+      rownames = FALSE
+    ) %>%
+    formatStyle(
+      'Interpretation',
+      backgroundColor = styleEqual(
+        c("Beneficial reduction", "Adverse increase", "No change"),
+        c('#d4edda', '#f8d7da', '#fff3cd')
+      ),
+      color = styleEqual(
+        c("Beneficial reduction", "Adverse increase", "No change"),
+        c('#155724', '#721c24', '#856404')
+      )
+    )
+  })
+  
+  # Death rate analysis plot
+  output$death_rate_analysis_plot <- renderPlotly({
+    req(simulation_results())
+    
+    results <- simulation_results()
+    time_data <- results$time
+    
+    # Extract death rate data
+    if ("tb_deaths_ppy" %in% names(results$results)) {
+      deaths_ppy <- as.numeric(results$results$tb_deaths_ppy$tolist())
+    } else {
+      # Fallback if death rate data not available
+      deaths_ppy <- rep(0, length(time_data))
+    }
+    
+    p <- plot_ly(
+      x = time_data,
+      y = deaths_ppy,
+      type = 'scatter',
+      mode = 'lines+markers',
+      name = 'Death Rate',
+      line = list(color = '#e74c3c', width = 3),
+      marker = list(size = 4, color = '#e74c3c'),
+      hovertemplate = '<b>Death Rate</b><br>Time: %{x:.2f} years<br>Rate: %{y:.6f} per person-year<extra></extra>'
+    ) %>%
+    layout(
+      title = "TB Death Rate Over Time",
+      xaxis = list(title = "Time (years)"),
+      yaxis = list(title = "Death Rate (per person-year)", type = "log"),
+      shapes = list(
+        list(
+          type = "line",
+          x0 = min(time_data), x1 = max(time_data),
+          y0 = mean(deaths_ppy, na.rm = TRUE), y1 = mean(deaths_ppy, na.rm = TRUE),
+          line = list(color = "red", width = 2, dash = "dash")
+        )
+      ),
+      annotations = list(
+        list(
+          x = max(time_data) * 0.7,
+          y = mean(deaths_ppy, na.rm = TRUE) * 1.1,
+          text = paste("Average:", sprintf("%.6f", mean(deaths_ppy, na.rm = TRUE))),
+          showarrow = FALSE,
+          font = list(size = 12, color = "red")
+        )
+      )
+    )
+    
+    p
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)

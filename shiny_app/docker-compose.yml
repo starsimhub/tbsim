@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  tbsim-shiny:
+    build: .
+    ports:
+      - "3838:3838"
+    environment:
+      - R_HOME=/usr/lib/R
+      - PYTHONPATH=/usr/local/lib/python3.9/site-packages
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3838/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
