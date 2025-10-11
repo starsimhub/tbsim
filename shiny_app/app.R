@@ -1,22 +1,64 @@
 # TBsim Shiny Web Application
 # A web interface for running tuberculosis simulations using the tbsim package
 
-library(shiny)
-library(plotly)
-library(DT)
-library(reticulate)
-library(shinydashboard)
-library(shinyBS)
+# Suppress warnings and messages for cleaner output
+options(warn = -1)  # Suppress warnings
+options(shiny.trace = FALSE)  # Disable Shiny tracing
+
+# Load libraries quietly
+suppressPackageStartupMessages({
+  library(shiny)
+  library(plotly)
+  library(DT)
+  library(reticulate)
+  library(shinydashboard)
+  library(shinyBS)
+})
 
 # Set up Python environment for tbsim
-venv_python <- "/Users/mine/gitweb/FORK-tbsim/venv/bin/python"
-if (file.exists(venv_python)) {
-  use_python(venv_python, required = TRUE)
-} else {
+# Try multiple locations for Python virtual environment
+configure_python_env <- function() {
+  # 1. Check for VIRTUAL_ENV environment variable
+  venv <- Sys.getenv("VIRTUAL_ENV", unset = NA)
+  if (!is.na(venv) && nzchar(venv)) {
+    python_bin <- file.path(venv, "bin", "python")
+    if (file.exists(python_bin)) {
+      use_python(python_bin, required = TRUE)
+      return(invisible())
+    }
+  }
+  
+  # 2. Check for workspace-specific paths
+  workspace_venv <- "/Users/mine/gitweb/tbsim/venv/bin/python"
+  if (file.exists(workspace_venv)) {
+    use_python(workspace_venv, required = TRUE)
+    return(invisible())
+  }
+  
+  # 3. Check for relative paths from current directory
+  relative_paths <- c(
+    "../venv/bin/python",
+    "venv/bin/python",
+    "../.venv/bin/python",
+    ".venv/bin/python"
+  )
+  
+  for (rel_path in relative_paths) {
+    if (file.exists(rel_path)) {
+      use_python(rel_path, required = TRUE)
+      return(invisible())
+    }
+  }
+  
+  # 4. Fallback to system Python
   use_python("python3", required = TRUE)
 }
 
-# Import required Python modules
+configure_python_env()
+
+# Import required Python modules (suppress warnings)
+py_run_string("import warnings; warnings.filterwarnings('ignore')")
+
 tbsim <- import("tbsim")
 starsim <- import("starsim")
 sciris <- import("sciris")
@@ -1121,9 +1163,6 @@ custom_connector = tb_nutrition.TB_Nutrition_Connector()
       sim$run()
       my_pars_value <- sim$pars
       my_pars(my_pars_value)
-
-      # Print my_pars to console for debugging
-      print(my_pars_value)
 
       # Extract results
       results <- sim$results$flatten()
