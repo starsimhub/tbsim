@@ -122,12 +122,19 @@ Use the "Raw Data" tab to view and export simulation results in tabular format.
 2. **Package installation fails**: Check internet connection and try again
 3. **Simulation errors**: Verify parameter values are within valid ranges
 4. **Memory issues**: Reduce population size for large simulations
+5. **"Could not find/load shared object file" error**: This occurs when `llvmlite` can't load system libraries. Fix:
+   ```bash
+   source venv/bin/activate  # activate your Python environment
+   pip install --force-reinstall --no-cache-dir llvmlite==0.45.1 numba==0.62.1
+   ```
+   The app now uses pinned versions (llvmlite 0.45.1, numba 0.62.1) to prevent this issue.
 
 ### Getting Help
 
 - Check the "About" tab for more information
 - Review parameter descriptions in the interface
 - Ensure all dependencies are properly installed
+- For library loading issues, verify `llvmlite==0.45.1` and `numba==0.62.1` are installed
 
 ## Technical Details
 

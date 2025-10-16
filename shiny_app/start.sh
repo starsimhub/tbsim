@@ -47,4 +47,9 @@ echo "The application will open in your web browser."
 echo "To stop the application, press Ctrl+C"
 echo ""
 
-Rscript run_app.R
+# Use run_server.R which has proper environment configuration
+if [ -f "run_server.R" ]; then
+    Rscript run_server.R
+else
+    Rscript run_app.R
+fi

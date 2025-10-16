@@ -55,15 +55,16 @@ if (!py_available()) {
   quit(status = 1)
 }
 
-# Install Python packages
+# Install Python packages with pinned versions to avoid library loading issues
 cat("Installing Python packages...\n")
 py_install(c(
-  "numpy>=1.21.0",
+  "numpy==2.3.3",
   "scipy>=1.7.0", 
   "pandas>=2.0.0",
   "sciris>=3.1.0",
   "matplotlib>=3.5.0",
-  "numba>=0.56.0",
+  "llvmlite==0.45.1",
+  "numba==0.62.1",
   "starsim==2.3.2",
   "seaborn>=0.11.0",
   "plotly>=5.0.0",
@@ -75,6 +76,17 @@ py_install(c(
 # Install tbsim package
 cat("Installing tbsim package...\n")
 py_install("tbsim", pip = TRUE)
+
+# Verify installation
+cat("\nVerifying Python environment...\n")
+tryCatch({
+  test_tbsim <- import("tbsim")
+  cat("✓ tbsim imported successfully\n")
+}, error = function(e) {
+  cat("✗ Failed to import tbsim:", e$message, "\n")
+  cat("If you see library loading errors, try reinstalling llvmlite and numba:\n")
+  cat("  pip install --force-reinstall --no-cache-dir llvmlite==0.45.1 numba==0.62.1\n")
+})
 
 cat("Setup complete! You can now run the Shiny app.\n")
 cat("To start the app, run: shiny::runApp('app.R')\n")

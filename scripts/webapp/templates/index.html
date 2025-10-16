@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}TB Simulation Script Catalog - Home{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="jumbotron bg-light p-5 rounded mb-4">
+            <h1 class="display-4">
+                <i class="bi bi-cpu text-primary"></i> TB Simulation Script Catalog
+            </h1>
+            <p class="lead">
+                Browse, explore, and execute TB simulation scripts with an intuitive web interface.
+                Discover various simulation scenarios, interventions, and analysis tools.
+            </p>
+            <hr class="my-4">
+            <p>
+                This catalog contains <span id="total-scripts" class="badge bg-primary">0</span> scripts 
+                across <span id="total-categories" class="badge bg-secondary">0</span> categories.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Categories Overview -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h2><i class="bi bi-grid-3x3-gap"></i> Script Categories</h2>
+        <div id="categories-grid" class="row">
+            <!-- Categories will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<!-- Scripts Browser -->
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-list-ul"></i> All Scripts</h2>
+        
+        <!-- Search and Filter -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="search-input" placeholder="Search scripts...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="category-filter">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="sort-select">
+                    <option value="name">Sort by Name</option>
+                    <option value="category">Sort by Category</option>
+                    <option value="modified">Sort by Modified</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Scripts List -->
+        <div id="scripts-list" class="row">
+            <!-- Scripts will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<!-- Script Details Modal -->
+<div class="modal fade" id="scriptDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-file-code"></i> <span id="script-title">Script Details</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="script-details-content">
+                    <!-- Script details will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="executeSelectedScript()">
+                    <i class="bi bi-play"></i> Execute Script
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let allScripts = [];
+let currentScript = null;
+
+// Initialize the page
+document.addEventListener('DOMContentLoaded', function() {
+    loadScripts();
+    setupEventListeners();
+});
+
+function loadScripts() {
+    fetch('/api/scripts')
+        .then(response => response.json())
+        .then(data => {
+            allScripts = [];
+            const categories = data.categories;
+            const scripts = data.scripts;
+            
+            // Update counters
+            let totalScripts = 0;
+            Object.keys(scripts).forEach(category => {
+                totalScripts += scripts[category].length;
+            });
+            
+            document.getElementById('total-scripts').textContent = totalScripts;
+            document.getElementById('total-categories').textContent = Object.keys(categories).length;
+            
+            // Populate categories grid
+            populateCategoriesGrid(categories, scripts);
+            
+            // Populate scripts list
+            Object.keys(scripts).forEach(category => {
+                scripts[category].forEach(script => {
+                    script.categoryInfo = categories[category];
+                    allScripts.push(script);
+                });
+            });
+            
+            displayScripts(allScripts);
+            populateCategoryFilter(categories);
+        })
+        .catch(error => {
+            console.error('Error loading scripts:', error);
+            showAlert('Error loading scripts', 'danger');
+        });
+}
+
+function populateCategoriesGrid(categories, scripts) {
+    const grid = document.getElementById('categories-grid');
+    grid.innerHTML = '';
+    
+    Object.keys(categories).forEach(categoryKey => {
+        const category = categories[categoryKey];
+        const categoryScripts = scripts[categoryKey] || [];
+        
+        const col = document.createElement('div');
+        col.className = 'col-md-6 col-lg-4 mb-3';
+        
+        col.innerHTML = `
+            <div class="card h-100 category-card" onclick="filterByCategory('${categoryKey}')">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-${category.icon} text-${category.color} fs-2 me-3"></i>
+                        <div>
+                            <h5 class="card-title mb-0">${categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1)}</h5>
+                            <small class="text-muted">${categoryScripts.length} scripts</small>
+                        </div>
+                    </div>
+                    <p class="card-text">${category.description}</p>
+                </div>
+            </div>
+        `;
+        
+        grid.appendChild(col);
+    });
+}
+
+function populateCategoryFilter(categories) {
+    const filter = document.getElementById('category-filter');
+    filter.innerHTML = '<option value="">All Categories</option>';
+    
+    Object.keys(categories).forEach(categoryKey => {
+        const option = document.createElement('option');
+        option.value = categoryKey;
+        option.textContent = categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1);
+        filter.appendChild(option);
+    });
+}
+
+function displayScripts(scripts) {
+    const container = document.getElementById('scripts-list');
+    container.innerHTML = '';
+    
+    if (scripts.length === 0) {
+        container.innerHTML = '<div class="col-12"><p class="text-muted">No scripts found.</p></div>';
+        return;
+    }
+    
+    scripts.forEach(script => {
+        const col = document.createElement('div');
+        col.className = 'col-md-6 col-lg-4 mb-3';
+        
+        const modifiedDate = new Date(script.modified * 1000).toLocaleDateString();
+        const sizeKB = Math.round(script.size / 1024);
+        
+        col.innerHTML = `
+            <div class="card h-100 script-card" onclick="showScriptDetails('${script.path}')">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="card-title mb-0">${script.name}</h6>
+                        <span class="badge bg-${script.categoryInfo.color}">${script.category}</span>
+                    </div>
+                    <p class="card-text small text-muted">${script.description || 'No description available'}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            <i class="bi bi-file-earmark-code"></i> ${sizeKB} KB
+                        </small>
+                        <small class="text-muted">
+                            <i class="bi bi-clock"></i> ${modifiedDate}
+                        </small>
+                    </div>
+                    ${script.executable ? '<span class="badge bg-success mt-2">Executable</span>' : '<span class="badge bg-warning mt-2">Analysis Only</span>'}
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(col);
+    });
+}
+
+function showScriptDetails(scriptPath) {
+    fetch(`/api/script/${scriptPath}`)
+        .then(response => response.json())
+        .then(script => {
+            currentScript = script;
+            
+            document.getElementById('script-title').textContent = script.name;
+            
+            const content = document.getElementById('script-details-content');
+            content.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Basic Information</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>Name:</strong></td><td>${script.name}</td></tr>
+                            <tr><td><strong>Category:</strong></td><td><span class="badge bg-${script.categoryInfo?.color || 'secondary'}">${script.category}</span></td></tr>
+                            <tr><td><strong>Size:</strong></td><td>${Math.round(script.size / 1024)} KB</td></tr>
+                            <tr><td><strong>Executable:</strong></td><td>${script.executable ? 'Yes' : 'No'}</td></tr>
+                        </table>
+                        
+                        <h6>Description</h6>
+                        <p>${script.description || 'No description available'}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Functions</h6>
+                        <ul class="list-unstyled">
+                            ${script.functions.map(func => `<li><code>${func}()</code></li>`).join('')}
+                        </ul>
+                        
+                        <h6>Dependencies</h6>
+                        <div class="small">
+                            ${script.dependencies.slice(0, 5).map(dep => `<span class="badge bg-light text-dark me-1">${dep}</span>`).join('')}
+                            ${script.dependencies.length > 5 ? `<span class="text-muted">+${script.dependencies.length - 5} more</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            new bootstrap.Modal(document.getElementById('scriptDetailsModal')).show();
+        })
+        .catch(error => {
+            console.error('Error loading script details:', error);
+            showAlert('Error loading script details', 'danger');
+        });
+}
+
+function executeSelectedScript() {
+    if (currentScript) {
+        // Close the details modal
+        bootstrap.Modal.getInstance(document.getElementById('scriptDetailsModal')).hide();
+        
+        // Show execution modal
+        showExecutionPanel();
+        
+        // Set up execution
+        document.getElementById('script-details').innerHTML = `
+            <h6>${currentScript.name}</h6>
+            <p class="small text-muted">${currentScript.description || 'No description'}</p>
+            <p class="small"><strong>Path:</strong> ${currentScript.path}</p>
+        `;
+    }
+}
+
+function showExecutionPanel() {
+    new bootstrap.Modal(document.getElementById('executionModal')).show();
+}
+
+function filterByCategory(category) {
+    document.getElementById('category-filter').value = category;
+    applyFilters();
+}
+
+function setupEventListeners() {
+    // Search functionality
+    document.getElementById('search-input').addEventListener('input', applyFilters);
+    
+    // Category filter
+    document.getElementById('category-filter').addEventListener('change', applyFilters);
+    
+    // Sort functionality
+    document.getElementById('sort-select').addEventListener('change', applyFilters);
+}
+
+function applyFilters() {
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    const categoryFilter = document.getElementById('category-filter').value;
+    const sortBy = document.getElementById('sort-select').value;
+    
+    let filtered = allScripts.filter(script => {
+        const matchesSearch = script.name.toLowerCase().includes(searchTerm) ||
+                            (script.description && script.description.toLowerCase().includes(searchTerm));
+        const matchesCategory = !categoryFilter || script.category === categoryFilter;
+        return matchesSearch && matchesCategory;
+    });
+    
+    // Sort
+    filtered.sort((a, b) => {
+        switch (sortBy) {
+            case 'name':
+                return a.name.localeCompare(b.name);
+            case 'category':
+                return a.category.localeCompare(b.category);
+            case 'modified':
+                return b.modified - a.modified;
+            default:
+                return 0;
+        }
+    });
+    
+    displayScripts(filtered);
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.querySelector('main').insertBefore(alertDiv, document.querySelector('main').firstChild);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}
+
