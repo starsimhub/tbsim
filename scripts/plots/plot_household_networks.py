@@ -26,12 +26,55 @@ from tbsim.networks import HouseholdNet, plot_household_structure
 
 def plot_household_network_basic(households, title="Household Network", save_path=None):
     """
-    Create a  visualization of household networks using NetworkX with dark theme.
+    Create a visualization of household networks using NetworkX with dark theme.
     
-    Args:
-        households: List of lists, where each inner list contains agent UIDs in a household
-        title: Title for the plot
-        save_path: Optional path to save the plot
+    This function generates a network graph where nodes represent individual agents
+    and edges connect household members. Each household is visualized as a complete
+    subgraph (everyone connected to everyone within the household) with distinct colors.
+    
+    Visualization Features:
+    -----------------------
+    - Dark theme with high-contrast colors
+    - Each household shown in a different color (viridis colormap)
+    - Nodes sized proportionally to household size
+    - Spring layout algorithm for aesthetic node positioning
+    - Network statistics displayed in text box
+    - Legend showing household membership and sizes
+    
+    Parameters
+    ----------
+    households : list of lists
+        List where each inner list contains agent UIDs (integers) in a household.
+        Example: [[0, 1, 2], [3, 4], [5, 6, 7, 8]]
+    title : str, default="Household Network"
+        Title for the plot
+    save_path : str, optional
+        Path to save the plot image. If None, plot is not saved.
+        Recommended format: PNG or PDF
+    
+    Returns
+    -------
+    networkx.Graph
+        The NetworkX graph object created for the visualization
+        
+    Examples
+    --------
+    Basic usage:
+    
+        >>> households = [[0, 1, 2], [3, 4], [5, 6, 7, 8]]
+        >>> G = plot_household_network_basic(households)
+    
+    Save plot to file:
+    
+        >>> plot_household_network_basic(households, save_path='household_network.png')
+    
+    Notes
+    -----
+    - Each household forms a complete graph (all members connected)
+    - Larger households have larger node sizes
+    - Edge colors match household colors
+    - Uses spring layout algorithm which may produce different arrangements on each run
+    - Dark background (#1a1a1a) optimized for presentations and dark mode environments
     """
     # Set dark theme
     plt.style.use('dark_background')
@@ -148,12 +191,52 @@ def plot_household_network_basic(households, title="Household Network", save_pat
 
 def plot_household_network_advanced(households, title="Advanced Household Network", save_path=None):
     """
-    Create a  advanced visualization with household clustering and enhanced statistics.
+    Create an advanced visualization with household clustering, enhanced statistics, and dual plots.
     
-    Args:
-        households: List of lists, where each inner list contains agent UIDs in a household
-        title: Title for the plot
-        save_path: Optional path to save the plot
+    This function creates a sophisticated two-panel visualization:
+    1. Left panel: Network graph with intelligent household clustering and spatial layout
+    2. Right panel: Household size distribution histogram with detailed statistics
+    
+    Advanced Features:
+    ------------------
+    - Circular household arrangement with optimal spacing
+    - Household-specific clustering algorithms
+    - Dynamic node sizing based on household characteristics
+    - Household center labels for easy identification
+    - Inter-household connection visualization
+    - Comprehensive statistical summary box
+    - Gradient color schemes using plasma colormap
+    - Value labels on histogram bars
+    
+    Parameters
+    ----------
+    households : list of lists
+        List where each inner list contains agent UIDs in a household
+    title : str, default="Advanced Household Network"
+        Title for the plot
+    save_path : str, optional
+        Path to save the plot image. If None, plot is not saved.
+    
+    Returns
+    -------
+    networkx.Graph
+        The NetworkX graph object with household membership attributes
+        
+    Examples
+    --------
+    Advanced visualization with statistics:
+    
+        >>> households = [[0, 1, 2, 3], [4, 5], [6, 7, 8], [9]]
+        >>> G = plot_household_network_advanced(households, save_path='advanced_network.png')
+    
+    Notes
+    -----
+    - Households are arranged in a circular pattern for clarity
+    - Larger households are positioned with more space
+    - Different layouts for couples (2 people) vs families (3+ people)
+    - Statistics panel shows total agents, households, mean/std size, and size range
+    - Inter-household connections shown as subtle white dashed lines
+    - Uses plasma colormap for vibrant household differentiation
     """
     # Set dark theme
     plt.style.use('dark_background')
@@ -332,7 +415,41 @@ def plot_household_network_advanced(households, title="Advanced Household Networ
 
 def demonstrate_household_network_simulation():
     """
-    Demonstrate how to extract and plot household networks from a TBSim simulation.
+    Demonstrate how to create and visualize household networks in a TBSim simulation.
+    
+    This function shows the complete workflow for incorporating household networks
+    into TB simulations:
+    1. Define household structure
+    2. Create HouseholdNet network object
+    3. Build simulation with household network
+    4. Run simulation
+    5. Visualize household structure
+    
+    Returns
+    -------
+    tuple of (ss.Sim, HouseholdNet)
+        - Completed simulation object
+        - Household network object
+        
+    Examples
+    --------
+    Run demonstration:
+    
+        >>> sim, net = demonstrate_household_network_simulation()
+    
+    Notes
+    -----
+    The demonstration uses:
+    - 5 households with varying sizes (1-4 members)
+    - 13 total agents
+    - Monthly time steps for 1 year
+    - TB disease module with default parameters
+    - Both basic and advanced visualization methods
+    
+    The household network is important for:
+    - Modeling within-household TB transmission
+    - Implementing household contact tracing interventions
+    - Testing TPT (tuberculosis preventive therapy) for household contacts
     """
     print("Creating household network simulation...")
     
@@ -371,7 +488,50 @@ def demonstrate_household_network_simulation():
 
 
 def create_sample_households():
-    """Create  sample household structures for demonstration."""
+    """
+    Create diverse sample household structures for demonstration and testing.
+    
+    This function provides pre-defined household structures representing different
+    community types and complexities, useful for testing visualization functions
+    and demonstrating different network patterns.
+    
+    Returns
+    -------
+    dict
+        Dictionary mapping household type names to household lists:
+        - 'simple': 3 small households (3-4 people each)
+        - 'complex': 6 varied households (1-5 people each)
+        - 'realistic': 8 diverse households representing typical community
+        - 'extended': 13 households with large extended families
+        - 'community': 18 households representing full community structure
+    
+    Household Types:
+    ----------------
+    - simple: Minimal test case with 3 households
+    - complex: Varied sizes including singles, couples, and large families
+    - realistic: Representative community with diverse household types
+    - extended: Includes large multigenerational families
+    - community: Large-scale community with 60+ agents across 18 households
+    
+    Examples
+    --------
+    Get simple households for testing:
+    
+        >>> samples = create_sample_households()
+        >>> plot_household_network_basic(samples['simple'])
+    
+    Visualize complex community:
+    
+        >>> samples = create_sample_households()
+        >>> plot_household_network_advanced(samples['community'])
+    
+    Notes
+    -----
+    These sample structures represent realistic demographic patterns:
+    - Mix of singles, couples, nuclear families, and extended families
+    - Household sizes ranging from 1 to 8+ members
+    - Distributions roughly matching typical community demographics
+    """
     return {
         'simple': [[0, 1, 2], [3, 4], [5, 6, 7, 8]],
         'complex': [
@@ -431,7 +591,56 @@ def create_sample_households():
 
 
 def main():
-    """Main function to run the household network plotting script."""
+    """
+    Main function to run the household network plotting script with command-line interface.
+    
+    Provides a command-line interface for generating various types of household network
+    visualizations. Supports multiple example types, optional file saving, and custom
+    output directories.
+    
+    Command-Line Arguments:
+    -----------------------
+    --example : Choose visualization type
+        Options: 'basic', 'advanced', 'simulation', 'extended', 'community', 'all'
+        Default: 'all' (runs all examples)
+    
+    --save : Save plots to files
+        If specified, plots are saved as PNG files with dark backgrounds
+    
+    --output-dir : Output directory for saved plots
+        Default: 'scripts/results'
+        Directory is created if it doesn't exist
+    
+    Examples
+    --------
+    Run all examples (default):
+    
+        $ python plot_household_networks.py
+    
+    Run only basic example:
+    
+        $ python plot_household_networks.py --example basic
+    
+    Save all plots to files:
+    
+        $ python plot_household_networks.py --save
+    
+    Save to custom directory:
+    
+        $ python plot_household_networks.py --save --output-dir my_plots/
+    
+    Notes
+    -----
+    The script demonstrates:
+    - Basic network visualization with household structure
+    - Advanced visualization with clustering and statistics
+    - Extended community networks with large families
+    - Large-scale community networks (60+ agents)
+    - Full TBSim simulation with household networks
+    - Built-in TBSim plotting functions
+    
+    All visualizations use dark themes optimized for presentations.
+    """
     parser = argparse.ArgumentParser(description='Plot household networks from TBSim')
     parser.add_argument('--example', choices=['basic', 'advanced', 'simulation', '', 'community', 'all'], 
                        default='all', help='Type of example to run')

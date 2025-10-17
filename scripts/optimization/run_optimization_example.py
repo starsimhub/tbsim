@@ -24,7 +24,37 @@ from tb_calibration_south_africa import (
 
 def run_focused_optimization():
     """
-    Run a focused parameter optimization with higher transmission rates
+    Run a focused parameter optimization to find best TB calibration parameters for South Africa.
+    
+    This function performs a systematic grid search over three key TB model parameters
+    to find the combination that best matches South Africa TB data:
+    - beta: Transmission rate
+    - rel_sus_latentslow: Relative susceptibility of latent slow TB
+    - tb_mortality: TB-specific mortality rate
+    
+    The optimization:
+    - Tests 48 parameter combinations (4 × 4 × 3)
+    - Uses smaller population (400 agents) for speed
+    - Runs shorter simulations (120 years vs 200)
+    - Calculates calibration scores for each combination
+    - Identifies best parameters with lowest composite score
+    
+    Returns
+    -------
+    tuple of (pd.DataFrame, ss.Sim, tuple)
+        - results_df: DataFrame with all parameter combinations and scores
+        - best_sim: Simulation object with best parameters
+        - best_params: Tuple of (beta, rel_sus, tb_mortality) with best values
+        or (None, None, None) if all simulations failed
+        
+    Notes
+    -----
+    The composite calibration score balances:
+    - Case notification rate matching (40% weight)
+    - Age-stratified prevalence matching (40% weight)
+    - Overall prevalence accuracy (20% weight)
+    
+    Lower scores indicate better calibration to South Africa data.
     """
     
     print("=== TB Model Parameter Optimization for South Africa ===")
@@ -167,7 +197,39 @@ def run_focused_optimization():
 
 def create_optimization_plots(results_df, timestamp):
     """
-    Create plots showing optimization results
+    Create comprehensive visualization of parameter optimization results.
+    
+    Generates a 2x2 subplot grid showing:
+    1. Distribution of calibration scores across all parameter combinations
+    2. Beta vs score scatter plot (colored by rel_sus parameter)
+    3. Rel_sus vs score scatter plot (colored by beta parameter)
+    4. Overall prevalence vs score with target line
+    
+    Parameters
+    ----------
+    results_df : pd.DataFrame
+        DataFrame containing optimization results with columns:
+        - beta, rel_sus_latentslow, tb_mortality: Parameter values
+        - composite_score: Calibration quality score
+        - model_overall_prev: Model's overall TB prevalence
+    timestamp : str
+        Timestamp string for output filename
+    
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure object
+        
+    Output Files
+    ------------
+    optimization_plots_{timestamp}.pdf : High-resolution plot saved to current directory
+    
+    Notes
+    -----
+    - Scatter plots use color to show third dimension (parameter interactions)
+    - Target prevalence line (0.852%) shown as reference on prevalence plot
+    - Uses viridis and plasma colormaps for clear parameter visualization
+    - All plots include grid lines and proper axis labels
     """
     
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
@@ -218,7 +280,34 @@ def create_optimization_plots(results_df, timestamp):
 
 def compare_with_initial_results():
     """
-    Compare optimization results with initial demo results
+    Compare optimization results with initial demonstration run parameters.
+    
+    Displays the baseline results from the initial calibration demo to provide
+    context for optimization improvements. Shows the starting point parameters
+    and their associated calibration scores before optimization.
+    
+    Returns
+    -------
+    dict
+        Dictionary containing initial demo results:
+        - Parameter values (beta, rel_sus_latentslow, tb_mortality)
+        - Calibration scores (composite, notification MAPE, age MAPE)
+        - Model outputs (overall prevalence, prevalence error)
+        
+    Notes
+    -----
+    The initial demo used:
+    - beta = 0.020
+    - rel_sus_latentslow = 0.15
+    - tb_mortality = 3e-4
+    
+    These parameters achieved:
+    - 78.1% average MAPE (composite score)
+    - 0.496% overall prevalence (target: 0.852%)
+    - 86.4% notification MAPE
+    - 69.7% age prevalence MAPE
+    
+    Optimization aims to improve upon these baseline metrics.
     """
     
     print("\n=== COMPARISON WITH INITIAL RESULTS ===")

@@ -1,3 +1,58 @@
+"""
+WHO Global TB Report Data Extraction Script
+
+This script extracts and processes TB case notification data from the WHO Global TB Report
+2024 data files. It reads RDA (R Data Archive) files, extracts South Africa TB data,
+and calculates case notification rates per 100,000 population over time.
+
+Purpose:
+--------
+- Extract WHO Global TB Report data for South Africa
+- Calculate case notification rates from absolute case counts
+- Merge TB case data with population data
+- Visualize TB case notification trends over time
+- Prepare calibration data for TB simulation models
+
+Data Sources:
+-------------
+The script requires WHO Global TB Report 2024 data files in RDA format:
+- tb.rda: TB case notification data by country and year
+- pop.rda: Population data by country and year
+- dic.rda: Data dictionary and variable definitions
+
+Expected directory structure:
+    scripts/data/gtbreport2024/data/gtb/
+        ├── snapshot_2024-07-29/
+        │   └── tb.rda
+        └── other/
+            ├── pop.rda
+            └── dic.rda
+
+Output:
+-------
+- Displays columns available in TB data
+- Shows notification variables found in the data
+- Plots case notification rate over time for South Africa
+- Case notification rate per 100,000 population trend plot
+
+Usage:
+------
+    python scripts/data/extract_gtb_data.py
+
+Requirements:
+-------------
+- rdata: For reading R data files
+- pandas: For data manipulation
+- matplotlib: For visualization
+- WHO GTB Report 2024 data files (downloaded separately)
+
+Notes:
+------
+The script automatically searches for the most appropriate notification variable
+from the WHO data (e.g., new_bact_pos, new_labconf, new_notif, new_pos) and uses
+the first available one for analysis.
+"""
+
 import os
 import rdata
 import pandas as pd
@@ -15,6 +70,33 @@ dic_rda_path = os.path.join(other_dir, 'dic.rda')
 
 # Helper to load RDA file and return as pandas DataFrame
 def load_rda_df(rda_path):
+    """
+    Load an R Data Archive (RDA) file and convert to pandas DataFrame.
+    
+    This helper function reads RDA files from WHO Global TB Reports and
+    extracts the first DataFrame object found in the file.
+    
+    Parameters
+    ----------
+    rda_path : str
+        Path to the RDA file to load
+    
+    Returns
+    -------
+    pd.DataFrame
+        The first DataFrame found in the RDA file
+        
+    Raises
+    ------
+    ValueError
+        If no DataFrame is found in the RDA file
+        
+    Notes
+    -----
+    The function uses the rdata library to parse and convert R objects to
+    pandas DataFrames. It searches through all objects in the RDA file and
+    returns the first DataFrame encountered.
+    """
     parsed = rdata.parser.parse_file(rda_path)
     converted = rdata.conversion.convert(parsed)
     # Find first DataFrame in the RDA file

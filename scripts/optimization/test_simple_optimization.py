@@ -1,5 +1,45 @@
 """
-Simple test script for TB optimization with conservative parameters
+Simple TB Optimization Test Script
+
+This script provides basic testing functionality for the TB model parameter optimization
+framework. It tests individual simulations and small optimization runs with conservative
+parameters to identify and debug issues before running large-scale optimizations.
+
+Purpose:
+--------
+- Verify that the TB calibration simulation runs correctly
+- Test single simulation execution
+- Test small-scale optimization with minimal parameter combinations
+- Identify issues early before running expensive large-scale optimizations
+- Provide quick feedback on optimization framework functionality
+
+Components:
+-----------
+- Single simulation test with conservative parameters
+- Small optimization with 2x2x2 = 8 parameter combinations
+- Conservative population size (300 agents) for fast execution
+- Short simulation period (100 years) for testing
+
+Usage:
+------
+    python scripts/optimization/test_simple_optimization.py
+
+Output:
+-------
+- Test results for single simulation
+- Test results for small optimization
+- Success/failure indicators
+- Parameter combinations and scores for successful runs
+- Diagnostic information if tests fail
+
+Notes:
+------
+Run this script before running full optimizations to ensure:
+- All dependencies are correctly installed
+- Calibration functions work properly
+- South Africa data is accessible
+- Parameter ranges are appropriate
+- No fundamental simulation issues exist
 """
 
 import numpy as np
@@ -18,7 +58,41 @@ from scripts.burn_in.run_tb_burn_in_South_Africa import (
 
 def test_single_simulation():
     """
-    Test a single simulation to make sure everything works
+    Test a single TB calibration simulation with conservative parameters.
+    
+    This function runs one complete simulation to verify that the calibration
+    framework is functioning correctly. It uses conservative parameters that
+    should reliably complete without errors.
+    
+    Test Parameters:
+    ----------------
+    - beta = 0.015 (conservative transmission rate)
+    - rel_sus_latentslow = 0.10 (low susceptibility)
+    - tb_mortality = 2e-4 (moderate mortality)
+    - n_agents = 300 (small population for speed)
+    - years = 100 (short simulation for testing)
+    
+    Returns
+    -------
+    bool
+        True if the test passed successfully, False if it failed
+        
+    Output:
+    -------
+    Prints:
+    - Test progress and status
+    - Calibration score if successful
+    - Overall prevalence achieved
+    - Notification and age prevalence MAPEs
+    - Full error traceback if test fails
+    
+    Notes
+    -----
+    If this test fails, there are likely fundamental issues with:
+    - Module imports or dependencies
+    - Calibration simulation setup
+    - South Africa data access
+    - Parameter value ranges
     """
     
     print("=== Testing Single Simulation ===")
@@ -62,7 +136,44 @@ def test_single_simulation():
 
 def test_small_optimization():
     """
-    Test a very small optimization with just a few parameter combinations
+    Test a small-scale optimization with minimal parameter combinations.
+    
+    This function tests the complete optimization loop with a minimal number
+    of parameter combinations (2×2×2 = 8 combinations). It verifies that:
+    - Multiple simulations can run sequentially
+    - Results are properly collected and sorted
+    - Best parameters are correctly identified
+    - No errors occur during the optimization loop
+    
+    Parameter Ranges:
+    -----------------
+    - beta: [0.015, 0.020]
+    - rel_sus_latentslow: [0.10, 0.15]
+    - tb_mortality: [2e-4, 3e-4]
+    
+    Returns
+    -------
+    bool
+        True if at least one simulation succeeded and optimization completed,
+        False if all simulations failed
+        
+    Output:
+    -------
+    Prints:
+    - Progress for each parameter combination
+    - Success/failure status for each run
+    - Summary of successful simulations
+    - Best parameter combination and score
+    - Overall prevalence for best parameters
+    
+    Notes
+    -----
+    This is a lightweight test using:
+    - 300 agents (very small for speed)
+    - 100 years simulation (shorter for testing)
+    - Only 8 parameter combinations (2^3)
+    
+    If this test passes, the full optimization framework should work correctly.
     """
     
     print("\n=== Testing Small Optimization ===")
@@ -135,7 +246,39 @@ def test_small_optimization():
 
 def main():
     """
-    Main test function
+    Main test function to run all TB optimization tests sequentially.
+    
+    Orchestrates the complete testing workflow:
+    1. Runs single simulation test to verify basic functionality
+    2. If single test passes, runs small optimization test
+    3. Reports overall testing status and identifies issues
+    
+    The tests are run in sequence with early termination if fundamental
+    issues are detected.
+    
+    Test Sequence:
+    --------------
+    1. Single simulation test
+       - Tests basic calibration framework
+       - Uses one parameter set
+       - Fast execution (~10-30 seconds)
+    
+    2. Small optimization test (only if single test passes)
+       - Tests optimization loop
+       - Uses 8 parameter combinations
+       - Moderate execution (~2-5 minutes)
+    
+    Exit Status Messages:
+    ---------------------
+    - "Single simulation test passed" - Basic framework works
+    - "Small optimization test passed" - Optimization framework works
+    - "Single simulation test failed" - Fundamental setup issues
+    - "Small optimization test failed" - Issues with optimization loop
+    
+    Notes
+    -----
+    Run this before attempting large-scale optimizations to catch issues early.
+    The tests use conservative parameters to maximize likelihood of success.
     """
     
     print("TB Model Optimization Test")

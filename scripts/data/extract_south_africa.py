@@ -22,8 +22,31 @@ import os
 
 def download_wpp_data():
     """
-    Download UN WPP data files if they don't exist locally.
-    Note: This requires manual download from UN WPP website.
+    Check for required UN WPP data files and provide download instructions if missing.
+    
+    This function verifies that all required UN World Population Prospects (WPP)
+    data files are present in the current directory. If files are missing, it prints
+    instructions for manual download from the UN WPP website.
+    
+    Note: This function does not automatically download files - the user must
+    manually download them from the UN WPP website due to their size and licensing.
+    
+    Required Files:
+    ---------------
+    - WPP2024_Life_Table_Complete_Medium_Female_1950-2023.csv
+    - WPP2024_Life_Table_Complete_Medium_Male_1950-2023.csv
+    - WPP2024_Demographic_Indicators_Medium.csv
+    - WPP2024_Fertility_by_Age1.csv
+    
+    Returns
+    -------
+    bool
+        True if all required files exist, False otherwise
+        
+    Notes
+    -----
+    Download files from: https://population.un.org/wpp/Download/Standard/
+    Place them in the same directory as this script before running.
     """
     required_files = [
         'WPP2024_Life_Table_Complete_Medium_Female_1950-2023.csv',
@@ -49,7 +72,29 @@ def download_wpp_data():
     return True
 
 def extract_south_africa_cbr():
-    """Extract South Africa crude birth rates from UN WPP data."""
+    """
+    Extract South Africa crude birth rates (CBR) from UN WPP data.
+    
+    Reads the WPP2024 demographic indicators file, filters for South Africa,
+    and extracts crude birth rate (CBR) time series data. The CBR represents
+    the number of births per 1000 population per year.
+    
+    Returns
+    -------
+    pd.DataFrame or None
+        DataFrame with columns ['Year', 'CBR'] containing South Africa birth rates,
+        or None if extraction fails
+        
+    Output Files
+    ------------
+    South_Africa_CBR.csv : CSV file with Year and CBR columns
+    
+    Notes
+    -----
+    - CBR is reported as births per 1000 population per year
+    - Data typically spans 1950-2100 (historical and projections)
+    - Used as input to ss.Births() demographic module in simulations
+    """
     print("Extracting South Africa crude birth rates...")
     
     try:
@@ -72,7 +117,31 @@ def extract_south_africa_cbr():
         return None
 
 def extract_south_africa_asmr():
-    """Extract South Africa age-sex-specific mortality rates from UN WPP data."""
+    """
+    Extract South Africa age-sex-specific mortality rates (ASMR) from UN WPP data.
+    
+    Reads WPP2024 life table files for both males and females, filters for South Africa,
+    and combines them into a single age-sex-specific mortality rate dataset. The mx
+    (mortality rate) values represent the probability of dying within a given age interval.
+    
+    Returns
+    -------
+    pd.DataFrame or None
+        DataFrame with columns ['Time', 'Sex', 'AgeGrpStart', 'mx'] containing
+        age-sex-specific mortality rates, or None if extraction fails
+        
+    Output Files
+    ------------
+    South_Africa_ASMR.csv : CSV file with Time, Sex, AgeGrpStart, and mx columns
+    
+    Notes
+    -----
+    - mx is the central death rate per person per year for the age interval
+    - Data includes both males and females
+    - Age groups typically start at 0, 1, 5, 10, 15, ..., 100+
+    - Used as input to ss.Deaths() demographic module in simulations
+    - Combines data from separate male and female life tables
+    """
     print("Extracting South Africa age-sex-specific mortality rates...")
     
     try:
@@ -104,7 +173,30 @@ def extract_south_africa_asmr():
         return None
 
 def extract_south_africa_asfr():
-    """Extract South Africa age-specific fertility rates from UN WPP 2025 CSV data."""
+    """
+    Extract South Africa age-specific fertility rates (ASFR) from UN WPP data.
+    
+    Reads WPP2025 fertility by age data, filters for South Africa and reproductive
+    ages (15-49), and extracts age-specific fertility rates. ASFR represents the
+    number of births per woman in each age group per year.
+    
+    Returns
+    -------
+    pd.DataFrame or None
+        DataFrame with Time and AgeGrp index and ASFR values,
+        or None if extraction fails
+        
+    Output Files
+    ------------
+    South_Africa_ASFR.csv : CSV file with Time, AgeGrp index and ASFR column
+    
+    Notes
+    -----
+    - ASFR is reported for women aged 15-49 (reproductive age range)
+    - Values represent births per woman per year in each age group
+    - Data combines historical observations and future projections
+    - Can be used for age-stratified birth modeling in simulations
+    """
     print("Extracting South Africa age-specific fertility rates...")
 
     try:
@@ -130,7 +222,31 @@ def extract_south_africa_asfr():
         return None
 
 def create_south_africa_population_structure():
-    """Create South Africa population age structure data for simulation initialization."""
+    """
+    Create South Africa population age structure for simulation initialization.
+    
+    Generates an approximate age distribution for South Africa circa 1960 based on
+    UN WPP data. This provides realistic population structure for initializing
+    agent-based simulations.
+    
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with columns:
+        - 'age': Age groups from 0 to 100 in 5-year intervals
+        - 'value': Population counts in each age group
+        
+    Output Files
+    ------------
+    South_Africa_Age_Structure.csv : CSV file with age distribution
+    
+    Notes
+    -----
+    - Age distribution reflects typical developing country demographics (1960)
+    - Younger age groups have higher population counts (pyramid structure)
+    - Used for realistic age distribution in ss.People() initialization
+    - Values are approximate and can be adjusted for specific modeling needs
+    """
     print("Creating South Africa population age structure...")
     
     # South Africa population age structure (approximate 1960 data)
@@ -149,7 +265,32 @@ def create_south_africa_population_structure():
     return age_structure
 
 def main():
-    """Main function to extract all South Africa demographic data."""
+    """
+    Main function to orchestrate extraction of all South Africa demographic data.
+    
+    This function coordinates the complete extraction process:
+    1. Checks for required WPP data files
+    2. Extracts crude birth rates (CBR)
+    3. Extracts age-sex-specific mortality rates (ASMR)
+    4. Extracts age-specific fertility rates (ASFR)
+    5. Creates population age structure
+    6. Reports summary of extraction success/failure
+    
+    The extracted data files are ready to use in TB simulations for realistic
+    demographic modeling of South Africa populations.
+    
+    Output Files
+    ------------
+    - South_Africa_CBR.csv: Crude birth rates by year
+    - South_Africa_ASMR.csv: Age-sex-specific mortality rates
+    - South_Africa_ASFR.csv: Age-specific fertility rates  
+    - South_Africa_Age_Structure.csv: Population age distribution
+    
+    Notes
+    -----
+    All data files are created in the current directory. Move them to the
+    appropriate data/ directory for use in simulations.
+    """
     print("South Africa Demographic Data Extraction")
     print("=" * 50)
     

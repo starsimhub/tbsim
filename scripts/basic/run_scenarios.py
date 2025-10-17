@@ -1,5 +1,54 @@
 """
-TB-Malnutrition scenarios
+TB-Malnutrition Scenario Comparison with Parallel Execution
+
+This script runs multiple TB-malnutrition co-infection scenarios in parallel to compare
+outcomes under different parameter settings. It demonstrates how to use parallel processing
+for efficient scenario analysis and how TB and malnutrition interact through the
+TB-Nutrition connector.
+
+Purpose:
+--------
+This script demonstrates:
+- Running multiple scenarios in parallel for efficiency
+- Modeling TB-malnutrition co-infection dynamics
+- Using the TB-Nutrition connector for disease interactions
+- Comparing outcomes across parameter variations
+- Saving results to CSV for further analysis
+
+Components:
+-----------
+- TB disease module with configurable transmission
+- Malnutrition comorbidity module
+- TB-Nutrition connector for disease interactions
+- Demographics (births and deaths via Pregnancy)
+- Random contact network
+- Parallel execution with sciris.parallelize()
+
+Scenarios:
+----------
+The script varies the rel_sus_latentslow parameter (relative susceptibility of
+latent slow TB) to test its impact on disease dynamics. Default values test
+parameter values of 2, 3, and 1.
+
+Usage:
+------
+    # Run scenarios and generate results
+    python scripts/basic/run_scenarios.py
+    
+    # Specify custom number of agents
+    python scripts/basic/run_scenarios.py -n 5000
+    
+    # Specify custom number of random seeds
+    python scripts/basic/run_scenarios.py -s 10
+    
+    # Plot from cached CSV file
+    python scripts/basic/run_scenarios.py -p results/results.csv
+
+Output:
+-------
+- CSV file with simulation results saved to results/ directory
+- Displays simulation timing information
+- Shows combined metrics from all scenario runs
 """
 
 # %% Imports and settings
@@ -23,6 +72,46 @@ default_n_agents = [10_000, 1000][debug]
 default_n_rand_seeds = [20, 2][debug]
 
 def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
+    """
+    Run a single TB-malnutrition simulation with specified parameters.
+    
+    This function creates and runs one complete simulation instance with TB and
+    malnutrition comorbidities. It's designed to be called in parallel for efficient
+    scenario analysis.
+    
+    Parameters
+    ----------
+    n_agents : int, default=10000 (or 1000 in debug mode)
+        Number of agents in the simulation
+    rand_seed : int, default=0
+        Random seed for reproducibility
+    idx : int, default=0
+        Simulation index for tracking in parallel runs
+    xLS : float, default=1
+        Relative susceptibility parameter for latent slow TB
+        (currently not used in TB parameters but logged in results)
+    
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with simulation results including:
+        - year: Simulation time vector
+        - Deaths: Cumulative deaths over time
+        - xLS: Parameter value used
+        - rand_seed: Random seed used
+        - network: Network type (currently 'None')
+        - n_agents: Population size
+        
+    Notes
+    -----
+    The simulation includes:
+    - TB disease with 25% initial prevalence
+    - Malnutrition with 0.1% initial prevalence
+    - TB-Nutrition connector for disease interactions
+    - Random network with average 5 contacts
+    - Demographics: Pregnancy (15 per 1000) and Deaths (10 per 1000)
+    - 41-year period (1980-2020)
+    """
     # --------- People ----------
     pop = ss.People(n_agents=n_agents)
 
@@ -91,6 +180,38 @@ def run_sim(n_agents=default_n_agents, rand_seed=0, idx=0, xLS=1):
 
 
 def run_scenarios(n_agents=default_n_agents, n_seeds=default_n_rand_seeds):
+    """
+    Run multiple TB-malnutrition scenarios in parallel with different parameter combinations.
+    
+    This function orchestrates parallel execution of multiple simulations with different
+    parameter values and random seeds. It uses sciris.parallelize() for efficient
+    multi-core processing.
+    
+    Parameters
+    ----------
+    n_agents : int, default=10000 (or 1000 in debug mode)
+        Number of agents per simulation
+    n_seeds : int, default=20 (or 2 in debug mode)
+        Number of different random seeds to test
+    
+    Returns
+    -------
+    tuple of (pd.DataFrame, str)
+        - DataFrame: Combined results from all scenario runs
+        - str: Path to saved CSV file
+        
+    Notes
+    -----
+    The function:
+    - Creates configurations for all parameter and seed combinations
+    - Runs simulations in parallel using all available CPU cores
+    - Combines results into a single DataFrame
+    - Saves results to a timestamped CSV file in results/ directory
+    - Prints timing information for performance monitoring
+    
+    The x_latent_slow parameter variations test how relative susceptibility
+    of latent slow TB affects disease dynamics.
+    """
     results = []
     cfgs = []
     for rs in range(n_seeds):

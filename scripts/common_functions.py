@@ -1,3 +1,36 @@
+"""
+Common Functions for TB Simulation Scripts
+
+This module provides a centralized collection of reusable functions for setting up
+and running TB simulations. It includes factory functions for creating simulation
+components (diseases, populations, networks, interventions) with sensible defaults,
+as well as plotting and analysis utilities.
+
+Main Components:
+----------------
+- Disease modules: TB, HIV, and comorbidities
+- Population setup: Age distributions and demographic initialization
+- Network setup: Random and household contact networks
+- Interventions: HIV interventions, demographics (births/deaths)
+- Connectors: TB-HIV disease interaction modeling
+- Plotting: Comparative scenario plotting with multiple metrics
+
+Usage:
+------
+Import this module in simulation scripts to access reusable components:
+
+    from common_functions import make_tb, make_pop, plot_results
+    
+    # Create TB disease with defaults
+    tb = make_tb()
+    
+    # Create population
+    pop = make_pop(n_agents=1000)
+    
+    # Plot scenario comparison
+    plot_results(results_dict, keywords=['prevalence', 'incidence'])
+"""
+
 import starsim as ss 
 import sciris as sc
 import tbsim as mtb 
@@ -10,7 +43,33 @@ import re
 
 def make_tb(pars = None):
     """
-    Set up the TB simulation with default parameters.
+    Set up the TB disease module with default parameters.
+    
+    Creates a TB disease module suitable for use in Starsim simulations.
+    If no parameters are provided, uses sensible defaults for transmission
+    rate and initial prevalence.
+    
+    Parameters
+    ----------
+    pars : dict, optional
+        TB-specific parameters. If None, uses defaults:
+        - beta: 0.0025 per year (transmission rate)
+        - init_prev: 25% Bernoulli (initial prevalence)
+    
+    Returns
+    -------
+    mtb.TB
+        Configured TB disease module ready to add to a simulation
+        
+    Examples
+    --------
+    Create TB with default parameters:
+    
+        >>> tb = make_tb()
+    
+    Create TB with custom transmission rate:
+    
+        >>> tb = make_tb(pars={'beta': ss.peryear(0.005), 'init_prev': ss.bernoulli(p=0.1)})
     """
     # Define simulation parameters
     if pars is None: 
@@ -23,7 +82,39 @@ def make_tb(pars = None):
 
 def make_pop(pars = None, n_agents=500):
     """
-    Set up the population with default parameters.
+    Set up the population with default parameters and age distribution.
+    
+    Creates a population (People object) for use in Starsim simulations.
+    The population can be initialized with a default age distribution based
+    on UN World Population Prospects data from 1960.
+    
+    Parameters
+    ----------
+    pars : dict, optional
+        Population-specific parameters. Currently not used but reserved for
+        future extensions. Age data is loaded from load_age_data() function.
+    n_agents : int, default=500
+        Number of agents (individuals) in the population
+    
+    Returns
+    -------
+    ss.People
+        Configured population object ready to add to a simulation
+        
+    Examples
+    --------
+    Create population with default size:
+    
+        >>> pop = make_pop()
+    
+    Create larger population:
+    
+        >>> pop = make_pop(n_agents=10000)
+    
+    Notes
+    -----
+    The age distribution is loaded from the load_age_data() function which
+    provides UN WPP 1960 data by default.
     """
     # Define population parameters
     if pars is None: 
@@ -40,7 +131,38 @@ def make_pop(pars = None, n_agents=500):
 
 def make_net(pars = None):
     """
-    Set up the network with default parameters.
+    Set up a random contact network with default parameters.
+    
+    Creates a RandomNet network where agents form random contacts with each other.
+    The number of contacts per agent follows a Poisson distribution, and contacts
+    can have optional durations.
+    
+    Parameters
+    ----------
+    pars : dict, optional
+        Network-specific parameters. If None, uses defaults:
+        - n_contacts: Poisson(λ=5) - average 5 contacts per agent per timestep
+        - dur: 0 - instantaneous contacts (end after one timestep)
+    
+    Returns
+    -------
+    ss.RandomNet
+        Configured random network ready to add to a simulation
+        
+    Examples
+    --------
+    Create network with default parameters:
+    
+        >>> net = make_net()
+    
+    Create network with more contacts:
+    
+        >>> net = make_net(pars={'n_contacts': ss.poisson(lam=10), 'dur': 5})
+    
+    Notes
+    -----
+    The dur=0 setting means contacts are instantaneous and reset each timestep,
+    which is appropriate for modeling transient social interactions.
     """
     # Define network parameters
     if pars is None: 
@@ -54,7 +176,36 @@ def make_net(pars = None):
 
 def make_births(pars = None):
     """
-    Set up the births demographic with default parameters.
+    Set up the births demographic process with default parameters.
+    
+    Creates a Births module that adds new agents to the population over time.
+    The birth rate controls how many new individuals enter the population.
+    
+    Parameters
+    ----------
+    pars : dict, optional
+        Birth process parameters. If None, uses defaults:
+        - birth_rate: 20 per 1000 population per year
+    
+    Returns
+    -------
+    ss.Births
+        Configured births module ready to add to a simulation
+        
+    Examples
+    --------
+    Create births with default rate:
+    
+        >>> births = make_births()
+    
+    Create births with custom rate:
+    
+        >>> births = make_births(pars={'birth_rate': 25})
+    
+    Notes
+    -----
+    The birth_rate is typically specified per 1000 population per year.
+    A rate of 20 means 20 births per 1000 people annually.
     """
     # Define births parameters
     if pars is None: 
@@ -67,7 +218,38 @@ def make_births(pars = None):
 
 def make_deaths(pars = None):
     """
-    Set up the deaths demographic with default parameters.
+    Set up the deaths demographic process with default parameters.
+    
+    Creates a Deaths module that removes agents from the population over time.
+    The death rate controls background mortality independent of disease-specific
+    mortality.
+    
+    Parameters
+    ----------
+    pars : dict, optional
+        Death process parameters. If None, uses defaults:
+        - death_rate: 15 per 1000 population per year
+    
+    Returns
+    -------
+    ss.Deaths
+        Configured deaths module ready to add to a simulation
+        
+    Examples
+    --------
+    Create deaths with default rate:
+    
+        >>> deaths = make_deaths()
+    
+    Create deaths with custom rate:
+    
+        >>> deaths = make_deaths(pars={'death_rate': 10})
+    
+    Notes
+    -----
+    The death_rate is typically specified per 1000 population per year.
+    A rate of 15 means 15 deaths per 1000 people annually (1.5% annual mortality).
+    This is background mortality; TB-specific mortality is handled by the TB module.
     """
     # Define deaths parameters
     if pars is None: 
@@ -110,7 +292,51 @@ def make_cnn(pars = None):
 
 def load_age_data(source='default', file_path=''):
     """
-    Load population data from a CSV file or use default data.
+    Load population age distribution data from various sources.
+    
+    This function provides age distribution data for population initialization.
+    It can either return default UN WPP 1960 data or load custom data from a JSON file.
+    
+    Parameters
+    ----------
+    source : str, default='default'
+        Source of age data:
+        - 'default': Use built-in UN WPP 1960 age distribution
+        - 'json': Load from a JSON file (requires file_path)
+    file_path : str, optional
+        Path to JSON file when source='json'
+    
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with columns:
+        - 'age': Age groups (0, 5, 10, ..., 100)
+        - 'value': Population counts in each age group
+    
+    Raises
+    ------
+    ValueError
+        If source is 'json' but file_path is not provided
+    FileNotFoundError
+        If the specified file_path does not exist
+    ValueError
+        If source is neither 'default' nor 'json'
+        
+    Examples
+    --------
+    Load default age distribution:
+    
+        >>> age_data = load_age_data()
+    
+    Load custom age distribution from file:
+    
+        >>> age_data = load_age_data(source='json', file_path='my_age_data.json')
+    
+    Notes
+    -----
+    The default age distribution is from UN World Population Prospects (WPP) 1960 data,
+    representing a demographic structure typical of developing countries at that time.
+    Source: https://population.un.org/wpp/Download/Standard/MostUsed/
     """
     if source == 'default':
         # Default population data
@@ -338,8 +564,40 @@ def plot_results(flat_results, keywords=None, exclude=('15',), n_cols=5,
 
 def uncertainty_plot():
     """
-    Create an uncertainty plot with example data.
-    This is a demonstration function showing how to create uncertainty plots.
+    Create an uncertainty plot with example data and confidence bands.
+    
+    This demonstration function shows how to create publication-quality uncertainty
+    plots for TB simulation results. It visualizes multiple simulation runs with
+    confidence bands, different line styles, and proper statistical representation.
+    
+    The plot includes:
+    - Multiple simulation runs shown as individual lines
+    - Confidence bands (shaded regions) representing uncertainty
+    - Different groups (e.g., different scenarios) in different colors
+    - Grid layout for multiple metrics
+    
+    Returns
+    -------
+    None
+        Displays the plot directly
+        
+    Examples
+    --------
+    Generate example uncertainty plot:
+    
+        >>> uncertainty_plot()
+    
+    Notes
+    -----
+    This is a demonstration function using synthetic data. In practice, you would
+    replace the fake data generation with actual simulation results from multiple
+    runs with different random seeds.
+    
+    The plot shows 4 example TB metrics:
+    - n_positive_smpos: Smear-positive TB cases
+    - n_positive_smneg: Smear-negative TB cases
+    - n_positive_via_LS: Positive cases via latent slow progression
+    - n_positive_via_LF_dur: Positive cases via latent fast progression
     """
     # Example data generation
     np.random.seed(0)
