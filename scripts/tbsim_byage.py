@@ -1,14 +1,50 @@
 """
-Sample script demonstrating how to initialize a population with specific
-age and sex distributions from a CSV file.
+Population Initialization from Demographic Data
+================================================
 
-This script addresses the feature request in:
-https://github.com/starsimhub/starsim/issues/1045
+This script demonstrates how to initialize a TBsim/Starsim population with specific
+age and sex distributions from a CSV file, using the latest Starsim 3.0+ API.
 
-The script demonstrates:
+Features:
+---------
 1. Loading age-sex cross-tabulated demographic data from a CSV file
 2. Creating a population that matches the specified demographic structure
 3. Validating the resulting population against the input data
+4. Generating population pyramid visualizations
+
+Two Initialization Methods:
+---------------------------
+
+1. **'exact' method**: Creates precise age-sex distribution
+   - Each age-sex group matches CSV counts exactly
+   - Best for: Calibration, validation, matching census data
+   - Implementation: Post-initialization assignment of age/sex arrays
+   
+2. **'starsim' method**: Uses Starsim's native distribution sampling
+   - Ages sampled from ss.histogram distribution
+   - Sex sampled from ss.bernoulli with overall proportion
+   - Best for: Flexible modeling, demographic uncertainty
+   - Implementation: age_data parameter in ss.People()
+
+CSV Format:
+----------
+age_min,age_max,male_count,female_count
+0,5,450,430
+5,10,480,460
+...
+
+Usage:
+------
+# Method 1: Exact matching
+sim = initialize_population_from_demographics('data.csv', method='exact')
+
+# Method 2: Starsim distribution sampling  
+sim = initialize_population_from_demographics('data.csv', method='starsim')
+
+# With population scaling
+sim = initialize_population_from_demographics('data.csv', scale_factor=0.1)
+
+Updated for Starsim 3.0+ API patterns.
 """
 
 import pandas as pd
@@ -44,45 +80,71 @@ def load_demographic_data(filepath):
     return df
 
 
-def create_age_sex_distribution(demo_data):
+def create_age_distribution(demo_data):
     """
-    Convert demographic data into a format suitable for population initialization.
+    Convert demographic data into age distribution format for Starsim.
+    
+    Starsim expects age data in histogram format with 'age' and 'value' columns,
+    where 'age' represents bin edges and 'value' represents counts or proportions.
+    
+    Args:
+        demo_data: DataFrame with demographic data (age_min, age_max, male_count, female_count)
+        
+    Returns:
+        DataFrame with 'age' and 'value' columns suitable for ss.People(age_data=...)
+    """
+    age_bins = []
+    age_counts = []
+    
+    for _, row in demo_data.iterrows():
+        age_bins.append(row['age_min'])
+        total_count = row['male_count'] + row['female_count']
+        age_counts.append(total_count)
+    
+    # Add upper edge for the last age bin
+    if len(demo_data) > 0:
+        last_row = demo_data.iloc[-1]
+        age_bins.append(last_row['age_max'])
+        age_counts.append(0)  # Zero count to mark upper boundary
+    
+    age_dist_df = pd.DataFrame({
+        'age': age_bins,
+        'value': age_counts
+    })
+    
+    return age_dist_df
+
+
+def create_sex_distribution(demo_data):
+    """
+    Calculate the proportion of females from demographic data.
     
     Args:
         demo_data: DataFrame with demographic data
         
     Returns:
-        Dictionary with age and sex arrays for initialization
+        Float representing proportion of females (for ss.bernoulli distribution)
     """
-    ages = []
-    sexes = []
+    total_male = demo_data['male_count'].sum()
+    total_female = demo_data['female_count'].sum()
+    total = total_male + total_female
     
-    for _, row in demo_data.iterrows():
-        age_min = row['age_min']
-        age_max = row['age_max']
-        male_count = int(row['male_count'])
-        female_count = int(row['female_count'])
-        
-        # Generate ages uniformly distributed within the age group
-        male_ages = np.random.uniform(age_min, age_max, male_count)
-        female_ages = np.random.uniform(age_min, age_max, female_count)
-        
-        # Append to lists
-        ages.extend(male_ages)
-        ages.extend(female_ages)
-        sexes.extend(['m'] * male_count)
-        sexes.extend(['f'] * female_count)
+    if total == 0:
+        return 0.5  # Default to 50/50 if no data
     
-    return {'ages': np.array(ages), 'sexes': np.array(sexes)}
+    return total_female / total
 
 
-def initialize_population_from_demographics(demo_filepath, scale_factor=1.0):
+def initialize_population_from_demographics(demo_filepath, scale_factor=1.0, method='starsim'):
     """
     Initialize a TB simulation population based on demographic data from a file.
+    
+    Uses latest Starsim 3.0+ API with age_data parameter for People initialization.
     
     Args:
         demo_filepath: Path to demographic data CSV file
         scale_factor: Factor to scale the population (1.0 = use counts as-is)
+        method: 'starsim' for distribution sampling, 'exact' for precise age-sex matching
         
     Returns:
         Initialized simulation object
@@ -95,43 +157,92 @@ def initialize_population_from_demographics(demo_filepath, scale_factor=1.0):
     
     # Scale the demographic data if needed
     if scale_factor != 1.0:
+        demo_data = demo_data.copy()
         demo_data['male_count'] = (demo_data['male_count'] * scale_factor).astype(int)
         demo_data['female_count'] = (demo_data['female_count'] * scale_factor).astype(int)
     
-    # Create age and sex distribution
-    dist_data = create_age_sex_distribution(demo_data)
-    
-    # Initialize simulation with custom age distribution
-    pars = sc.objdict(
-        n_agents=total_pop,
-        dt=ss.days(7),
-        start=ss.date('2000-01-01'),
-        stop=ss.date('2010-01-01'),
-    )
-    
-    sim = ss.Sim(diseases=mtb.TB(), pars=pars)
-    
-    # Initialize the simulation to create the people object
-    sim.init()
-    
-    # Set ages and sexes from the demographic data
-    # Note: This is a workaround since direct loading isn't supported yet
-    if len(dist_data['ages']) == len(sim.people):
-        sim.people.age[:] = dist_data['ages']
-        sim.people.female[:] = (dist_data['sexes'] == 'f')
-    else:
-        print(f"Warning: Population size mismatch. Expected {len(dist_data['ages'])}, got {len(sim.people)}")
+    if method == 'exact':
+        # Create exact age-sex distribution
+        ages = []
+        sexes = []
+        
+        for _, row in demo_data.iterrows():
+            age_min = row['age_min']
+            age_max = row['age_max']
+            male_count = int(row['male_count'])
+            female_count = int(row['female_count'])
+            
+            # Generate ages uniformly within age group
+            male_ages = np.random.uniform(age_min, age_max, male_count)
+            female_ages = np.random.uniform(age_min, age_max, female_count)
+            
+            ages.extend(male_ages)
+            ages.extend(female_ages)
+            sexes.extend([False] * male_count)  # False = male
+            sexes.extend([True] * female_count)  # True = female
+        
+        # Create People object
+        people = ss.People(n_agents=total_pop)
+        
+        # Create simulation
+        sim = ss.Sim(
+            people=people,
+            diseases=mtb.TB(),
+            dt=ss.days(7),
+            start=ss.date('2000-01-01'),
+            stop=ss.date('2010-01-01'),
+        )
+        
+        # Initialize the simulation
+        sim.init()
+        
+        # Set exact ages and sexes
+        sim.people.age[:] = np.array(ages)
+        sim.people.female[:] = np.array(sexes)
+        
+    else:  # method == 'starsim'
+        # Create age distribution for Starsim
+        age_dist_df = create_age_distribution(demo_data)
+        
+        # Calculate sex distribution (proportion female)
+        p_female = create_sex_distribution(demo_data)
+        
+        # Create People object with custom age and sex distributions
+        # Starsim will sample from these distributions during initialization
+        people = ss.People(
+            n_agents=total_pop,
+            age_data=age_dist_df,
+        )
+        
+        # Override default female distribution with our calculated proportion
+        people.female.default = ss.bernoulli(p=p_female, name='female')
+        
+        # Create simulation with custom population
+        sim = ss.Sim(
+            people=people,
+            diseases=mtb.TB(),
+            dt=ss.days(7),
+            start=ss.date('2000-01-01'),
+            stop=ss.date('2010-01-01'),
+        )
+        
+        # Initialize the simulation
+        sim.init()
     
     return sim
 
 
-def validate_population_demographics(sim, demo_data):
+def validate_population_demographics(sim, demo_data, tolerance=0.1):
     """
     Validate that the generated population matches the input demographic data.
+    
+    Since Starsim samples from distributions, exact matches are not expected.
+    Validation checks if actual values are within tolerance of expected values.
     
     Args:
         sim: Initialized simulation object
         demo_data: Original demographic data DataFrame
+        tolerance: Acceptable relative deviation (default 0.1 = 10%)
         
     Returns:
         Dictionary with validation results
@@ -141,10 +252,13 @@ def validate_population_demographics(sim, demo_data):
     # Check total population
     total_expected = demo_data['male_count'].sum() + demo_data['female_count'].sum()
     total_actual = len(sim.people)
+    rel_diff = abs(total_actual - total_expected) / total_expected if total_expected > 0 else 0
     validation['total_population'] = {
-        'expected': total_expected,
-        'actual': total_actual,
-        'match': total_expected == total_actual
+        'expected': int(total_expected),
+        'actual': int(total_actual),
+        'match': total_expected == total_actual,
+        'rel_diff': rel_diff,
+        'within_tolerance': rel_diff <= tolerance
     }
     
     # Check sex distribution
@@ -153,9 +267,22 @@ def validate_population_demographics(sim, demo_data):
     male_actual = (~sim.people.female).sum()
     female_actual = sim.people.female.sum()
     
+    male_rel_diff = abs(male_actual - male_expected) / male_expected if male_expected > 0 else 0
+    female_rel_diff = abs(female_actual - female_expected) / female_expected if female_expected > 0 else 0
+    
     validation['sex_distribution'] = {
-        'male': {'expected': male_expected, 'actual': male_actual},
-        'female': {'expected': female_expected, 'actual': female_actual}
+        'male': {
+            'expected': int(male_expected), 
+            'actual': int(male_actual),
+            'rel_diff': male_rel_diff,
+            'within_tolerance': male_rel_diff <= tolerance
+        },
+        'female': {
+            'expected': int(female_expected), 
+            'actual': int(female_actual),
+            'rel_diff': female_rel_diff,
+            'within_tolerance': female_rel_diff <= tolerance
+        }
     }
     
     # Check age distribution by group
@@ -167,10 +294,26 @@ def validate_population_demographics(sim, demo_data):
         actual_male = (~sim.people.female & mask).sum()
         actual_female = (sim.people.female & mask).sum()
         
+        male_exp = row['male_count']
+        female_exp = row['female_count']
+        
+        male_rel_diff = abs(actual_male - male_exp) / male_exp if male_exp > 0 else 0
+        female_rel_diff = abs(actual_female - female_exp) / female_exp if female_exp > 0 else 0
+        
         age_validation.append({
             'age_range': f"{age_min}-{age_max}",
-            'male': {'expected': row['male_count'], 'actual': actual_male},
-            'female': {'expected': row['female_count'], 'actual': actual_female}
+            'male': {
+                'expected': int(male_exp), 
+                'actual': int(actual_male),
+                'rel_diff': male_rel_diff,
+                'within_tolerance': male_rel_diff <= tolerance
+            },
+            'female': {
+                'expected': int(female_exp), 
+                'actual': int(actual_female),
+                'rel_diff': female_rel_diff,
+                'within_tolerance': female_rel_diff <= tolerance
+            }
         })
     
     validation['age_sex_distribution'] = age_validation
@@ -241,11 +384,12 @@ def plot_population_pyramid(sim, demo_data, filename=None):
 
 def main():
     """
-    Main function demonstrating the usage of demographic data loading.
+    Main function demonstrating the usage of demographic data loading with latest Starsim.
     """
-    print("=" * 70)
+    print("=" * 80)
     print("TB Simulation: Population Initialization from Demographic Data")
-    print("=" * 70)
+    print("Updated for Starsim 3.0+ API")
+    print("=" * 80)
     print()
     
     # Path to demographic data
@@ -256,46 +400,79 @@ def main():
     
     print(f"\nDemographic Summary:")
     print(f"  Age groups: {len(demo_data)}")
-    print(f"  Total males: {demo_data['male_count'].sum()}")
-    print(f"  Total females: {demo_data['female_count'].sum()}")
-    print(f"  Total population: {demo_data['male_count'].sum() + demo_data['female_count'].sum()}")
+    print(f"  Total males: {int(demo_data['male_count'].sum())}")
+    print(f"  Total females: {int(demo_data['female_count'].sum())}")
+    print(f"  Total population: {int(demo_data['male_count'].sum() + demo_data['female_count'].sum())}")
+    print(f"  Proportion female: {create_sex_distribution(demo_data):.3f}")
     print()
     
-    # Initialize population (with optional scaling)
-    print("Initializing population from demographic data...")
+    # Method selection
+    method = 'exact'  # Change to 'starsim' for distribution-based sampling
     scale_factor = 1.0  # Change this to scale population up or down
-    sim = initialize_population_from_demographics(demo_filepath, scale_factor=scale_factor)
     
-    print(f"Population initialized with {len(sim.people)} agents")
+    print(f"Method: '{method}'")
+    if method == 'exact':
+        print("  - Creates exact age-sex distribution matching CSV data")
+        print("  - Each age-sex group will match expected counts precisely")
+    else:
+        print("  - Uses Starsim's age_data distribution sampling")
+        print("  - Overall distribution matches, but individual groups may vary")
+    print()
+    
+    # Initialize population
+    print("Initializing population from demographic data...")
+    sim = initialize_population_from_demographics(demo_filepath, scale_factor=scale_factor, method=method)
+    
+    print(f"\nPopulation initialized with {len(sim.people)} agents")
     print(f"  Males: {(~sim.people.female).sum()}")
     print(f"  Females: {sim.people.female.sum()}")
     print(f"  Age range: {sim.people.age.min():.1f} - {sim.people.age.max():.1f}")
+    print(f"  Mean age: {sim.people.age.mean():.1f} ± {sim.people.age.std():.1f}")
     print()
     
     # Validate the population
-    print("Validating population demographics...")
-    validation = validate_population_demographics(sim, demo_data)
+    tolerance = 0.02 if method == 'exact' else 0.1  # Tighter tolerance for exact method
+    print(f"Validating population demographics (tolerance = {tolerance*100:.0f}%)...")
+    validation = validate_population_demographics(sim, demo_data, tolerance=tolerance)
     
     print(f"\nValidation Results:")
-    print(f"  Total population match: {validation['total_population']['match']}")
+    print(f"  Total population:")
     print(f"    Expected: {validation['total_population']['expected']}")
     print(f"    Actual: {validation['total_population']['actual']}")
+    print(f"    Exact match: {validation['total_population']['match']}")
+    print(f"    Within tolerance: {validation['total_population']['within_tolerance']} "
+          f"(diff: {validation['total_population']['rel_diff']*100:.1f}%)")
     print()
     
     print(f"  Sex distribution:")
-    print(f"    Males - Expected: {validation['sex_distribution']['male']['expected']}, "
-          f"Actual: {validation['sex_distribution']['male']['actual']}")
-    print(f"    Females - Expected: {validation['sex_distribution']['female']['expected']}, "
-          f"Actual: {validation['sex_distribution']['female']['actual']}")
+    male_val = validation['sex_distribution']['male']
+    female_val = validation['sex_distribution']['female']
+    print(f"    Males - Expected: {male_val['expected']}, Actual: {male_val['actual']} "
+          f"(diff: {male_val['rel_diff']*100:.1f}%, within tolerance: {male_val['within_tolerance']})")
+    print(f"    Females - Expected: {female_val['expected']}, Actual: {female_val['actual']} "
+          f"(diff: {female_val['rel_diff']*100:.1f}%, within tolerance: {female_val['within_tolerance']})")
+    print()
+    
+    # Check age-sex groups
+    age_groups_ok = sum(1 for ag in validation['age_sex_distribution'] 
+                       if ag['male']['within_tolerance'] and ag['female']['within_tolerance'])
+    print(f"  Age-sex groups within tolerance: {age_groups_ok}/{len(validation['age_sex_distribution'])}")
+    if age_groups_ok < len(validation['age_sex_distribution']):
+        print(f"  Note: With '{method}' method, some age-sex groups may not match exactly")
     print()
     
     # Plot population pyramid
     print("Generating population pyramid...")
     plot_population_pyramid(sim, demo_data, filename='population_pyramid.png')
     
-    print("\n" + "=" * 70)
+    print("\n" + "=" * 80)
     print("Demonstration complete!")
-    print("=" * 70)
+    print()
+    print("Key takeaways:")
+    print("  1. Use method='exact' for precise age-sex distribution matching")
+    print("  2. Use method='starsim' for native Starsim age_data distribution sampling")
+    print("  3. Starsim 3.0+ People() accepts age_data parameter for demographic structure")
+    print("=" * 80)
     
     return sim, demo_data, validation
 
