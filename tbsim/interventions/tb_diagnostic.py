@@ -1,7 +1,6 @@
 import numpy as np
 import starsim as ss
 from tbsim import TBS
-from .interventions_eh import TBDiagnosticErrors
 
 __all__ = ['TBDiagnostic', 'EnhancedTBDiagnostic']
 
@@ -206,26 +205,7 @@ class TBDiagnostic(ss.Intervention):
         ppl = sim.people
         tb = sim.diseases.tb
 
-        # # Error handling: Check required simulation components
-        # assert hasattr(ppl, 'sought_care'), TBDiagnosticErrors.SOUGHT_CARE_MISSING
-        # assert hasattr(ppl, 'diagnosed'), TBDiagnosticErrors.DIAGNOSED_MISSING
-        # assert hasattr(ppl, 'alive'), TBDiagnosticErrors.ALIVE_MISSING
-        # assert hasattr(ppl, 'tested'), TBDiagnosticErrors.TESTED_MISSING
-        # assert hasattr(ppl, 'n_times_tested'), TBDiagnosticErrors.N_TIMES_TESTED_MISSING
-        # assert hasattr(ppl, 'test_result'), TBDiagnosticErrors.TEST_RESULT_MISSING
-        # assert hasattr(ppl, 'care_seeking_multiplier'), TBDiagnosticErrors.CARE_SEEKING_MULTIPLIER_MISSING
-        # assert hasattr(ppl, 'multiplier_applied'), TBDiagnosticErrors.MULTIPLIER_APPLIED_MISSING
 
-        # # Error handling: Check TB disease module
-        # assert hasattr(sim, 'diseases'), TBDiagnosticErrors.DISEASES_MISSING
-        # assert hasattr(sim.diseases, 'tb'), TBDiagnosticErrors.TB_DISEASE_MISSING
-        # assert hasattr(tb, 'state'), TBDiagnosticErrors.TB_STATE_MISSING
-
-        # # Error handling: Check parameter validity
-        # assert 0.0 <= self.pars.coverage <= 1.0, TBDiagnosticErrors.coverage_invalid(self.pars.coverage)
-        # assert 0.0 <= self.pars.sensitivity <= 1.0, TBDiagnosticErrors.sensitivity_invalid(self.pars.sensitivity)
-        # assert 0.0 <= self.pars.specificity <= 1.0, TBDiagnosticErrors.specificity_invalid(self.pars.specificity)
-        # assert self.pars.care_seeking_multiplier >= 1.0, TBDiagnosticErrors.care_seeking_multiplier_invalid(self.pars.care_seeking_multiplier)
 
         # Find people who sought care but haven't been tested
         # eligible = ppl.sought_care & (~ppl.tested) & ppl.alive
@@ -235,11 +215,14 @@ class TBDiagnostic(ss.Intervention):
             return
 
         # Apply coverage filter to determine who actually gets tested
-        if isinstance(self.pars.coverage, ss.Dist):
-            selected = self.pars.coverage.filter(uids)
-        else:
-            # Use starsim bernoulli distribution for coverage selection
-            selected = ss.bernoulli(self.pars.coverage, strict=False).filter(uids)
+        try:
+            if isinstance(self.pars.coverage, ss.Dist):
+                selected = self.pars.coverage.filter(uids)
+            else:
+                selected = ss.bernoulli(self.pars.coverage, strict=False).filter(uids)
+        except Exception as e:
+            raise ValueError(f"Failed to apply coverage filter (coverage={self.pars.coverage}): {e}")
+        
         if len(selected) == 0:
             return
 
@@ -257,25 +240,15 @@ class TBDiagnostic(ss.Intervention):
         # Handle true TB cases with sensitivity
         tb_cases = selected[has_tb]
         if len(tb_cases) > 0:
-            try:
-                tb_test_positive = ss.bernoulli(self.pars.sensitivity, strict=False).filter(tb_cases)
-                test_positive[has_tb] = np.isin(selected[has_tb], tb_test_positive)
-            except Exception as e:
-                raise AssertionError(TBDiagnosticErrors.sensitivity_test_failed(e, self.pars.sensitivity))
+            tb_test_positive = ss.bernoulli(self.pars.sensitivity, strict=False).filter(tb_cases)
+            test_positive[has_tb] = np.isin(selected[has_tb], tb_test_positive)
         
         # Handle non-TB cases with specificity (test positive with prob = 1-specificity)
         non_tb_cases = selected[~has_tb]
         if len(non_tb_cases) > 0:
-            try:
-                non_tb_test_positive = ss.bernoulli(1 - self.pars.specificity, strict=False).filter(non_tb_cases)
-                test_positive[~has_tb] = np.isin(selected[~has_tb], non_tb_test_positive)
-            except Exception as e:
-                raise AssertionError(TBDiagnosticErrors.specificity_test_failed(e, self.pars.specificity))
+            non_tb_test_positive = ss.bernoulli(1 - self.pars.specificity, strict=False).filter(non_tb_cases)
+            test_positive[~has_tb] = np.isin(selected[~has_tb], non_tb_test_positive)
         
-        # Error handling: Check test result validity
-        assert len(test_positive) == len(selected), TBDiagnosticErrors.test_result_length_mismatch(len(selected), len(test_positive))
-        assert test_positive.dtype == bool, TBDiagnosticErrors.test_result_wrong_type(test_positive.dtype)
-
         # Update person state
         ppl.tested[selected] = True
         ppl.n_times_tested[selected] += 1
@@ -292,12 +265,6 @@ class TBDiagnostic(ss.Intervention):
         if len(false_negative_uids):
             # print(f"[t={self.sim.ti}] {len(false_negative_uids)} false negatives → retry scheduled")
             pass
-
-        # # Enable retry: reset care flag and allow re-test
-        # ppl.sought_care[false_negative_uids] = False
-        # ppl.tested[false_negative_uids] = False
-        # mult = self.pars.care_seeking_multiplier
-        # ppl.care_seeking_multiplier[false_negative_uids] *= mult
 
         # Filter only those who haven't had multiplier applied yet
         unboosted = false_negative_uids[~ppl.multiplier_applied[false_negative_uids]]
@@ -419,28 +386,41 @@ class TBDiagnostic(ss.Intervention):
 
 class EnhancedTBDiagnostic(ss.Intervention):
     """
-    Enhanced TB diagnostic intervention that combines detailed parameter stratification
-    from interventions_updated.py with health-seeking integration from tb_diagnostic.py.
+    Enhanced TB diagnostic intervention with stratified diagnostic parameters.
     
-    This intervention provides:
+    This intervention provides age, TB state, and HIV-stratified sensitivity/specificity
+    parameters for multiple diagnostic methods, integrated with health-seeking behavior.
+    
+    Features:
     1. Age and TB state-specific sensitivity/specificity parameters
     2. HIV-stratified parameters for LAM testing
     3. Integration with health-seeking behavior
     4. False negative handling with care-seeking multipliers
     5. Comprehensive result tracking
+    
+    Diagnostic Methods:
+    - Xpert MTB/RIF: Primary molecular diagnostic test
+    - Oral Swab: Non-sputum based testing (optional)
+    - FujiLAM: Urine-based test for HIV-positive individuals (optional)
+    - CAD CXR: Computer-aided chest X-ray for pediatric cases (optional)
+    
+    Note: Diagnostic performance parameters are based on published literature values
+    for each test method. Parameters can be customized via the pars argument.
     """
     
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         
-        # Define comprehensive parameters combining both approaches
+        # Define comprehensive parameters
         self.define_pars(
-            # Coverage and basic parameters (from tb_diagnostic.py)
+            # Coverage and basic parameters
             coverage=1.0,
             reset_flag=False,
             care_seeking_multiplier=1.0,
             
-            # Xpert baseline parameters (from interventions_updated.py)
+            # Xpert MTB/RIF baseline parameters
+            # Values based on published literature for Xpert MTB/RIF Ultra diagnostic test
+            # Source: See Papers - Parameters folder in tb_peds repository for original references
             sensitivity_adult_smearpos=0.909,
             specificity_adult_smearpos=0.966,
             sensitivity_adult_smearneg=0.775,
@@ -450,7 +430,12 @@ class EnhancedTBDiagnostic(ss.Intervention):
             sensitivity_child=0.73,
             specificity_child=0.95,
             
-            # Oral swab parameters (optional)
+            # Oral swab parameters (optional, literature-based)
+            # Values: Adult smear-pos: sens 66-92%, spec 66-100% (using 80%, 90%)
+            #         Adult smear-neg: sens 30% (95% CI: 11-59), spec 98% (95% CI: 88-100)
+            #         Children: sens 8-42% (using 25%), spec 93-100% (using 95%)
+            # Source: See Papers - Parameters folder in tb_peds repository for original references
+            #         Based on interventions_updated.py comments
             use_oral_swab=False,
             sens_adult_smearpos_oral=0.80,
             spec_adult_smearpos_oral=0.90,
@@ -459,7 +444,14 @@ class EnhancedTBDiagnostic(ss.Intervention):
             sens_child_oral=0.25,
             spec_child_oral=0.95,
             
-            # FujiLAM parameters (optional)
+            # FujiLAM parameters (optional, literature-based)
+            # Values: HIV+ adults (TB): sens 75% (95% CI: 72-79), spec 90% (95% CI: 88-82)
+            #         HIV+ adults (EPTB): sens 75% (95% CI: 47.6-92.7), spec 73.9% (95% CI: 69.8-78.0)
+            #         HIV- adults: sens 58% (95% CI: 51-66), spec 98% (95% CI: 97-99)
+            #         HIV+ children: sens 57.9% (95% CI: 48.4-67.3), spec 87.7% (95% CI: 75.3-100)
+            #         HIV- children: sens 51% (95% CI: 27.5-74.5), spec 89.5% (95% CI: 84.7-94.2)
+            # Source: See Papers - Parameters folder in tb_peds repository for original references
+            #         Based on interventions_updated.py comments
             use_fujilam=False,
             sens_hivpos_adult_tb=0.75,
             spec_hivpos_adult_tb=0.90,
@@ -472,7 +464,11 @@ class EnhancedTBDiagnostic(ss.Intervention):
             sens_hivneg_child=0.51,
             spec_hivneg_child=0.895,
             
-            # CAD CXR parameters (optional)
+            # CAD CXR parameters (optional, literature-based)
+            # Values: Children: sens 66%, spec 79%
+            # Note: Applied to children only (not EPTB)
+            # Source: See Papers - Parameters folder in tb_peds repository for original references
+            #         Based on interventions_updated.py comments
             use_cadcxr=False,
             cad_cxr_sensitivity=0.66,
             cad_cxr_specificity=0.79,
