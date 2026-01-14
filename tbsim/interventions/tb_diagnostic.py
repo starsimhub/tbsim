@@ -215,13 +215,12 @@ class TBDiagnostic(ss.Intervention):
             return
 
         # Apply coverage filter to determine who actually gets tested
-        try:
-            if isinstance(self.pars.coverage, ss.Dist):
-                selected = self.pars.coverage.filter(uids)
-            else:
-                selected = ss.bernoulli(self.pars.coverage, strict=False).filter(uids)
-        except Exception as e:
-            raise ValueError(f"Failed to apply coverage filter (coverage={self.pars.coverage}): {e}")
+        selected = [] # reset to empty list
+        if isinstance(self.pars.coverage, ss.Dist):
+            selected = self.pars.coverage.filter(uids)
+        else:
+            selected = ss.bernoulli(self.pars.coverage, strict=False).filter(uids)
+
         
         if len(selected) == 0:
             return
