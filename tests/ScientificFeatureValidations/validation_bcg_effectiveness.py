@@ -319,10 +319,16 @@ def main():
     bcg_sim = bcg_results['sim']
     bcg_intervention = bcg_sim.interventions['bcgprotection']
     final_vaccinated = bcg_intervention.is_bcg_vaccinated.sum()
-    final_protected = bcg_intervention.is_protected(
-        bcg_intervention.is_bcg_vaccinated.uids, 
-        bcg_sim.ti
-    ).sum()
+    # Check how many ever had protection (responders), not just currently protected
+    # (protection expires after immunity_period, so at end of 25-year sim, all may be expired)
+    vaccinated_uids = bcg_intervention.is_bcg_vaccinated.uids
+    if len(vaccinated_uids) > 0:
+        expires = np.array(bcg_intervention.ti_bcg_protection_expires[vaccinated_uids])
+        ever_protected = (~np.isnan(expires)).sum()  # Count responders (ever had protection)
+        final_protected = bcg_intervention.is_protected(vaccinated_uids, bcg_sim.ti).sum()  # Currently protected
+    else:
+        ever_protected = 0
+        final_protected = 0
     
     baseline_final_prev = baseline['prevalence'][-1] if len(baseline['prevalence']) > 0 else 0
     bcg_final_prev = bcg_results['prevalence'][-1] if len(bcg_results['prevalence']) > 0 else 0
@@ -342,7 +348,7 @@ def main():
     
     # Print summary
     print('\n=== METRICS ===')
-    print(f'BCG Coverage: {bcg_results["coverage"]:.1%} ({final_vaccinated} vaccinated, {final_protected} protected)')
+    print(f'BCG Coverage: {bcg_results["coverage"]:.1%} ({final_vaccinated} vaccinated, {ever_protected} responders, {final_protected} currently protected)')
     print(f'Prevalence Reduction: {prev_reduction:.1f}% (Baseline: {baseline_final_prev*100:.1f}% → BCG: {bcg_final_prev*100:.1f}%)')
     print(f'Incidence Reduction: {incidence_reduction:.1f}%')
     print(f'Vaccine Effectiveness: {bcg_results["effectiveness"]:.1%}')

@@ -27,7 +27,9 @@ def test_bcg_intervention_default_values():
         assert '0.5' in str(bcg.pars.coverage) or '0.50' in str(bcg.pars.coverage), "Default coverage should be 0.5"
     else:
         assert bcg.pars.coverage == 0.5, "Default coverage should be 0.5"
-    assert bcg.pars.efficacy == 0.8, "Default efficacy should be 0.8"
+    # Check efficacy value (now a distribution)
+    assert isinstance(bcg.pars.efficacy, ss.Dist), "Efficacy should be a distribution"
+    assert abs(bcg.pars.efficacy.pars['p'] - 0.8) < 0.01, "Default efficacy should be 0.8"
     assert bcg.pars.start == ss.date('1900-01-01'), "Default start year should be 1900-01-01 with type ss.date"
     assert bcg.pars.stop == ss.date('2100-12-31'), "Default stop year should be 2100-12-31 with type ss.date"
     # Check that immunity_period is approximately 10 years (in timesteps)
@@ -60,7 +62,9 @@ def test_bcg_intervention_custom_values():
         assert '0.75' in str(bcg.pars.coverage), "Custom coverage should be 0.75"
     else:
         assert bcg.pars.coverage == 0.75, "Custom coverage should be 0.75"
-    assert bcg.pars.efficacy == 0.9, "Custom efficacy should be 0.9"
+    # Check efficacy value (now a distribution)
+    assert isinstance(bcg.pars.efficacy, ss.Dist), "Efficacy should be a distribution"
+    assert abs(bcg.pars.efficacy.pars['p'] - 0.9) < 0.01, "Custom efficacy should be 0.9"
     assert bcg.pars.start == ss.date('2000-01-01'), "Custom start year should be 2000-01-01 with type ss.date"
     assert bcg.pars.stop == ss.date('2015-01-01'), "Custom stop year should be 2015-01-01 with type ss.date"
     # Check that immunity_period is approximately 15 years (in timesteps)
@@ -172,20 +176,24 @@ def test_bcg_improves_tb_outcomes():
     sim.run()
     bcg = sim.interventions['bcgprotection']
     
-    # Check if TB outcomes have improved for vaccinated individuals
-    tb = sim.diseases.tb
-    current_activation = np.array(tb.rr_activation)
-    current_clearance = np.array(tb.rr_clearance)
-    current_death = np.array(tb.rr_death)
-    
     # Check that some individuals are vaccinated
     vaccinated = bcg.is_bcg_vaccinated
     if np.any(vaccinated):
         vaccinated_uids = np.where(vaccinated)[0]
-        # For vaccinated individuals, BCG should improve outcomes
-        assert np.any(current_activation[vaccinated_uids] < initial_rr_activation[vaccinated_uids]), "BCG should reduce activation risk for vaccinated"
-        assert np.any(current_clearance[vaccinated_uids] > initial_rr_clearance[vaccinated_uids]), "BCG should improve clearance rate for vaccinated"
-        assert np.any(current_death[vaccinated_uids] < initial_rr_death[vaccinated_uids]), "BCG should reduce death risk for vaccinated"
+        # Check stored BCG modifiers (TB resets modifiers at end of each timestep)
+        # These modifiers show what BCG applied during the simulation
+        stored_activation = np.array(bcg.bcg_activation_modifier_applied[vaccinated_uids])
+        stored_clearance = np.array(bcg.bcg_clearance_modifier_applied[vaccinated_uids])
+        stored_death = np.array(bcg.bcg_death_modifier_applied[vaccinated_uids])
+        
+        # Get valid modifiers (non-NaN) - these are the vaccine responders
+        valid_mask = ~np.isnan(stored_activation)
+        if np.any(valid_mask):
+            valid_uids = vaccinated_uids[valid_mask]
+            # For vaccine responders, BCG should improve outcomes
+            assert np.all(stored_activation[valid_mask] < 1.0), "BCG should reduce activation risk (modifier < 1.0)"
+            assert np.all(stored_clearance[valid_mask] > 1.0), "BCG should improve clearance rate (modifier > 1.0)"
+            assert np.all(stored_death[valid_mask] < 1.0), "BCG should reduce death risk (modifier < 1.0)"
 
 def test_bcg_age_at_vaccination_calculation():
     """Test that age at vaccination is properly calculated in results using a real simulation"""
