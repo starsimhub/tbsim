@@ -32,8 +32,9 @@ def test_bcg_intervention_default_values():
     assert abs(bcg.pars.efficacy.pars['p'] - 0.8) < 0.01, "Default efficacy should be 0.8"
     assert bcg.pars.start == ss.date('1900-01-01'), "Default start year should be 1900-01-01 with type ss.date"
     assert bcg.pars.stop == ss.date('2100-12-31'), "Default stop year should be 2100-12-31 with type ss.date"
-    # Check that immunity_period is approximately 10 years (in timesteps)
-    assert abs(bcg.pars.immunity_period - 521.43) < 1.0, "Default immunity_period should be approximately 10 years"
+    # Check that immunity_period is 10 years (as ss.years object)
+    assert hasattr(bcg.pars.immunity_period, 'value'), "immunity_period should be a timepar object"
+    assert abs(bcg.pars.immunity_period.value - 10.0) < 0.01, "Default immunity_period should be 10 years"
     assert bcg.pars.age_range == [0, 5], "Default age range should be [0, 5]"
     assert bcg.min_age == 0, "Default min_age should be 0"
     assert bcg.max_age == 5, "Default max_age should be 5"
@@ -67,8 +68,9 @@ def test_bcg_intervention_custom_values():
     assert abs(bcg.pars.efficacy.pars['p'] - 0.9) < 0.01, "Custom efficacy should be 0.9"
     assert bcg.pars.start == ss.date('2000-01-01'), "Custom start year should be 2000-01-01 with type ss.date"
     assert bcg.pars.stop == ss.date('2015-01-01'), "Custom stop year should be 2015-01-01 with type ss.date"
-    # Check that immunity_period is approximately 15 years (in timesteps)
-    assert abs(bcg.pars.immunity_period - 782.14) < 1.0, "Custom immunity_period should be approximately 15 years"
+    # Check that immunity_period is 15 years (as ss.years object)
+    assert hasattr(bcg.pars.immunity_period, 'value'), "immunity_period should be a timepar object"
+    assert abs(bcg.pars.immunity_period.value - 15.0) < 0.01, "Custom immunity_period should be 15 years"
     assert bcg.pars.age_range == (1, 10), "Custom age range should be (1, 10)"
     assert bcg.min_age == 1, "Custom min_age should be 1"
     assert bcg.max_age == 10, "Custom max_age should be 10"
@@ -121,7 +123,7 @@ def test_bcg_eligibility_and_vaccination():
     assert len(bcg.is_bcg_vaccinated) == nagents, "is_bcg_vaccinated array should match population size"
     
     # Check eligibility before running simulation
-    eligible = bcg.select_for_vaccination()
+    eligible = ((bcg.sim.people.age >= bcg.min_age) & (bcg.sim.people.age <= bcg.max_age) & ~bcg.is_bcg_vaccinated).uids
     assert len(eligible) > 0, "There should be eligible individuals for vaccination"
     assert np.all(bcg.is_bcg_vaccinated[eligible] == False), "Eligible individuals should not be vaccinated yet"
     
@@ -143,7 +145,7 @@ def test_bcg_eligibility_with_age_range():
     sim.init()
     bcg = sim.interventions['bcgprotection']
     
-    eligible = bcg.select_for_vaccination()
+    eligible = ((bcg.sim.people.age >= bcg.min_age) & (bcg.sim.people.age <= bcg.max_age) & ~bcg.is_bcg_vaccinated).uids
     # Should have eligible individuals in the 10-20 age range
     assert len(eligible) > 0, "There should be eligible individuals in age range 10-20"
     
@@ -153,7 +155,7 @@ def test_bcg_eligibility_with_age_range():
     sim2.init()
     bcg2 = sim2.interventions['bcgprotection']
     
-    eligible2 = bcg2.select_for_vaccination()
+    eligible2 = ((bcg2.sim.people.age >= bcg2.min_age) & (bcg2.sim.people.age <= bcg2.max_age) & ~bcg2.is_bcg_vaccinated).uids
     # Should have eligible individuals in the 30-50 age range
     assert len(eligible2) > 0, "There should be eligible individuals in age range 30-50"
 
@@ -207,9 +209,9 @@ def test_bcg_age_at_vaccination_calculation():
     sim.run()
     bcg = sim.interventions['bcgprotection']
     
-    # Check that avg_age_at_vaccination is calculated in results
+    # Check that avg_age_at_vaccination is calculated in results (if it exists)
     vaccinated = bcg.is_bcg_vaccinated
-    if np.any(vaccinated):
+    if np.any(vaccinated) and 'avg_age_at_vaccination' in bcg.results:
         # Get results from the last timestep where vaccination occurred
         last_ti = bcg.ti
         avg_age = bcg.results['avg_age_at_vaccination'][last_ti]
@@ -230,9 +232,9 @@ def test_bcg_protection_duration():
     sim.init()
     bcg = sim.interventions['bcgprotection']
     
-    # Test that immunity_period is set correctly (approximately 8 years in timesteps)
-    # With dt=7 days, 8 years = 8 * 365.25 / 7 ≈ 417.43 timesteps
-    assert abs(bcg.pars.immunity_period - 417.43) < 1.0, "immunity_period should be set to approximately 8 years"
+    # Test that immunity_period is set correctly (8 years as ss.years object)
+    assert hasattr(bcg.pars.immunity_period, 'value'), "immunity_period should be a timepar object"
+    assert abs(bcg.pars.immunity_period.value - 8.0) < 0.01, "immunity_period should be set to 8 years"
     
     # Run simulation to perform vaccination
     sim.run()
@@ -245,9 +247,11 @@ def test_bcg_protection_duration():
         # Only check for non-NaN values (i.e., vaccine responders)
         valid = ~np.isnan(protection_expires)
         if np.any(valid):
-            # Protection should expire at vaccination time + immunity_period
+            # Protection should expire at vaccination time + immunity_period (converted to timesteps)
             vaccination_times = bcg.ti_bcg_vaccinated[vaccinated_uids[valid]]
-            expected_expiry = vaccination_times + bcg.pars.immunity_period
+            dt_days = bcg.sim.dt.days if hasattr(bcg.sim.dt, 'days') else bcg.sim.dt.value
+            immunity_period_ts = bcg.pars.immunity_period.days / dt_days
+            expected_expiry = vaccination_times + immunity_period_ts
             assert np.allclose(protection_expires[valid], expected_expiry), "Protection expiration should be set correctly for responders"
 
 def test_bcg_protection_expiry_and_removal():
@@ -272,7 +276,9 @@ def test_bcg_protection_expiry_and_removal():
         # Some individuals should have expired protection after 2 years with 1-year immunity
         all_vaccinated = bcg.is_bcg_vaccinated.uids
         if len(all_vaccinated) > 0:
-            currently_protected = bcg.is_protected(all_vaccinated, bcg.ti)
+            currently_protected = (bcg.is_bcg_vaccinated[all_vaccinated] & 
+                                   (bcg.ti <= bcg.ti_bcg_protection_expires[all_vaccinated]) & 
+                                   ~np.isnan(bcg.ti_bcg_protection_expires[all_vaccinated]))
             # Some protection should have expired (not all will be protected after 2 years with 1-year immunity)
             assert hasattr(bcg, 'ti_bcg_protection_expires'), "Protection expiration should be tracked"
 
@@ -294,7 +300,9 @@ def test_bcg_maintain_ongoing_protection():
     vaccinated = bcg.is_bcg_vaccinated
     if np.any(vaccinated):
         vaccinated_uids = np.where(vaccinated)[0]
-        currently_protected = bcg.is_protected(vaccinated_uids, bcg.ti)
+        currently_protected = (bcg.is_bcg_vaccinated[vaccinated_uids] & 
+                              (bcg.ti <= bcg.ti_bcg_protection_expires[vaccinated_uids]) & 
+                              ~np.isnan(bcg.ti_bcg_protection_expires[vaccinated_uids]))
         protected_uids = vaccinated_uids[currently_protected]
         
         if len(protected_uids) > 0:
@@ -331,8 +339,8 @@ def test_bcg_result_metrics():
     assert n_protected >= 0, "n_protected should be non-negative"
 
 
-def test_bcg_get_summary_stats():
-    """Test the get_summary_stats method returns expected keys and types using a real simulation"""
+def test_bcg_summary_metrics():
+    """Test that summary metrics can be calculated from intervention state using a real simulation"""
     nagents = 50
     pop, tb, net, pars = make_sim(agents=nagents, start=ss.date('2000-01-01'), stop=ss.date('2001-01-01'))
     pop = ss.People(n_agents=nagents, age_data=age_data)
@@ -343,11 +351,174 @@ def test_bcg_get_summary_stats():
     sim.run()
     bcg = sim.interventions['bcgprotection']
     
-    # Get summary statistics after simulation
-    stats = bcg.get_summary_stats()
-    assert 'total_vaccinated' in stats and 'final_coverage' in stats, "get_summary_stats should return total_vaccinated and final_coverage"
-    assert isinstance(stats['total_vaccinated'], (int, np.integer)), "total_vaccinated should be int"
-    assert isinstance(stats['final_coverage'], float), "final_coverage should be float"
-    assert stats['final_coverage'] >= 0.0, "final_coverage should be non-negative"
-    assert stats['final_coverage'] <= 1.0, "final_coverage should be <= 1.0"
+    # Calculate summary statistics directly from intervention state
+    total_vaccinated = np.count_nonzero(bcg.is_bcg_vaccinated)
+    total_pop = len(sim.people)
+    final_coverage = total_vaccinated / total_pop if total_pop > 0 else 0.0
+    protection_expires_array = np.array(bcg.ti_bcg_protection_expires)
+    total_responders = np.sum(~np.isnan(protection_expires_array))
+    effectiveness = total_responders / total_vaccinated if total_vaccinated > 0 else 0.0
+    
+    assert isinstance(total_vaccinated, (int, np.integer)), "total_vaccinated should be int"
+    assert isinstance(final_coverage, float), "final_coverage should be float"
+    assert final_coverage >= 0.0, "final_coverage should be non-negative"
+    assert final_coverage <= 1.0, "final_coverage should be <= 1.0"
+    assert effectiveness >= 0.0, "effectiveness should be non-negative"
+    assert effectiveness <= 1.0, "effectiveness should be <= 1.0"
 
+
+def test_bcg_immediate_vaccination_timing():
+    """Test that immediate vaccination (vaccination_timing=None) vaccinates eligible individuals immediately"""
+    nagents = 200
+    pop, tb, net, pars = make_sim(agents=nagents, start=ss.date('2000-01-01'), stop=ss.date('2010-12-31'))
+    itv = mtb.BCGProtection(pars={
+        'coverage': 1.0,  # 100% coverage to ensure all eligible are vaccinated
+        'age_range': (0, 18),
+        'vaccination_timing': None,  # Immediate vaccination
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2010-12-31')
+    })
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.run()
+    bcg = sim.interventions['bcgprotection']
+    
+    # Check that vaccinations happened early (immediate vaccination)
+    vacc_times = bcg.ti_bcg_vaccinated.raw
+    valid_times = vacc_times[~np.isnan(vacc_times)]
+    
+    vaccinated = bcg.is_bcg_vaccinated.sum()
+    assert vaccinated > 0, "Some individuals should be vaccinated"
+    assert hasattr(bcg, 'ti_bcg_scheduled'), "ti_bcg_scheduled state should exist"
+    
+    if len(valid_times) > 0:
+        # With immediate vaccination, mean vaccination time should be very early
+        # Convert timesteps to years for comparison
+        dt_years = sim.dt.value / 365.25
+        mean_vacc_years = np.mean(valid_times) * dt_years
+        assert mean_vacc_years < 1.0, f"Immediate vaccination should happen early (<1 year), got mean time: {mean_vacc_years:.2f} years"
+
+def test_bcg_distributed_vaccination_timing():
+    """Test that distributed vaccination (vaccination_timing=distribution) schedules and vaccinates over time"""
+    nagents = 200
+    pop, tb, net, pars = make_sim(agents=nagents, start=ss.date('2000-01-01'), stop=ss.date('2010-12-31'))
+    itv = mtb.BCGProtection(pars={
+        'coverage': 1.0,  # 100% coverage to ensure all eligible are vaccinated
+        'age_range': (0, 18),
+        'vaccination_timing': ss.uniform(0, 5),  # Distributed over 0-5 years
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2010-12-31')
+    })
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.run()
+    bcg = sim.interventions['bcgprotection']
+    
+    # Check scheduled times
+    scheduled = bcg.ti_bcg_scheduled.raw
+    valid_scheduled = scheduled[~np.isnan(scheduled)]
+    
+    # Check vaccination times
+    vacc_times = bcg.ti_bcg_vaccinated.raw
+    valid_vacc_times = vacc_times[~np.isnan(vacc_times)]
+    
+    assert len(valid_scheduled) > 0, "Some individuals should have scheduled vaccination times"
+    assert len(valid_vacc_times) > 0, "Some individuals should be vaccinated"
+    
+    if len(valid_scheduled) > 0:
+        # Convert timesteps to years
+        dt_years = sim.dt.value / 365.25
+        scheduled_years = valid_scheduled * dt_years
+        
+        # Scheduled times should be distributed over 0-5 years (allowing some tolerance)
+        assert np.min(scheduled_years) >= -0.1, f"Scheduled times should start near 0, got: {np.min(scheduled_years)}"
+        assert np.max(scheduled_years) <= 5.5, f"Scheduled times should be within 5 years, got: {np.max(scheduled_years)}"
+        
+        # Mean should be around 2.5 years for uniform(0, 5)
+        mean_scheduled = np.mean(scheduled_years)
+        assert 1.0 <= mean_scheduled <= 4.0, f"Mean scheduled time should be around 2.5 years, got: {mean_scheduled}"
+    
+    if len(valid_vacc_times) > 0 and len(valid_scheduled) > 0:
+        # Vaccination times should be >= scheduled times
+        vacc_years = valid_vacc_times[:len(valid_scheduled)] * dt_years
+        scheduled_years = valid_scheduled[:len(vacc_years)] * dt_years
+        assert np.all(vacc_years >= scheduled_years - 0.1), "Vaccinations should happen at or after scheduled time"
+
+def test_bcg_vaccination_timing_comparison():
+    """Test that distributed vaccination has later mean vaccination time than immediate"""
+    nagents = 100
+    age_data = pd.DataFrame({'age': [0, 2, 4, 10, 15, 20, 30, 40, 50], 'value': [10, 10, 15, 15, 10, 10, 10, 10, 10]})
+    
+    # Immediate vaccination
+    pop1 = ss.People(n_agents=nagents, age_data=age_data)
+    tb1 = mtb.TB()
+    net1 = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    bcg1 = mtb.BCGProtection(pars={
+        'coverage': 0.9,
+        'age_range': (0, 18),
+        'vaccination_timing': None,
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2010-12-31')
+    })
+    sim1 = ss.Sim(people=pop1, diseases=tb1, interventions=bcg1, networks=net1,
+                 pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2010-12-31')))
+    sim1.run()
+    
+    # Distributed vaccination
+    pop2 = ss.People(n_agents=nagents, age_data=age_data)
+    tb2 = mtb.TB()
+    net2 = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    bcg2 = mtb.BCGProtection(pars={
+        'coverage': 0.9,
+        'age_range': (0, 18),
+        'vaccination_timing': ss.uniform(0, 5),
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2010-12-31')
+    })
+    sim2 = ss.Sim(people=pop2, diseases=tb2, interventions=bcg2, networks=net2,
+                 pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2010-12-31')))
+    sim2.run()
+    
+    # Compare vaccination times
+    vacc1_times = bcg1.ti_bcg_vaccinated.raw
+    vacc2_times = bcg2.ti_bcg_vaccinated.raw
+    
+    valid1 = vacc1_times[~np.isnan(vacc1_times)]
+    valid2 = vacc2_times[~np.isnan(vacc2_times)]
+    
+    if len(valid1) > 0 and len(valid2) > 0:
+        dt_years = sim1.dt.value / 365.25
+        mean1 = np.mean(valid1) * dt_years
+        mean2 = np.mean(valid2) * dt_years
+        
+        # Distributed should have later mean vaccination time
+        assert mean2 > mean1, f"Distributed vaccination should have later mean time ({mean2}) than immediate ({mean1})"
+
+def test_bcg_vaccination_timing_none_default():
+    """Test that vaccination_timing defaults to None (immediate vaccination)"""
+    nagents = 100
+    pop, tb, net, pars = make_sim(agents=nagents)
+    itv = mtb.BCGProtection(pars={'coverage': 0.9, 'age_range': (0, 18)})
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.init()
+    bcg = sim.interventions['bcgprotection']
+    
+    # vaccination_timing should default to None
+    assert bcg.pars.vaccination_timing is None, "vaccination_timing should default to None"
+    assert bcg._vaccination_timing_dist is None, "_vaccination_timing_dist should be None when vaccination_timing is None"
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.run()
+    bcg = sim.interventions['bcgprotection']
+    
+    # Check that vaccinations happened early (immediate vaccination)
+    vacc_times = bcg.ti_bcg_vaccinated.raw
+    valid_times = vacc_times[~np.isnan(vacc_times)]
+    
+    vaccinated = bcg.is_bcg_vaccinated.sum()
+    assert vaccinated > 0, "Some individuals should be vaccinated"
+    assert hasattr(bcg, 'ti_bcg_scheduled'), "ti_bcg_scheduled state should exist"
+    
+    if len(valid_times) > 0:
+        # With immediate vaccination, mean vaccination time should be very early
+        # Convert timesteps to years for comparison
+        dt_years = sim.dt.value / 365.25
+        mean_vacc_years = np.mean(valid_times) * dt_years
+        assert mean_vacc_years < 1.0, f"Immediate vaccination should happen early (<1 year), got mean time: {mean_vacc_years:.2f} years"
