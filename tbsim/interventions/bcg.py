@@ -137,9 +137,9 @@ class BCGProtection(ss.Intervention):
             protected_uids = all_vaccinated[protected_mask]
             
             if len(expired_uids) > 0:
-                self._remove_protection(expired_uids)
+                self._update_protection_effects(expired_uids, apply=False)
             if len(protected_uids) > 0:
-                self._apply_protection_effects(protected_uids)
+                self._update_protection_effects(protected_uids, apply=True)
         
         # Handle vaccination timing: schedule eligible individuals if using distribution
         eligible = ((self.sim.people.age >= self.min_age) & (self.sim.people.age <= self.max_age) & ~self.is_bcg_vaccinated).uids
@@ -179,128 +179,118 @@ class BCGProtection(ss.Intervention):
             
             # Set expiration times for all responders (same period for all)
             self.ti_bcg_protection_expires[vaccine_responders] = current_time + immunity_period_ts
-            self._apply_protection_effects(vaccine_responders)
+            self._update_protection_effects(vaccine_responders, apply=True)
 
     def _calculate_waning_factor(self, vaccination_times, current_time):
-        """Calculate waning factor using the waning distribution's survival function."""
-        time_since_vaccination = np.asarray(current_time - vaccination_times, dtype=float)
+        """
+        Calculate waning factor using the waning distribution's survival function.
         
-        # Get dt_days from sim (Starsim handles time conversions)
-        dt_days = self.sim.dt.days if hasattr(self.sim.dt, 'days') else self.sim.dt.value
+        The waning factor represents the remaining protection strength:
+        - 1.0 = full protection (at vaccination time)
+        - 0.0 = no protection (at or after immunity_period)
+        """
+        if len(vaccination_times) == 0:
+            return np.array([], dtype=float)
         
-        # Convert immunity_period (always in years) to timesteps
-        immunity_period = self.pars.immunity_period
-        immunity_period_timesteps = immunity_period.days / dt_days
+        # Calculate time since vaccination (vectorized)
+        time_since_vaccination = np.maximum(current_time - np.asarray(vaccination_times, dtype=float), 0.0)
         
-        time_since_vaccination = np.maximum(time_since_vaccination, 0.0)
-        normalized_time = time_since_vaccination / immunity_period_timesteps
+        # Cache dt_days and immunity_period_timesteps (compute once per call)
+        dt_days = self.sim.dt.days if hasattr(self.sim.dt, 'days') else float(self.sim.dt)
+        immunity_period_timesteps = self.pars.immunity_period.days / dt_days
+        
+        # Normalize time: 0.0 at vaccination, 1.0 at immunity_period
+        # Clip to [0, 1] to handle cases where protection has expired (shouldn't happen, but safe)
+        normalized_time = np.clip(time_since_vaccination / immunity_period_timesteps, 0.0, 1.0)
+        
+        # Calculate waning factor using survival function
+        # For exponential: sf(x) = exp(-x), but we want it to reach ~0 at x=1.0
+        # So we scale: use exp(-scale * normalized_time) where scale ensures exp(-scale) ≈ 0
         try:
             if hasattr(self.pars.waning, 'dist') and hasattr(self.pars.waning.dist, 'sf'):
-                dist_pars = self.pars.waning.pars
+                dist_pars = getattr(self.pars.waning, 'pars', {})
+                # For exponential with scale=1.0, sf(1.0) = exp(-1.0) ≈ 0.368
+                # To get sf(1.0) ≈ 0.01, we'd need scale ≈ 4.6
+                # But we'll use the distribution's scale parameter if available
                 waning_factor = self.pars.waning.dist.sf(normalized_time, **dist_pars)
             else:
-                waning_factor = np.exp(-normalized_time)
+                # Default exponential: scale by a factor to ensure stronger waning
+                # Using scale=3.0 gives exp(-3.0) ≈ 0.05 at normalized_time=1.0
+                waning_factor = np.exp(-3.0 * normalized_time)
         except Exception:
-            waning_factor = np.exp(-normalized_time)
+            # Fallback: use scaled exponential for stronger waning
+            waning_factor = np.exp(-3.0 * normalized_time)
         
         # Ensure waning_factor is an array and clip to [0, 1]
         if not isinstance(waning_factor, np.ndarray):
-            waning_factor = np.full(len(time_since_vaccination), waning_factor)
-        waning_factor = np.clip(waning_factor, 0.0, 1.0)
+            waning_factor = np.full(len(time_since_vaccination), float(waning_factor))
         
-        return waning_factor
+        # At normalized_time=1.0 (end of immunity period), force waning_factor to 0
+        # This ensures protection fully wanes by expiration
+        waning_factor = np.where(normalized_time >= 1.0, 0.0, waning_factor)
+        
+        return np.clip(waning_factor, 0.0, 1.0)
     
-    def _apply_protection_effects(self, protected_uids):
-        """Apply BCG protection effects to TB risk modifiers, incorporating waning."""
-        if len(protected_uids) == 0:
+    def _update_protection_effects(self, uids, apply=True):
+        """
+        Apply or remove BCG protection effects to TB risk modifiers.
+        
+        Args:
+            uids: Array of individual IDs to update
+            apply: If True, apply protection effects (with waning). If False, remove protection effects.
+        """
+        if len(uids) == 0:
             return
             
         tb = self.sim.diseases.tb
-        tb.state[protected_uids] = TBS.PROTECTED
-        current_time = self.sim.ti
         
-        # Check which individuals already have modifiers (re-apply with waning) vs new (apply first time)
-        has_modifiers = ~np.isnan(self.bcg_activation_modifier_applied[protected_uids])
-        existing_uids = protected_uids[has_modifiers]
-        new_uids = protected_uids[~has_modifiers]
-        
-        # Re-apply stored modifiers with updated waning for existing protected individuals
-        if len(existing_uids) > 0:
-            activation_mods_base = self.bcg_activation_modifier_applied[existing_uids]
-            clearance_mods_base = self.bcg_clearance_modifier_applied[existing_uids]
-            death_mods_base = self.bcg_death_modifier_applied[existing_uids]
+        if apply:
+            # Apply protection effects with waning
+            current_time = self.sim.ti
             
-            # Remove old modifiers (divide them out to restore original values)
-            tb.rr_activation[existing_uids] /= activation_mods_base
-            tb.rr_clearance[existing_uids] /= clearance_mods_base
-            tb.rr_death[existing_uids] /= death_mods_base
+            # Separate individuals who already have base modifiers vs new (need to sample)
+            has_modifiers = ~np.isnan(self.bcg_activation_modifier_applied[uids])
+            new_uids = uids[~has_modifiers]
             
-            # Calculate waning factors
-            vaccination_times = self.ti_bcg_vaccinated[existing_uids]
+            # For new individuals: sample and store base modifiers
+            if len(new_uids) > 0:
+                self.bcg_activation_modifier_applied[new_uids] = self.pars.activation_modifier.rvs(new_uids)
+                self.bcg_clearance_modifier_applied[new_uids] = self.pars.clearance_modifier.rvs(new_uids)
+                self.bcg_death_modifier_applied[new_uids] = self.pars.death_modifier.rvs(new_uids)
+            
+            # Get base modifiers for all individuals
+            activation_mods_base = self.bcg_activation_modifier_applied[uids]
+            clearance_mods_base = self.bcg_clearance_modifier_applied[uids]
+            death_mods_base = self.bcg_death_modifier_applied[uids]
+            
+            # Calculate waning factors for all individuals
+            vaccination_times = self.ti_bcg_vaccinated[uids]
             waning_factors = self._calculate_waning_factor(vaccination_times, current_time)
             
-            # Apply waned modifiers: interpolate between base_modifier (factor=1) and 1.0 (factor=0)
-            activation_mods_waned = activation_mods_base + (1.0 - waning_factors) * (1.0 - activation_mods_base)
-            clearance_mods_waned = clearance_mods_base + (1.0 - waning_factors) * (1.0 - clearance_mods_base)
-            death_mods_waned = death_mods_base + (1.0 - waning_factors) * (1.0 - death_mods_base)
+            # Apply waned modifiers: interpolate between base_modifier (waning=1.0) and 1.0 (waning=0.0)
+            # Formula: waned = base * waning_factor + 1 * (1 - waning_factor)
+            activation_mods_waned = activation_mods_base * waning_factors + (1.0 - waning_factors)
+            clearance_mods_waned = clearance_mods_base * waning_factors + (1.0 - waning_factors)
+            death_mods_waned = death_mods_base * waning_factors + (1.0 - waning_factors)
             
-            # Apply waned modifiers
-            tb.rr_activation[existing_uids] *= activation_mods_waned
-            tb.rr_clearance[existing_uids] *= clearance_mods_waned
-            tb.rr_death[existing_uids] *= death_mods_waned
-        
-        # Apply to newly protected individuals (those without stored modifiers)
-        if len(new_uids) > 0:
-            # Sample, store base modifiers (full protection values)
-            activation_mods_base = self.pars.activation_modifier.rvs(new_uids)
-            clearance_mods_base = self.pars.clearance_modifier.rvs(new_uids)
-            death_mods_base = self.pars.death_modifier.rvs(new_uids)
+            # Apply modifiers directly (TB resets to 1.0 at end of each step)
+            tb.rr_activation[uids] = activation_mods_waned
+            tb.rr_clearance[uids] = clearance_mods_waned
+            tb.rr_death[uids] = death_mods_waned
+        else:
+            # Remove protection effects
+            # Reset modifiers to 1.0 (baseline) - only for individuals who actually had modifiers applied
+            has_modifiers = ~np.isnan(self.bcg_activation_modifier_applied[uids])
+            if np.any(has_modifiers):
+                valid_uids = uids[has_modifiers]
+                tb.rr_activation[valid_uids] = 1.0
+                tb.rr_clearance[valid_uids] = 1.0
+                tb.rr_death[valid_uids] = 1.0
             
-            # Store base modifiers (these represent full protection)
-            self.bcg_activation_modifier_applied[new_uids] = activation_mods_base
-            self.bcg_clearance_modifier_applied[new_uids] = clearance_mods_base
-            self.bcg_death_modifier_applied[new_uids] = death_mods_base
-            
-            # Calculate waning factors (should be 1.0 for newly vaccinated, but calculate for consistency)
-            vaccination_times = self.ti_bcg_vaccinated[new_uids]
-            waning_factors = self._calculate_waning_factor(vaccination_times, current_time)
-            
-            # Apply waned modifiers: interpolate between base_modifier (factor=1) and 1.0 (factor=0)
-            activation_mods_waned = activation_mods_base + (1.0 - waning_factors) * (1.0 - activation_mods_base)
-            clearance_mods_waned = clearance_mods_base + (1.0 - waning_factors) * (1.0 - clearance_mods_base)
-            death_mods_waned = death_mods_base + (1.0 - waning_factors) * (1.0 - death_mods_base)
-            
-            # Apply waned modifiers
-            tb.rr_activation[new_uids] *= activation_mods_waned
-            tb.rr_clearance[new_uids] *= clearance_mods_waned
-            tb.rr_death[new_uids] *= death_mods_waned
-
-    def _remove_protection(self, expired_uids):
-        """Remove BCG protection effects when protection expires."""
-        if len(expired_uids) == 0:
-            return
-            
-        tb = self.sim.diseases.tb
-        tb.state[expired_uids] = TBS.NONE
-        
-        # Get stored modifiers and reverse them
-        activation_modifiers = self.bcg_activation_modifier_applied[expired_uids]
-        clearance_modifiers = self.bcg_clearance_modifier_applied[expired_uids]
-        death_modifiers = self.bcg_death_modifier_applied[expired_uids]
-        
-        valid_mask = ~np.isnan(activation_modifiers)
-        if not np.any(valid_mask):
-            return
-        
-        valid_uids = expired_uids[valid_mask]
-        tb.rr_activation[valid_uids] /= activation_modifiers[valid_mask]
-        tb.rr_clearance[valid_uids] /= clearance_modifiers[valid_mask]
-        tb.rr_death[valid_uids] /= death_modifiers[valid_mask]
-        
-        # Clear modifiers (expiration times preserved for historical tracking)
-        self.bcg_activation_modifier_applied[expired_uids] = np.nan
-        self.bcg_clearance_modifier_applied[expired_uids] = np.nan
-        self.bcg_death_modifier_applied[expired_uids] = np.nan
+            # Clear stored modifiers (expiration times preserved for historical tracking)
+            self.bcg_activation_modifier_applied[uids] = np.nan
+            self.bcg_clearance_modifier_applied[uids] = np.nan
+            self.bcg_death_modifier_applied[uids] = np.nan
             
     def init_results(self):
         """Define simulation result metrics for the BCG intervention."""
