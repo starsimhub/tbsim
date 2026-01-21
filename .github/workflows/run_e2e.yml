@@ -8,7 +8,7 @@ on:
         required: true
         default: 'main' # Set a default branch
       run_additional_scripts:
-        description: 'Run scripts i.e. scripts/general/run_scenarios.py'
+        description: 'Full path to script to run (e.g., scripts/basic/run_tb.py)'
         required: false
         default: 'None'
         type: string
@@ -17,14 +17,6 @@ on:
         required: true
         default: false
         type: boolean
-
-  pull_request: 
-    branches:
-      - main
-  push:
-    paths:
-      - '**.yml'
-      - '**.py'
 jobs:
   run-tests:
     runs-on: ubuntu-latest
@@ -69,8 +61,20 @@ jobs:
     - name: Run requested script
       if: ${{ github.event.inputs.run_additional_scripts != 'None' }}
       run: |
-        echo Starting requested script: ${{ github.event.inputs.run_additional_scripts }}....
-        python ${{ github.event.inputs.run_additional_scripts }}
+        SCRIPT_PATH="${{ github.event.inputs.run_additional_scripts }}"
+        echo "Starting requested script: $SCRIPT_PATH"
+        
+        # Check if script exists
+        if [ ! -f "$SCRIPT_PATH" ]; then
+          echo "Error: Script not found at path: $SCRIPT_PATH"
+          echo "Current directory: $(pwd)"
+          echo "Available files:"
+          ls -la
+          exit 1
+        fi
+        
+        # Run the script
+        python "$SCRIPT_PATH"
 
     # Step 3.2 Run basic scripts
     - name: Run scripts to validate simulations with Malnutrition and TB
