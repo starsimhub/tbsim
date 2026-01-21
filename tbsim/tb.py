@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from enum import IntEnum
+from abc import ABC, abstractmethod
 
-__all__ = ['TB', 'TBS']
+__all__ = ['BaseTB', 'TB', 'TBS', 'TBSL', 'TB_LSHTM', 'TB_LSHTM_Acute']
 
 
 class TBS(IntEnum):
@@ -93,7 +94,132 @@ class TBS(IntEnum):
     # endregion
     
 
-class TB(ss.Infection):
+class BaseTB(ss.Infection, ABC):
+    """
+    Base TB disease module.
+
+    This class centralizes the shared reporting/results surface so that different
+    TB natural history implementations (e.g. TBsim vs LSHTM) can be swapped while
+    keeping reporting consistent.
+    
+    Derived classes must implement:
+    - step(): Model-specific state transitions
+    - set_prognoses(): Model-specific initial infection handling
+    - start_treatment(): Model-specific treatment initiation
+    - infectious: Property defining which states are infectious
+    - _init_state_results(): Model-specific result initialization
+    - _update_state_results(): Model-specific result updates
+    - _calc_detectable_15plus(): Model-specific detectable case calculation
+    """
+    def __init__(self, **kwargs):
+        """Initialize base TB class. Derived classes should call super().__init__(**kwargs)."""
+        super().__init__(**kwargs)
+    
+    def step_die(self, uids):
+        """Handle death for TB-infected individuals. Derived classes can override if needed."""
+        if len(uids) == 0:
+            return
+        super().step_die(uids)
+        # Ensure deceased individuals cannot transmit or get infected
+        self.susceptible[uids] = False
+        self.infected[uids] = False
+        self.rel_trans[uids] = 0
+        return
+    
+    @abstractmethod
+    def step(self):
+        """Execute one simulation time step for TB disease progression. Must be implemented by derived classes."""
+        pass
+    
+    @abstractmethod
+    def set_prognoses(self, uids, sources=None):
+        """Set initial prognoses for newly infected individuals. Must be implemented by derived classes."""
+        pass
+    
+    @abstractmethod
+    def start_treatment(self, uids):
+        """Start treatment for active TB. Must be implemented by derived classes."""
+        pass
+    
+    @property
+    @abstractmethod
+    def infectious(self):
+        """Determine which individuals are currently infectious. Must be implemented by derived classes."""
+        pass
+    def init_results(self):
+        super().init_results()
+        self._init_state_results()
+        self.define_results(
+            ss.Result('n_infectious',          dtype=int, label='Number Infectious'),
+            ss.Result('n_infectious_15+',      dtype=int, label='Number Infectious, 15+'),
+            ss.Result('new_active',            dtype=int, label='New Active'),
+            ss.Result('new_active_15+',        dtype=int, label='New Active, 15+'),
+            ss.Result('cum_active',            dtype=int, label='Cumulative Active'),
+            ss.Result('cum_active_15+',        dtype=int, label='Cumulative Active, 15+'),
+            ss.Result('new_deaths',            dtype=int, label='New Deaths'),
+            ss.Result('new_deaths_15+',        dtype=int, label='New Deaths, 15+'),
+            ss.Result('cum_deaths',            dtype=int, label='Cumulative Deaths'),
+            ss.Result('cum_deaths_15+',        dtype=int, label='Cumulative Deaths, 15+'),
+            ss.Result('prevalence_active',     dtype=float, scale=False, label='Prevalence (Active)'),
+            ss.Result('incidence_kpy',         dtype=float, scale=False, label='Incidence per 1,000 person-years'),
+            ss.Result('deaths_ppy',            dtype=float, label='Death per person-year'),
+            ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'),
+            ss.Result('n_detectable_15+',      dtype=float, label='Detectable cases (15+)'),
+        )
+        return
+
+    def update_results(self):
+        super().update_results()
+        res = self.results
+        ti = self.ti
+        dty = self.sim.t.dt_year
+        n_alive = np.count_nonzero(self.sim.people.alive)
+
+        self._update_state_results(ti)
+
+        res.n_infectious[ti]        = np.count_nonzero(self.infectious)
+        res['n_infectious_15+'][ti] = np.count_nonzero(self.infectious & (self.sim.people.age >= 15))
+
+        res['n_detectable_15+'][ti] = self._calc_detectable_15plus()
+
+        if n_alive > 0:
+            res.prevalence_active[ti] = res.n_infectious[ti] / n_alive
+            res.incidence_kpy[ti]     = 1_000 * np.count_nonzero(self.ti_infected == ti) / (n_alive * dty)
+            res.deaths_ppy[ti]        = res.new_deaths[ti] / (n_alive * dty)
+        return
+
+    def finalize_results(self):
+        super().finalize_results()
+        res = self.results
+        res['cum_deaths']     = np.cumsum(res['new_deaths'])
+        res['cum_deaths_15+'] = np.cumsum(res['new_deaths_15+'])
+        res['cum_active']     = np.cumsum(res['new_active'])
+        res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
+        return
+
+    def plot(self):
+        fig = plt.figure()
+        for rkey in self.results.keys():
+            if rkey == 'timevec':
+                continue
+            plt.plot(self.results['timevec'], self.results[rkey], label=rkey.title())
+        plt.legend()
+        return fig
+
+    @abstractmethod
+    def _init_state_results(self) -> None:
+        """Define model-specific state-count results."""
+
+    @abstractmethod
+    def _update_state_results(self, ti: int) -> None:
+        """Update model-specific state-count results for the current timestep."""
+
+    @abstractmethod
+    def _calc_detectable_15plus(self) -> float:
+        """Return detectable cases among adults 15+ using this model's definition."""
+
+
+class TB(BaseTB):
     """
     Tuberculosis disease model for TBsim simulations.
     
@@ -131,7 +257,7 @@ class TB(ss.Infection):
             pars: Dictionary of parameters to override defaults
             **kwargs: Additional keyword arguments for parameters
         """
-        super().__init__()
+        super().__init__(**kwargs)
 
         self.define_pars(
             # Initial conditions
@@ -228,6 +354,64 @@ class TB(ss.Infection):
         """
         # These will be calculated dynamically in the transition methods
         pass
+    
+    def update_risk_modifiers(self, uids, remove_old_mods=None, **kwargs):
+        """Update risk modifiers for specified individuals.
+        
+        This method allows interventions to modify disease risk ratios without directly
+        accessing the internal arrays. It handles both applying new modifiers and
+        removing old ones (by dividing them out). New modifiers are passed as keyword
+        arguments matching the parameter names (e.g., rr_activation, rr_clearance, rr_death).
+        
+        Args:
+            uids: Array of individual IDs to update
+            remove_old_mods: Dictionary mapping parameter names to old modifier values to remove.
+                            Old modifiers are divided out to restore original values.
+                            Keys should match attribute names (e.g., 'rr_activation', 'rr_clearance', 'rr_death').
+            **kwargs: Keyword arguments mapping parameter names to new modifier arrays/values.
+                     Only parameters with matching attribute names will be applied.
+                     Each modifier is applied multiplicatively to the corresponding attribute.
+        
+        Examples:
+            # Apply a single modifier
+            tb.update_risk_modifiers(uids, rr_activation=0.6)
+            
+            # Apply multiple modifiers
+            tb.update_risk_modifiers(uids, rr_activation=0.6, rr_clearance=1.4, rr_death=0.1)
+            
+            # Update modifiers (remove old, apply new)
+            tb.update_risk_modifiers(uids,
+                remove_old_mods={
+                    'rr_activation': old_act,
+                    'rr_clearance': old_clr,
+                    'rr_death': old_death
+                },
+                rr_activation=new_act,
+                rr_clearance=new_clr,
+                rr_death=new_death)
+            
+            # Remove modifiers only
+            tb.update_risk_modifiers(uids, remove_old_mods={
+                'rr_activation': old_act,
+                'rr_clearance': old_clr,
+                'rr_death': old_death
+            })
+        """
+        if len(uids) == 0:
+            return
+        
+        # Remove old modifiers if provided (divide them out to restore original values)
+        if remove_old_mods is not None:
+            for param_name, old_mod in remove_old_mods.items():
+                if old_mod is not None and hasattr(self, param_name):
+                    param_array = getattr(self, param_name)
+                    param_array[uids] /= old_mod
+        
+        # Apply new modifiers from kwargs (multiply them in)
+        for param_name, new_mod in kwargs.items():
+            if new_mod is not None and hasattr(self, param_name):
+                param_array = getattr(self, param_name)
+                param_array[uids] *= new_mod
 
     def p_latent_to_presym(self, sim, uids):
         """
@@ -883,46 +1067,8 @@ class TB(ss.Infection):
         self.rel_trans[uids] = 0
         return
 
-    def init_results(self):
-        """
-        Initialize result tracking variables for TB epidemiological outcomes.
-        
-        This method sets up all the result variables used to track TB-specific
-        epidemiological outcomes throughout the simulation. It defines both
-        basic state counts and derived epidemiological indicators.
-        
-        **State Count Results:**
-        - n_latent_slow, n_latent_fast: Counts of individuals in latent states
-        - n_active_presymp, n_active_smpos, n_active_smneg, n_active_exptb: Active state counts
-        - n_active: Combined count of all active TB cases
-        - n_infectious: Total number of infectious individuals
-        
-        **Age-Specific Results (15+ years):**
-        - All active state counts have 15+ variants for adult-focused analysis
-        - new_active_15+, new_deaths_15+: Age-specific incidence and mortality
-        - new_notifications_15+: Treatment initiations for adults
-        - n_detectable_15+: Detectable cases including CXR screening
-        
-        **Incidence and Cumulative Measures:**
-        - new_active, new_deaths: Daily incidence of new cases and deaths
-        - cum_active, cum_deaths: Cumulative counts over simulation period
-        - cum_active_15+, cum_deaths_15+: Age-specific cumulative measures
-        
-        **Derived Epidemiological Indicators:**
-        - prevalence_active: Active TB prevalence (active cases / total population)
-        - incidence_kpy: Incidence per 1,000 person-years
-        - deaths_ppy: Death rate per person-year
-        - n_reinfected: Number of reinfection events
-        
-        **Detection and Treatment Metrics:**
-        - new_notifications_15+: New TB notifications (treatment initiations)
-        - n_detectable_15+: Detectable cases (smear pos/neg + CXR-screened pre-symptomatic)
-        
-        This method is called automatically by the Starsim framework during
-        simulation initialization and should not be called manually.
-        """
-        super().init_results()
-        
+    def _init_state_results(self):
+        """Define TBsim-specific state-count results."""
         self.define_results(
             # State counts
             ss.Result('n_latent_slow',         dtype=int, label='Latent Slow'),
@@ -936,78 +1082,13 @@ class TB(ss.Infection):
             ss.Result('n_active_smneg_15+',    dtype=int, label='Active Smear Negative, 15+'),
             ss.Result('n_active_exptb',        dtype=int, label='Active Extra-Pulmonary'),
             ss.Result('n_active_exptb_15+',    dtype=int, label='Active Extra-Pulmonary, 15+'),
-            
-            # Incidence and cumulative measures
-            ss.Result('new_active',            dtype=int, label='New Active'),
-            ss.Result('new_active_15+',        dtype=int, label='New Active, 15+'),
-            ss.Result('cum_active',            dtype=int, label='Cumulative Active'),
-            ss.Result('cum_active_15+',        dtype=int, label='Cumulative Active, 15+'),
-            
-            # Mortality measures
-            ss.Result('new_deaths',            dtype=int, label='New Deaths'),
-            ss.Result('new_deaths_15+',        dtype=int, label='New Deaths, 15+'),
-            ss.Result('cum_deaths',            dtype=int, label='Cumulative Deaths'),
-            ss.Result('cum_deaths_15+',        dtype=int, label='Cumulative Deaths, 15+'),
-            
-            # Transmission and detection measures
-            ss.Result('n_infectious',          dtype=int, label='Number Infectious'),
-            ss.Result('n_infectious_15+',      dtype=int, label='Number Infectious, 15+'),
-            ss.Result('prevalence_active',     dtype=float, scale=False, label='Prevalence (Active)'),
-            ss.Result('incidence_kpy',         dtype=float, scale=False, label='Incidence per 1,000 person-years'),
-            ss.Result('deaths_ppy',            dtype=float, label='Death per person-year'), 
-            ss.Result('n_reinfected',          dtype=int, label='Number reinfected'), 
-            ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'),
-            ss.Result('n_detectable_15+',      dtype=float, label='Detectable cases (Sm+ + Sm- + CXR-screened pre-symptomatic)'),
+            ss.Result('n_reinfected',          dtype=int, label='Number reinfected'),
         )
         return
 
-    def update_results(self):
-        """
-        Update result tracking variables for the current time step.
-        
-        This method is called by the Starsim framework at each time step to
-        calculate and store all TB-specific epidemiological metrics. It updates
-        both basic state counts and derived epidemiological indicators.
-        
-        **State Count Updates:**
-        - Counts individuals in each TB state (latent, active, infectious)
-        - Calculates age-specific counts for individuals 15+ years old
-        - Updates total active TB and infectious case counts
-        
-        **Detection Metrics:**
-        - n_detectable_15+: Calculates detectable cases including:
-          * All smear positive and negative cases (100% detectable)
-          * CXR-screened pre-symptomatic cases (cxr_asymp_sens sensitivity)
-        
-        **Derived Epidemiological Indicators:**
-        - **prevalence_active**: Active TB prevalence = n_active / total_alive_population
-        - **incidence_kpy**: Incidence per 1,000 person-years = 1000 * new_infections / (alive_pop * dt_year)
-        - **deaths_ppy**: Death rate per person-year = new_deaths / (alive_pop * dt_year)
-        
-        **Age-Specific Calculations:**
-        - All 15+ metrics use age >= 15 filter for adult-focused analysis
-        - Important for TB epidemiology as adult cases are typically more severe
-        
-        **Population Scaling:**
-        - Uses sim.people.alive to get current living population
-        - Accounts for deaths and births during simulation
-        - Ensures rates are calculated relative to current population
-        
-        **Time Step Integration:**
-        - Uses sim.t.dt_year for time-based rate calculations
-        - Ensures consistent units across different time step sizes
-        
-        This method is called automatically by the Starsim framework at each
-        time step and should not be called manually.
-        """
-        super().update_results()
+    def _update_state_results(self, ti):
+        """Update TBsim-specific state-count results for the current timestep."""
         res = self.results
-        ti = self.ti
-        ti_infctd = self.ti_infected
-        dty = self.sim.t.dt_year
-        n_alive = np.count_nonzero(self.sim.people.alive)
-
-        # Update state counts
         res.n_latent_slow[ti]       = np.count_nonzero(self.state == TBS.LATENT_SLOW)
         res.n_latent_fast[ti]       = np.count_nonzero(self.state == TBS.LATENT_FAST)
         res.n_active_presymp[ti]    = np.count_nonzero(self.state == TBS.ACTIVE_PRESYMP)
@@ -1019,111 +1100,426 @@ class TB(ss.Infection):
         res.n_active_exptb[ti]      = np.count_nonzero(self.state == TBS.ACTIVE_EXPTB)
         res['n_active_exptb_15+'][ti] = np.count_nonzero((self.sim.people.age>=15) & (self.state == TBS.ACTIVE_EXPTB))
         res.n_active[ti]            = np.count_nonzero(np.isin(self.state, TBS.all_active()))
-        res.n_infectious[ti]        = np.count_nonzero(self.infectious)
-        res['n_infectious_15+'][ti] = np.count_nonzero(self.infectious & (self.sim.people.age>=15))
+        return
 
-        # Calculate detectable cases (including CXR screening)
-        res['n_detectable_15+'][ti] = np.dot( self.sim.people.age >= 15,
+    def _calc_detectable_15plus(self):
+        """Calculate detectable cases among adults 15+ for TBsim model."""
+        return np.dot( self.sim.people.age >= 15,
             np.isin(self.state, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG]) + \
                 self.pars.cxr_asymp_sens * (self.state == TBS.ACTIVE_PRESYMP) )
 
-        # Calculate rates if population is alive
-        if n_alive > 0:
-            res.prevalence_active[ti] = res.n_active[ti] / n_alive 
-            res.incidence_kpy[ti]     = 1_000 * np.count_nonzero(ti_infctd == ti) / (n_alive * dty)
-            res.deaths_ppy[ti]        = res.new_deaths[ti] / (n_alive * dty)
+
+class TBSL(IntEnum):
+    SUSCEPTIBLE  = -1    # No TB
+    INFECTION    = 0     # Has latent infection
+    CLEARED      = 1     # Cleared infection
+    UNCONFIRMED  = 2     # Unconfirmed TB
+    RECOVERED    = 3     # Recovered from TB
+    ASYMPTOMATIC = 4     # Asymptomatic TB
+    SYMPTOMATIC  = 5     # Symptomatic TB
+    TREATMENT    = 6     # On treatment
+    TREATED      = 7     # Treated
+    DEAD         = 8     # TB death
+    ACUTE        = 9     # Acute infection ~ (only in TB_LSHTM_ACUTE)
+
+
+class TB_LSHTM(BaseTB):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__(name=kwargs.pop('name', None), label=kwargs.pop('label', None))
+
+        self.define_pars(
+            init_prev = ss.bernoulli(0.01), # Initial seed infections
+            beta = ss.beta(0.25, unit='month'), # Infection probability
+            kappa = 0.82,                   # Relative transmission from asymptomatic TB
+            pi    = 0.21,                   # Relative risk of reinfection after recovery from unconfirmed TB
+            rho   = 3.15,                   # Relative risk of reinfection after treatment completion
+            infcle    = ss.years(ss.expon(1/1.90)),   # Rate of clearance from infection per year
+            infunc    = ss.years(ss.expon(1/0.16)),   # Rate of progression from infection to unconfirmed TB per year
+            infasy    = ss.years(ss.expon(1/0.06)),   # Rate of progression from infection to asymptomatic TB per year
+            uncrec    = ss.years(ss.expon(1/0.18)),   # Rate of recovery from unconfirmed TB per year
+            uncasy    = ss.years(ss.expon(1/0.25)),   # Rate of progression from unconfirmed TB to asymptomatic TB per year
+            asyunc    = ss.years(ss.expon(1/1.66)),   # Rate of recovery from asymptomatic to unconfirmed TB per year
+            asysym    = ss.years(ss.expon(1/0.88)),   # Rate of progression from asymptomatic to symptomatic TB per year
+            symasy    = ss.years(ss.expon(1/0.54)),   # Rate of recovery from symptomatic to asymptomatic TB per year
+            #theta     = ss.years(expon_LTV(ss.date('1800-01-01'), 0.46, ss.date('2050-01-01'), 0.71)),   # Rate of treatment initiation from symptomatic TB per year
+            theta     = ss.years(ss.expon(1/0.46)),   # Rate of treatment initiation from symptomatic TB per year, initial value
+            delta     = ss.years(ss.expon(1/2.00)),   # Rate of treatment completion per year 
+            #phi       = ss.years(expon_LTV(ss.date('1800-01-01'), 0.63, ss.date('2050-01-01'), 0.09)),   # Rate of treatment failure per year
+            phi       = ss.years(ss.expon(1/0.63)),   # Rate of treatment failure per year, initial value
+            #mutb      = ss.years(expon_LTV(ss.date('1800-01-01'), 0.34, ss.date('2050-01-01'), 0.17)),   # TB-specific mortality rate per year
+            mutb      = ss.years(ss.expon(1/0.34)),   # TB-specific mortality rate per year, initial value
+            mu        = ss.years(ss.expon(1/0.014)),  # Background mortality rate per year
+
+            cxr_asymp_sens = 1.0, # Sensitivity of chest x-ray for screening asymptomatic cases
+        )
+        self.update_pars(pars, **kwargs) 
+
+        self.define_states(
+            # Initialize states specific to TB:
+            ss.FloatArr('state', default=TBSL.SUSCEPTIBLE),      # One state to rule them all?
+            ss.FloatArr('state_next', default=TBSL.INFECTION),   # Next state
+            ss.FloatArr('ti_next', default=np.inf),             # Time of next transition
+            ss.State('on_treatment', default=False),
+            ss.State('ever_infected', default=False),
+            ss.FloatArr('ti_infected', default=-np.inf),         # Time of infection
+        )
 
         return
 
-    def finalize_results(self):
+    @property
+    def infectious(self):
         """
-        Finalize result calculations after simulation completion.
-        
-        This method is called by the Starsim framework after the simulation
-        has completed to calculate cumulative measures and finalize any results
-        that depend on the complete simulation history.
-        
-        **Cumulative Calculations:**
-        - **cum_deaths**: Cumulative TB deaths = cumsum(new_deaths)
-        - **cum_deaths_15+**: Cumulative TB deaths for adults 15+ = cumsum(new_deaths_15+)
-        - **cum_active**: Cumulative active TB cases = cumsum(new_active)
-        - **cum_active_15+**: Cumulative active TB cases for adults 15+ = cumsum(new_active_15+)
-        
-        **Purpose:**
-        - Provides total burden measures over the entire simulation period
-        - Enables calculation of cumulative incidence and mortality rates
-        - Supports long-term epidemiological analysis and program evaluation
-        
-        **Usage:**
-        - Called automatically by Starsim at simulation end
-        - Results are available in self.results after completion
-        - Used for final analysis and reporting
-        
-        **Integration:**
-        - Calls super().finalize_results() to handle base class finalization
-        - Ensures compatibility with Starsim result system
-        
-        This method is called automatically by the Starsim framework at the
-        end of simulation and should not be called manually.
+        Infectious if in any of the active states
         """
-        super().finalize_results()
+        return (self.state==TBSL.ASYMPTOMATIC) | (self.state==TBSL.SYMPTOMATIC)
+
+    def set_prognoses(self, uids, from_uids=None):
+        super().set_prognoses(uids, from_uids)
+        if len(uids) == 0:
+            return # Nothing to do
+
+        p = self.pars
+
+        # Carry out state changes upon new infection
+        self.susceptible[uids] = False
+        self.infected[uids] = True # Not needed, but useful for reporting
+        self.ever_infected[uids] = True
+        self.ti_infected[uids] = self.ti
+
+        self.state[uids] = TBSL.INFECTION
+
+        # INFECTION --> CLEARED, UNCONFIRMED, or ASYMPTOMATIC
+        self.state_next[uids], self.ti_next[uids] = self.transition(uids, to={
+            TBSL.CLEARED: self.pars.infcle,
+            TBSL.UNCONFIRMED: self.pars.infunc,
+            TBSL.ASYMPTOMATIC: self.pars.infasy
+        })
+
+        return
+
+    def transition(self, uids, to):
+        """ Transition between states """
+        if len(uids) == 0:
+            return np.array([]), np.array([])
+
+        state_next = np.full(len(uids), fill_value=TBSL.SUSCEPTIBLE)
+        ti_next = np.full(len(uids), fill_value=np.inf)
+        ti = self.ti
+
+        # TODO: Consider SSA algorithm
+        ti_state = np.zeros((len(to), len(uids)))
+        for idx, rate in enumerate(to.values()):
+            ti_state[idx,:] = ti + rate.rvs(uids)
+
+        state_next_idx = ti_state.argmin(axis=0)
+
+        state_next = np.array(list(to.keys()))[state_next_idx]
+        ti_next = ti_state.min(axis=0)
+
+        # Potentially faster compared to doing min when we already have argmin:
+        #entries = zip(state_next_idx, range(len(uids)))
+        #ti_next = ti_state[entries]
+
+        return state_next, ti_next
+
+    def step(self):
+        super().step()
+        p = self.pars
+        ti = self.ti
+
+        uids = ss.uids(ti >= self.ti_next)
+        if len(uids) == 0:
+            return # Nothing to do
+
+        # Reporting of new_active
+        new_asymp_uids = uids[self.state_next[uids] == TBSL.ASYMPTOMATIC]
+        self.results['new_active'][ti] = len(new_asymp_uids)
+        self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_asymp_uids] >= 15)
+
+        # Update infected flag
+        new_inf_uids = uids[self.state_next[uids] == TBSL.INFECTION]
+        self.infected[new_inf_uids] = True
+        new_clr_uids = uids[np.isin(self.state_next[uids], [TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED])]
+        self.infected[new_clr_uids] = False
+
+        # Update state
+        self.state[uids] = self.state_next[uids]
+        self.ti_next[uids] = np.inf # Reset to avoid accidental transitions
+        self.on_treatment[uids] = self.state[uids] == TBSL.TREATMENT # Set treatment flag
+
+        # Cleared, recovered, and treated are all susceptible to infection
+        self.susceptible[uids] = np.isin(self.state[uids], [TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED])
+
+        # Handle deaths
+        new_death_uids = uids[self.state_next[uids] == TBSL.DEAD]
+        self.sim.people.request_death(new_death_uids)
+        self.results['new_deaths'][ti] = len(new_death_uids)
+        self.results['new_deaths_15+'][ti] = np.count_nonzero(self.sim.people.age[new_death_uids] >= 15)
+
+        # Set rel_sus
+        self.rel_sus[uids] = 1 # Reset
+        #self.rel_sus[self.state == TBSL.CLEARED] = 1.0 # Nothing to do for now
+        self.rel_sus[uids[self.state[uids] == TBSL.RECOVERED]] = self.pars.pi
+        self.rel_sus[uids[self.state[uids] == TBSL.TREATED]] = self.pars.rho
+
+        # Set rel_trans
+        self.rel_trans[uids] = 1 # Reset
+        self.rel_trans[uids[self.state[uids] == TBSL.ASYMPTOMATIC]] = self.pars.kappa
+
+        # INFECTION --> CLEARED, UNCONFIRMED, or ASYMPTOMATIC
+        u = uids[self.state[uids] == TBSL.INFECTION]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.CLEARED: self.pars.infcle,
+            TBSL.UNCONFIRMED: self.pars.infunc,
+            TBSL.ASYMPTOMATIC: self.pars.infasy
+        })
+
+        # CLEARED --> INFECTION [Happens via transmission]
+
+        # UNCONFIRMED to RECOVERED or ASYMPTOMATIC
+        u = uids[self.state[uids] == TBSL.UNCONFIRMED]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.RECOVERED: self.pars.uncrec,
+            TBSL.ASYMPTOMATIC: self.pars.uncasy
+        })
+
+        # RECOVERED to INFECTION [Happens via transmission, modified by pi]
+
+        # ASYMPTOMATIC to UNCONFIRMED or SYMPTOMATIC
+        u = uids[self.state[uids] == TBSL.ASYMPTOMATIC]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.UNCONFIRMED: self.pars.asyunc,
+            TBSL.SYMPTOMATIC: self.pars.asysym
+        })
+
+        # SYMPTOMATIC to ASYMPTOMATIC, TREATMENT, or TB DEATH
+        u = uids[self.state[uids] == TBSL.SYMPTOMATIC]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.ASYMPTOMATIC: self.pars.symasy,
+            TBSL.TREATMENT: self.pars.theta,
+            TBSL.DEAD: self.pars.mutb
+        })
+
+        # TREATMENT to SYMPTOMATIC or TREATED
+        u = uids[self.state[uids] == TBSL.TREATMENT]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.SYMPTOMATIC: self.pars.phi,
+            TBSL.TREATED: self.pars.delta
+        })
+
+        # TREATED to INFECTION [Happens via transmission, modified by rho]
+
+        return
+
+    def start_treatment(self, uids):
+        """ Start treatment for active TB """
+        if len(uids) == 0:
+            return 0  # No one to treat
+
+        # INFECTION --> CLEARED
+        u = uids[self.state[uids] == TBSL.INFECTION]
+        self.state_next[u] = TBSL.CLEARED
+        self.ti_next[u] = self.ti
+
+        # UNCONFIRMED, ASYMPTOMATIC, SYMPTOMATIC --> TREATMENT
+        u = uids[np.isin(self.state[uids], [TBSL.UNCONFIRMED, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC])]
+        self.state_next[u] = TBSL.TREATMENT # Schwalb paper shows TREATED here
+        self.ti_next[u] = self.ti
+
+        self.results['new_notifications_15+'][self.ti] = np.count_nonzero(self.sim.people.age[u] >= 15)
+
+        return
+
+    def step_die(self, uids):
+        if len(uids) == 0:
+            return # Nothing to do
+
+        super().step_die(uids)
+        # Make sure these agents do not transmit or get infected after death
+        self.susceptible[uids] = False
+        self.infected[uids] = False
+        self.state[uids] = TBSL.DEAD
+        self.ti_next[uids] = np.inf # Ensure no more transitions
+        self.rel_trans[uids] = 0 # Ensure no disease transmission
+        return
+
+    def _init_state_results(self):
+        """Define LSHTM-specific state-count results."""
+        results = []
+        for state in TBSL:
+            results.append(ss.Result(f'n_{state.name}', dtype=int, label=state.name))
+            results.append(ss.Result(f'n_{state.name}_15+', dtype=int, label=f'{state.name} (15+)'))
+        self.define_results(*results)
+        return
+
+    def _update_state_results(self, ti):
+        """Update LSHTM-specific state-count results for the current timestep."""
         res = self.results
-        
-        # Calculate cumulative measures
-        res['cum_deaths']     = np.cumsum(res['new_deaths'])
-        res['cum_deaths_15+'] = np.cumsum(res['new_deaths_15+'])
-        res['cum_active']     = np.cumsum(res['new_active'])
-        res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
-        
+        for state in TBSL:
+            res[f'n_{state.name}'][ti] = np.count_nonzero(self.state == state)
+            res[f'n_{state.name}_15+'][ti] = np.count_nonzero((self.sim.people.age>=15) & (self.state == state))
         return
 
-    def plot(self):
-        """
-        Create a basic plot of all TB simulation results.
-        
-        This method generates a matplotlib figure showing the time series of all
-        tracked TB epidemiological measures over the simulation period. It provides
-        a quick visual overview of the simulation outcomes.
-        
-        **Plot Contents:**
-        - **Time Series**: All result variables plotted against simulation time
-        - **Multiple Metrics**: Includes state counts, incidence, mortality, and prevalence
-        - **Legend**: Each result variable is labeled in the legend
-        - **Automatic Scaling**: Matplotlib handles axis scaling automatically
-        
-        **Excluded Variables:**
-        - timevec: Excluded as it represents the x-axis (time)
-        - All other result variables are included in the plot
-        
-        **Plot Features:**
-        - **Line Plot**: Each result variable plotted as a separate line
-        - **Legend**: Automatic legend with result variable names
-        - **Time Axis**: X-axis represents simulation time steps
-        - **Value Axis**: Y-axis represents result variable values
-        
-        **Usage:**
-        - Useful for quick visual inspection of simulation results
-        - Can be customized by modifying the returned figure
-        - Suitable for basic analysis and presentation
-        
-        **Limitations:**
-        - All variables on same plot may have different scales
-        - No automatic subplot organization
-        - Basic styling without customization
-        
-        Returns:
-            matplotlib.figure.Figure: Figure containing the time series plot of all TB results
-            
-        Example:
-            >>> fig = tb.plot()
-            >>> fig.show()  # Display the plot
-            >>> fig.savefig('tb_results.png')  # Save to file
-        """
-        fig = plt.figure()
-        for rkey in self.results.keys():
-            if rkey == 'timevec':
-                continue
-            plt.plot(self.results['timevec'], self.results[rkey], label=rkey.title())
-        plt.legend()
-        return fig
+    def _calc_detectable_15plus(self):
+        """Calculate detectable cases among adults 15+ for LSHTM model."""
+        return np.dot( self.sim.people.age >= 15, 
+            (self.state == TBSL.SYMPTOMATIC) + self.pars.cxr_asymp_sens * (self.state == TBSL.ASYMPTOMATIC) )
 
+
+# Make a version of the TB_LSHTM class that includes one additional state representing acute infection immediately after infection
+class TB_LSHTM_Acute(TB_LSHTM):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__()
+
+        # Where the current INFECTION state is... split that into ACUTE and INFECTION
+        # We had infunc and infasy, but now there's a brief ACUTE state prior to INFECTION
+        # The infunc rate is not 
+
+        self.define_pars(
+            acuinf = ss.years(ss.expon(1/4.0)),   # Rate of transition from acute to infection per year
+            alpha = 0.9,                   # Relative transmission from acute TB
+        )
+        self.update_pars(pars, **kwargs) 
+        return
+
+    @property
+    def infectious(self):
+        return (self.state==TBSL.ACUTE) | (self.state==TBSL.ASYMPTOMATIC) | (self.state==TBSL.SYMPTOMATIC)
+
+    def set_prognoses(self, uids, from_uids=None):
+        super().set_prognoses(uids, from_uids)
+        if len(uids) == 0:
+            return # Nothing to do
+
+        p = self.pars
+
+        # Carry out state changes upon new infection
+        self.susceptible[uids] = False
+        self.infected[uids] = True # Not needed, but useful for reporting
+        self.ever_infected[uids] = True
+        self.ti_infected[uids] = self.ti
+
+        self.state[uids] = TBSL.ACUTE # Instead of INFECTION
+
+        # ACUTE --> INFECTION
+        self.state_next[uids], self.ti_next[uids] = self.transition(uids, to={
+            TBSL.INFECTION: self.pars.acuinf,
+        })
+
+        return
+
+    def step(self):
+        super(TB_LSHTM, self).step() # Performs transmission
+        p = self.pars
+        ti = self.ti
+
+        uids = ss.uids(ti >= self.ti_next)
+        if len(uids) == 0:
+            return # Nothing to do
+
+        # Reporting of new_active
+        new_asymp_uids = uids[self.state_next[uids] == TBSL.ASYMPTOMATIC]
+        self.results['new_active'][ti] = len(new_asymp_uids)
+        self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_asymp_uids] >= 15)
+
+        # Update infected flag
+        new_inf_uids = uids[self.state_next[uids] == TBSL.ACUTE]
+        self.infected[new_inf_uids] = True
+        new_clr_uids = uids[np.isin(self.state_next[uids], [TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED])]
+        self.infected[new_clr_uids] = False
+
+        # Update state
+        self.state[uids] = self.state_next[uids]
+        self.ti_next[uids] = np.inf # Reset to avoid accidental transitions
+        self.on_treatment[uids] = self.state[uids] == TBSL.TREATMENT # Set treatment flag
+
+        # Cleared, recovered, and treated are all susceptible to infection
+        self.susceptible[uids] = np.isin(self.state[uids], [TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED])
+
+        # Handle deaths
+        new_death_uids = uids[self.state_next[uids] == TBSL.DEAD]
+        self.sim.people.request_death(new_death_uids)
+        self.results['new_deaths'][ti] = len(new_death_uids)
+        self.results['new_deaths_15+'][ti] = np.count_nonzero(self.sim.people.age[new_death_uids] >= 15)
+
+        # Set rel_sus
+        self.rel_sus[uids] = 1 # Reset
+        #self.rel_sus[self.state == TBSL.CLEARED] = 1.0 # Nothing to do for now
+        self.rel_sus[uids[self.state[uids] == TBSL.RECOVERED]] = self.pars.pi
+        self.rel_sus[uids[self.state[uids] == TBSL.TREATED]] = self.pars.rho
+
+        # Set rel_trans
+        self.rel_trans[uids] = 1 # Reset
+        self.rel_trans[uids[self.state[uids] == TBSL.ACUTE]] = self.pars.alpha
+        self.rel_trans[uids[self.state[uids] == TBSL.ASYMPTOMATIC]] = self.pars.kappa
+
+        # ACUTE --> INFECTION
+        u = uids[self.state[uids] == TBSL.ACUTE]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.INFECTION: self.pars.acuinf,
+        })
+
+
+        # INFECTION --> CLEARED, UNCONFIRMED, or ASYMPTOMATIC
+        u = uids[self.state[uids] == TBSL.INFECTION]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.CLEARED: self.pars.infcle,
+            TBSL.UNCONFIRMED: self.pars.infunc,
+            TBSL.ASYMPTOMATIC: self.pars.infasy
+        })
+
+        # CLEARED --> ACUTE [Happens via transmission]
+
+        # UNCONFIRMED to RECOVERED or ASYMPTOMATIC
+        u = uids[self.state[uids] == TBSL.UNCONFIRMED]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.RECOVERED: self.pars.uncrec,
+            TBSL.ASYMPTOMATIC: self.pars.uncasy
+        })
+
+        # RECOVERED to ACUTE [Happens via transmission, modified by pi]
+
+        # ASYMPTOMATIC to UNCONFIRMED or SYMPTOMATIC
+        u = uids[self.state[uids] == TBSL.ASYMPTOMATIC]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.UNCONFIRMED: self.pars.asyunc,
+            TBSL.SYMPTOMATIC: self.pars.asysym
+        })
+
+        # SYMPTOMATIC to ASYMPTOMATIC, TREATMENT, or TB DEATH
+        u = uids[self.state[uids] == TBSL.SYMPTOMATIC]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.ASYMPTOMATIC: self.pars.symasy,
+            TBSL.TREATMENT: self.pars.theta,
+            TBSL.DEAD: self.pars.mutb
+        })
+
+        # TREATMENT to SYMPTOMATIC or TREATED
+        u = uids[self.state[uids] == TBSL.TREATMENT]
+        self.state_next[u], self.ti_next[u] = self.transition(u, to={
+            TBSL.SYMPTOMATIC: self.pars.phi,
+            TBSL.TREATED: self.pars.delta
+        })
+
+        # TREATED to ACUTE [Happens via transmission, modified by rho]
+
+        return
+
+    def start_treatment(self, uids):
+        """ Start treatment for active TB """
+        if len(uids) == 0:
+            return 0  # No one to treat
+
+        # ACUTE or INFECTION --> CLEARED
+        u = uids[(self.state[uids] == TBSL.ACUTE) | (self.state[uids] == TBSL.INFECTION)]
+        self.state_next[u] = TBSL.CLEARED
+        self.ti_next[u] = self.ti
+
+        # UNCONFIRMED, ASYMPTOMATIC, SYMPTOMATIC --> TREATMENT
+        u = uids[np.isin(self.state[uids], [TBSL.UNCONFIRMED, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC])]
+        self.state_next[u] = TBSL.TREATMENT # Schwalb paper shows TREATED here
+        self.ti_next[u] = self.ti
+
+        self.results['new_notifications_15+'][self.ti] = np.count_nonzero(self.sim.people.age[u] >= 15)
+
+        return
