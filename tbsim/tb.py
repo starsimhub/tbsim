@@ -207,13 +207,67 @@ class TB(ss.Infection):
         # Initialize probability objects for state transitions
         self._init_transition_probabilities()
 
-        # AI, and ME insist that these get overridden by the dynamic probabilities
-        # self.p_latent_to_presym = ss.bernoulli(p=self.p_latent_to_presym)
-        # self.p_presym_to_clear = ss.bernoulli(p=self.p_presym_to_clear)
-        # self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
-        # self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
-        # self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
-        # return
+
+    def apply_vaccine_protection(self, uids, waning_factors, activation_modifier_base, clearance_modifier_base, death_modifier_base, apply=True):
+        """
+        Apply or remove vaccine protection effects to TB risk modifiers.
+        
+        This is a listener-style method that gets called by vaccine interventions (e.g., BCG)
+        to apply protection effects. The TB model handles the application of waning factors
+        to the base modifiers internally.
+        
+        **Protection Effects:**
+        - **Activation**: Reduces latent-to-active progression risk (typically 0.5-0.65x)
+        - **Clearance**: Increases active-to-clearance rate (typically 1.3-1.5x)
+        - **Death**: Reduces active-to-death risk (typically 0.05-0.15x)
+        
+        **Waning:**
+        - Waning factors are applied to interpolate between base modifier (waning=1.0) 
+          and baseline (waning=0.0)
+        - Formula: waned_modifier = base_modifier * waning_factor + 1.0 * (1 - waning_factor)
+        - As waning_factor decreases from 1.0 to 0.0, protection gradually wanes
+        
+        **Usage:**
+        This method is called by vaccine interventions, not directly by users.
+        
+        Args:
+            uids (numpy.ndarray): Array of individual IDs to update
+            waning_factors (numpy.ndarray): Waning factors (1.0 = full protection, 0.0 = no protection)
+            activation_modifier_base (numpy.ndarray): Base activation risk modifiers
+            clearance_modifier_base (numpy.ndarray): Base clearance modifiers
+            death_modifier_base (numpy.ndarray): Base death risk modifiers
+            apply (bool): If True, apply protection effects. If False, remove protection effects.
+            
+        Example:
+            >>> # Called by BCG intervention
+            >>> tb.apply_vaccine_protection(
+            ...     uids=vaccinated_uids,
+            ...     waning_factors=waning_factors,
+            ...     activation_modifier_base=activation_mods,
+            ...     clearance_modifier_base=clearance_mods,
+            ...     death_modifier_base=death_mods,
+            ...     apply=True
+            ... )
+        """
+        if len(uids) == 0:
+            return
+        
+        if apply:
+            # Apply waned modifiers: interpolate between base_modifier (waning=1.0) and 1.0 (waning=0.0)
+            # Formula: waned = base * waning_factor + 1 * (1 - waning_factor)
+            activation_mods_waned = activation_modifier_base * waning_factors + (1.0 - waning_factors)
+            clearance_mods_waned = clearance_modifier_base * waning_factors + (1.0 - waning_factors)
+            death_mods_waned = death_modifier_base * waning_factors + (1.0 - waning_factors)
+            
+            # Apply modifiers directly (TB resets to 1.0 at end of each step)
+            self.rr_activation[uids] = activation_mods_waned
+            self.rr_clearance[uids] = clearance_mods_waned
+            self.rr_death[uids] = death_mods_waned
+        else:
+            # Remove protection effects - reset to baseline (1.0)
+            self.rr_activation[uids] = 1.0
+            self.rr_clearance[uids] = 1.0
+            self.rr_death[uids] = 1.0
 
     def _init_transition_probabilities(self):
         """Initialize probability objects for state transitions.

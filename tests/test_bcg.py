@@ -368,13 +368,13 @@ def test_bcg_summary_metrics():
 
 
 def test_bcg_immediate_vaccination_timing():
-    """Test that immediate vaccination (vaccination_timing=None) vaccinates eligible individuals immediately"""
+    """Test that immediate vaccination (delivery=ss.constant(0)) vaccinates eligible individuals immediately"""
     nagents = 200
     pop, tb, net, pars = make_sim(agents=nagents, start=ss.date('2000-01-01'), stop=ss.date('2010-12-31'))
     itv = mtb.BCGProtection(pars={
         'coverage': 1.0,  # 100% coverage to ensure all eligible are vaccinated
         'age_range': (0, 18),
-        'vaccination_timing': None,  # Immediate vaccination
+        'delivery': ss.constant(0),  # Immediate vaccination
         'start': ss.date('2000-01-01'),
         'stop': ss.date('2010-12-31')
     })
@@ -398,13 +398,13 @@ def test_bcg_immediate_vaccination_timing():
         assert mean_vacc_years < 1.0, f"Immediate vaccination should happen early (<1 year), got mean time: {mean_vacc_years:.2f} years"
 
 def test_bcg_distributed_vaccination_timing():
-    """Test that distributed vaccination (vaccination_timing=distribution) schedules and vaccinates over time"""
+    """Test that distributed vaccination (delivery=distribution) schedules and vaccinates over time"""
     nagents = 200
     pop, tb, net, pars = make_sim(agents=nagents, start=ss.date('2000-01-01'), stop=ss.date('2010-12-31'))
     itv = mtb.BCGProtection(pars={
         'coverage': 1.0,  # 100% coverage to ensure all eligible are vaccinated
         'age_range': (0, 18),
-        'vaccination_timing': ss.uniform(0, 5),  # Distributed over 0-5 years
+        'delivery': ss.uniform(0, 5),  # Distributed over 0-5 years
         'start': ss.date('2000-01-01'),
         'stop': ss.date('2010-12-31')
     })
@@ -454,7 +454,7 @@ def test_bcg_vaccination_timing_comparison():
     bcg1 = mtb.BCGProtection(pars={
         'coverage': 0.9,
         'age_range': (0, 18),
-        'vaccination_timing': None,
+        'delivery': ss.constant(0),
         'start': ss.date('2000-01-01'),
         'stop': ss.date('2010-12-31')
     })
@@ -469,7 +469,7 @@ def test_bcg_vaccination_timing_comparison():
     bcg2 = mtb.BCGProtection(pars={
         'coverage': 0.9,
         'age_range': (0, 18),
-        'vaccination_timing': ss.uniform(0, 5),
+        'delivery': ss.uniform(0, 5),
         'start': ss.date('2000-01-01'),
         'stop': ss.date('2010-12-31')
     })
@@ -492,33 +492,345 @@ def test_bcg_vaccination_timing_comparison():
         # Distributed should have later mean vaccination time
         assert mean2 > mean1, f"Distributed vaccination should have later mean time ({mean2}) than immediate ({mean1})"
 
-def test_bcg_vaccination_timing_none_default():
-    """Test that vaccination_timing defaults to None (immediate vaccination)"""
-    nagents = 100
-    pop, tb, net, pars = make_sim(agents=nagents)
-    itv = mtb.BCGProtection(pars={'coverage': 0.9, 'age_range': (0, 18)})
-    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
-    sim.init()
-    bcg = sim.interventions['bcgprotection']
+
+def test_bcg_protection_reduces_activation_rate():
+    """Test that BCG protection reduces latent-to-active TB progression rate"""
+    nagents = 500
+    age_data_test = pd.DataFrame({'age': [0, 2, 4, 10, 15, 20, 30, 40, 50], 'value': [10, 10, 15, 15, 10, 10, 10, 10, 10]})
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    pars = dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2010-12-31'))
     
-    # vaccination_timing should default to None
-    assert bcg.pars.vaccination_timing is None, "vaccination_timing should default to None"
-    assert bcg._vaccination_timing_dist is None, "_vaccination_timing_dist should be None when vaccination_timing is None"
-    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    # Baseline: no BCG
+    sim_baseline = ss.Sim(
+        people=ss.People(n_agents=nagents, age_data=age_data_test),
+        diseases=mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}),
+        networks=net,
+        pars=pars
+    )
+    sim_baseline.run()
+    baseline_new_active = np.sum(sim_baseline.results['tb']['new_active'].values)
+    
+    # With BCG: early vaccination, high coverage
+    bcg = mtb.BCGProtection(pars={
+        'coverage': 0.95,
+        'efficacy': 0.95,
+        'age_range': (0, 100),
+        'delivery': ss.uniform(0, 2),  # Vaccinate within first 2 years
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2010-12-31')
+    })
+    sim_bcg = ss.Sim(
+        people=ss.People(n_agents=nagents, age_data=age_data_test),
+        diseases=mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}),
+        networks=net,
+        interventions=[bcg],
+        pars=pars
+    )
+    sim_bcg.run()
+    bcg_new_active = np.sum(sim_bcg.results['tb']['new_active'].values)
+    
+    # BCG should reduce new active cases
+    reduction = (baseline_new_active - bcg_new_active) / baseline_new_active if baseline_new_active > 0 else 0
+    assert reduction > 0.05, \
+        f"BCG should reduce new active cases by at least 5% (got {reduction*100:.1f}% reduction)"
+
+
+def test_bcg_protection_increases_clearance_rate():
+    """Test that BCG protection increases active-to-clearance rate"""
+    nagents = 300
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+    tb = mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    
+    # Create population with some active TB cases
+    bcg = mtb.BCGProtection(pars={
+        'coverage': 1.0,
+        'efficacy': 1.0,
+        'age_range': (0, 100),
+        'delivery': ss.uniform(0, 1),
+        'clearance_modifier': ss.uniform(1.5, 1.5),  # Fixed 1.5x clearance
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2005-12-31')
+    })
+    
+    sim = ss.Sim(
+        people=pop,
+        diseases=tb,
+        networks=net,
+        interventions=[bcg],
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'))
+    )
     sim.run()
-    bcg = sim.interventions['bcgprotection']
     
-    # Check that vaccinations happened early (immediate vaccination)
-    vacc_times = bcg.ti_bcg_vaccinated.raw
-    valid_times = vacc_times[~np.isnan(vacc_times)]
+    # Check that protection is applied to clearance modifier
+    vaccinated_uids = bcg.is_bcg_vaccinated.uids
+    if len(vaccinated_uids) > 0:
+        protection_expires = np.array(bcg.ti_bcg_protection_expires[vaccinated_uids])
+        responders = vaccinated_uids[~np.isnan(protection_expires)]
+        
+        if len(responders) > 0:
+            # Apply protection to check modifiers
+            bcg._update_protection_effects(responders, apply=True)
+            rr_clearance = tb.rr_clearance[responders]
+            
+            # Clearance modifier should be > 1.0 (increases clearance rate)
+            assert np.mean(rr_clearance) > 1.0, \
+                f"BCG should increase clearance rate (rr_clearance > 1.0, got {np.mean(rr_clearance):.3f})"
+            assert np.mean(rr_clearance) > 1.2, \
+                f"BCG should significantly increase clearance (expected ~1.5, got {np.mean(rr_clearance):.3f})"
+
+
+def test_bcg_protection_reduces_death_rate():
+    """Test that BCG protection reduces active-to-death rate"""
+    nagents = 300
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+    tb = mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     
-    vaccinated = bcg.is_bcg_vaccinated.sum()
-    assert vaccinated > 0, "Some individuals should be vaccinated"
-    assert hasattr(bcg, 'ti_bcg_scheduled'), "ti_bcg_scheduled state should exist"
+    bcg = mtb.BCGProtection(pars={
+        'coverage': 1.0,
+        'efficacy': 1.0,
+        'age_range': (0, 100),
+        'delivery': ss.uniform(0, 1),
+        'death_modifier': ss.uniform(0.1, 0.1),  # Fixed 0.1x death
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2005-12-31')
+    })
     
-    if len(valid_times) > 0:
-        # With immediate vaccination, mean vaccination time should be very early
-        # Convert timesteps to years for comparison
-        dt_years = sim.dt.value / 365.25
-        mean_vacc_years = np.mean(valid_times) * dt_years
-        assert mean_vacc_years < 1.0, f"Immediate vaccination should happen early (<1 year), got mean time: {mean_vacc_years:.2f} years"
+    sim = ss.Sim(
+        people=pop,
+        diseases=tb,
+        networks=net,
+        interventions=[bcg],
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'))
+    )
+    sim.run()
+    
+    # Check that protection is applied to death modifier
+    vaccinated_uids = bcg.is_bcg_vaccinated.uids
+    if len(vaccinated_uids) > 0:
+        protection_expires = np.array(bcg.ti_bcg_protection_expires[vaccinated_uids])
+        responders = vaccinated_uids[~np.isnan(protection_expires)]
+        
+        if len(responders) > 0:
+            # Apply protection to check modifiers
+            bcg._update_protection_effects(responders, apply=True)
+            rr_death = tb.rr_death[responders]
+            
+            # Death modifier should be < 1.0 (reduces death rate)
+            assert np.mean(rr_death) < 1.0, \
+                f"BCG should reduce death rate (rr_death < 1.0, got {np.mean(rr_death):.3f})"
+            assert np.mean(rr_death) < 0.2, \
+                f"BCG should significantly reduce death (expected ~0.1, got {np.mean(rr_death):.3f})"
+
+
+def test_bcg_protection_waning_over_time():
+    """Test that BCG protection wanes over time"""
+    nagents = 200
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+    tb = mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    
+    bcg = mtb.BCGProtection(pars={
+        'coverage': 1.0,
+        'efficacy': 1.0,
+        'age_range': (0, 100),
+        'delivery': ss.uniform(0, 1),
+        'immunity_period': ss.years(10),
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2015-12-31')
+    })
+    
+    sim = ss.Sim(
+        people=pop,
+        diseases=tb,
+        networks=net,
+        interventions=[bcg],
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2015-12-31'))
+    )
+    sim.run()
+    
+    vaccinated_uids = bcg.is_bcg_vaccinated.uids
+    if len(vaccinated_uids) > 0:
+        protection_expires = np.array(bcg.ti_bcg_protection_expires[vaccinated_uids])
+        responders = vaccinated_uids[~np.isnan(protection_expires)]
+        
+        if len(responders) > 0:
+            # Check waning at different times
+            vaccination_times = bcg.ti_bcg_vaccinated[responders]
+            
+            # Early in protection (1 year after vaccination)
+            early_time = vaccination_times[0] + (365.25 / sim.dt.days)  # 1 year later
+            early_waning = bcg._calculate_waning_factor(vaccination_times[:1], early_time)
+            
+            # Late in protection (9 years after vaccination, near expiration)
+            late_time = vaccination_times[0] + (9 * 365.25 / sim.dt.days)  # 9 years later
+            late_waning = bcg._calculate_waning_factor(vaccination_times[:1], late_time)
+            
+            # Waning should decrease over time
+            assert early_waning[0] > late_waning[0], \
+                f"Protection should wane over time (early: {early_waning[0]:.3f}, late: {late_waning[0]:.3f})"
+            assert early_waning[0] > 0.5, \
+                f"Early protection should be strong (waning factor > 0.5, got {early_waning[0]:.3f})"
+
+
+def test_bcg_protection_reapplied_each_timestep():
+    """Test that BCG protection is re-applied each timestep after TB resets modifiers"""
+    nagents = 100
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+    tb = mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    
+    bcg = mtb.BCGProtection(pars={
+        'coverage': 1.0,
+        'efficacy': 1.0,
+        'age_range': (0, 100),
+        'delivery': ss.uniform(0, 1),
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2002-12-31')
+    })
+    
+    sim = ss.Sim(
+        people=pop,
+        diseases=tb,
+        networks=net,
+        interventions=[bcg],
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2002-12-31'))
+    )
+    sim.run()
+    
+    # After simulation, TB has reset modifiers to 1.0
+    # Check that BCG can re-apply protection
+    vaccinated_uids = bcg.is_bcg_vaccinated.uids
+    if len(vaccinated_uids) > 0:
+        protection_expires = np.array(bcg.ti_bcg_protection_expires[vaccinated_uids])
+        responders = vaccinated_uids[~np.isnan(protection_expires)]
+        
+        if len(responders) > 0:
+            # TB should have reset modifiers to 1.0
+            assert np.allclose(tb.rr_activation[responders], 1.0, atol=0.01), \
+                "TB should have reset rr_activation to 1.0"
+            
+            # Re-apply protection
+            bcg._update_protection_effects(responders, apply=True)
+            
+            # Check that protection is now applied
+            rr_activation = tb.rr_activation[responders]
+            assert not np.allclose(rr_activation, 1.0, atol=0.01), \
+                f"Protection should be re-applied (rr_activation should be < 1.0, got mean: {np.mean(rr_activation):.3f})"
+            assert np.mean(rr_activation) < 0.7, \
+                f"Protection should reduce activation (expected < 0.7, got {np.mean(rr_activation):.3f})"
+
+
+def test_bcg_protection_expires_correctly():
+    """Test that BCG protection expires after immunity_period and effects are removed"""
+    nagents = 100
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+    tb = mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    
+    bcg = mtb.BCGProtection(pars={
+        'coverage': 1.0,
+        'efficacy': 1.0,
+        'age_range': (0, 100),
+        'delivery': ss.uniform(0, 0.5),  # Vaccinate within first 6 months
+        'immunity_period': ss.years(1),  # 1 year protection
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2003-12-31')
+    })
+    
+    sim = ss.Sim(
+        people=pop,
+        diseases=tb,
+        networks=net,
+        interventions=[bcg],
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2003-12-31'))
+    )
+    sim.run()
+    
+    # After 3 years with 1-year protection, most should have expired
+    vaccinated_uids = bcg.is_bcg_vaccinated.uids
+    if len(vaccinated_uids) > 0:
+        protection_expires = np.array(bcg.ti_bcg_protection_expires[vaccinated_uids])
+        responders = vaccinated_uids[~np.isnan(protection_expires)]
+        
+        if len(responders) > 0:
+            # Check who is still protected (not expired)
+            current_time = sim.ti
+            expires_array = protection_expires[~np.isnan(protection_expires)]
+            still_protected_mask = current_time <= expires_array
+            still_protected = responders[still_protected_mask]
+            expired = responders[~still_protected_mask]
+            
+            # Most protection should have expired after 3 years with 1-year immunity
+            if len(expired) > 0:
+                # Expired individuals should have modifiers reset to 1.0
+                bcg._update_protection_effects(expired, apply=False)
+                rr_activation_expired = tb.rr_activation[expired]
+                assert np.allclose(rr_activation_expired, 1.0, atol=0.01), \
+                    "Expired protection should reset modifiers to 1.0"
+
+
+def test_bcg_protection_combined_effects():
+    """Test that BCG protection has combined effects on all three risk modifiers"""
+    nagents = 200
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+    tb = mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    
+    bcg = mtb.BCGProtection(pars={
+        'coverage': 1.0,
+        'efficacy': 1.0,
+        'age_range': (0, 100),
+        'delivery': ss.uniform(0, 1),
+        'activation_modifier': ss.uniform(0.5, 0.65),
+        'clearance_modifier': ss.uniform(1.3, 1.5),
+        'death_modifier': ss.uniform(0.05, 0.15),
+        'start': ss.date('2000-01-01'),
+        'stop': ss.date('2005-12-31')
+    })
+    
+    sim = ss.Sim(
+        people=pop,
+        diseases=tb,
+        networks=net,
+        interventions=[bcg],
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'))
+    )
+    sim.run()
+    
+    # Verify all three protection effects are applied
+    vaccinated_uids = bcg.is_bcg_vaccinated.uids
+    if len(vaccinated_uids) > 0:
+        protection_expires = np.array(bcg.ti_bcg_protection_expires[vaccinated_uids])
+        responders = vaccinated_uids[~np.isnan(protection_expires)]
+        
+        if len(responders) > 0:
+            # Apply protection
+            bcg._update_protection_effects(responders, apply=True)
+            
+            rr_activation = tb.rr_activation[responders]
+            rr_clearance = tb.rr_clearance[responders]
+            rr_death = tb.rr_death[responders]
+            
+            # All three modifiers should be modified
+            assert np.all(rr_activation < 1.0), \
+                f"All rr_activation should be < 1.0 (got range: {np.min(rr_activation):.3f}-{np.max(rr_activation):.3f})"
+            assert np.all(rr_clearance > 1.0), \
+                f"All rr_clearance should be > 1.0 (got range: {np.min(rr_clearance):.3f}-{np.max(rr_clearance):.3f})"
+            assert np.all(rr_death < 1.0), \
+                f"All rr_death should be < 1.0 (got range: {np.min(rr_death):.3f}-{np.max(rr_death):.3f})"
+            
+            # Check expected ranges (with waning, values may be slightly outside base ranges)
+            assert np.all(rr_activation >= 0.3), \
+                f"rr_activation should be >= 0.3 (got min: {np.min(rr_activation):.3f})"
+            assert np.all(rr_activation <= 0.8), \
+                f"rr_activation should be <= 0.8 (got max: {np.max(rr_activation):.3f})"
+            assert np.all(rr_clearance >= 1.1), \
+                f"rr_clearance should be >= 1.1 (got min: {np.min(rr_clearance):.3f})"
+            assert np.all(rr_clearance <= 1.7), \
+                f"rr_clearance should be <= 1.7 (got max: {np.max(rr_clearance):.3f})"
+            assert np.all(rr_death >= 0.0), \
+                f"rr_death should be >= 0.0 (got min: {np.min(rr_death):.3f})"
+            assert np.all(rr_death <= 0.3), \
+                f"rr_death should be <= 0.3 (got max: {np.max(rr_death):.3f})"
