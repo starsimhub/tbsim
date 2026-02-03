@@ -346,6 +346,10 @@ class BCGProtection(ss.Intervention):
         # This ensures protection is active for the NEXT timestep when TB uses the modifiers
         # This is essential because TB resets rr_activation, rr_clearance, rr_death to 1.0
         # at the end of its step(), so we must re-apply protection here
+        #
+        # BUG FIX (Issue #3): Exclude newly vaccinated this timestep from re-application.
+        # They already had protection applied in step() before TB ran. Including them here
+        # would double-apply protection (squaring efficacy: 0.5 -> 0.25) in the same timestep.
         all_vaccinated = self.is_bcg_vaccinated.uids
         if len(all_vaccinated) > 0:
             current_time = self.sim.ti
@@ -356,11 +360,15 @@ class BCGProtection(ss.Intervention):
                 ~np.isnan(expires_array)
             )
             protected_uids = all_vaccinated[protected_mask]
-            if len(protected_uids) > 0:
+            # Exclude newly vaccinated this timestep - they were already applied in step()
+            # (avoids double-application bug: squaring efficacy 0.5 -> 0.25 in first timestep)
+            newly_vaccinated_mask = np.asarray(self.ti_bcg_vaccinated[protected_uids]) == current_time
+            previously_protected = protected_uids[~newly_vaccinated_mask]
+            if len(previously_protected) > 0:
                 # Re-apply protection to ensure it's active for next timestep
                 # This happens AFTER TB has reset modifiers, so protection will be active
                 # when BCG step() runs at the start of the next timestep
-                self._update_protection_effects(protected_uids, apply=True)
+                self._update_protection_effects(previously_protected, apply=True)
         
         # Use self.ti (intervention's timestep counter) instead of self.sim.ti
         # This ensures we index into results arrays that are sized based on npts
