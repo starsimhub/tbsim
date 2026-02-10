@@ -11,10 +11,13 @@ if [ ! -L "tutorials" ]; then
     echo "Created symlink to tutorials directory"
 fi
 
-# Set up matplotlib backend for Jupyter
-mkdir -p ~/.jupyter
-echo "c.NotebookApp.allow_origin = '*'" >> ~/.jupyter/jupyter_notebook_config.py
-echo "c.NotebookApp.ip = '0.0.0.0'" >> ~/.jupyter/jupyter_notebook_config.py
+# Set up Jupyter config for Binder user (postBuild may run as root during image build)
+JUPYTER_DIR="/home/jovyan/.jupyter"
+mkdir -p "$JUPYTER_DIR"
+echo "c.NotebookApp.allow_origin = '*'" >> "$JUPYTER_DIR/jupyter_notebook_config.py"
+echo "c.NotebookApp.ip = '0.0.0.0'" >> "$JUPYTER_DIR/jupyter_notebook_config.py"
+# Ensure jovyan can use this when postBuild runs as root
+if [ "$(id -u)" = 0 ]; then chown -R jovyan:jovyan "$JUPYTER_DIR"; fi
 
 # Create a welcome notebook
 cat > welcome.ipynb << 'EOF'
@@ -93,6 +96,7 @@ cat > welcome.ipynb << 'EOF'
 EOF
 
 echo "Created welcome notebook"
+if [ "$(id -u)" = 0 ]; then chown jovyan:jovyan welcome.ipynb 2>/dev/null || true; fi
 
 # Set up environment variables
 export PYTHONPATH="${PYTHONPATH}:/home/jovyan/work"

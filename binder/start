@@ -8,5 +8,10 @@ echo "Starting Jupyter notebook server..."
 # Set up environment variables
 export PYTHONPATH="${PYTHONPATH}:/home/jovyan/work"
 
+# Run postBuild if present (repo is mounted at runtime; no chmod needed when using bash)
+if [ -f binder/postBuild ]; then
+    bash binder/postBuild
+fi
+
 # Launch Jupyter notebook
 jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password='' 

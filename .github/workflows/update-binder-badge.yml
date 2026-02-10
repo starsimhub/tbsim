@@ -1,0 +1,33 @@
+# Update Binder badge in README to use current repo and default branch (HEAD)
+# so the badge auto-resolves when invoked from this repo or any fork.
+name: Update Binder badge URL
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'README.md'
+      - '.github/workflows/update-binder-badge.yml'
+  workflow_dispatch:
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set Binder URL to current repo and HEAD
+        run: |
+          REPO="${{ github.repository }}"
+          # Replace repo in mybinder.org URLs so badge points to this repo and default branch
+          sed -i.bak "s|\(https://mybinder.org/v2/gh\)/[^/]*/[^/]*/|\1/${REPO}/|g" README.md
+          rm -f README.md.bak
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --exit-code README.md || (git add README.md && git commit -m "chore: point Binder badge at current repo (${GITHUB_REPOSITORY}) and HEAD" && git push)

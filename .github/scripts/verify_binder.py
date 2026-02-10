@@ -91,11 +91,11 @@ def main():
     if success:
         print("🎉 All Binder checks passed!")
         print("\nBinder Links:")
-        print("- Main: https://mybinder.org/v2/gh/starsimhub/tbsim/main")
-        print("- Direct to tutorial: https://mybinder.org/v2/gh/starsimhub/tbsim/main?filepath=docs%2Ftutorials%2Ftb_interventions_tutorial.ipynb")
+        print("- Main (uses repo default branch): https://mybinder.org/v2/gh/starsimhub/tbsim/HEAD")
+        print("- Direct to tutorial: https://mybinder.org/v2/gh/starsimhub/tbsim/HEAD?filepath=docs%2Ftutorials%2Ftb_interventions_tutorial.ipynb")
         sys.exit(0)
     else:
-        print("❌ Some Binder checks failed. Please fix the issues above.")
+        print("***** Some Binder checks failed. Please fix the issues above.")
         sys.exit(1)
 
 if __name__ == "__main__":

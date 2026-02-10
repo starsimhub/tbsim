@@ -13,7 +13,6 @@ RUN apt-get update && apt-get install -y \
 
 # Create jovyan user (Binder standard)
 RUN useradd -m -s /bin/bash jovyan
-USER jovyan
 WORKDIR /home/jovyan/work
 
 # Copy requirements and install Python packages
@@ -25,6 +24,9 @@ COPY binder/start .
 
 # Expose port
 EXPOSE 8888
+
+# Switch to jovyan only at the end so repo2docker-injected COPY/chmod/RUN postBuild run as root (avoids "chmod: Operation not permitted")
+USER jovyan
 
 # Default command
 CMD ["bash", "start"] 
