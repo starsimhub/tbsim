@@ -1,18 +1,7 @@
 """
 LSHTM TB sample script (TB_LSHTM / TB_LSHTM_Acute).
 
-Runs a Starsim simulation with the LSHTM TB module, optional Births/Deaths,
-and a random contact network. All parameters are defined at the top:
-
-  RUN_PARS          — run behavior (variant, n_agents, years, plot, …)
-  DEFAULT_TB_PARS   — TB model (init_prev, beta, kappa, …)
-  DEFAULT_ACUTE_PARS — acute variant (acuinf, alpha)
-  DEFAULT_NET_PARS  — RandomNet (n_contacts, dur)
-  DEFAULT_SIM_PARS  — dt, verbose
-  DEFAULT_DEMO_PARS — birth_rate, death_rate
-
-Usage: edit RUN_PARS (and optionally DEFAULT_*), then run:
-  python run_tb_lshtm.py
+Edit tb_params and sim_params below; build_lshtm_sim(tb_params, sim_params) uses them.
 """
 
 import matplotlib.pyplot as plt
@@ -21,137 +10,88 @@ import tbsim as mtb
 import starsim as ss
 
 
-# -----------------------------------------------------------------------------
-# Run parameters (edit these to change run behavior)
-# -----------------------------------------------------------------------------
+# =============================================================================
+# tb_params — passed to TB_LSHTM(pars=...) or TB_LSHTM_Acute(pars=...)
+# =============================================================================
 
-RUN_PARS = {
-    "use_acute": False,
-    "with_demographics": True,
+tb_params = {
+    "use_acute": False,             # True → TB_LSHTM_Acute
+    "init_prev": ss.bernoulli(0.01), # seed prevalence
+    "beta": ss.peryear(0.25), # transmission rate
+    "kappa": 0.82,            # asymp vs symp relative transmissibility      
+    "pi": 0.21,               # reinfection risk after recovery (unconfirmed)
+    "rho": 3.15,              # reinfection risk after treatment
+    "cxr_asymp_sens": 1.0,    # CXR sensitivity for asymptomatic (0–1)  
+    # Acute variant only (ignored if use_acute is False)
+    "acuinf": ss.years(ss.expon(1 / 4.0)),   # 1/4 years to infectious
+    "alpha": 0.9,                            # reinfection risk after treatment
+}
+
+# =============================================================================
+# sim_params — run setup, network, Sim pars, demographics
+# =============================================================================
+
+sim_params = {
+    # Run
     "n_agents": 5_000,
     "start_year": 1990,
     "years": 20,
-    "rand_seed": None,
+    "rand_seed": 5,
     "plot": True,
-}
-
-# -----------------------------------------------------------------------------
-# TB and network/sim/demographics defaults (merged with user overrides in build_lshtm_sim)
-# -----------------------------------------------------------------------------
-# TB model parameters; names and types must match tbsim.models.tb_lshtm.TB_LSHTM.define_pars.
-DEFAULT_TB_PARS = {
-    "init_prev": ss.bernoulli(0.01),   # Initial prevalence (seed infections)
-    "beta": ss.peryear(0.25),          # Transmission rate per year
-    "kappa": 0.82,                     # Relative transmission (asymptomatic vs symptomatic)
-    "pi": 0.21,                        # Relative risk reinfection after recovery (unconfirmed)
-    "rho": 3.15,                       # Relative risk reinfection after treatment completion
-    "cxr_asymp_sens": 1.0,             # CXR sensitivity for screening asymptomatic (0–1)
-}
-
-# Extra parameters for TB_LSHTM_Acute only; merged when use_acute=True.
-DEFAULT_ACUTE_PARS = {
-    "acuinf": ss.years(ss.expon(1 / 4.0)),  # Rate ACUTE → INFECTION per year
-    "alpha": 0.9,                           # Relative transmission from acute vs symptomatic
-}
-
-# ss.RandomNet parameters: n_contacts (e.g. ss.poisson), dur (contact duration).
-DEFAULT_NET_PARS = {
+    # Network (RandomNet)
     "n_contacts": ss.poisson(lam=5),
     "dur": 0,
-}
-
-# Sim pars: dt (time step), verbose (0–1). start/stop set from start_year/stop_year in build_lshtm_sim.
-DEFAULT_SIM_PARS = {
+    # Sim
     "dt": ss.days(7),
-    "verbose": 0.1,
-}
-
-# Demographics for ss.Births and ss.Deaths: rates per 1000 population per year.
-DEFAULT_DEMO_PARS = {
+    "verbose": 0.002,
+    # Demographics (Births, Deaths); set with_demographics False to disable
+    "with_demographics": True,
     "birth_rate": 25,
     "death_rate": 10,
 }
 
 
-def build_lshtm_sim(
-    n_agents=10_000,
-    start_year=1990,
-    stop_year=2010,
-    dt=None,
-    use_acute=False,
-    with_demographics=True,
-    tb_pars=None,
-    net_pars=None,
-    sim_pars=None,
-    demo_pars=None,
-    verbose=0.1,
-):
-    """Build a Starsim simulation with TB_LSHTM or TB_LSHTM_Acute. *pars are merged with DEFAULT_*; user overrides win."""
-    # TB disease: merge defaults with user overrides (user overrides last)
-    tb = dict(DEFAULT_TB_PARS)
+def build_lshtm_sim(tb_params, sim_params):
+    """Build a Starsim simulation from tb_params and sim_params."""
+    use_acute = tb_params.get("use_acute", False)
+    skip = {"use_acute"}
+    if not use_acute:
+        skip |= {"acuinf", "alpha"}  # base model doesn't use these
+    infection_pars = {k: v for k, v in tb_params.items() if k not in skip}
     if use_acute:
-        tb.update(DEFAULT_ACUTE_PARS)
-    tb.update(tb_pars or {})
-    if use_acute:
-        infection = mtb.TB_LSHTM_Acute(pars=tb)
+        infection = mtb.TB_LSHTM_Acute(pars=infection_pars)
     else:
-        infection = mtb.TB_LSHTM(pars=tb)
+        infection = mtb.TB_LSHTM(pars=infection_pars)
 
-    pop = ss.People(n_agents=n_agents)
+    pop = ss.People(n_agents=sim_params["n_agents"])
+    net = ss.RandomNet(pars={"n_contacts": sim_params["n_contacts"], "dur": sim_params["dur"]})
 
-    net_p = dict(DEFAULT_NET_PARS)
-    net_p.update(net_pars or {})
-    net = ss.RandomNet(pars=net_p)
+    start_year = sim_params["start_year"]
+    stop_year = start_year + sim_params["years"]
+    sp = {
+        "start": ss.date(f"{start_year}-01-01"),
+        "stop": ss.date(f"{stop_year}-12-31"),
+        "dt": sim_params["dt"],
+        "verbose": sim_params["verbose"],
+    }
+    if sim_params.get("rand_seed") is not None:
+        sp["rand_seed"] = sim_params["rand_seed"]
 
-    sp = dict(DEFAULT_SIM_PARS, verbose=verbose)
-    sp["start"] = ss.date(f"{start_year}-01-01")
-    sp["stop"] = ss.date(f"{stop_year}-12-31")
-    if dt is not None:
-        sp["dt"] = dt
-    sp.update(sim_pars or {})
-
-    if with_demographics:
-        dp = dict(DEFAULT_DEMO_PARS)
-        dp.update(demo_pars or {})
+    if sim_params.get("with_demographics", True):
         demographics = [
-            ss.Births(pars=dict(birth_rate=dp["birth_rate"])),
-            ss.Deaths(pars=dict(death_rate=dp["death_rate"])),
+            ss.Births(pars=dict(birth_rate=sim_params["birth_rate"])),
+            ss.Deaths(pars=dict(death_rate=sim_params["death_rate"])),
         ]
-        sim = ss.Sim(
-            people=pop,
-            networks=net,
-            diseases=infection,
-            demographics=demographics,
-            pars=sp,
-        )
+        sim = ss.Sim(people=pop, networks=net, diseases=infection, demographics=demographics, pars=sp)
     else:
-        sim = ss.Sim(
-            people=pop,
-            networks=net,
-            diseases=infection,
-            pars=sp,
-        )
+        sim = ss.Sim(people=pop, networks=net, diseases=infection, pars=sp)
 
     return sim
 
 
 def main():
-    """Build sim from RUN_PARS and DEFAULT_*, run, print summary; if RUN_PARS['plot'], call mtb.plot_combined and plt.show()."""
-    r = RUN_PARS
-    stop_year = r["start_year"] + r["years"]
-    sim_pars = {}
-    if r["rand_seed"] is not None:
-        sim_pars["rand_seed"] = r["rand_seed"]
-
-    sim = build_lshtm_sim(
-        n_agents=r["n_agents"],
-        start_year=r["start_year"],
-        stop_year=stop_year,
-        use_acute=r["use_acute"],
-        with_demographics=r["with_demographics"],
-        sim_pars=sim_pars if sim_pars else None,
-        verbose=DEFAULT_SIM_PARS["verbose"],
-    )
+    """Build sim from tb_params and sim_params, run, print summary; show plot if sim_params['plot']."""
+    sim = build_lshtm_sim(tb_params, sim_params)
 
     sim.run()
     print("Done.")
@@ -163,7 +103,7 @@ def main():
     print(f"  Prevalence active (final): {res['prevalence_active'][idx]:.4f}")
     print(f"  Incidence (final, per 1000 py): {res['incidence_kpy'][idx]:.2f}")
 
-    if r["plot"]:
+    if sim_params["plot"]:
         flat = sim.results.flatten()
         flat_str = {str(k): v for k, v in flat.items()}
         results = {"TB LSHTM": flat_str}
