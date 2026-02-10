@@ -1,12 +1,8 @@
 # Tuberculosis Modeling using Starsim (TBsim)
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/starsimhub/tbsim/main?filepath=docs%2Ftutorials%2Ftuberculosis_sim.ipynb)
-
 **Warning! TBsim is still in the early stages of development. It is being shared solely for transparency and to facilitate collaborative development. It is not ready to be used for real research or policy questions.**
 
 This repository contains tuberculosis (TB) models built on the [Starsim](https://github.com/starsimhub/starsim) package. It simulates TB spread, treatment, and interventions in a population, with support for comorbidities (HIV, malnutrition), interventions (BCG, TPT, DOTS, diagnostics), and analysis tools.
-
-**Try the tutorials online!** Click the Binder badge above to launch an interactive environment with all tutorials ready to run.
 
 ## Introduction
 
@@ -25,15 +21,6 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
 
 ## Getting Started
 
-### Option 1: Run Online (Recommended for Beginners)
-
-The easiest way to get started is to run the tutorials online using Binder:
-
-1. **Click the Binder badge** at the top of this README
-2. **Wait for the environment to build** (takes 2-3 minutes)
-3. **Navigate to the `tutorials` directory**
-4. **Open any tutorial notebook** and start exploring!
-
 Available tutorials (in `docs/tutorials/`):
 - `tuberculosis_sim.ipynb` - Basic TB simulation
 - `lshtm_model_example.ipynb` - LSHTM-style TB model (TB_LSHTM) quick start
@@ -42,7 +29,7 @@ Available tutorials (in `docs/tutorials/`):
 - `run_tbhiv_scens.ipynb` - TB-HIV scenario runs
 - `comprehensive_analyzer_plots_example.ipynb` - Dwell-time analysis and plotting
 
-### Option 2: Local Installation
+### Local installation (recommended)
 
 #### Prerequisites
 
