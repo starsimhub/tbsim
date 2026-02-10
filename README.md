@@ -1,24 +1,27 @@
 # Tuberculosis Modeling using Starsim (TBsim)
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/starsimhub/tbsim/main?filepath=docs%2Ftutorials%2Ftb_interventions_tutorial.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/starsimhub/tbsim/main?filepath=docs%2Ftutorials%2Ftuberculosis_sim.ipynb)
 
 **Warning! TBsim is still in the early stages of development. It is being shared solely for transparency and to facilitate collaborative development. It is not ready to be used for real research or policy questions.**
 
-This repository contains the implementation of a new Tuberculosis (TB) model using the Starsim package. The model aims to simulate the dynamics of TB spread and treatment efficacy under various scenarios.
+This repository contains tuberculosis (TB) models built on the [Starsim](https://github.com/starsimhub/starsim) package. It simulates TB spread, treatment, and interventions in a population, with support for comorbidities (HIV, malnutrition), interventions (BCG, TPT, DOTS, diagnostics), and analysis tools.
 
 **Try the tutorials online!** Click the Binder badge above to launch an interactive environment with all tutorials ready to run.
 
 ## Introduction
 
-Tuberculosis is a major global health problem, and understanding its dynamics can help in developing better strategies for control and treatment. This project uses the Starsim package to simulate TB spread in a population, considering factors like transmission rates, treatment efficacy, and social dynamics.
+Tuberculosis is a major global health problem, and understanding its dynamics can help in developing better strategies for control and treatment. TBsim uses Starsim to simulate TB in a population, including transmission, progression, treatment, and the impact of interventions and comorbidities.
 
 ## Features
 
-- **TB Dynamics Simulation:** Models the spread of TB in a given population.
-- **Treatment Scenarios:** Evaluates the efficacy of different treatment strategies.
-- **Customizable Parameters:** Allows adjustment of various parameters to simulate different scenarios.
-- **Visualization Tools:** Includes tools for visualizing the simulation results.
-- **IBM and NBM:** Leverages Individual-Based Models and Network-Based Models for more accurate and comprehensive simulations.
+- **Two TB model formulations:**
+  - **Natural history model** (`TB`): Latent (slow/fast) and active states (pre-symptomatic, smear +/- , extra-pulmonary), with detailed progression and treatment.
+  - **LSHTM-style model** (`TB_LSHTM`, `TB_LSHTM_Acute`): Compartmental formulation with infection → unconfirmed/asymptomatic/symptomatic → treatment, and optional acute-infectious state.
+- **Comorbidities:** HIV and malnutrition with connectors for TB interaction.
+- **Interventions:** BCG vaccination, TPT, DOTS-style treatment, enhanced diagnostics, health-seeking behavior.
+- **Networks:** Random and household networks for contact structure.
+- **Analysis:** Dwell-time analyzers, visualizations, and post-processing.
+- **IBM and network-based:** Individual-based and network-based transmission.
 
 ## Getting Started
 
@@ -31,55 +34,80 @@ The easiest way to get started is to run the tutorials online using Binder:
 3. **Navigate to the `tutorials` directory**
 4. **Open any tutorial notebook** and start exploring!
 
-Available tutorials:
-- `tb_interventions_tutorial.ipynb` - TB interventions modeling
-- `tbhiv_comorbidity.ipynb` - TB-HIV comorbidity analysis  
+Available tutorials (in `docs/tutorials/`):
 - `tuberculosis_sim.ipynb` - Basic TB simulation
+- `lshtm_model_example.ipynb` - LSHTM-style TB model (TB_LSHTM) quick start
+- `tb_interventions_tutorial.ipynb` - TB interventions (BCG, TPT, DOTS, etc.)
+- `tbhiv_comorbidity.ipynb` - TB-HIV comorbidity analysis
+- `run_tbhiv_scens.ipynb` - TB-HIV scenario runs
+- `comprehensive_analyzer_plots_example.ipynb` - Dwell-time analysis and plotting
 
 ### Option 2: Local Installation
 
 #### Prerequisites
 
 - Python 3.11 or higher
-- Starsim package
-- Other dependencies (listed in `requirements.txt`)
+- pip
+- Dependencies are listed in `requirements.txt` (Starsim and others are installed with TBsim)
 
-### Installation
+#### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/starsimhub/tbsim.git 
+   git clone https://github.com/starsimhub/tbsim.git
    cd tbsim
    ```
-2. Install the required packages:
+2. Install TBsim and its dependencies:
    ```bash
    pip install -e .
    ```
 
-### Starsim:
-The steps described below will allow you to use the latest unreleased features of starsim, it needs to be run after tbsim has been installed to allow for the package to be updated:
-1. Clone and install starsim:
-   ```bash
-   git clone https://github.com/starsimhub/starsim.git 
-   cd starsim
-   pip install -e .
+#### Optional: latest Starsim (development)
 
-   ```
+To use the latest unreleased Starsim features, install Starsim in development mode after installing TBsim:
 
-### Running a sample simulation
+```bash
+git clone https://github.com/starsimhub/starsim.git
+cd starsim
+pip install -e .
+```
 
-1. Navigate to the directory **_scripts/basic_**
-2. Run the script:
-   ```bash
-   python run_tb.py
-   ```
-3. running this script should result in basic charts being displayed.
+#### Running a sample simulation
 
-## Usage 
-- Usage examples are available in the **[scripts](https://github.com/starsimhub/tbsim/tree/main/scripts)** folder.
+From the repo root:
 
-## Documentation: 
-_TBsim_ is based on Starsim, please refer to [Starsim documentation](https://docs.idmod.org/projects/starsim/en/latest/) for additional information.
+```bash
+# Natural-history TB model
+python scripts/basic/run_tb.py
+
+# LSHTM-style TB model
+python scripts/basic/run_tb_lshtm.py
+```
+
+Or in Python:
+
+```python
+import starsim as ss
+from tbsim import TB, TB_LSHTM
+
+# Natural-history model
+sim = ss.Sim(diseases=TB())
+sim.run()
+
+# LSHTM-style model
+sim = ss.Sim(diseases=TB_LSHTM())
+sim.run()
+```
+
+## Usage
+
+- **Tutorials:** See `docs/tutorials/` (and the [online docs](https://starsimhub.github.io/tbsim/) if built).
+- **Scripts:** Example runs and demos are in [scripts/](https://github.com/starsimhub/tbsim/tree/main/scripts) (e.g. `scripts/basic/`).
+
+## Documentation
+
+- **TBsim API and tutorials:** Build locally with `cd docs && make html` (see [Building the Documentation](#building-the-documentation) below), or see the deployed site if available.
+- **Starsim:** TBsim is built on [Starsim](https://docs.idmod.org/projects/starsim/en/latest/); refer to its docs for the core framework.
 
 ## Contributing
 
@@ -95,7 +123,7 @@ Contributions to the TBsim project are welcome! Please read [CONTRIBUTING.md](ht
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](https://github.com/amath-idm/tbsim/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/starsimhub/tbsim/blob/main/LICENSE) file for details.
 
 ## Disclaimer
 The code in this repository was developed by IDM, the Burnet Institute, and other collaborators to support our joint research on flexible agent-based modeling. We've made it publicly available under the MIT License to provide others with a better understanding of our research and an opportunity to build upon it for their own work. We make no representations that the code works as intended or that we will provide support, address issues that are found, or accept pull requests. You are welcome to create your own fork and modify the code to suit your own modeling needs as permitted under the MIT License.
@@ -107,15 +135,14 @@ The code in this repository was developed by IDM, the Burnet Institute, and othe
 
 ## Building the Documentation
 
-To build the documentation locally:
+To build the API and tutorial docs locally:
 
-1. Install the documentation dependencies:
+1. From the repo root, install doc dependencies:
    ```bash
    pip install -r docs/requirements.txt
    ```
-2. Build the docs:
+2. Build the HTML docs:
    ```bash
-   cd docs
-   make html
+   cd docs && make html
    ```
-3. The generated HTML will be in `docs/_build/html/index.html`.
+3. Open `docs/_build/html/index.html` in a browser.
