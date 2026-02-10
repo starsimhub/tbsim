@@ -1,6 +1,6 @@
 # Tuberculosis Modeling using Starsim (TBsim)
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/starsimhub/tbsim/main?filepath=docs%2Ftutorials%2Ftuberculosis_sim.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/starsimhub/tbsimV2/main?filepath=docs%2Ftutorials%2Ftuberculosis_sim.ipynb)
 
 **Warning! TBsim is still in the early stages of development. It is being shared solely for transparency and to facilitate collaborative development. It is not ready to be used for real research or policy questions.**
 
