@@ -1,12 +1,12 @@
-TB Disease Model
-===============
+Natural History TB Model
+========================
 
 This module implements the core tuberculosis disease model for TBsim simulations, including disease dynamics, state transitions, and transmission modeling.
 
 Main TB Module
 --------------
 
-.. automodule:: tbsim.tb
+.. automodule:: tbsim.models.tb
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ Main TB Module
 TB State Enumeration
 --------------------
 
-.. automodule:: tbsim.tb.TBS
+.. automodule:: tbsim.models.tb.TBS
    :members:
    :undoc-members:
    :show-inheritance:
@@ -22,7 +22,7 @@ TB State Enumeration
 TB Disease Class
 ----------------
 
-.. automodule:: tbsim.tb.TB
+.. automodule:: tbsim.models.tb.TB
    :members:
    :undoc-members:
    :show-inheritance:
@@ -77,7 +77,7 @@ Key Methods
 Usage Examples
 -------------
 
-Basic TB simulation:
+Basic TB simulation (TB and TBS are also available from the main package):
 
 .. code-block:: python
 
@@ -140,4 +140,4 @@ State Management
    - Network structure determines transmission patterns
    - Intervention effects modify disease parameters
 
-For detailed information about specific methods and parameters, see the individual class documentation above. All methods include comprehensive mathematical models and implementation details in their docstrings. 
+For detailed information about specific methods and parameters, see the individual class documentation above. All methods include comprehensive mathematical models and implementation details in their docstrings.

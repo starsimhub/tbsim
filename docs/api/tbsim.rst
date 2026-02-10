@@ -26,10 +26,13 @@ TBsim is a comprehensive tuberculosis modeling framework built on the Starsim pl
 Key Components
 -------------
 
-**TB Disease Model** (`tbsim.tb`)
-   Main tuberculosis simulation class that handles disease dynamics, transmission, and state transitions.
+**Natural History TB Model** (`tbsim.models.tb`)
+   Main tuberculosis simulation class that handles disease dynamics, transmission, and state transitions. Implements the TBS state enumeration.
 
-**TBS State Enumeration** (`tbsim.tb.TBS`)
+**LSHTM-Style TB Models** (`tbsim.models.tb_lshtm`)
+   :class:`~tbsim.models.tb_lshtm.TB_LSHTM` and :class:`~tbsim.models.tb_lshtm.TB_LSHTM_Acute` provide compartmental TB models with LSHTM-inspired states (:class:`~tbsim.models.tb_lshtm.TBSL`). Available as ``TB_LSHTM`` and ``TB_LSHTM_Acute`` from the main package.
+
+**TBS State Enumeration** (`tbsim.models.tb.TBS`)
    Comprehensive state definitions for TB progression including latent, active, and treatment states.
 
 **Network Structures** (`tbsim.networks`)
@@ -92,14 +95,17 @@ Analysis and visualization:
 
 .. code-block:: python
 
+   from tbsim import TB
    from tbsim.analyzers import DwtAnalyzer
    
-   # Add analyzer to simulation
-   sim = ss.Sim(diseases=mtb.TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
-   
+   sim = ss.Sim(
+       diseases=TB(),
+       analyzers=DwtAnalyzer(scenario_name="Baseline"),
+       pars=dict(dt=ss.days(7), start=ss.date('1940'), stop=ss.date('2010'))
+   )
    sim.run()
    
-   # Access results and create visualizations
+   analyzer = sim.analyzers[0]
    analyzer.sankey_agents()
    analyzer.histogram_with_kde()
    analyzer.graph_state_transitions_enhanced() 

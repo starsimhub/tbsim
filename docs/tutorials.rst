@@ -20,6 +20,7 @@ Core Modeling
    :maxdepth: 2
    :caption: TB Modeling:
 
+   tutorials/lshtm_model_example.ipynb
    tutorials/tb_interventions_tutorial.ipynb
    tutorials/run_tbhiv_scens.ipynb
 
@@ -41,6 +42,9 @@ Tutorial Descriptions
 
 **tuberculosis_sim.ipynb**
    Comprehensive TB simulation tutorial with step-by-step explanations
+
+**lshtm_model_example.ipynb**
+   Minimal example: run the LSHTM-style TB model (TB_LSHTM) and plot prevalence and incidence.
 
 **tb_interventions_tutorial.ipynb**
    Detailed guide to implementing and analyzing TB interventions
