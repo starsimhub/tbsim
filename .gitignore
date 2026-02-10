@@ -172,6 +172,7 @@ cython_debug/
 
 # data files
 *.png
-# Exception: allow logo files for documentation
+# Exception: allow image files under docs for documentation
+!docs/**/*.png
 !docs/_static/*.png
 !docs/_static/*.svg
