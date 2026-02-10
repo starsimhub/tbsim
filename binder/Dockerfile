@@ -20,16 +20,11 @@ WORKDIR /home/jovyan/work
 COPY binder/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy postBuild script and make it executable
-COPY binder/postBuild .
-RUN chmod +x postBuild
-
-# Copy start script and make it executable
+# Copy start script (invoke via bash so no chmod needed in repo2docker)
 COPY binder/start .
-RUN chmod +x start
 
 # Expose port
 EXPOSE 8888
 
 # Default command
-CMD ["./start"] 
+CMD ["bash", "start"] 
