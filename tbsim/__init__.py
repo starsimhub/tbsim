@@ -2,7 +2,8 @@ from os.path import dirname, join as joinpath
 DATADIR = joinpath(dirname(__file__), 'data')
 
 
-from .models import TB_LSHTM, TB_LSHTM_Acute, TBSL, TB, TBS
+from .tb_lshtm import TB_LSHTM, TB_LSHTM_Acute, TBSL
+from .tb import TB, TBS
 from .comorbidities.malnutrition.malnutrition import Malnutrition
 from .comorbidities.hiv.hiv import HIV
 from .comorbidities.hiv.hiv import HIVState
