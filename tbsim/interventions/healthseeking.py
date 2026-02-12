@@ -1,108 +1,109 @@
 import numpy as np
 import starsim as ss
-from tbsim import TBS
+from tbsim import TBS, TBSL, TB_LSHTM, TB_LSHTM_Acute
 
 __all__ = ['HealthSeekingBehavior']
 
 
+def _get_tb(sim):
+    """Return the TB disease module (sim.diseases.tb or first disease when only one)."""
+    return getattr(sim.diseases, 'tb', None) or (sim.diseases[0] if len(sim.diseases) else None)
+
+
+def _active_tb_eligible(tb):
+    """Return boolean state array of agents with active TB eligible for care-seeking (and start_treatment)."""
+    if isinstance(tb, (TB_LSHTM, TB_LSHTM_Acute)):
+        return (
+            (tb.state == TBSL.UNCONFIRMED)
+            | (tb.state == TBSL.ASYMPTOMATIC)
+            | (tb.state == TBSL.SYMPTOMATIC)
+            | (tb.state == TBSL.ACUTE)
+        )
+    return (
+        (tb.state == TBS.ACTIVE_SMPOS)
+        | (tb.state == TBS.ACTIVE_SMNEG)
+        | (tb.state == TBS.ACTIVE_EXPTB)
+    )
+
+
 class HealthSeekingBehavior(ss.Intervention):
     """
-    Trigger care-seeking behavior for individuals with active TB.
+    Care-seeking for active TB; calls tb.start_treatment on those who seek care.
+    Works with TB (TBS) and LSHTM (TB_LSHTM / TB_LSHTM_Acute, TBSL).
 
     Parameters:
-        prob (float): Probability of seeking care per unit time.
-        single_use (bool): Whether to expire the intervention after success.
-        actual (Intervention): Optional downstream intervention (e.g. testing or treatment).
+        prob (float or ss.Dist): Probability per unit time. Ignored if initial_care_seeking_rate is set.
+        initial_care_seeking_rate: Optional rate (e.g. ss.perday(0.1)). If set, overrides prob.
+        single_use (bool): Expire after first care-seeking.
+        start, stop: Optional time window.
     """
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         self.define_pars(
-            prob=0.1,              # Daily probability of seeking care if active
-            single_use=True,       # Whether to expire after seeking care
-            start=None,            # Optional start time
-            stop=None,             # Optional stop time
+            prob=0.1,
+            initial_care_seeking_rate=None,
+            single_use=True,
+            start=None,
+            stop=None,
         )
         self.update_pars(pars=pars, **kwargs)
+        self.define_states(ss.BoolArr('sought_care', default=False))
+        self._new_seekers_count = 0
 
     def step(self):
         sim = self.sim
         t = sim.now
-        ppl = sim.people
-        tb = sim.diseases.tb
-
-        # Optional timing window
+        tb = _get_tb(sim)
+        if tb is None:
+            return
         if self.pars.start is not None and t < self.pars.start:
             return
         if self.pars.stop is not None and t > self.pars.stop:
             return
 
-        # Active TB and not yet sought care
-        active_tb = (tb.state == TBS.ACTIVE_SMPOS) | (tb.state == TBS.ACTIVE_SMNEG) | (tb.state == TBS.ACTIVE_EXPTB)
+        active_tb = _active_tb_eligible(tb)
         active_uids = active_tb.uids
-        not_yet_sought = active_uids[~ppl.sought_care[active_uids]]
+        not_yet_sought = active_uids[~self.sought_care[active_uids]]
+        self._new_seekers_count = 0
 
-        # Initialize or extract a working distribution
-        if isinstance(self.pars.prob, ss.Dist):
-            dist = self.pars.prob
+        if len(not_yet_sought) == 0:
+            return
+
+        if self.pars.initial_care_seeking_rate is not None:
+            p = self.pars.initial_care_seeking_rate.to_prob()
+            probs = np.full(len(not_yet_sought), p) if np.isscalar(p) else np.asarray(p)
+            seeking_uids = not_yet_sought[np.random.rand(len(not_yet_sought)) < probs]
         else:
-            dist = ss.bernoulli(p=self.pars.prob)
-
-        dist.init(sim)  # Explicitly initialize with the simulation context
-        seeking_uids = dist.filter(not_yet_sought)
+            if isinstance(self.pars.prob, ss.Dist):
+                dist = self.pars.prob
+            else:
+                dist = ss.bernoulli(p=self.pars.prob)
+            dist.init(sim)
+            seeking_uids = dist.filter(not_yet_sought)
 
         if len(seeking_uids) == 0:
             return
-
-        ppl.sought_care[seeking_uids] = True
+        self._new_seekers_count = len(seeking_uids)
+        self.sought_care[seeking_uids] = True
         tb.start_treatment(seeking_uids)
-
         if self.pars.single_use:
             self.expired = True
 
     def init_results(self):
-        """Define metrics to track over time."""
         super().init_results()
         self.define_results(
+            ss.Result('new_sought_care', dtype=int),
             ss.Result('n_sought_care', dtype=int),
             ss.Result('n_eligible', dtype=int),
         )
-    
+
     def update_results(self):
-        """Record who was eligible and who sought care at this timestep."""
         sim = self.sim
-        ppl = sim.people
-        tb = sim.diseases.tb
-
-        active_tb = (tb.state == TBS.ACTIVE_SMPOS) | (tb.state == TBS.ACTIVE_SMNEG) | (tb.state == TBS.ACTIVE_EXPTB)
+        tb = _get_tb(sim)
+        active_tb = _active_tb_eligible(tb)
         active_uids = active_tb.uids
-        not_yet_sought = active_uids[~ppl.sought_care[active_uids]]
-
+        not_yet_sought = active_uids[~self.sought_care[active_uids]]
+        self.results['new_sought_care'][self.ti] = self._new_seekers_count
+        self.results['n_sought_care'][self.ti] = np.count_nonzero(self.sought_care)
         self.results['n_eligible'][self.ti] = len(not_yet_sought)
-        self.results['n_sought_care'][self.ti] = np.count_nonzero(ppl.sought_care)
 
-# Sample calling function below
-if __name__ == '__main__':
-
-    import tbsim as mtb
-    import starsim as ss
-    import matplotlib.pyplot as plt
-    sim = ss.Sim(
-        people=ss.People(n_agents=1000, extra_states=mtb.get_extrastates()),  # 👈 Add this!
-        diseases=mtb.TB({'init_prev': ss.bernoulli(0.25)}),
-        interventions=[mtb.HealthSeekingBehavior(pars={'prob': ss.bernoulli(p=0.2, strict=False)})],
-        networks=ss.RandomNet({'n_contacts': ss.poisson(lam=2), 'dur': 0}),
-        pars=dict(start=2000, stop=2020, dt=ss.days(1)),
-    )
-    sim.run()
-
-    # Plot results
-    sim.results.plot()
-    hsb = sim.results['healthseekingbehavior']
-    plt.plot(hsb['n_sought_care'].timevec, hsb['n_sought_care'].values, label='Sought care')
-    plt.plot(hsb['n_eligible'].timevec, hsb['n_eligible'].values, label='Eligible')
-    plt.xlabel('Time')
-    plt.ylabel('People')
-    plt.title('Health-Seeking Behavior Over Time')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
