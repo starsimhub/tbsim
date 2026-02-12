@@ -21,18 +21,18 @@ TBsim is a comprehensive tuberculosis modeling framework built on the Starsim pl
 - **Intervention Framework**: DOTS, BCG, diagnostics, and treatment protocols
 - **Network Structures**: Household and social network modeling
 - **Analysis Tools**: Dwell time analysis, visualization, and post-processing
-- **Data Utilities**: Demographics, plotting, and probability calculations
+- **Data Utilities**: Demographics, plotting, and data processing
 
 Key Components
 -------------
 
-**Natural History TB Model** (`tbsim.models.tb`)
+**Natural History TB Model** (`tbsim.tb`)
    Main tuberculosis simulation class that handles disease dynamics, transmission, and state transitions. Implements the TBS state enumeration.
 
-**LSHTM-Style TB Models** (`tbsim.models.tb_lshtm`)
-   :class:`~tbsim.models.tb_lshtm.TB_LSHTM` and :class:`~tbsim.models.tb_lshtm.TB_LSHTM_Acute` provide compartmental TB models with LSHTM-inspired states (:class:`~tbsim.models.tb_lshtm.TBSL`). Available as ``TB_LSHTM`` and ``TB_LSHTM_Acute`` from the main package.
+**LSHTM-Style TB Models** (`tbsim.tb_lshtm`)
+   :class:`~tbsim.tb_lshtm.TB_LSHTM` and :class:`~tbsim.tb_lshtm.TB_LSHTM_Acute` provide compartmental TB models with LSHTM-inspired states (:class:`~tbsim.tb_lshtm.TBSL`). Available as ``TB_LSHTM`` and ``TB_LSHTM_Acute`` from the main package.
 
-**TBS State Enumeration** (`tbsim.models.tb.TBS`)
+**TBS State Enumeration** (`tbsim.tb.TBS`)
    Comprehensive state definitions for TB progression including latent, active, and treatment states.
 
 **Network Structures** (`tbsim.networks`)

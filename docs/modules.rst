@@ -10,8 +10,8 @@ Core Modules
    :maxdepth: 2
 
    api/tbsim
-   api/tbsim.models.natural_history
-   api/tbsim.models.lshtm
+   api/tbsim.tb
+   api/tbsim.tb_lshtm
    api/tbsim.networks
 
 Analysis and Visualization
@@ -21,10 +21,14 @@ Analysis and Visualization
    :maxdepth: 2
 
    api/tbsim.analyzers
+
+Utilities
+---------
+
+.. toctree::
+   :maxdepth: 2
+
    api/tbsim.utils
-   api/tbsim.utils.demographics
-   api/tbsim.utils.plots
-   api/tbsim.utils.probabilities
 
 Interventions
 -------------
@@ -33,17 +37,6 @@ Interventions
    :maxdepth: 2
 
    api/tbsim.interventions
-   api/tbsim.interventions.bcg
-   api/tbsim.interventions.beta
-   api/tbsim.interventions.enhanced_tb_diagnostic
-   api/tbsim.interventions.enhanced_tb_treatment
-   api/tbsim.interventions.healthseeking
-   api/tbsim.interventions.interventions
-   api/tbsim.interventions.tb_diagnostic
-   api/tbsim.interventions.tb_drug_types
-   api/tbsim.interventions.tb_health_seeking
-   api/tbsim.interventions.tb_treatment
-   api/tbsim.interventions.tpt
 
 Comorbidities
 -------------
@@ -78,11 +71,11 @@ Data and Utilities
 Module Overview
 ---------------
 
-**Natural History TB Model** (`tbsim.models.tb`)
+**Natural History TB Model** (`tbsim.tb`)
    Main tuberculosis simulation module with disease dynamics, transmission, and state transitions. Implements the TBS state enumeration and TB disease class.
 
-**LSHTM-Style TB Model** (`tbsim.models.tb_lshtm`)
-   Individual-based TB compartmental models with LSHTM-inspired states and transitions: :class:`~tbsim.models.tb_lshtm.TB_LSHTM` (latent → active) and :class:`~tbsim.models.tb_lshtm.TB_LSHTM_Acute` (adds acute infectious state). State labels in :class:`~tbsim.models.tb_lshtm.TBSL`.
+**LSHTM-Style TB Model** (`tbsim.tb_lshtm`)
+   Individual-based TB compartmental models with LSHTM-inspired states and transitions: :class:`~tbsim.tb_lshtm.TB_LSHTM` (latent → active) and :class:`~tbsim.tb_lshtm.TB_LSHTM_Acute` (adds acute infectious state). State labels in :class:`~tbsim.tb_lshtm.TBSL`.
 
 **Networks** (`tbsim.networks`)
    Social network structures for modeling transmission patterns, including household networks and RATIONS trial specific implementations.
@@ -97,7 +90,7 @@ Module Overview
    Modeling of HIV, malnutrition, and other co-occurring conditions with bidirectional interactions with TB dynamics.
 
 **Utilities** (`tbsim.utils.*`)
-   Helper functions for demographics, plotting, probability calculations, and data processing.
+   Helper functions for demographics, plotting, and data processing.
 
 **Configuration** (`tbsim.config`)
    Parameter management, simulation configuration, and result directory creation utilities.

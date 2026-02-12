@@ -1,7 +1,7 @@
 TBsim Utilities
 ==============
 
-This module provides various utility functions and tools for TBsim simulations, including demographics, plotting, and probability calculations.
+This module provides various utility functions and tools for TBsim simulations, including demographics and plotting.
 
 Main Utilities Module
 --------------------
@@ -20,18 +20,23 @@ Available Utility Modules
 **Plotting** (`tbsim.utils.plots`)
    Visualization and plotting tools for simulation results
 
-**Probabilities** (`tbsim.utils.probabilities`)
-   Probability calculations and statistical utilities
-
 **General Utilities** (`tbsim.utils`)
    Common utility functions and helpers
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 2
+
+   tbsim.utils.demographics
+   tbsim.utils.plots
 
 Key Features
 -----------
 
 - **Demographic Modeling**: Age-structured population utilities
 - **Visualization Tools**: Comprehensive plotting capabilities
-- **Statistical Functions**: Probability and statistical calculations
 - **Data Processing**: Utilities for handling simulation data
 - **Export Functions**: Tools for saving and sharing results
 
@@ -54,14 +59,6 @@ Plotting utilities:
    
    plot_tb_incidence(sim_results)
 
-Probability calculations:
-
-.. code-block:: python
-
-   from tbsim.utils.probabilities import calculate_transmission_prob
-   
-   prob = calculate_transmission_prob(contact_rate, infectivity)
-
 Utility Functions
 ----------------
 
@@ -73,13 +70,7 @@ Utility Functions
 **Plotting**
    - Time series visualization
    - Comparative plots
-   - Custom chart creation
-   - Export to various formats
-
-**Probabilities**
-   - Transmission probability calculations
-   - Risk factor modeling
-   - Statistical distributions
-   - Uncertainty quantification
+- Custom chart creation
+- Export to various formats
 
 For detailed information about specific utility functions, see the individual submodule documentation above. 

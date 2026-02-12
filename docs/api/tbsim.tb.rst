@@ -3,26 +3,10 @@ Natural History TB Model
 
 This module implements the core tuberculosis disease model for TBsim simulations, including disease dynamics, state transitions, and transmission modeling.
 
-Main TB Module
---------------
-
-.. automodule:: tbsim.models.tb
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-TB State Enumeration
---------------------
-
-.. automodule:: tbsim.models.tb.TBS
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-TB Disease Class
+Module Reference
 ----------------
 
-.. automodule:: tbsim.models.tb.TB
+.. automodule:: tbsim.tb
    :members:
    :undoc-members:
    :show-inheritance:
@@ -75,7 +59,7 @@ Key Methods
    - Mortality and recovery rates
 
 Usage Examples
--------------
+--------------
 
 Basic TB simulation (TB and TBS are also available from the main package):
 
@@ -118,7 +102,7 @@ Accessing results:
    mortality = results.mortality
 
 State Management
----------------
+----------------
 
 **State Transitions**
    The model implements a comprehensive state transition system where agents move between different TB states based on:

@@ -10,7 +10,7 @@ after infection).
 Module Reference
 ----------------
 
-.. automodule:: tbsim.models.tb_lshtm
+.. automodule:: tbsim.tb_lshtm
    :members: TBSL, TB_LSHTM, TB_LSHTM_Acute
    :undoc-members:
    :show-inheritance:
@@ -52,7 +52,7 @@ Key Methods
 - **step_die(uids)**: Update TB state when agents die (e.g. background mortality)
 
 Usage Examples
--------------
+--------------
 
 Basic LSHTM TB simulation:
 

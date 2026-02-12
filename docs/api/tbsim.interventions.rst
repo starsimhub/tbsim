@@ -17,8 +17,14 @@ Available Intervention Types
 **BCG Vaccination** (`tbsim.interventions.bcg`)
    Bacillus Calmette-Guérin vaccination for TB prevention
 
+**Beta Interventions** (`tbsim.interventions.beta`)
+   Time-varying intervention parameters
+
 **Treatment Protocols** (`tbsim.interventions.interventions`)
    Various TB treatment regimens and protocols
+
+**Preventive Therapy** (`tbsim.interventions.tpt`)
+   Isoniazid preventive therapy (IPT) implementation
 
 **Enhanced Treatment** (`tbsim.interventions.enhanced_tb_treatment`)
    Advanced treatment with configurable drug types and protocols
@@ -40,21 +46,6 @@ Available Intervention Types
 
 **Drug Types and Parameters** (`tbsim.interventions.tb_drug_types`)
    Comprehensive TB drug regimen definitions and parameters
-
-**Preventive Therapy** (`tbsim.interventions.tpt`)
-   Isoniazid preventive therapy (IPT) implementation
-
-**Diagnostic Tools** (`tbsim.interventions.tb_diagnostic`)
-   Enhanced case detection and diagnostic methods
-
-**Health Seeking** (`tbsim.interventions.tb_health_seeking`)
-   Modeling of healthcare-seeking behavior
-
-**Treatment Management** (`tbsim.interventions.tb_treatment`)
-   Treatment adherence and outcome modeling
-
-**Beta Interventions** (`tbsim.interventions.beta`)
-   Time-varying intervention parameters
 
 Subpackages
 ----------
