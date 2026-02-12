@@ -3,13 +3,13 @@ LSHTM-style tuberculosis (TB) compartmental models for Starsim.
 
 This module provides individual-based TB models with states and transitions
 inspired by LSHTM (London School of Hygiene & Tropical Medicine) formulations.
-Two variants are available: :class:`TB_LSHTM` (infection → active progression) and
+Two variants are available: :class:`TB_LSHTM` (latent → active progression) and
 :class:`TB_LSHTM_Acute` (adds an acute infectious state immediately after
 infection). State labels are defined in :class:`TBSL`.
 
 State flow (TB_LSHTM):
 
-- Susceptible → [transmission] → INFECTION → CLEARED | UNCONFIRMED | ASYMPTOMATIC
+- Susceptible → [transmission] → INFECTION (latent) → CLEARED | UNCONFIRMED | ASYMPTOMATIC
 - From UNCONFIRMED: RECOVERED | ASYMPTOMATIC
 - From ASYMPTOMATIC: UNCONFIRMED | SYMPTOMATIC
 - From SYMPTOMATIC: ASYMPTOMATIC | TREATMENT | DEAD
@@ -27,26 +27,6 @@ from enum import IntEnum
 __all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL']
 
 
-class _ScaledRate:
-    """
-    Wrapper that multiplies a base rate by a per-agent factor for transition sampling.
-
-    For exponential waiting time T ~ Exp(λ), using T_eff = T / rr gives
-    effective rate λ * rr. So .rvs(uids) returns base_rate.rvs(uids) / rr_slice,
-    with rr_slice indexed to match uids (same length). Used to apply rr_activation,
-    rr_clearance, and rr_death in TB_LSHTM.
-    """
-    def __init__(self, base_rate, rr_slice):
-        self.base_rate = base_rate
-        self.rr_slice = np.asarray(rr_slice, dtype=float) 
-
-    def rvs(self, uids):
-        draw = self.base_rate.rvs(uids)
-        rr = self.rr_slice
-        # Avoid division by zero: rr=0 => never transition (infinite waiting time)
-        return np.where(rr > 0, draw / rr, np.inf)
-
-
 class TBSL(IntEnum):
     """
     TB state labels for the LSHTM model.
@@ -55,8 +35,8 @@ class TBSL(IntEnum):
     - Transitions are driven by exponential rates in :class:`TB_LSHTM`
       (and :class:`TB_LSHTM_Acute`).
     """
-    SUSCEPTIBLE  = -1    # No TB; never infected (naive susceptible; distinct from CLEARED/RECOVERED/TREATED)
-    INFECTION    = 0     # Infected, not yet active TB
+    SUSCEPTIBLE  = -1    # No TB; never infected or cleared/recovered/treated
+    INFECTION    = 0     # Latent infection (not yet active TB)
     CLEARED      = 1     # Cleared infection without developing active TB
     UNCONFIRMED  = 2     # Unconfirmed TB (early/smear-negative type state)
     RECOVERED    = 3     # Recovered from unconfirmed TB (susceptible to reinfection)
@@ -69,12 +49,13 @@ class TBSL(IntEnum):
 
 
 class TB_LSHTM(ss.Infection):
+    #region Documentation
     """
     LSHTM-style compartmental tuberculosis (TB) model.
 
     Implements a stochastic, individual-based TB model with states defined by the
-    :class:`TBSL` enum. After infection, agents enter INFECTION, then may clear
-    (CLEARED), develop unconfirmed TB (UNCONFIRMED), or
+    :class:`TBSL` enum. After infection, agents progress through latent infection
+    (INFECTION), then may clear (CLEARED), develop unconfirmed TB (UNCONFIRMED), or
     progress to asymptomatic (ASYMPTOMATIC) or symptomatic (SYMPTOMATIC) active TB.
     Symptomatic cases may recover to asymptomatic, start treatment (TREATMENT), or
     die from TB (DEAD). Treated agents complete as TREATED. Cleared, recovered, and
@@ -85,11 +66,49 @@ class TB_LSHTM(ss.Infection):
     progression and mortality rates are defined as exponential waiting times (per
     year). Use :meth:`start_treatment` to move eligible agents onto treatment.
 
-    **Risk modifiers** (per-agent, default 1.0): :attr:`rr_activation` multiplies
-    the infection-to-active rates (INFECTION → UNCONFIRMED, ASYMPTOMATIC);
-    :attr:`rr_clearance` multiplies the unconfirmed-to-recovered rate
-    (UNCONFIRMED → RECOVERED); :attr:`rr_death` multiplies the TB death rate
-    (SYMPTOMATIC → DEAD). Effective rate = base rate × modifier for each agent.
+    Per-agent risk modifiers (default 1.0): ``rr_activation``, ``rr_clearance``, ``rr_death``
+    multiply the relevant transition rates (effective rate = base rate * modifier for each agent).
+    Internally applied via :class:`TB_LSHTM._ScaledRate` (wrapper that scales a base rate by a per-agent factor).
+    
+    pars dict valid keys
+    ---------------------
+
+    - ``init_prev``: Initial seed infections (prevalence). Default ``ss.bernoulli(0.01)``.
+    - ``beta``: Transmission rate per year. Default ``ss.peryear(0.25)``.
+    - ``kappa``: Relative transmission from asymptomatic vs symptomatic. Default ``0.82``.
+    - ``pi``: Relative risk of reinfection after recovery (unconfirmed). Default ``0.21``.
+    - ``rho``: Relative risk of reinfection after treatment completion. Default ``3.15``.
+    - ``infcle``: Clear infection from latent (no active TB). Default ``ss.years(ss.expon(1/1.90))``.
+    - ``infunc``: Progress from latent to unconfirmed TB. Default ``ss.years(ss.expon(1/0.16))``.
+    - ``infasy``: Progress from latent to asymptomatic active TB. Default ``ss.years(ss.expon(1/0.06))``.
+    - ``uncrec``: Recover from unconfirmed → RECOVERED. Default ``ss.years(ss.expon(1/0.18))``.
+    - ``uncasy``: Progress from unconfirmed to asymptomatic. Default ``ss.years(ss.expon(1/0.25))``.
+    - ``asyunc``: Revert from asymptomatic to unconfirmed. Default ``ss.years(ss.expon(1/1.66))``.
+    - ``asysym``: Progress from asymptomatic to symptomatic. Default ``ss.years(ss.expon(1/0.88))``.
+    - ``symasy``: Recover from symptomatic to asymptomatic. Default ``ss.years(ss.expon(1/0.54))``.
+    - ``theta``: Start treatment from symptomatic. Default ``ss.years(ss.expon(1/0.46))``.
+    - ``mutb``: TB-specific mortality. Default ``ss.years(ss.expon(1/0.34))``.
+    - ``phi``: Treatment failure (back to symptomatic). Default ``ss.years(ss.expon(1/0.63))``.
+    - ``delta``: Treatment completion (→ TREATED). Default ``ss.years(ss.expon(1/2.00))``.
+    - ``mu``: Background mortality (per year). Default ``ss.years(ss.expon(1/0.014))``.
+    - ``cxr_asymp_sens``: CXR sensitivity for screening asymptomatic (0–1). Default ``1.0``.
+
+    Agent States
+    -------------
+
+    - ``susceptible`` (BoolState, default=True): Whether the agent is susceptible to TB.
+    - ``infected`` (BoolState): Whether the agent is currently infected.
+    - ``rel_sus`` (FloatArr, default=1.0): Relative susceptibility to TB.
+    - ``rel_trans`` (FloatArr, default=1.0): Relative transmissibility of TB.
+    - ``ti_infected`` (FloatArr, default=-inf): Time of infection (if never infected).
+    - ``state`` (FloatArr, default=TBSL.SUSCEPTIBLE): Current TB state (:class:`TBSL` value).
+    - ``state_next`` (FloatArr, default=TBSL.INFECTION): Scheduled next state.
+    - ``ti_next`` (FloatArr, default=inf): Time of next transition.
+    - ``on_treatment`` (BoolState, default=False): Whether the agent is on TB treatment.
+    - ``ever_infected`` (BoolState, default=False): Whether the agent has ever been infected.
+    - ``rr_activation`` (FloatArr, default=1.0): Multiplier on infection-to-active rate (INFECTION → UNCONFIRMED, ASYMPTOMATIC).
+    - ``rr_clearance`` (FloatArr, default=1.0): Multiplier on active-to-clearance rate (UNCONFIRMED → RECOVERED).
+    - ``rr_death`` (FloatArr, default=1.0): Multiplier on active-to-death rate (SYMPTOMATIC → DEAD).
 
     State flow (high level)
     -----------------------
@@ -108,6 +127,26 @@ class TB_LSHTM(ss.Infection):
     Subclasses :class:`starsim.Infection`; integrate with a :class:`starsim.Sim`
     and a population (e.g. :class:`starsim.People`) to run simulations.
     """
+    #endregion Documentation
+    
+    class _ScaledRate:
+        """
+        Wrapper that multiplies a base rate by a per-agent factor for transition sampling.
+
+        For exponential waiting time T ~ Exp(λ), using T_eff = T / rr gives
+        effective rate λ * rr. So .rvs(uids) returns base_rate.rvs(uids) / rr_slice,
+        with rr_slice indexed to match uids (same length). Used to apply rr_activation,
+        rr_clearance, and rr_death in TB_LSHTM.
+        """
+        def __init__(self, base_rate, rr_slice):
+            self.base_rate = base_rate
+            self.rr_slice = np.asarray(rr_slice, dtype=float)
+
+        def rvs(self, uids):
+            draw = self.base_rate.rvs(uids)
+            rr = self.rr_slice
+            # Avoid division by zero: rr=0 => never transition (infinite waiting time)
+            return np.where(rr > 0, draw / rr, np.inf)
 
     def __init__(self, pars=None, **kwargs):
         """
@@ -142,45 +181,41 @@ class TB_LSHTM(ss.Infection):
             kappa=0.82,                         # Relative transmission from asymptomatic vs symptomatic
             pi=0.21,                            # Relative risk of reinfection after recovery (unconfirmed)
             rho=3.15,                           # Relative risk of reinfection after treatment completion
-            # --- From INFECTION ---
+            # --- From INFECTION (latent) ---
             infcle=ss.years(ss.expon(1/1.90)),  # Clear infection (no active TB)
-            infunc=ss.years(ss.expon(1/0.16)),  # Progress to unconfirmed TB
+            infunc=ss.years(ss.expon(1/0.16)), # Progress to unconfirmed TB
             infasy=ss.years(ss.expon(1/0.06)),  # Progress to asymptomatic active TB
             # --- From UNCONFIRMED ---
             uncrec=ss.years(ss.expon(1/0.18)),  # Recover (→ RECOVERED)
             uncasy=ss.years(ss.expon(1/0.25)),  # Progress to asymptomatic
             # --- From ASYMPTOMATIC ---
             asyunc=ss.years(ss.expon(1/1.66)),  # Revert to unconfirmed
-            asysym=ss.years(ss.expon(1/0.88)),  # Progress to symptomatic
+            asysym=ss.years(ss.expon(1/0.88)), # Progress to symptomatic
             # --- From SYMPTOMATIC ---
-            symasy=ss.years(ss.expon(1/0.54)),  # Recover to asymptomatic
-            theta=ss.years(ss.expon(1/0.46)),   # Start treatment
-            mutb=ss.years(ss.expon(1/0.34)),    # TB-specific mortality
+            symasy=ss.years(ss.expon(1/0.54)), # Recover to asymptomatic
+            theta=ss.years(ss.expon(1/0.46)),  # Start treatment
+            mutb=ss.years(ss.expon(1/0.34)),   # TB-specific mortality
             # --- From TREATMENT ---
             phi=ss.years(ss.expon(1/0.63)),     # Treatment failure (back to symptomatic)
             delta=ss.years(ss.expon(1/2.00)),   # Treatment completion (→ TREATED)
             # --- Background ---
-            mu=ss.years(ss.expon(1/0.014)),     # Background mortality (per year)
+            mu=ss.years(ss.expon(1/0.014)),    # Background mortality (per year)
             cxr_asymp_sens=1.0,                 # CXR sensitivity for screening asymptomatic (0–1)
         )
         self.update_pars(pars, **kwargs)
 
         # Per-agent state: redefine base Infection states and add TB-specific ones
         self.define_states(
-            ss.BoolState('susceptible', default=True),           # True if agent is susceptible to TB
-            ss.BoolState('infected'),                            # True if agent is infected with TB
-            # Relative susceptibility and transmissibility
+            ss.BoolState('susceptible', default=True),
+            ss.BoolState('infected'),
             ss.FloatArr('rel_sus', default=1.0),                 # Relative susceptibility to TB (default 1.0)
             ss.FloatArr('rel_trans', default=1.0),               # Relative transmissibility of TB (default 1.0)
-            # Timing variables
-            ss.FloatArr('ti_infected', default=-np.inf),         # Time of infection
-            # TB state
-            ss.FloatArr('state', default=TBSL.SUSCEPTIBLE),      # Current TB state
+            ss.FloatArr('ti_infected', default=-np.inf),
+            ss.FloatArr('state', default=TBSL.SUSCEPTIBLE),       # Current TB state
             ss.FloatArr('state_next', default=TBSL.INFECTION),   # Scheduled next state
             ss.FloatArr('ti_next', default=np.inf),              # Time of next transition
-            # Treatment and infection flags
-            ss.BoolState('on_treatment', default=False),         # True if agent is on treatment
-            ss.BoolState('ever_infected', default=False),        # True if agent has ever been infected with TB
+            ss.BoolState('on_treatment', default=False),
+            ss.BoolState('ever_infected', default=False),
             # Risk modifiers
             ss.FloatArr('rr_activation', default=1.0),           # Multiplier on infection-to-active rate (INFECTION → UNCONFIRMED, ASYMPTOMATIC)
             ss.FloatArr('rr_clearance', default=1.0),            # Multiplier on active-to-clearance rate (UNCONFIRMED → RECOVERED)
@@ -207,7 +242,7 @@ class TB_LSHTM(ss.Infection):
         The base :class:`starsim.Infection` calls this when a susceptible agent
         acquires infection. We:
 
-        - Mark agents infected and set state to INFECTION
+        - Mark agents infected and set state to INFECTION (latent)
         - Schedule the first competing transition: CLEARED, UNCONFIRMED, or ASYMPTOMATIC
         - Leave the actual transition to :meth:`step` when ``ti >= ti_next``
 
@@ -230,12 +265,12 @@ class TB_LSHTM(ss.Infection):
 
         self.state[uids] = TBSL.INFECTION
 
-        # Schedule first transition: INFECTION → cleared, unconfirmed, or asymptomatic.
+        # Schedule first transition: latent → cleared, unconfirmed, or asymptomatic
         # rr_activation multiplies the infection-to-active rates (infunc, infasy).
         self.state_next[uids], self.ti_next[uids] = self.transition(uids, to={
             TBSL.CLEARED: self.pars.infcle,
-            TBSL.UNCONFIRMED: _ScaledRate(self.pars.infunc, self.rr_activation[uids]),
-            TBSL.ASYMPTOMATIC: _ScaledRate(self.pars.infasy, self.rr_activation[uids]),
+            TBSL.UNCONFIRMED: TB_LSHTM._ScaledRate(self.pars.infunc, self.rr_activation[uids]),
+            TBSL.ASYMPTOMATIC: TB_LSHTM._ScaledRate(self.pars.infasy, self.rr_activation[uids]),
         })
 
         return
@@ -254,9 +289,9 @@ class TB_LSHTM(ss.Infection):
         uids : array-like
             Agent indices to transition.
         to : dict
-            Mapping from TBSL state -> rate-like object. Keys are possible next
-            states; values must have ``.rvs(uids)`` returning a sample of waiting
-            time (e.g. ``ss.expon``-based rates or :class:`_ScaledRate`).
+            Mapping from TBSL state -> rate (e.g. ``ss.expon``-based). Keys are
+            possible next states; values are callables that return a sample of
+            waiting time (e.g. ``rate.rvs(uids)``).
 
         Returns
         -------
@@ -356,14 +391,14 @@ class TB_LSHTM(ss.Infection):
         u = uids[self.state[uids] == TBSL.INFECTION]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
             TBSL.CLEARED: self.pars.infcle,
-            TBSL.UNCONFIRMED: _ScaledRate(self.pars.infunc, self.rr_activation[u]),
-            TBSL.ASYMPTOMATIC: _ScaledRate(self.pars.infasy, self.rr_activation[u]),
+            TBSL.UNCONFIRMED: TB_LSHTM._ScaledRate(self.pars.infunc, self.rr_activation[u]), 
+            TBSL.ASYMPTOMATIC: TB_LSHTM._ScaledRate(self.pars.infasy, self.rr_activation[u]),
         })
 
         # rr_clearance: UNCONFIRMED → RECOVERED (unconfirmed-to-recovered)
         u = uids[self.state[uids] == TBSL.UNCONFIRMED]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.RECOVERED: _ScaledRate(self.pars.uncrec, self.rr_clearance[u]),
+            TBSL.RECOVERED: TB_LSHTM._ScaledRate(self.pars.uncrec, self.rr_clearance[u]),
             TBSL.ASYMPTOMATIC: self.pars.uncasy,
         })
 
@@ -379,7 +414,7 @@ class TB_LSHTM(ss.Infection):
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
             TBSL.ASYMPTOMATIC: self.pars.symasy,
             TBSL.TREATMENT: self.pars.theta,
-            TBSL.DEAD: _ScaledRate(self.pars.mutb, self.rr_death[u]),
+            TBSL.DEAD: TB_LSHTM._ScaledRate(self.pars.mutb, self.rr_death[u]),
         })
 
         # TREATMENT → SYMPTOMATIC (failure) or TREATED (completion)
@@ -390,32 +425,33 @@ class TB_LSHTM(ss.Infection):
         })
 
         # CLEARED, RECOVERED, TREATED: no scheduled transition; reinfection via transmission only
+        
+        # Reset rate multipliers states to 1
+        self.rr_activation[uids] = 1
+        self.rr_clearance[uids] = 1
+        self.rr_death[uids] = 1
 
         return
 
     def start_treatment(self, uids):
         """
-        Move specified agents onto TB treatment (or clear infection).
+        Move specified agents onto TB treatment (or clear latent infection).
 
         Called by interventions (e.g. screening/case-finding) when an agent is
         identified for treatment. We set state_next and ti_next to the *current*
         time so the change takes effect on the next :meth:`step` (no extra delay).
 
-        - INFECTION: cleared without treatment (→ CLEARED).
+        - Latent (INFECTION): cleared without treatment (→ CLEARED).
         - Active (UNCONFIRMED, ASYMPTOMATIC, SYMPTOMATIC): moved to TREATMENT.
         - Records new notifications (15+) for active cases starting treatment.
 
         Parameters
         ----------
         uids : array-like
-            Agent indices to start treatment (or clear if in INFECTION).
-
-        Returns
-        -------
-        None
+            Agent indices to start treatment (or clear if latent).
         """
         if len(uids) == 0:
-            return
+            return 0
 
         # Latent infection: clear without active disease
         u = uids[self.state[uids] == TBSL.INFECTION]
@@ -577,7 +613,7 @@ class TB_LSHTM_Acute(TB_LSHTM):
     LSHTM TB model with an acute infection state immediately after exposure.
 
     Extends :class:`TB_LSHTM` by inserting an ACUTE state between infection and
-    the usual INFECTION state. New infections enter ACUTE first, then
+    the usual INFECTION (latent) state. New infections enter ACUTE first, then
     transition to INFECTION at rate :attr:`pars.acuinf`. Acute cases are
     infectious with relative transmissibility :attr:`pars.alpha`. All other
     states and transitions match :class:`TB_LSHTM`.
@@ -588,7 +624,7 @@ class TB_LSHTM_Acute(TB_LSHTM):
     - From ACUTE the only spontaneous transition is ACUTE → INFECTION.
     - Once in INFECTION, flow is as in the base (CLEARED, UNCONFIRMED, ASYMPTOMATIC, etc.).
     - Reinfection of CLEARED/RECOVERED/TREATED again leads to ACUTE.
-    - When :meth:`start_treatment` is called, both ACUTE and INFECTION
+    - When :meth:`start_treatment` is called, both ACUTE and INFECTION (latent)
       are cleared; active states go to TREATMENT as in the base.
     """
 
@@ -605,7 +641,7 @@ class TB_LSHTM_Acute(TB_LSHTM):
         """
         super().__init__(pars=pars, **kwargs)
 
-        # ACUTE is a brief infectious state before INFECTION; reinfection leads to ACUTE
+        # ACUTE is a brief infectious state before latent (INFECTION); reinfection leads to ACUTE
         self.define_pars(
             acuinf=ss.years(ss.expon(1/4.0)),  # Rate: ACUTE → INFECTION (per year)
             alpha=0.9,                          # Relative transmission from acute vs symptomatic
@@ -651,14 +687,14 @@ class TB_LSHTM_Acute(TB_LSHTM):
         """
         Advance TB state; same order of operations as base :meth:`TB_LSHTM.step`.
 
-        Overrides the base to handle ACUTE:
+        Advance TB state; same order of operations as base :meth:`TB_LSHTM.step`. Overrides:
 
         - Treat ACUTE as infectious (infected-flag and rel_trans).
         - Add ACUTE → INFECTION transition.
         - Reinfection leads to ACUTE (handled in set_prognoses).
-        - Uses ``super(TB_LSHTM, self).step()`` for base Infection step, then
-          implements the full TB transition logic including ACUTE handling
-          (does not call TB_LSHTM.step).
+
+        Calls super(TB_LSHTM, self).step() to use this class's step body
+        without going through a subclass step().
         """
         super(TB_LSHTM, self).step()
         p = self.pars
@@ -705,34 +741,34 @@ class TB_LSHTM_Acute(TB_LSHTM):
             TBSL.INFECTION: self.pars.acuinf,
         })
 
-        # rr_activation: INFECTION → UNCONFIRMED or ASYMPTOMATIC (infection-to-active)
+        # INFECTION → CLEARED, UNCONFIRMED, or ASYMPTOMATIC (same as base)
         u = uids[self.state[uids] == TBSL.INFECTION]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
             TBSL.CLEARED: self.pars.infcle,
-            TBSL.UNCONFIRMED: _ScaledRate(self.pars.infunc, self.rr_activation[u]),
-            TBSL.ASYMPTOMATIC: _ScaledRate(self.pars.infasy, self.rr_activation[u]),
+            TBSL.UNCONFIRMED: TB_LSHTM._ScaledRate(self.pars.infunc, self.rr_activation[u]),
+            TBSL.ASYMPTOMATIC: TB_LSHTM._ScaledRate(self.pars.infasy, self.rr_activation[u]),
         })
 
-        # rr_clearance: UNCONFIRMED → RECOVERED (unconfirmed-to-recovered)
+        # UNCONFIRMED → RECOVERED or ASYMPTOMATIC
         u = uids[self.state[uids] == TBSL.UNCONFIRMED]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.RECOVERED: _ScaledRate(self.pars.uncrec, self.rr_clearance[u]),
+            TBSL.RECOVERED: TB_LSHTM._ScaledRate(self.pars.uncrec, self.rr_clearance[u]),
             TBSL.ASYMPTOMATIC: self.pars.uncasy,
         })
 
-        # ASYMPTOMATIC → UNCONFIRMED or SYMPTOMATIC (no rr modifier)
+        # ASYMPTOMATIC → UNCONFIRMED or SYMPTOMATIC
         u = uids[self.state[uids] == TBSL.ASYMPTOMATIC]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
             TBSL.UNCONFIRMED: self.pars.asyunc,
             TBSL.SYMPTOMATIC: self.pars.asysym
         })
 
-        # rr_death: SYMPTOMATIC → DEAD (symptomatic-to-death)
+        # SYMPTOMATIC → ASYMPTOMATIC, TREATMENT, or TB DEATH
         u = uids[self.state[uids] == TBSL.SYMPTOMATIC]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
             TBSL.ASYMPTOMATIC: self.pars.symasy,
             TBSL.TREATMENT: self.pars.theta,
-            TBSL.DEAD: _ScaledRate(self.pars.mutb, self.rr_death[u]),
+            TBSL.DEAD: TB_LSHTM._ScaledRate(self.pars.mutb, self.rr_death[u]),
         })
 
         # TREATMENT → SYMPTOMATIC (failure) or TREATED (completion)
@@ -750,19 +786,15 @@ class TB_LSHTM_Acute(TB_LSHTM):
         """
         Move specified agents onto treatment (or clear); ACUTE/INFECTION → CLEARED.
 
-        Same as base but INFECTION-state handling includes both ACUTE and INFECTION:
+        Same as base but latent includes both ACUTE and INFECTION:
 
-        - ACUTE or INFECTION: cleared without treatment (→ CLEARED).
+        - ACUTE or INFECTION (latent): cleared without treatment (→ CLEARED).
         - Active (UNCONFIRMED, ASYMPTOMATIC, SYMPTOMATIC): moved to TREATMENT.
-
-        Returns
-        -------
-        None
         """
         if len(uids) == 0:
-            return
+            return 0
 
-        # ACUTE or INFECTION: clear infection
+        # ACUTE or INFECTION (latent): clear infection
         u = uids[(self.state[uids] == TBSL.ACUTE) | (self.state[uids] == TBSL.INFECTION)]
         self.state_next[u] = TBSL.CLEARED
         self.ti_next[u] = self.ti
