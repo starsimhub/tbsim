@@ -9,6 +9,7 @@ release = '0.5.0'
 
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
@@ -214,6 +215,9 @@ napoleon_include_summary_with_docstring = False
 napoleon_custom_sections = None
 napoleon_use_keyword = True
 napoleon_attr_annotations = True
+
+# Autosummary: generate API stubs from code at build time
+autosummary_generate = True
 
 # Additional autodoc settings for scripts
 autodoc_ignore_module_all = True
