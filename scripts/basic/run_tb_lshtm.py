@@ -1,18 +1,11 @@
-"""
-LSHTM TB sample script (TB_LSHTM / TB_LSHTM_Acute).
-
-Edit tb_params and sim_params below; build_lshtm_sim(tb_params, sim_params) uses them.
-"""
 
 import matplotlib.pyplot as plt
-
+import numpy as np
 import tbsim as mtb
 import starsim as ss
 
-
-# =============================================================================
-# tb_params — passed to TB_LSHTM(pars=...) or TB_LSHTM_Acute(pars=...)
-# =============================================================================
+# "default" | "risk_modifiers" | "both" (run both and plot combined)
+RUN_MODE = "both"  # "default" | "risk_modifiers" | "both"  
 
 tb_params = {
     "use_acute": False,             # True → TB_LSHTM_Acute
@@ -22,37 +15,23 @@ tb_params = {
     "pi": 0.21,               # reinfection risk after recovery (unconfirmed)
     "rho": 3.15,              # reinfection risk after treatment
     "cxr_asymp_sens": 1.0,    # CXR sensitivity for asymptomatic (0–1)  
+    
     # Acute variant only (ignored if use_acute is False)
     "acuinf": ss.years(ss.expon(1 / 4.0)),   # 1/4 years to infectious
     "alpha": 0.9,                            # reinfection risk after treatment
 }
 
-# =============================================================================
-# sim_params — run setup, network, Sim pars, demographics
-# =============================================================================
+n_agents = 5_000
+rand_seed = 5
 
-sim_params = {
-    # Run
-    "n_agents": 5_000,
-    "start_year": 1990,
-    "years": 20,
-    "rand_seed": 5,
-    "plot": True,
-    # Network (RandomNet)
-    "n_contacts": ss.poisson(lam=5),
-    "dur": 0,
-    # Sim
-    "dt": ss.days(7),
-    "verbose": 0.002,
-    # Demographics (Births, Deaths); set with_demographics False to disable
-    "with_demographics": True,
-    "birth_rate": 25,
-    "death_rate": 10,
-}
+# Pleae note, this is not a recommended way to apply risk modifiers. 
+# It is only used for demonstration purposes.
+modifier_fraction = 0.8  # fraction of agents to apply risk modifiers to
+modifier_rr = dict(rr_activation=1.5, rr_clearance=2.5, rr_death=0.5)
 
 
-def build_lshtm_sim(tb_params, sim_params):
-    """Build a Starsim simulation from tb_params and sim_params."""
+def build_lshtm_sim(tb_params, n_agents, interventions=None):
+    """Build a Starsim simulation from tb_params and n_agents (other run options are fixed)."""
     use_acute = tb_params.get("use_acute", False)
     skip = {"use_acute"}
     if not use_acute:
@@ -63,53 +42,85 @@ def build_lshtm_sim(tb_params, sim_params):
     else:
         infection = mtb.TB_LSHTM(pars=infection_pars)
 
-    pop = ss.People(n_agents=sim_params["n_agents"])
-    net = ss.RandomNet(pars={"n_contacts": sim_params["n_contacts"], "dur": sim_params["dur"]})
-
-    start_year = sim_params["start_year"]
-    stop_year = start_year + sim_params["years"]
+    pop = ss.People(n_agents=n_agents)
+    net = ss.RandomNet(pars={"n_contacts": ss.poisson(lam=5), "dur": 0})
     sp = {
-        "start": ss.date(f"{start_year}-01-01"),
-        "stop": ss.date(f"{stop_year}-12-31"),
-        "dt": sim_params["dt"],
-        "verbose": sim_params["verbose"],
+        "start": ss.date("1990-01-01"),
+        "stop": ss.date("2010-12-31"),
+        "dt": ss.days(7),
+        "verbose": 0.002,
+        "rand_seed": rand_seed,
     }
-    if sim_params.get("rand_seed") is not None:
-        sp["rand_seed"] = sim_params["rand_seed"]
+    kwargs = dict(people=pop, networks=net, diseases=infection, pars=sp)
+    if interventions is not None:
+        kwargs["interventions"] = interventions
+    demographics = [
+        ss.Births(pars=dict(birth_rate=25)),
+        ss.Deaths(pars=dict(death_rate=10)),
+    ]
+    kwargs["demographics"] = demographics
+    sim = ss.Sim(**kwargs)
+    return sim
 
-    if sim_params.get("with_demographics", True):
-        demographics = [
-            ss.Births(pars=dict(birth_rate=sim_params["birth_rate"])),
-            ss.Deaths(pars=dict(death_rate=sim_params["death_rate"])),
-        ]
-        sim = ss.Sim(people=pop, networks=net, diseases=infection, demographics=demographics, pars=sp)
-    else:
-        sim = ss.Sim(people=pop, networks=net, diseases=infection, pars=sp)
+def apply_risk_modifiers(tb):
+    """Set rr_activation, rr_clearance, rr_death on a random fraction of agents."""
+    n = len(tb.state)
+    rng = np.random.default_rng(rand_seed)
+    mask = rng.random(n) < modifier_fraction
+    tb.rr_activation[mask] = modifier_rr["rr_activation"]
+    tb.rr_clearance[mask] = modifier_rr["rr_clearance"]
+    tb.rr_death[mask] = modifier_rr["rr_death"]
 
+
+def run_default():
+    """Run LSHTM with default parameters."""
+    sim = build_lshtm_sim(tb_params, n_agents)
+    sim.run()
+    res = sim.diseases[0].results
+    print(f"Default: infectious={res['n_infectious'][-1]:.0f}, prevalence={res['prevalence_active'][-1]:.4f}, incidence_kpy={res['incidence_kpy'][-1]:.2f}")
     return sim
 
 
-def main():
-    """Build sim from tb_params and sim_params, run, print summary; show plot if sim_params['plot']."""
-    sim = build_lshtm_sim(tb_params, sim_params)
-
+def run_risk_modifiers_sample():
+    """Run LSHTM with same params as default, plus risk modifiers on a fraction of agents."""
+    sim = build_lshtm_sim(tb_params, n_agents)
+    sim.init()
+    apply_risk_modifiers(sim.diseases[0])
     sim.run()
-    print("Done.")
+    res = sim.diseases[0].results
+    print(f"Risk modifiers: n_infectious={res['n_infectious'][-1]:.0f}, prevalence={res['prevalence_active'][-1]:.4f}, cum_active={res['cum_active'][-1]:.0f}, cum_deaths={res['cum_deaths'][-1]:.0f}")
+    return sim
 
-    model = sim.diseases[0]
-    res = model.results
-    idx = -1
-    print(f"  Infectious (final): {res['n_infectious'][idx]:.0f}")
-    print(f"  Prevalence active (final): {res['prevalence_active'][idx]:.4f}")
-    print(f"  Incidence (final, per 1000 py): {res['incidence_kpy'][idx]:.2f}")
 
-    if sim_params["plot"]:
-        flat = sim.results.flatten()
-        flat_str = {str(k): v for k, v in flat.items()}
-        results = {"TB LSHTM": flat_str}
-        mtb.plot_combined(results, title="TB LSHTM model", dark=False, heightfold=1.5)
-        plt.show()
+def build_sims_for_both():
+    """Build two sims with identical tb_params and n_agents; second has risk modifiers applied after init."""
+    sim_default = build_lshtm_sim(tb_params, n_agents)
+    sim_default.label = "LSHTM (default)"
+    sim_modifiers = build_lshtm_sim(tb_params, n_agents)
+    sim_modifiers.label = "LSHTM (risk modifiers)"
+    sim_modifiers.init()
+    apply_risk_modifiers(sim_modifiers.diseases[0])
+    return [sim_default, sim_modifiers]
 
 
 if __name__ == "__main__":
-    main()
+    if RUN_MODE == "both":
+        sims = build_sims_for_both()
+        msim = ss.MultiSim(sims=sims, label="TB_LSHTM_both")
+        msim.run(parallel=True, shrink=False, reseed=False)
+        results = {
+            s.label: {str(k): v for k, v in s.results.flatten().items()}
+            for s in msim.sims
+        }
+        mtb.plot_combined(results, title="TB LSHTM: default vs risk modifiers", dark=False, heightfold=1.5)
+        plt.show()
+    elif RUN_MODE == "risk_modifiers":
+        sim = run_risk_modifiers_sample()
+        results = {"LSHTM (risk modifiers)": {str(k): v for k, v in sim.results.flatten().items()}}
+        mtb.plot_combined(results, title="TB LSHTM (risk modifiers)", dark=False, heightfold=1.5)
+        plt.show()
+    else:
+        sim = run_default()
+        results = {"LSHTM": {str(k): v for k, v in sim.results.flatten().items()}}
+        mtb.plot_combined(results, title="TB LSHTM", dark=False, heightfold=1.5)
+        plt.show()
