@@ -49,6 +49,27 @@ class HealthSeekingBehavior(ss.Intervention):
         self.update_pars(pars=pars, **kwargs)
         self.define_states(ss.BoolArr('sought_care', default=False))
         self._new_seekers_count = 0
+        self._care_seeking_dist = None  # set in init_post when using prob (not initial_care_seeking_rate)
+
+    def init_post(self):
+        """Initialize once sim and module are linked. Validates rate if set; builds prob-based dist if using prob."""
+        super().init_post()
+        rate = self.pars.initial_care_seeking_rate
+        if rate is not None:
+            if not isinstance(rate, ss.Rate):
+                raise TypeError(
+                    f"initial_care_seeking_rate must be an ss.Rate (e.g. ss.perday(0.1), ss.peryear(0.1)), got {type(rate).__name__}"
+                )
+            return
+        # Use prob: build and init distribution once
+        trace = self.name or 'HealthSeekingBehavior.care_seeking'
+        if isinstance(self.pars.prob, ss.Dist):
+            dist = self.pars.prob
+        else:
+            dist = ss.bernoulli(p=self.pars.prob)
+        dist.init(trace=trace, sim=self.sim, module=self)
+        self._care_seeking_dist = dist
+        return
 
     def step(self):
         sim = self.sim
@@ -70,16 +91,18 @@ class HealthSeekingBehavior(ss.Intervention):
             return
 
         if self.pars.initial_care_seeking_rate is not None:
-            p = self.pars.initial_care_seeking_rate.to_prob()
-            probs = np.full(len(not_yet_sought), p) if np.isscalar(p) else np.asarray(p)
-            seeking_uids = not_yet_sought[np.random.rand(len(not_yet_sought)) < probs]
-        else:
-            if isinstance(self.pars.prob, ss.Dist):
-                dist = self.pars.prob
-            else:
-                dist = ss.bernoulli(p=self.pars.prob)
-            dist.init(sim)
+            rate = self.pars.initial_care_seeking_rate
+            if not isinstance(rate, ss.Rate):
+                raise TypeError(
+                    f"initial_care_seeking_rate must be an ss.Rate (e.g. ss.perday(0.1)), got {type(rate).__name__}"
+                )
+            p = rate.to_prob()
+            dist = ss.bernoulli(p=p)
+            trace = self.name or 'HealthSeekingBehavior.care_seeking'
+            dist.init(trace=trace, sim=sim, module=self)
             seeking_uids = dist.filter(not_yet_sought)
+        else:
+            seeking_uids = self._care_seeking_dist.filter(not_yet_sought)
 
         if len(seeking_uids) == 0:
             return
