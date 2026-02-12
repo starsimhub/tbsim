@@ -49,6 +49,7 @@ class TBSL(IntEnum):
 
 
 class TB_LSHTM(ss.Infection):
+    #region Documentation
     """
     LSHTM-style compartmental tuberculosis (TB) model.
 
@@ -65,81 +66,49 @@ class TB_LSHTM(ss.Infection):
     progression and mortality rates are defined as exponential waiting times (per
     year). Use :meth:`start_treatment` to move eligible agents onto treatment.
 
-    **Risk modifiers** (per-agent, default 1.0): :attr:`rr_activation` multiplies
-    the infection-to-active rates (INFECTION → UNCONFIRMED, ASYMPTOMATIC);
-    :attr:`rr_clearance` multiplies the unconfirmed-to-recovered rate
-    (UNCONFIRMED → RECOVERED); :attr:`rr_death` multiplies the TB death rate
-    (SYMPTOMATIC → DEAD). Effective rate = base rate × modifier for each agent.
+    Per-agent risk modifiers (default 1.0): ``rr_activation``, ``rr_clearance``, ``rr_death``
+    multiply the relevant transition rates (effective rate = base rate * modifier for each agent).
+    Internally applied via :class:`TB_LSHTM._ScaledRate` (wrapper that scales a base rate by a per-agent factor).
+    
+    pars dict valid keys
+    ---------------------
 
-    Parameters
-    ----------
-    init_prev : bernoulli
-        Initial seed infections (prevalence).
-    beta : peryear
-        Transmission rate per year.
-    kappa : float
-        Relative transmission from asymptomatic vs symptomatic.
-    pi : float
-        Relative risk of reinfection after recovery (unconfirmed).
-    rho : float
-        Relative risk of reinfection after treatment completion.
-    infcle : years(expon)
-        Clear infection from latent (no active TB).
-    infunc : years(expon)
-        Progress from latent to unconfirmed TB.
-    infasy : years(expon)
-        Progress from latent to asymptomatic active TB.
-    uncrec : years(expon)
-        Recover from unconfirmed → RECOVERED.
-    uncasy : years(expon)
-        Progress from unconfirmed to asymptomatic.
-    asyunc : years(expon)
-        Revert from asymptomatic to unconfirmed.
-    asysym : years(expon)
-        Progress from asymptomatic to symptomatic.
-    symasy : years(expon)
-        Recover from symptomatic to asymptomatic.
-    theta : years(expon)
-        Start treatment from symptomatic.
-    mutb : years(expon)
-        TB-specific mortality.
-    phi : years(expon)
-        Treatment failure (back to symptomatic).
-    delta : years(expon)
-        Treatment completion (→ TREATED).
-    mu : years(expon)
-        Background mortality (per year).
-    cxr_asymp_sens : float
-        CXR sensitivity for screening asymptomatic (0–1).
+    - ``init_prev``: Initial seed infections (prevalence). Default ``ss.bernoulli(0.01)``.
+    - ``beta``: Transmission rate per year. Default ``ss.peryear(0.25)``.
+    - ``kappa``: Relative transmission from asymptomatic vs symptomatic. Default ``0.82``.
+    - ``pi``: Relative risk of reinfection after recovery (unconfirmed). Default ``0.21``.
+    - ``rho``: Relative risk of reinfection after treatment completion. Default ``3.15``.
+    - ``infcle``: Clear infection from latent (no active TB). Default ``ss.years(ss.expon(1/1.90))``.
+    - ``infunc``: Progress from latent to unconfirmed TB. Default ``ss.years(ss.expon(1/0.16))``.
+    - ``infasy``: Progress from latent to asymptomatic active TB. Default ``ss.years(ss.expon(1/0.06))``.
+    - ``uncrec``: Recover from unconfirmed → RECOVERED. Default ``ss.years(ss.expon(1/0.18))``.
+    - ``uncasy``: Progress from unconfirmed to asymptomatic. Default ``ss.years(ss.expon(1/0.25))``.
+    - ``asyunc``: Revert from asymptomatic to unconfirmed. Default ``ss.years(ss.expon(1/1.66))``.
+    - ``asysym``: Progress from asymptomatic to symptomatic. Default ``ss.years(ss.expon(1/0.88))``.
+    - ``symasy``: Recover from symptomatic to asymptomatic. Default ``ss.years(ss.expon(1/0.54))``.
+    - ``theta``: Start treatment from symptomatic. Default ``ss.years(ss.expon(1/0.46))``.
+    - ``mutb``: TB-specific mortality. Default ``ss.years(ss.expon(1/0.34))``.
+    - ``phi``: Treatment failure (back to symptomatic). Default ``ss.years(ss.expon(1/0.63))``.
+    - ``delta``: Treatment completion (→ TREATED). Default ``ss.years(ss.expon(1/2.00))``.
+    - ``mu``: Background mortality (per year). Default ``ss.years(ss.expon(1/0.014))``.
+    - ``cxr_asymp_sens``: CXR sensitivity for screening asymptomatic (0–1). Default ``1.0``.
 
-    States
-    ------
-    susceptible : BoolState
-        Whether the agent is susceptible to TB (default True).
-    infected : BoolState
-        Whether the agent is currently infected.
-    rel_sus : FloatArr
-        Relative susceptibility to TB (default 1.0).
-    rel_trans : FloatArr
-        Relative transmissibility of TB (default 1.0).
-    ti_infected : FloatArr
-        Time of infection (default -inf if never infected).
-    state : FloatArr
-        Current TB state (:class:`TBSL` value; default SUSCEPTIBLE).
-    state_next : FloatArr
-        Scheduled next state (default INFECTION).
-    ti_next : FloatArr
-        Time of next transition (default inf).
-    on_treatment : BoolState
-        Whether the agent is on TB treatment (default False).
-    ever_infected : BoolState
-        Whether the agent has ever been infected (default False).
-    rr_activation : FloatArr
-        Multiplier on infection-to-active rate (INFECTION → UNCONFIRMED, ASYMPTOMATIC; default 1.0).
-    rr_clearance : FloatArr
-        Multiplier on active-to-clearance rate (UNCONFIRMED → RECOVERED; default 1.0).
-    rr_death : FloatArr
-        Multiplier on active-to-death rate (SYMPTOMATIC → DEAD; default 1.0).
+    Agent States
+    -------------
+
+    - ``susceptible`` (BoolState, default=True): Whether the agent is susceptible to TB.
+    - ``infected`` (BoolState): Whether the agent is currently infected.
+    - ``rel_sus`` (FloatArr, default=1.0): Relative susceptibility to TB.
+    - ``rel_trans`` (FloatArr, default=1.0): Relative transmissibility of TB.
+    - ``ti_infected`` (FloatArr, default=-inf): Time of infection (if never infected).
+    - ``state`` (FloatArr, default=TBSL.SUSCEPTIBLE): Current TB state (:class:`TBSL` value).
+    - ``state_next`` (FloatArr, default=TBSL.INFECTION): Scheduled next state.
+    - ``ti_next`` (FloatArr, default=inf): Time of next transition.
+    - ``on_treatment`` (BoolState, default=False): Whether the agent is on TB treatment.
+    - ``ever_infected`` (BoolState, default=False): Whether the agent has ever been infected.
+    - ``rr_activation`` (FloatArr, default=1.0): Multiplier on infection-to-active rate (INFECTION → UNCONFIRMED, ASYMPTOMATIC).
+    - ``rr_clearance`` (FloatArr, default=1.0): Multiplier on active-to-clearance rate (UNCONFIRMED → RECOVERED).
+    - ``rr_death`` (FloatArr, default=1.0): Multiplier on active-to-death rate (SYMPTOMATIC → DEAD).
 
     State flow (high level)
     -----------------------
@@ -158,7 +127,8 @@ class TB_LSHTM(ss.Infection):
     Subclasses :class:`starsim.Infection`; integrate with a :class:`starsim.Sim`
     and a population (e.g. :class:`starsim.People`) to run simulations.
     """
-
+    #endregion Documentation
+    
     class _ScaledRate:
         """
         Wrapper that multiplies a base rate by a per-agent factor for transition sampling.
