@@ -45,7 +45,7 @@ def test_tbsl_enum_values():
     assert TBSL.SUSCEPTIBLE == -1
     assert TBSL.INFECTION == 0
     assert TBSL.CLEARED == 1
-    assert TBSL.UNCONFIRMED == 2
+    assert TBSL.NON_INFECTIOUS == 2
     assert TBSL.RECOVERED == 3
     assert TBSL.ASYMPTOMATIC == 4
     assert TBSL.SYMPTOMATIC == 5
@@ -75,8 +75,8 @@ def test_tb_lshtm_initialization():
     assert tb.pars.kappa == 0.82
     assert tb.pars.pi == 0.21
     assert tb.pars.rho == 3.15
-    assert hasattr(tb.pars, "infcle") and hasattr(tb.pars, "infunc") and hasattr(tb.pars, "infasy")
-    assert hasattr(tb.pars, "mutb") and hasattr(tb.pars, "theta") and hasattr(tb.pars, "delta")
+    assert hasattr(tb.pars, "inf_cle") and hasattr(tb.pars, "inf_non") and hasattr(tb.pars, "inf_asy")
+    assert hasattr(tb.pars, "mu_tb") and hasattr(tb.pars, "theta") and hasattr(tb.pars, "delta")
 
 
 def test_tb_lshtm_initial_states_after_init():
@@ -99,9 +99,9 @@ def test_tb_lshtm_initial_states_after_init():
 
 
 def test_tb_lshtm_acute_initialization():
-    """TB_LSHTM_Acute adds acuinf and alpha pars."""
+    """TB_LSHTM_Acute adds acu_inf and alpha pars."""
     tb = TB_LSHTM_Acute()
-    assert hasattr(tb.pars, "acuinf")
+    assert hasattr(tb.pars, "acu_inf")
     assert tb.pars.alpha == 0.9
 
 
@@ -152,8 +152,8 @@ def test_scaled_rate_positive_rr():
     sim = make_lshtm_sim(agents=5)
     sim.init()
     tb = sim.diseases[0]
-    # Use an already-initialized rate from the model (infcle)
-    base = tb.pars.infcle
+    # Use an already-initialized rate from the model (inf_cle)
+    base = tb.pars.inf_cle
     rr = np.array([1.0, 2.0, 0.5, 1.0, 1.0], dtype=float)
     scaled = TB_LSHTM._ScaledRate(base, rr)
     uids = ss.uids(np.arange(5))
@@ -168,7 +168,7 @@ def test_scaled_rate_zero_rr():
     sim = make_lshtm_sim(agents=3)
     sim.init()
     tb = sim.diseases[0]
-    base = tb.pars.infcle
+    base = tb.pars.inf_cle
     rr = np.array([0.0, 1.0, 0.0], dtype=float)
     scaled = TB_LSHTM._ScaledRate(base, rr)
     uids = ss.uids([0, 1, 2])
@@ -188,8 +188,8 @@ def test_transition_empty_uids():
     sim.init()
     tb = sim.diseases[0]
     state_next, ti_next = tb.transition(np.array([], dtype=int), to={
-        TBSL.CLEARED: tb.pars.infcle,
-        TBSL.UNCONFIRMED: tb.pars.infunc,
+        TBSL.CLEARED: tb.pars.inf_cle,
+        TBSL.NON_INFECTIOUS: tb.pars.inf_non,
     })
     assert len(state_next) == 0
     assert len(ti_next) == 0
@@ -201,11 +201,11 @@ def test_transition_returns_valid_states():
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids(np.arange(30))
-    keys = [TBSL.CLEARED, TBSL.UNCONFIRMED, TBSL.ASYMPTOMATIC]
+    keys = [TBSL.CLEARED, TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC]
     state_next, ti_next = tb.transition(uids, to={
-        TBSL.CLEARED: tb.pars.infcle,
-        TBSL.UNCONFIRMED: tb.pars.infunc,
-        TBSL.ASYMPTOMATIC: tb.pars.infasy,
+        TBSL.CLEARED: tb.pars.inf_cle,
+        TBSL.NON_INFECTIOUS: tb.pars.inf_non,
+        TBSL.ASYMPTOMATIC: tb.pars.inf_asy,
     })
     assert len(state_next) == 30
     assert len(ti_next) == 30
@@ -230,8 +230,8 @@ def test_set_prognoses_sets_state_and_susceptible():
     assert tb.infected[uids].all()
     assert tb.ever_infected[uids].all()
     assert np.all(tb.ti_infected[uids] == tb.ti)
-    # Next transition should be to one of CLEARED, UNCONFIRMED, ASYMPTOMATIC
-    assert np.all(np.isin(tb.state_next[uids], [TBSL.CLEARED, TBSL.UNCONFIRMED, TBSL.ASYMPTOMATIC]))
+    # Next transition should be to one of CLEARED, NON_INFECTIOUS, ASYMPTOMATIC
+    assert np.all(np.isin(tb.state_next[uids], [TBSL.CLEARED, TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC]))
     assert np.all(np.isfinite(tb.ti_next[uids]))
 
 
@@ -282,7 +282,7 @@ def test_start_treatment_latent_cleared():
     tb = sim.diseases[0]
     uids = ss.uids([1, 2, 3])
     tb.state[uids] = TBSL.INFECTION
-    tb.state_next[uids] = TBSL.UNCONFIRMED  # would have transitioned later
+    tb.state_next[uids] = TBSL.NON_INFECTIOUS  # would have transitioned later
     tb.ti_next[uids] = tb.ti + 10
     tb.start_treatment(uids)
     assert np.all(tb.state_next[uids] == TBSL.CLEARED)
@@ -290,11 +290,11 @@ def test_start_treatment_latent_cleared():
 
 
 def test_start_treatment_active_to_treatment():
-    """start_treatment on UNCONFIRMED/ASYMPTOMATIC/SYMPTOMATIC schedules TREATMENT."""
+    """start_treatment on NON_INFECTIOUS/ASYMPTOMATIC/SYMPTOMATIC schedules TREATMENT."""
     sim = make_lshtm_sim(agents=50)
     sim.init()
     tb = sim.diseases[0]
-    for state in [TBSL.UNCONFIRMED, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC]:
+    for state in [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC]:
         uids = ss.uids([0])
         tb.state[uids] = state
         tb.start_treatment(uids)
@@ -524,7 +524,7 @@ def test_start_treatment_mixed_latent_active_ignores_cleared():
     tb.state[u_inf] = TBSL.INFECTION
     tb.state[u_sym] = TBSL.SYMPTOMATIC
     tb.state[u_clr] = TBSL.CLEARED
-    tb.state_next[u_inf] = TBSL.UNCONFIRMED
+    tb.state_next[u_inf] = TBSL.NON_INFECTIOUS
     tb.state_next[u_sym] = TBSL.DEAD
     tb.ti_next[u_inf] = tb.ti + 5
     tb.ti_next[u_sym] = tb.ti + 5
@@ -545,7 +545,7 @@ def test_transition_single_destination_all_get_it():
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids(np.arange(20))
-    state_next, ti_next = tb.transition(uids, to={TBSL.CLEARED: tb.pars.infcle})
+    state_next, ti_next = tb.transition(uids, to={TBSL.CLEARED: tb.pars.inf_cle})
     assert np.all(state_next == TBSL.CLEARED)
     assert len(ti_next) == 20
     assert np.all(ti_next >= tb.ti)
@@ -579,14 +579,14 @@ def test_set_prognoses_acute_enters_acute_not_infection():
 
 
 def test_rr_activation_zero_prevents_progression_to_active():
-    """With rr_activation=0, latent agents only transition to CLEARED (infcle not scaled)."""
+    """With rr_activation=0, latent agents only transition to CLEARED (inf_cle not scaled)."""
     sim = make_lshtm_sim(agents=50)
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids(np.arange(20))
     tb.rr_activation[uids] = 0  # before set_prognoses so transition uses it
     with np.errstate(divide="ignore"):
-        tb.set_prognoses(uids)  # infunc/infasy -> inf; CLEARED wins
+        tb.set_prognoses(uids)  # inf_non/inf_asy -> inf; CLEARED wins
     tb.ti_next[uids] = tb.ti  # transition this step
     tb.step()
     assert np.all(tb.state[uids] == TBSL.CLEARED)
