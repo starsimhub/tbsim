@@ -75,7 +75,7 @@ class TBSL(IntEnum):
 
 
 class TB_LSHTM(ss.Infection):
-    #region Documentation
+    #region IDE Collapsable section for documentation
     """
     Implements a stochastic, agent-based TB natural history suitable for transmission modeling, using 
     the state structure specified by the :class:`TBSL` enum. Designed for users familiar with TB epidemiology 
@@ -263,6 +263,9 @@ class TB_LSHTM(ss.Infection):
             # --- Background ---
             mu=ss.years(ss.expon(1/0.014)),    # Background mortality (per year)
             cxr_asymp_sens=1.0,                 # CXR sensitivity for screening asymptomatic (0–1)
+            # --- For ACUTE ---
+            acu_inf=None, 
+            alpha=None,                          
         )
         self.update_pars(pars, **kwargs)
 
@@ -525,7 +528,7 @@ class TB_LSHTM(ss.Infection):
         self.state_next[u] = TBSL.TREATMENT
         self.ti_next[u] = self.ti
 
-        self.results['new_notifications_15+'][self.ti] = np.count_nonzero(self.sim.people.age[u] >= 15)
+        self.results['new_notifications_15+'][self.ti] += np.count_nonzero(self.sim.people.age[u] >= 15)
 
         return
 
@@ -839,9 +842,12 @@ class TB_LSHTM_Acute(TB_LSHTM):
             TBSL.SYMPTOMATIC: self.pars.phi,
             TBSL.TREATED: self.pars.delta
         })
+        # Set default risk modifiers to 1.0
+        self.rr_activation[u] = 1
+        self.rr_clearance[u] = 1
+        self.rr_death[u] = 1
 
         # CLEARED, RECOVERED, TREATED: next change is reinfection → ACUTE (via transmission)
-
         return
 
     def start_treatment(self, uids):
@@ -866,6 +872,6 @@ class TB_LSHTM_Acute(TB_LSHTM):
         self.state_next[u] = TBSL.TREATMENT
         self.ti_next[u] = self.ti
 
-        self.results['new_notifications_15+'][self.ti] = np.count_nonzero(self.sim.people.age[u] >= 15)
+        self.results['new_notifications_15+'][self.ti]+= np.count_nonzero(self.sim.people.age[u] >= 15)
 
         return
