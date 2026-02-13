@@ -12,13 +12,13 @@ tb_params = {
     "init_prev": ss.bernoulli(0.01), # seed prevalence
     "beta": ss.peryear(0.25), # transmission rate
     "kappa": 0.82,            # asymp vs symp relative transmissibility      
-    "pi": 0.21,               # reinfection risk after recovery (unconfirmed)
+    "pi": 0.21,               # reinfection risk after recovery (non-infectious)
     "rho": 3.15,              # reinfection risk after treatment
     "cxr_asymp_sens": 1.0,    # CXR sensitivity for asymptomatic (0–1)  
     
     # Acute variant only (ignored if use_acute is False)
-    "acuinf": ss.years(ss.expon(1 / 4.0)),   # 1/4 years to infectious
-    "alpha": 0.9,                            # reinfection risk after treatment
+    "acu_inf": ss.years(ss.expon(1 / 4.0)),  # 1/4 years to infectious
+    "alpha": 0.9,                             # relative transmissibility from acute
 }
 
 n_agents = 5_000
@@ -35,7 +35,7 @@ def build_lshtm_sim(tb_params, n_agents, interventions=None):
     use_acute = tb_params.get("use_acute", False)
     skip = {"use_acute"}
     if not use_acute:
-        skip |= {"acuinf", "alpha"}  # base model doesn't use these
+        skip |= {"acu_inf", "alpha"}  # base model doesn't use these
     infection_pars = {k: v for k, v in tb_params.items() if k not in skip}
     if use_acute:
         infection = mtb.TB_LSHTM_Acute(pars=infection_pars)
