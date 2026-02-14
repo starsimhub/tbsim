@@ -10,17 +10,16 @@ Prerequisites
 - pip package manager
 - Git (for development installation)
 
-Option 1: Online Environment (Recommended for Beginners)
--------------------------------------------------------
+Option 1: Online Environment (Google Colab)
+------------------------------------------
 
-The easiest way to get started is to use the online Binder environment:
+You can run the tutorials online using Google Colab (links are included at the top of each tutorial notebook).
 
-1. Click the Binder badge in the main README
-2. Wait for the environment to build (2-3 minutes)
-3. Navigate to the tutorials directory
-4. Open any tutorial notebook and start exploring
+For Google Colab, run the install cell to install TBsimV2 from GitHub:
 
-This option requires no local setup and provides a fully configured environment.
+.. code-block:: python
+
+   %pip install -q git+https://github.com/starsimhub/tbsimV2.git
 
 Option 2: Local Installation
 ----------------------------
@@ -29,8 +28,8 @@ Clone and install TBsim locally:
 
 .. code-block:: bash
 
-   git clone https://github.com/starsimhub/tbsim.git
-   cd tbsim
+   git clone https://github.com/starsimhub/tbsimV2.git
+   cd tbsimV2
    pip install -e .
 
 Option 3: Development Installation
@@ -39,13 +38,17 @@ Option 3: Development Installation
 For developers who want to work with the latest features:
 
 1. Install TBsim first:
+   
    .. code-block:: bash
-      git clone https://github.com/starsimhub/tbsim.git
-      cd tbsim
+   
+      git clone https://github.com/starsimhub/tbsimV2.git
+      cd tbsimV2
       pip install -e .
 
 2. Install the latest Starsim development version:
+   
    .. code-block:: bash
+   
       git clone https://github.com/starsimhub/starsim.git
       cd starsim
       pip install -e .
