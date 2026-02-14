@@ -1,6 +1,0 @@
-{
-  "default_path": "docs/tutorials",
-  "default_notebook": "tb_interventions_tutorial.ipynb",
-  "description": "TB Simulation Tutorials - Interactive environment for learning TB modeling with tbsim and starsim",
-  "keywords": ["epidemiology", "tuberculosis", "simulation", "modeling", "tutorial"]
-} 
