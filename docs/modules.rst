@@ -11,6 +11,7 @@ Core Modules
 
    api/tbsim
    api/tbsim.tb
+   api/tbsim.tb_lshtm
    api/tbsim.networks
 
 Analysis and Visualization
@@ -79,6 +80,9 @@ Module Overview
 
 **Core TB Model** (`tbsim.tb`)
    Main tuberculosis simulation module with disease dynamics, transmission, and state transitions. Implements the TBS state enumeration and TB disease class.
+
+**LSHTM-Style TB Models** (`tbsim.tb_lshtm`)
+   LSHTM-inspired compartmental TB models with states and transitions. Provides ``TB_LSHTM`` (latent → active progression) and ``TB_LSHTM_Acute`` (adds acute infectious state). State labels in ``TBSL``.
 
 **Networks** (`tbsim.networks`)
    Social network structures for modeling transmission patterns, including household networks and RATIONS trial specific implementations.

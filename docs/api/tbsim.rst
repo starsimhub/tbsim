@@ -6,6 +6,12 @@ This page documents the core package and main modules of the TBsim framework.
 Main Package
 -----------
 
+.. autosummary::
+   :toctree: .
+   :nosignatures:
+
+   tbsim.tb_lshtm
+
 .. automodule:: tbsim
    :members:
    :undoc-members:
