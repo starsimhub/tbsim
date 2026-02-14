@@ -29,12 +29,6 @@ Welcome to TBsim Documentation
 
 .. toctree::
    :maxdepth: 2
-   :caption: Scripts
-
-   scripts
-
-.. toctree::
-   :maxdepth: 2
    :caption: Development
 
    contributing
