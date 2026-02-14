@@ -1,12 +1,8 @@
-# Tuberculosis Modeling using Starsim (TBsim)
-
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/starsimhub/tbsim/main?filepath=docs%2Ftutorials%2Ftb_interventions_tutorial.ipynb)
+# Tuberculosis Modeling with starsim
 
 **Warning! TBsim is still in the early stages of development. It is being shared solely for transparency and to facilitate collaborative development. It is not ready to be used for real research or policy questions.**
 
-This repository contains the implementation of a new Tuberculosis (TB) model using the Starsim package. The model aims to simulate the dynamics of TB spread and treatment efficacy under various scenarios.
-
-**Try the tutorials online!** Click the Binder badge above to launch an interactive environment with all tutorials ready to run.
+TBsim is a computational modeling framework for simulating tuberculosis transmission, disease progression, and treatment outcomes in populations. Built on the Starsim agent-based modeling platform, it enables researchers to evaluate intervention strategies, explore disease dynamics under different conditions, and inform TB control policy decisions.
 
 ## Introduction
 
@@ -19,17 +15,15 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
 - **Customizable Parameters:** Allows adjustment of various parameters to simulate different scenarios.
 - **Visualization Tools:** Includes tools for visualizing the simulation results.
 - **IBM and NBM:** Leverages Individual-Based Models and Network-Based Models for more accurate and comprehensive simulations.
+- **TB natural history model structures:**
+  - **Natural history model** (`TB`): Agent-based (stochastic) TB progression with latent infection split into fast/slow pathways, progression through an active pre-symptomatic stage, and active disease stratified into smear-positive, smear-negative, and extra-pulmonary states, with TB mortality. See Abu-Raddad et al. (2009) for background: https://doi.org/10.1073/pnas.0901720106
+  - **LSHTM-style spectrum model** (`TB_LSHTM`, `TB_LSHTM_Acute`): Agent-based implementation of the LSHTM “spectrum of TB disease” natural history (susceptible → infection/cleared → non-infectious → asymptomatic → symptomatic → treatment/treated/death; optional acute infectious state), designed to support evaluating active case-finding / population-wide screening algorithms (e.g., CXR and NAAT workflows) as in Schwalb et al. 2025 ([PLOS Glob Public Health](https://journals.plos.org/globalpublichealth/article?id=10.1371/journal.pgph.0005050)).
 
 ## Getting Started
 
-### Option 1: Run Online (Recommended for Beginners)
+### Option 1: Run Online (Google Colab)
 
-The easiest way to get started is to run the tutorials online using Binder:
-
-1. **Click the Binder badge** at the top of this README
-2. **Wait for the environment to build** (takes 2-3 minutes)
-3. **Navigate to the `tutorials` directory**
-4. **Open any tutorial notebook** and start exploring!
+To run tutorials online, open a tutorial notebook in Google Colab (links are included at the top of each tutorial notebook) and run the install cell to install TBsimV2 from GitHub.
 
 Available tutorials:
 - `tb_interventions_tutorial.ipynb` - TB interventions modeling
@@ -48,8 +42,8 @@ Available tutorials:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/starsimhub/tbsim.git 
-   cd tbsim
+   git clone https://github.com/starsimhub/tbsimV2.git
+   cd tbsimV2
    ```
 2. Install the required packages:
    ```bash

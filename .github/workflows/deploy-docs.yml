@@ -78,8 +78,6 @@ jobs:
             echo "Build with warnings as errors failed, attempting to build without warnings as errors..."
             make html SPHINXOPTS="--keep-going"
           }
-      - name: Verify Binder configuration
-        run: python .github/scripts/verify_binder.py
 
       - name: Verify build output
         working-directory: ./docs
