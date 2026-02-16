@@ -13,6 +13,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
+    'sphinxcontrib.mermaid',
     'sphinx_copybutton',
     'sphinx_design',
     'nbsphinx',
@@ -219,6 +220,6 @@ napoleon_attr_annotations = True
 # Autosummary: generate API stubs from code at build time
 autosummary_generate = True
 
-# Additional autodoc settings for scripts
+# Additional autodoc settings
 autodoc_ignore_module_all = True
-autodoc_preserve_defaults = True 
+autodoc_preserve_defaults = True
