@@ -1,42 +1,78 @@
 import numpy as np
 import starsim as ss
-from tbsim import TBS, TBSL, TB_LSHTM, TB_LSHTM_Acute
+from tbsim.interventions.base import TBIntervention
 
 __all__ = ['HealthSeekingBehavior']
 
 
-def _get_tb(sim):
-    """Return the TB disease module (sim.diseases.tb or first disease when only one)."""
-    return getattr(sim.diseases, 'tb', None) or (sim.diseases[0] if len(sim.diseases) else None)
+class HealthSeekingBehavior(TBIntervention):
+    """
+    Simulates initial care-seeking behaviour for individuals with active TB.
 
+    At each time step the intervention identifies agents whose disease state
+    is eligible for care-seeking (e.g. symptomatic, smear-positive) and who
+    have not previously sought care.  A subset of those agents — determined
+    by a probability or a rate — "seek care" and are handed to the TB
+    disease module's ``start_treatment()`` method.
 
-def _active_tb_eligible(tb):
-    """Return boolean state array of agents with active TB eligible for care-seeking (and start_treatment)."""
-    if isinstance(tb, (TB_LSHTM, TB_LSHTM_Acute)):
-        return (
-            (tb.state == TBSL.UNCONFIRMED)
-            | (tb.state == TBSL.ASYMPTOMATIC)
-            | (tb.state == TBSL.SYMPTOMATIC)
-            | (tb.state == TBSL.ACUTE)
+    The intervention works with every TB variant in tbsim (``TB``,
+    ``TB_LSHTM``, ``TB_LSHTM_Acute``).  The base class automatically
+    detects which variant is running and looks up the eligible states, so
+    no manual configuration is needed.
+
+    Parameters
+    ----------
+    prob : float or ss.Dist, default 0.1
+        Per-step probability that an eligible agent seeks care.
+        Ignored when ``initial_care_seeking_rate`` is provided.
+    initial_care_seeking_rate : ss.Rate, optional
+        A care-seeking rate expressed as an ``ss.Rate`` object
+        (e.g. ``ss.perday(0.1)`` or ``ss.peryear(36.5)``).
+        Internally converted to a per-step probability.
+        When provided, ``prob`` is ignored.
+    single_use : bool, default True
+        If True, the intervention expires after the first time step in
+        which at least one agent seeks care (one-shot trigger).
+        Set to False for continuous care-seeking over time.
+    start : date-like, optional
+        Simulation date before which the intervention is inactive.
+    stop : date-like, optional
+        Simulation date after which the intervention is inactive.
+
+    Results (recorded each time step)
+    ----------------------------------
+    new_sought_care : int
+        Number of agents who sought care this step.
+    n_sought_care : int
+        Cumulative number of agents who have ever sought care.
+    n_eligible : int
+        Number of agents currently eligible but who have not yet sought care.
+
+    Examples
+    --------
+    Rate-based, continuous care-seeking with the LSHTM model::
+
+        sim = ss.Sim(
+            diseases=TB_LSHTM(),
+            interventions=HealthSeekingBehavior(pars={
+                'initial_care_seeking_rate': ss.perday(0.1),
+                'single_use': False,
+            }),
+            ...
         )
-    return (
-        (tb.state == TBS.ACTIVE_SMPOS)
-        | (tb.state == TBS.ACTIVE_SMNEG)
-        | (tb.state == TBS.ACTIVE_EXPTB)
-    )
+        sim.run()
 
+    Probability-based, single-use with the legacy model::
 
-class HealthSeekingBehavior(ss.Intervention):
+        sim = ss.Sim(
+            diseases=TB(),
+            interventions=HealthSeekingBehavior(pars={'prob': 0.5}),
+            ...
+        )
     """
-    Care-seeking for active TB; calls tb.start_treatment on those who seek care.
-    Works with TB (TBS) and LSHTM (TB_LSHTM / TB_LSHTM_Acute, TBSL).
 
-    Parameters:
-        prob (float or ss.Dist): Probability per unit time. Ignored if initial_care_seeking_rate is set.
-        initial_care_seeking_rate: Optional rate (e.g. ss.perday(0.1)). If set, overrides prob.
-        single_use (bool): Expire after first care-seeking.
-        start, stop: Optional time window.
-    """
+    _state_method = 'care_seeking_eligible'
+
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         self.define_pars(
@@ -49,10 +85,16 @@ class HealthSeekingBehavior(ss.Intervention):
         self.update_pars(pars=pars, **kwargs)
         self.define_states(ss.BoolArr('sought_care', default=False))
         self._new_seekers_count = 0
-        self._care_seeking_dist = None  # set in init_post when using prob (not initial_care_seeking_rate)
+        self._care_seeking_dist = None
 
     def init_post(self):
-        """Initialize once sim and module are linked. Validates rate if set; builds prob-based dist if using prob."""
+        """Validate parameters and build the sampling distribution.
+
+        Called automatically after the simulation is initialised.
+        If ``initial_care_seeking_rate`` is set, it is validated here and
+        converted to a probability each step.  Otherwise a Bernoulli
+        distribution is created from ``prob`` and reused every step.
+        """
         super().init_post()
         rate = self.pars.initial_care_seeking_rate
         if rate is not None:
@@ -61,7 +103,6 @@ class HealthSeekingBehavior(ss.Intervention):
                     f"initial_care_seeking_rate must be an ss.Rate (e.g. ss.perday(0.1), ss.peryear(0.1)), got {type(rate).__name__}"
                 )
             return
-        # Use prob: build and init distribution once
         trace = self.name or 'HealthSeekingBehavior.care_seeking'
         if isinstance(self.pars.prob, ss.Dist):
             dist = self.pars.prob
@@ -69,21 +110,17 @@ class HealthSeekingBehavior(ss.Intervention):
             dist = ss.bernoulli(p=self.pars.prob)
         dist.init(trace=trace, sim=self.sim, module=self)
         self._care_seeking_dist = dist
-        return
 
     def step(self):
+        """Identify eligible agents and sample who seeks care this step."""
         sim = self.sim
         t = sim.now
-        tb = _get_tb(sim)
-        if tb is None:
-            return
         if self.pars.start is not None and t < self.pars.start:
             return
         if self.pars.stop is not None and t > self.pars.stop:
             return
 
-        active_tb = _active_tb_eligible(tb)
-        active_uids = active_tb.uids
+        active_uids = np.where(np.isin(self.tb.state, self.states))[0]
         not_yet_sought = active_uids[~self.sought_care[active_uids]]
         self._new_seekers_count = 0
 
@@ -108,7 +145,7 @@ class HealthSeekingBehavior(ss.Intervention):
             return
         self._new_seekers_count = len(seeking_uids)
         self.sought_care[seeking_uids] = True
-        tb.start_treatment(seeking_uids)
+        self.tb.start_treatment(seeking_uids)
         if self.pars.single_use:
             self.expired = True
 
@@ -121,12 +158,9 @@ class HealthSeekingBehavior(ss.Intervention):
         )
 
     def update_results(self):
-        sim = self.sim
-        tb = _get_tb(sim)
-        active_tb = _active_tb_eligible(tb)
-        active_uids = active_tb.uids
-        not_yet_sought = active_uids[~self.sought_care[active_uids]]
+        """Record care-seeking counts and remaining eligible agents."""
         self.results['new_sought_care'][self.ti] = self._new_seekers_count
         self.results['n_sought_care'][self.ti] = np.count_nonzero(self.sought_care)
+        active_uids = np.where(np.isin(self.tb.state, self.states))[0]
+        not_yet_sought = active_uids[~self.sought_care[active_uids]]
         self.results['n_eligible'][self.ti] = len(not_yet_sought)
-
