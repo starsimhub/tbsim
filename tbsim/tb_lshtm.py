@@ -73,6 +73,12 @@ class TBSL(IntEnum):
     DEAD            = 8     # TB-related death
     ACUTE           = 9     # Acute infection immediately after exposure (TB_LSHTM_Acute only)
 
+    @staticmethod
+    def care_seeking_eligible():
+        """Active TB states eligible for care-seeking.
+        Includes ACUTE — harmless for TB_LSHTM since no agent is ever in that state."""
+        return np.array([TBSL.ACUTE, TBSL.SYMPTOMATIC])
+
 
 class TB_LSHTM(ss.Infection):
     #region IDE Collapsable section for documentation
