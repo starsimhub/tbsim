@@ -10,7 +10,7 @@ from .comorbidities.hiv.hiv import HIVState
 from .comorbidities.hiv.intervention import HivInterventions
 from .config import *
 from .interventions.interventions import *
-from .interventions.tb_health_seeking import *
+from .interventions.healthseeking import *
 from .interventions.tb_diagnostic import *
 from .interventions.tb_treatment import *
 from .interventions.tpt import *
