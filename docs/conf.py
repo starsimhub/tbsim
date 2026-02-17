@@ -25,7 +25,9 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = 'furo'
 html_static_path = ['_static']
-autodoc_mock_imports = ["starsim", "sciris", "matplotlib", "pandas", "numpy", "rdata"]
+# Only mock packages that are not needed for import or that provide __version__ used by scipy/numpy.
+# Do not mock numpy/pandas/matplotlib or scipy will fail when parsing version during tbsim import.
+autodoc_mock_imports = ["starsim", "sciris", "rdata"]
 
 # nbsphinx configuration
 nbsphinx_execute = 'never'
@@ -219,6 +221,8 @@ napoleon_attr_annotations = True
 
 # Autosummary: generate API stubs from code at build time
 autosummary_generate = True
+# Do not overwrite hand-written API .rst files (e.g. api/tbsim.tb_lshtm.rst)
+autosummary_generate_overwrite = False
 
 # Additional autodoc settings
 autodoc_ignore_module_all = True
