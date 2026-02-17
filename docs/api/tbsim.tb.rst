@@ -14,7 +14,7 @@ Main TB Module
 TB State Enumeration
 --------------------
 
-.. automodule:: tbsim.tb.TBS
+.. autoclass:: tbsim.tb.TBS
    :members:
    :undoc-members:
    :show-inheritance:
@@ -22,7 +22,7 @@ TB State Enumeration
 TB Disease Class
 ----------------
 
-.. automodule:: tbsim.tb.TB
+.. autoclass:: tbsim.tb.TB
    :members:
    :undoc-members:
    :show-inheritance:

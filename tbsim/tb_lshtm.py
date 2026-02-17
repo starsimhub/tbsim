@@ -1,47 +1,4 @@
-"""
-This module defines an individual-based tuberculosis (TB) natural history model 
-reflecting the LSHTM (London School of Hygiene & Tropical Medicine) structure, 
-implemented for use in the Starsim simulation framework.
-
-The model adopts the LSHTM state-transition structure and is provided as a 
-subclass of :class:`starsim.Infection`.
-
-State definitions in this model:
-
-- :class:`TBSL.SUSCEPTIBLE`: Susceptible to TB infection.
-- :class:`TBSL.INFECTION`: Latent infection (not yet active TB).
-- :class:`TBSL.CLEARED`: Cleared infection without developing active TB.
-- :class:`TBSL.NON_INFECTIOUS`: Non-infectious TB (early/smear-negative).
-- :class:`TBSL.RECOVERED`: Recovered from non-infectious TB (susceptible to reinfection).
-- :class:`TBSL.ASYMPTOMATIC`: Active TB, asymptomatic (infectious).
-- :class:`TBSL.SYMPTOMATIC`: Active TB, symptomatic (infectious).
-- :class:`TBSL.TREATMENT`: On TB treatment.
-- :class:`TBSL.TREATED`: Completed treatment (susceptible to reinfection).
-- :class:`TBSL.DEAD`: TB-related death.
-- :class:`TBSL.ACUTE`: Acute infection immediately after exposure (TB_LSHTM_Acute only).
-
-The model has the following transitions:
-
-    .. mermaid::
-
-       graph TD
-           S[Susceptible] -->|λ| I[INFECTION]
-           I -->|infcle| C[CLEARED]
-           I -->|infnon| N[NON_INFECTIOUS]
-           I -->|infasy| A[ASYMPTOMATIC]
-           N -->|nonrec| R[RECOVERED]
-           N -->|nonasy| A
-           A -->|asynon| N
-           A -->|asysym| Sym[SYMPTOMATIC]
-           Sym -->|symasy| A
-           Sym -->|θ| T[TREATMENT]
-           Sym -->|μTB| D[DEAD]
-           T -->|φ| Sym
-           T -->|δ| Tr[TREATED]
-           C -.->|λ| I
-           R -.->|λ·π| I
-           Tr -.->|λ·ρ| I
-"""
+"""LSHTM TB natural history model. State definitions and transition diagram are in the API docs (tbsim.tb_lshtm)."""
 
 import numpy as np
 import starsim as ss
@@ -94,25 +51,25 @@ class TBSL(IntEnum):
 class TB_LSHTM(ss.Infection):
     #region IDE Collapsable section for documentation
     """
-    Implements a stochastic, agent-based TB natural history suitable for transmission modeling, using 
-    the state structure specified by the :class:`TBSL` enum. Designed for users familiar with TB epidemiology 
-    but new to :mod:`starsim`/`tbsim`, this class represents disease progression as state transitions 
-    governed by exponential waiting times (per year), with all rates and parameters supplied at instantiation.
+    Stochastic, agent-based TB natural history implementing the LSHTM state-transition structure
+    (:class:`TBSL`). Progression is a continuous-time state machine: at each state, competing
+    exponential waiting times are sampled; the minimum determines the next state and transition
+    time. All rates defaults are in :attr:`pars` (per-year); transition logic is in :meth:`step` and
+    :meth:`set_prognoses`.
 
-    State transitions include latent infection (INFECTION) progressing to cleared infection (CLEARED), 
-    non-infectious disease (NON_INFECTIOUS), or active TB—either asymptomatic (ASYMPTOMATIC) or symptomatic 
-    (SYMPTOMATIC). SYMPTOMATIC cases may recover back to ASYMPTOMATIC, start TB treatment (TREATMENT), 
-    or die due to TB (DEAD). Upon completing therapy, agents enter the TREATED state. States CLEARED, RECOVERED, 
-    and TREATED remain at risk for reinfection (with adjustable relative risks for each class).
+    Latent (INFECTION) exits to CLEARED, NON_INFECTIOUS, or ASYMPTOMATIC. From NON_INFECTIOUS:
+    RECOVERED or ASYMPTOMATIC. From ASYMPTOMATIC: NON_INFECTIOUS or SYMPTOMATIC. From SYMPTOMATIC:
+    ASYMPTOMATIC, TREATMENT (theta), or DEAD (mu_tb). From TREATMENT: SYMPTOMATIC (phi, failure)
+    or TREATED (delta, completion). CLEARED, RECOVERED, and TREATED have no spontaneous exit;
+    reinfection is via transmission, with relative risks :attr:`pars.pi` and :attr:`pars.rho` for
+    RECOVERED and TREATED.
 
-    Transmission is parameterized by :attr:`pars.beta`; only ASYMPTOMATIC and SYMPTOMATIC agents are infectious, 
-    with relative infectiousness modulated via :attr:`pars.kappa` for asymptomatics. All transition and mortality 
-    rates are exponential; see parameter details below. TB progression and mortality rates can be modulated at the 
-    individual level via the `rr_activation`, `rr_clearance`, and `rr_death` modifiers 
-    (effective rate per-agent = base rate × modifier), using the internal :class:`TB_LSHTM._ScaledRate` mechanism.
-
-    Initiating treatment for selected individuals is handled by :meth:`start_treatment`, which applies 
-    model-appropriate rules for active and latent TB states, as described in method documentation.
+    Only ASYMPTOMATIC and SYMPTOMATIC are infectious; force of infection uses :attr:`pars.beta`
+    and :attr:`pars.kappa` (relative infectiousness of ASYMPTOMATIC). Per-agent rate modifiers
+    ``rr_activation`` (latent→active), ``rr_clearance`` (NON_INFECTIOUS→RECOVERED), and
+    ``rr_death`` (SYMPTOMATIC→DEAD) scale the corresponding base rates; see :class:`TB_LSHTM._ScaledRate`.
+    Treatment initiation from interventions is via :meth:`start_treatment` (latent→CLEARED,
+    active→TREATMENT).
 
     parameters (pars) keys:
     -----------------------
