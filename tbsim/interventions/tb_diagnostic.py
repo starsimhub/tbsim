@@ -1,7 +1,6 @@
 import numpy as np
 import starsim as ss
 from tbsim import TBS
-from .interventions_eh import TBDiagnosticErrors
 
 __all__ = ['TBDiagnostic', 'EnhancedTBDiagnostic']
 
@@ -206,26 +205,6 @@ class TBDiagnostic(ss.Intervention):
         ppl = sim.people
         tb = sim.diseases.tb
 
-        # # Error handling: Check required simulation components
-        # assert hasattr(ppl, 'sought_care'), TBDiagnosticErrors.SOUGHT_CARE_MISSING
-        # assert hasattr(ppl, 'diagnosed'), TBDiagnosticErrors.DIAGNOSED_MISSING
-        # assert hasattr(ppl, 'alive'), TBDiagnosticErrors.ALIVE_MISSING
-        # assert hasattr(ppl, 'tested'), TBDiagnosticErrors.TESTED_MISSING
-        # assert hasattr(ppl, 'n_times_tested'), TBDiagnosticErrors.N_TIMES_TESTED_MISSING
-        # assert hasattr(ppl, 'test_result'), TBDiagnosticErrors.TEST_RESULT_MISSING
-        # assert hasattr(ppl, 'care_seeking_multiplier'), TBDiagnosticErrors.CARE_SEEKING_MULTIPLIER_MISSING
-        # assert hasattr(ppl, 'multiplier_applied'), TBDiagnosticErrors.MULTIPLIER_APPLIED_MISSING
-
-        # # Error handling: Check TB disease module
-        # assert hasattr(sim, 'diseases'), TBDiagnosticErrors.DISEASES_MISSING
-        # assert hasattr(sim.diseases, 'tb'), TBDiagnosticErrors.TB_DISEASE_MISSING
-        # assert hasattr(tb, 'state'), TBDiagnosticErrors.TB_STATE_MISSING
-
-        # # Error handling: Check parameter validity
-        # assert 0.0 <= self.pars.coverage <= 1.0, TBDiagnosticErrors.coverage_invalid(self.pars.coverage)
-        # assert 0.0 <= self.pars.sensitivity <= 1.0, TBDiagnosticErrors.sensitivity_invalid(self.pars.sensitivity)
-        # assert 0.0 <= self.pars.specificity <= 1.0, TBDiagnosticErrors.specificity_invalid(self.pars.specificity)
-        # assert self.pars.care_seeking_multiplier >= 1.0, TBDiagnosticErrors.care_seeking_multiplier_invalid(self.pars.care_seeking_multiplier)
 
         # Find people who sought care but haven't been tested
         # eligible = ppl.sought_care & (~ppl.tested) & ppl.alive
@@ -261,7 +240,7 @@ class TBDiagnostic(ss.Intervention):
                 tb_test_positive = ss.bernoulli(self.pars.sensitivity, strict=False).filter(tb_cases)
                 test_positive[has_tb] = np.isin(selected[has_tb], tb_test_positive)
             except Exception as e:
-                raise AssertionError(TBDiagnosticErrors.sensitivity_test_failed(e, self.pars.sensitivity))
+                raise RuntimeError(f"Sensitivity test failed (sensitivity={self.pars.sensitivity}): {e}")
         
         # Handle non-TB cases with specificity (test positive with prob = 1-specificity)
         non_tb_cases = selected[~has_tb]
@@ -270,11 +249,15 @@ class TBDiagnostic(ss.Intervention):
                 non_tb_test_positive = ss.bernoulli(1 - self.pars.specificity, strict=False).filter(non_tb_cases)
                 test_positive[~has_tb] = np.isin(selected[~has_tb], non_tb_test_positive)
             except Exception as e:
-                raise AssertionError(TBDiagnosticErrors.specificity_test_failed(e, self.pars.specificity))
+                raise RuntimeError(f"Specificity test failed (specificity={self.pars.specificity}): {e}")
         
         # Error handling: Check test result validity
-        assert len(test_positive) == len(selected), TBDiagnosticErrors.test_result_length_mismatch(len(selected), len(test_positive))
-        assert test_positive.dtype == bool, TBDiagnosticErrors.test_result_wrong_type(test_positive.dtype)
+        assert len(test_positive) == len(selected), (
+            f"Test result length mismatch: expected {len(selected)}, got {len(test_positive)}"
+        )
+        assert test_positive.dtype == bool, (
+            f"Test result has wrong dtype: expected bool, got {test_positive.dtype}"
+        )
 
         # Update person state
         ppl.tested[selected] = True
