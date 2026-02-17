@@ -12,17 +12,17 @@ LSHTM state-transition structure and is provided as a subclass of
 State definitions in this model
 -------------------------------
 
-- :class:`TBSL.SUSCEPTIBLE`: Susceptible to TB infection.
-- :class:`TBSL.INFECTION`: Latent infection (not yet active TB).
-- :class:`TBSL.CLEARED`: Cleared infection without developing active TB.
-- :class:`TBSL.NON_INFECTIOUS`: Non-infectious TB (early/smear-negative).
-- :class:`TBSL.RECOVERED`: Recovered from non-infectious TB (susceptible to reinfection).
-- :class:`TBSL.ASYMPTOMATIC`: Active TB, asymptomatic (infectious).
-- :class:`TBSL.SYMPTOMATIC`: Active TB, symptomatic (infectious).
-- :class:`TBSL.TREATMENT`: On TB treatment.
-- :class:`TBSL.TREATED`: Completed treatment (susceptible to reinfection).
-- :class:`TBSL.DEAD`: TB-related death.
-- :class:`TBSL.ACUTE`: Acute infection immediately after exposure (TB_LSHTM_Acute only).
+- ``TBSL.SUSCEPTIBLE``: Susceptible to TB infection.
+- ``TBSL.INFECTION``: Latent infection (not yet active TB).
+- ``TBSL.CLEARED``: Cleared infection without developing active TB.
+- ``TBSL.NON_INFECTIOUS``: Non-infectious TB (early/smear-negative).
+- ``TBSL.RECOVERED``: Recovered from non-infectious TB (susceptible to reinfection).
+- ``TBSL.ASYMPTOMATIC``: Active TB, asymptomatic (infectious).
+- ``TBSL.SYMPTOMATIC``: Active TB, symptomatic (infectious).
+- ``TBSL.TREATMENT``: On TB treatment.
+- ``TBSL.TREATED``: Completed treatment (susceptible to reinfection).
+- ``TBSL.DEAD``: TB-related death.
+- ``TBSL.ACUTE``: Acute infection immediately after exposure (TB_LSHTM_Acute only).
 
 State transition diagram
 ------------------------
