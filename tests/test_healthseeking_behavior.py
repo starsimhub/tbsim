@@ -1,16 +1,16 @@
 """
-Tests for HealthSeekingBehavior intervention with TB_LSHTM.
+Tests for HealthSeekingBehavior intervention with TB_LSHTM and legacy TB model (tbsim.tb.TB).
 
-Covers: integration run, eligibility (SYMPTOMATIC only), prob vs initial_care_seeking_rate,
-single_use, start/stop, symptom assignment, parameter validation, results consistency, burn-in.
-Assertions match tbsim/interventions/healthseeking.py and tbsim/tb_lshtm.py.
+Covers: integration run, eligibility (SYMPTOMATIC only for LSHTM; ACTIVE_SMPOS/SMNEG/EXPTB for TB),
+prob vs initial_care_seeking_rate, single_use, start/stop, symptom assignment, parameter validation,
+results consistency, burn-in. Assertions match tbsim/interventions/healthseeking.py, tbsim/tb_lshtm.py, tbsim/tb.py.
 """
 
 import pytest
 import numpy as np
 import starsim as ss
 import tbsim as mtb
-from tbsim import TB_LSHTM, TBSL
+from tbsim import TB_LSHTM, TB, TBSL, TBS
 from tbsim.interventions.healthseeking import HealthSeekingBehavior
 
 
@@ -38,6 +38,30 @@ def make_sim_with_hsb(
     return sim
 
 
+def make_sim_with_hsb_tb(
+    agents=200,
+    start=ss.date("2000-01-01"),
+    stop=ss.date("2005-12-31"),
+    dt=ss.days(7),
+    tb_pars=None,
+    hsb_pars=None,
+):
+    """Sim with legacy TB model and one HealthSeekingBehavior intervention."""
+    pop = ss.People(n_agents=agents)
+    tb = mtb.TB(pars=tb_pars or {})
+    net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
+    hsb = HealthSeekingBehavior(pars=hsb_pars or {})
+    sim = ss.Sim(
+        people=pop,
+        networks=net,
+        diseases=tb,
+        interventions=[hsb],
+        pars=dict(dt=dt, start=start, stop=stop),
+    )
+    sim.pars.verbose = 0
+    return sim
+
+
 def get_hsb(sim):
     """Return the HealthSeekingBehavior intervention from a sim (after init or run)."""
     # Starsim stores interventions in an ndict keyed by lowercase module name
@@ -50,7 +74,7 @@ def get_hsb(sim):
     raise LookupError("HealthSeekingBehavior not found in sim.interventions")
 
 
-# --- Integration: sim runs ---
+# --- Integration: sim runs (TB_LSHTM) ---
 
 
 def test_tb_lshtm_healthseeking_sim_runs():
@@ -455,3 +479,101 @@ def test_healthseeking_burn_in_symptoms_assigned_to_already_eligible():
     assert np.all(hsb.symptoms_initialized[uids])
     assert np.all(hsb.has_cough[uids])
     assert not np.any(hsb.has_fever[uids])
+
+
+# =============================================================================
+# HealthSeekingBehavior with legacy TB model (tbsim.tb.TB)
+# =============================================================================
+# Care-seeking-eligible states: ACTIVE_SMPOS, ACTIVE_SMNEG, ACTIVE_EXPTB (excludes ACTIVE_PRESYMP).
+
+
+def test_tb_healthseeking_sim_runs():
+    """Legacy TB + HealthSeekingBehavior(prob) runs without error."""
+    sim = make_sim_with_hsb_tb(
+        agents=150,
+        start=ss.date("2000-01-01"),
+        stop=ss.date("2002-12-31"),
+        hsb_pars=dict(prob=0.1, single_use=False),
+    )
+    sim.run()
+    tb = sim.diseases[0]
+    assert "n_infectious" in tb.results
+    hsb = get_hsb(sim)
+    assert "new_sought_care" in hsb.results
+    assert "n_sought_care" in hsb.results
+    assert "n_eligible" in hsb.results
+
+
+def test_tb_healthseeking_with_rate_runs():
+    """Legacy TB + HealthSeekingBehavior(initial_care_seeking_rate) runs."""
+    sim = make_sim_with_hsb_tb(
+        agents=100,
+        start=ss.date("2000-01-01"),
+        stop=ss.date("2001-12-31"),
+        hsb_pars=dict(
+            initial_care_seeking_rate=ss.peryear(1.5),
+            single_use=False,
+        ),
+    )
+    sim.run()
+    hsb = get_hsb(sim)
+    n_sought = np.asarray(hsb.results["n_sought_care"][:])
+    assert len(n_sought) > 0
+    assert np.all(np.diff(n_sought) >= 0)
+
+
+def test_tb_healthseeking_eligible_states():
+    """With legacy TB, care-seeking-eligible states are ACTIVE_SMPOS, ACTIVE_SMNEG, ACTIVE_EXPTB only."""
+    sim = make_sim_with_hsb_tb(agents=50)
+    sim.init()
+    hsb = get_hsb(sim)
+    expected = TBS.care_seeking_eligible()
+    assert np.array_equal(np.sort(hsb.states), np.sort(expected))
+    assert set(hsb.states) == {TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB}
+    assert TBS.ACTIVE_PRESYMP not in hsb.states
+    assert hsb.tb is sim.diseases[0]
+
+
+def test_tb_healthseeking_only_symptomatic_active_eligible():
+    """Only ACTIVE_SMPOS, ACTIVE_SMNEG, ACTIVE_EXPTB are eligible; ACTIVE_PRESYMP is not."""
+    sim = make_sim_with_hsb_tb(agents=80, hsb_pars=dict(prob=1.0, single_use=False))
+    sim.init()
+    tb = sim.diseases[0]
+    hsb = get_hsb(sim)
+    uids_eligible = np.array([0, 1, 2])
+    uids_presymp = np.array([3, 4])
+    tb.state[uids_eligible] = TBS.ACTIVE_SMPOS
+    tb.state[uids_presymp] = TBS.ACTIVE_PRESYMP
+    hsb.step()
+    assert np.sum(hsb.sought_care[uids_eligible]) == 3
+    assert np.sum(hsb.sought_care[uids_presymp]) == 0
+
+
+def test_tb_healthseeking_all_three_active_states_eligible():
+    """ACTIVE_SMPOS, ACTIVE_SMNEG, and ACTIVE_EXPTB are all care-seeking-eligible."""
+    sim = make_sim_with_hsb_tb(agents=60, hsb_pars=dict(prob=1.0, single_use=False))
+    sim.init()
+    tb = sim.diseases[0]
+    hsb = get_hsb(sim)
+    tb.state[0] = TBS.ACTIVE_SMPOS
+    tb.state[1] = TBS.ACTIVE_SMNEG
+    tb.state[2] = TBS.ACTIVE_EXPTB
+    hsb.step()
+    assert hsb.sought_care[0] and hsb.sought_care[1] and hsb.sought_care[2]
+    assert hsb._new_seekers_count == 3
+
+
+def test_tb_healthseeking_results_consistent():
+    """With legacy TB, new_sought_care and n_sought_care are cumulative-consistent."""
+    sim = make_sim_with_hsb_tb(
+        agents=80,
+        start=ss.date("2000-01-01"),
+        stop=ss.date("2002-12-31"),
+        hsb_pars=dict(prob=0.15, single_use=False),
+    )
+    sim.run()
+    hsb = get_hsb(sim)
+    new_sought = np.asarray(hsb.results["new_sought_care"][:])
+    n_sought = np.asarray(hsb.results["n_sought_care"][:])
+    assert len(new_sought) == len(n_sought)
+    np.testing.assert_array_equal(np.cumsum(new_sought), n_sought)
