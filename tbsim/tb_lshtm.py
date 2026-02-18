@@ -96,43 +96,43 @@ class TB_LSHTM(ss.Infection):
     
     *Transmission and reinfection*
 
-    - ``init_prev``:  Initial seed infections (prevalence). Default ``ss.bernoulli(0.01)``.
-    - ``beta``:       Transmission rate per year. Default ``ss.peryear(0.25)``.
-    - ``kappa``:      Relative transmissibility, asymptomatic vs symptomatic. Default ``0.82``.
-    - ``pi``:         Relative risk of reinfection for RECOVERED. Default ``0.21``.
-    - ``rho``:        Relative risk of reinfection for TREATED. Default ``3.15``.
+    - ``init_prev``:  Initial seed infections (prevalence). 
+    - ``beta``:       Transmission rate per year. 
+    - ``kappa``:      Relative transmissibility, asymptomatic vs symptomatic. 
+    - ``pi``:         Relative risk of reinfection for RECOVERED.
+    - ``rho``:        Relative risk of reinfection for TREATED.
 
     *From INFECTION (latent)*
 
-    - ``inf_cle``:    Infection → Cleared (no active TB). Default ``ss.years(ss.expon(1/1.90))``.
-    - ``inf_non``:    Infection → Non-infectious TB. Default ``ss.years(ss.expon(1/0.16))``.
-    - ``inf_asy``:    Infection → Asymptomatic TB. Default ``ss.years(ss.expon(1/0.06))``.
+    - ``inf_cle``:    Infection → Cleared (no active TB). 
+    - ``inf_non``:    Infection → Non-infectious TB. 
+    - ``inf_asy``:    Infection → Asymptomatic TB. 
 
     *From NON_INFECTIOUS*
 
-    - ``non_rec``:    Non-infectious → Recovered. Default ``ss.years(ss.expon(1/0.18))``.
-    - ``non_asy``:    Non-infectious → Asymptomatic. Default ``ss.years(ss.expon(1/0.25))``.
+    - ``non_rec``:    Non-infectious → Recovered. 
+    - ``non_asy``:    Non-infectious → Asymptomatic.
 
     *From ASYMPTOMATIC*
 
-    - ``asy_non``:    Asymptomatic → Non-infectious. Default ``ss.years(ss.expon(1/1.66))``.
-    - ``asy_sym``:    Asymptomatic → Symptomatic. Default ``ss.years(ss.expon(1/0.88))``.
+    - ``asy_non``:    Asymptomatic → Non-infectious. .
+    - ``asy_sym``:    Asymptomatic → Symptomatic. 
 
     *From SYMPTOMATIC*
 
-    - ``sym_asy``:    Symptomatic → Asymptomatic. Default ``ss.years(ss.expon(1/0.54))``.
-    - ``theta``:      Symptomatic → Treatment. Default ``ss.years(ss.expon(1/0.46))``.
-    - ``mu_tb``:      Symptomatic → Dead (TB-specific mortality). Default ``ss.years(ss.expon(1/0.34))``.
+    - ``sym_asy``:    Symptomatic → Asymptomatic. 
+    - ``theta``:      Symptomatic → Treatment. 
+    - ``mu_tb``:      Symptomatic → Dead (TB-specific mortality). .
 
     *From TREATMENT*
 
-    - ``phi``:        Treatment → Symptomatic (failure). Default ``ss.years(ss.expon(1/0.63))``.
-    - ``delta``:      Treatment → Treated (completion). Default ``ss.years(ss.expon(1/2.00))``.
+    - ``phi``:        Treatment → Symptomatic (failure). 
+    - ``delta``:      Treatment → Treated (completion). 
 
     *Background*
 
-    - ``mu``:              Background mortality (per year). Default ``ss.years(ss.expon(1/0.014))``.
-    - ``cxr_asymp_sens``:  CXR sensitivity for screening asymptomatic (0–1). Default ``1.0``.
+    - ``mu``:              Background mortality (per year). 
+    - ``cxr_asymp_sens``:  CXR sensitivity for screening asymptomatic (0–1). 
 
     Agent States
     -------------
@@ -167,16 +167,15 @@ class TB_LSHTM(ss.Infection):
     - ``rr_clearance``   (FloatArr, default=1.0):  Multiplier on NON_INFECTIOUS → RECOVERED.
     - ``rr_death``       (FloatArr, default=1.0):  Multiplier on SYMPTOMATIC → DEAD.
 
-    State flow (high level)
-    -----------------------
-    - This model tracks TB progression per agent using a state machine, with transitions occurring after 
-    scheduled waiting times influenced by individual risk modifiers.
-    - Agents move between key TB states (e.g., susceptible, infected, active forms, treatment, cleared) 
-    via transitions determined by transmission events or progression rates.
-    - The main update loop applies transitions at scheduled times, updates relevant agent-level properties, 
-    and prepares the next state change.
-    - Reinfection and treatment are handled as distinct events, with external triggers or transmission 
-    leading to appropriate state updates.
+    State flow
+    ----------
+    Transmission → INFECTION → CLEARED | NON_INFECTIOUS | ASYMPTOMATIC
+
+    - NON_INFECTIOUS → RECOVERED | ASYMPTOMATIC
+    - ASYMPTOMATIC ↔ NON_INFECTIOUS; ASYMPTOMATIC → SYMPTOMATIC
+    - SYMPTOMATIC → ASYMPTOMATIC | TREATMENT | DEAD
+    - TREATMENT → TREATED (completion) | SYMPTOMATIC (failure)
+    - CLEARED / RECOVERED / TREATED: no scheduled exit; reinfectable via transmission.
 
     Subclasses :class:`starsim.Infection`; integrate with a :class:`starsim.Sim`
     and a population (e.g. :class:`starsim.People`) to run simulations.
