@@ -3,11 +3,6 @@ name: Test Documentation Build
 on:
   workflow_dispatch:
     inputs:
-      test_binder:
-        description: 'Test Binder configuration'
-        required: false
-        default: true
-        type: boolean
       test_tutorial:
         description: 'Test tutorial functionality'
         required: false
@@ -24,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
       - name: Install pandoc
         run: |
@@ -42,12 +37,6 @@ jobs:
           pip install -r requirements.txt
           pip freeze
 
-      - name: Test Binder configuration
-        if: ${{ github.event.inputs.test_binder }}
-        run: |
-          echo "=== Testing Binder Configuration ==="
-          python .github/scripts/verify_binder.py
-
       - name: Test tutorial functionality
         if: ${{ github.event.inputs.test_tutorial }}
         run: python .github/scripts/test_tutorial_imports.py
@@ -60,9 +49,6 @@ jobs:
           echo "=== Test Summary ==="
           echo "✅ Repository structure verified"
           echo "✅ Dependencies installed"
-          if [ "${{ github.event.inputs.test_binder }}" = "true" ]; then
-            echo "✅ Binder configuration tested"
-          fi
           if [ "${{ github.event.inputs.test_tutorial }}" = "true" ]; then
             echo "✅ Tutorial functionality tested"
           fi
@@ -70,5 +56,4 @@ jobs:
           echo ""
           echo "Next steps:"
           echo "- Use the 'deploy-docs' workflow for full documentation build and deployment"
-          echo "- Check Binder links: https://mybinder.org/v2/gh/starsimhub/tbsim/main"
           echo "- Review tutorial: docs/tutorials/tb_interventions_tutorial.ipynb" 
