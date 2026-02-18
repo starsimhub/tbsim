@@ -69,31 +69,17 @@ def make_scaled_rate(base_rate, rr_callable):
 class TB_LSHTM(ss.Infection):
     #region IDE Collapsable section for documentation
     """
-    Stochastic, agent-based TB natural history implementing the LSHTM state-transition structure
-    (:class:`TBSL`). Progression is a continuous-time state machine: at each state, competing
-    exponential waiting times are sampled; the minimum determines the next state and transition
-    time. All rates defaults are in :attr:`pars` (per-year); transition logic is in :meth:`step` and
-    :meth:`set_prognoses`.
+    Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al. 2025). 
+    States in :class:`TBSL` span the spectrum from susceptibility to active disease and treatment.  
+    Infectious states are :class:`TBSL.ASYMPTOMATIC` and :class:`TBSL.SYMPTOMATIC`; the force
+    of infection depends on :attr:`pars.beta` and the prevalence of those states, with
+    :attr:`pars.kappa` giving the relative infectiousness of asymptomatic vs symptomatic TB.
+    Reinfectable states (:class:`TBSL.CLEARED`, :class:`TBSL.RECOVERED`, :class:`TBSL.TREATED`) use
+    :attr:`pars.pi` and :attr:`pars.rho`. Per-agent modifiers ``rr_activation``, ``rr_clearance``,
+    ``rr_death`` scale selected rates. Interventions call :meth:`start_treatment`.
 
-    Latent (INFECTION) exits to CLEARED, NON_INFECTIOUS, or ASYMPTOMATIC. From NON_INFECTIOUS:
-    RECOVERED or ASYMPTOMATIC. From ASYMPTOMATIC: NON_INFECTIOUS or SYMPTOMATIC. From SYMPTOMATIC:
-    ASYMPTOMATIC, TREATMENT (theta), or DEAD (mu_tb). From TREATMENT: SYMPTOMATIC (phi, failure)
-    or TREATED (delta, completion). CLEARED, RECOVERED, and TREATED have no spontaneous exit;
-    reinfection is via transmission, with relative risks :attr:`pars.pi` and :attr:`pars.rho` for
-    RECOVERED and TREATED.
-
-    Only ASYMPTOMATIC and SYMPTOMATIC are infectious; force of infection uses :attr:`pars.beta`
-    and :attr:`pars.kappa` (relative infectiousness of ASYMPTOMATIC). Per-agent rate modifiers
-    ``rr_activation`` (latent→active), ``rr_clearance`` (NON_INFECTIOUS→RECOVERED), and
-    ``rr_death`` (SYMPTOMATIC→DEAD) scale the corresponding base rates; see :func:`make_scaled_rate`.
-    Treatment initiation from interventions is via :meth:`start_treatment` (latent→CLEARED,
-    active→TREATMENT).
-
-    parameters (pars) keys:
-    -----------------------
-    **Parameters** (``pars``) represent the initial conditions and rates for the TB disease module. 
-    They are used to initialize the disease module that gets passed to the simulation.
-    
+    Parameters (pars)
+    -----------------
     *Transmission and reinfection*
 
     - ``init_prev``:  Initial seed infections (prevalence). 
@@ -115,14 +101,14 @@ class TB_LSHTM(ss.Infection):
 
     *From ASYMPTOMATIC*
 
-    - ``asy_non``:    Asymptomatic → Non-infectious. .
-    - ``asy_sym``:    Asymptomatic → Symptomatic. 
+    - ``asy_non``:    Asymptomatic → Non-infectious.
+    - ``asy_sym``:    Asymptomatic → Symptomatic.
 
     *From SYMPTOMATIC*
 
     - ``sym_asy``:    Symptomatic → Asymptomatic. 
     - ``theta``:      Symptomatic → Treatment. 
-    - ``mu_tb``:      Symptomatic → Dead (TB-specific mortality). .
+    - ``mu_tb``:      Symptomatic → Dead (TB-specific mortality).
 
     *From TREATMENT*
 
@@ -134,14 +120,9 @@ class TB_LSHTM(ss.Infection):
     - ``mu``:              Background mortality (per year). 
     - ``cxr_asymp_sens``:  CXR sensitivity for screening asymptomatic (0–1). 
 
-    Agent States
-    -------------
+    Agent states (array-like, one per agent)
+    ---------------------------------------
 
-    **States** represent the information for each agent in the population with respect to the TB model. 
-    They are used to track the state of the agent's TB infection, therefore they are **array-like** and 
-    there will be one "row" per agent in the population and their values will be dynamically updated 
-    during the simulation.
-    
     *Infection flags*
 
     - ``susceptible``    (BoolState, default=True):   Whether the agent is susceptible to TB.
@@ -167,45 +148,16 @@ class TB_LSHTM(ss.Infection):
     - ``rr_clearance``   (FloatArr, default=1.0):  Multiplier on NON_INFECTIOUS → RECOVERED.
     - ``rr_death``       (FloatArr, default=1.0):  Multiplier on SYMPTOMATIC → DEAD.
 
-    State flow
+    References
     ----------
-    Transmission → INFECTION → CLEARED | NON_INFECTIOUS | ASYMPTOMATIC
+    .. [1] Schwalb et al. (2025) Potential impact, costs, and benefits of population-wide
+       screening interventions for tuberculosis in Viet Nam. PLOS Glob Public Health.
+       https://doi.org/10.1371/journal.pgph.0005050
 
-    - NON_INFECTIOUS → RECOVERED | ASYMPTOMATIC
-    - ASYMPTOMATIC ↔ NON_INFECTIOUS; ASYMPTOMATIC → SYMPTOMATIC
-    - SYMPTOMATIC → ASYMPTOMATIC | TREATMENT | DEAD
-    - TREATMENT → TREATED (completion) | SYMPTOMATIC (failure)
-    - CLEARED / RECOVERED / TREATED: no scheduled exit; reinfectable via transmission.
-
-    Subclasses :class:`starsim.Infection`; integrate with a :class:`starsim.Sim`
-    and a population (e.g. :class:`starsim.People`) to run simulations.
     """
     #endregion Documentation
 
     def __init__(self, pars=None, **kwargs):
-        """
-        Initialize the LSHTM TB model parameters and state arrays.
-
-        Parameters
-        ----------
-        pars : dict, optional
-            Override or extend default parameters (e.g. ``beta``, ``kappa``,
-            progression rates). Rates are per-year exponentials unless noted.
-        **kwargs
-            Passed to base; ``name`` and ``label`` are popped for the infection module.
-
-        Notes
-        -----
-        Default parameters include:
-
-        - Transmission: beta; relative risks for reinfection (pi, rho) and
-          asymptomatic transmission (kappa)
-        - Exponential rates for all state transitions: inf_cle, inf_non, inf_asy,
-          non_rec, non_asy, asy_non, asy_sym, sym_asy, theta, delta, phi, mu_tb, mu
-        - Per-agent risk modifiers (FloatArr, default 1.0): rr_activation
-          (infection→active), rr_clearance (non-infectious→recovered), rr_death
-          (symptomatic→death); effective rate = base_rate * rr_* for each agent.
-        """
         super().__init__(name=kwargs.pop('name', None), label=kwargs.pop('label', None))
 
         # --- Transmission and reinfection ---
