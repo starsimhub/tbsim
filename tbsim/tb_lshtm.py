@@ -40,17 +40,13 @@ class TBSL(IntEnum):
 
 
 def _get_rate_from_base(base_rate):
-    # Get underlying scipy dist (ss.expon uses scale=1/rate, so rate=1/scale)
-    dist = getattr(base_rate, 'dist', None)
-    if dist is None:
-        raise AttributeError('base_rate has no .dist')
-    # Prefer scale from kwds, else from args
-    scale = getattr(dist, 'kwds', {}).get('scale')
-    if scale is None:
-        scale = getattr(dist, 'args', (None,))[0]
-    if scale is None or scale <= 0:
-        raise ValueError('Cannot get rate from base_rate: missing or invalid scale')
-    return 1.0 / scale
+    # ss.expon stores scale=1/rate; try kwds first, fall back to positional args
+    try:
+        dist = base_rate.dist
+        scale = dist.kwds.get('scale') or dist.args[0]
+        return 1.0 / scale
+    except Exception as e:
+        raise ValueError(f'Cannot extract rate from base_rate: {base_rate!r}') from e
 
 
 def make_scaled_rate(base_rate, rr_callable):
