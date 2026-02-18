@@ -275,7 +275,8 @@ def test_p_presym_to_active():
     probabilities = mtb.TB.p_presym_to_active(tb, sim, presym_uids)
 
     # Assert that all probabilities are the same if rate is constant across all individuals
-    expected_rate = np.full(len(presym_uids), fill_value=tb.pars.rate_presym_to_active.rate)
+    expected_rate = np.empty(len(presym_uids))
+    expected_rate[:] = tb.pars.rate_presym_to_active.rate  # broadcast (works for float or 0-d array)
     expected_prob = 1 - np.exp(-expected_rate)
     assert np.allclose(probabilities, expected_prob), "Probabilities should match expected values calculated from the rate"
 
@@ -308,20 +309,16 @@ def test_p_active_to_clear():
     assert np.all(0 <= probabilities) and np.all(probabilities <= 1)
 
     # Check that the rates for those on treatment are correctly applied
-    # Use the actual rate values instead of trying to do math on rate objects
-    base_rate = tb.pars.rate_active_to_clear.rate
-    treatment_rate = tb.pars.rate_treatment_to_clear.rate
-    
-    expected_rate = np.full(len(active_uids), fill_value=base_rate)
-    expected_rate[:2] = treatment_rate  # Adjust for treatment
-    expected_rate *= tb.rr_clearance[active_uids]  # Adjust for relative clearance
+    expected_rate = np.empty(len(active_uids))
+    expected_rate[:] = tb.pars.rate_active_to_clear.rate
+    expected_rate[:2] = tb.pars.rate_treatment_to_clear.rate  # Adjust for treatment
+    expected_rate *= tb.rr_clearance[active_uids]
 
     expected_prob = 1 - np.exp(-expected_rate)
     assert np.allclose(probabilities, expected_prob), "Probabilities should match expected values calculated from the adjusted rates"
 
-    # Additional check for correct handling of treatment effects
-    treatment_effect = treatment_rate > base_rate
-    assert treatment_effect, "Treatment should generally provide a higher clearance rate"
+    # Treatment should generally provide a higher clearance rate (broadcast-safe comparison)
+    assert np.asarray(tb.pars.rate_treatment_to_clear.rate) > np.asarray(tb.pars.rate_active_to_clear.rate), "Treatment should generally provide a higher clearance rate"
 
 def test_p_active_to_death( ):
     sim = make_tb_simplified(agents=10)
@@ -338,8 +335,9 @@ def test_p_active_to_death( ):
     # Check that probabilities are within the expected range (0 to 1)
     assert np.all(0 <= probabilities) and np.all(probabilities <= 1)
 
-    # Expected rates based on TB state and individual death rate adjustments
-    expected_rate = np.full(len(active_uids), fill_value=tb.pars.rate_exptb_to_dead.rate)
+    # Expected rates based on TB state and individual death rate adjustments (assignment broadcasts 0-d rates)
+    expected_rate = np.empty(len(active_uids))
+    expected_rate[:] = tb.pars.rate_exptb_to_dead.rate
     expected_rate[tb.state[active_uids] == mtb.TBS.ACTIVE_SMPOS] = tb.pars.rate_smpos_to_dead.rate
     expected_rate[tb.state[active_uids] == mtb.TBS.ACTIVE_SMNEG] = tb.pars.rate_smneg_to_dead.rate
     expected_rate *= tb.rr_death[active_uids]
