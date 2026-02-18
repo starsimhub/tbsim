@@ -1,7 +1,6 @@
 import starsim as ss 
 import tbsim as mtb 
 import numpy as np 
-import pandas as pd
 import os
 
 def make_tb(pars = None):
