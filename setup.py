@@ -8,7 +8,6 @@ versionpath = os.path.join(cwd, 'tbsim', 'version.py')
 version = runpy.run_path(versionpath)['__version__']
 
 # # Get the documentation
-# with open(os.path.join(cwd, 'README.rst'), "r") as f:
 long_description = "TBsim, an agent-based TB model implemented using the Starsim framework"
 
 CLASSIFIERS = [
@@ -16,11 +15,9 @@ CLASSIFIERS = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Development Status :: 3 - Alpha",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
 ]
 
 setup(
@@ -41,19 +38,11 @@ setup(
         'scipy',
         'pandas>=2.0.0',
         'sciris>=3.1.0',
-        'matplotlib',
-        'numba',
-        'starsim>=3.0.0',
-        'wheel',
-        'setuptools',
-        'seaborn',
-        'pytest',
-        'plotly',
         'lifelines',
-        'tqdm',
         'networkx',
+        'matplotlib',
+        'seaborn',
         'plotly',
-        'rdata',
-        'nbformat',
+        'starsim>=3.1.1',
     ],
 )

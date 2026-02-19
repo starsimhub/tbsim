@@ -6,6 +6,7 @@ This module contains all intervention classes for the TB simulation.
 
 # Import all intervention classes
 from .interventions import *
+from .beta import *
 from .tpt import TPTInitiation
 from .bcg import BCGProtection
 from .tb_treatment import TBTreatment, EnhancedTBTreatment, create_dots_treatment, create_dots_improved_treatment, create_first_line_treatment
@@ -16,6 +17,8 @@ from .interventions import TBVaccinationCampaign
 
 # Export all classes
 __all__ = [
+    'BetaByYear',
+    'Product',
     'TPTInitiation',
     'BCGProtection',
     'TBTreatment',
