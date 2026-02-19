@@ -1,3 +1,7 @@
+"""
+Run the LSHTM model for 20 years with default parameters, 
+comparing with and without acute compartment
+"""
 
 import matplotlib.pyplot as plt
 import numpy as np
