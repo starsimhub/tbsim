@@ -22,19 +22,6 @@ python3 ../.github/scripts/test_tutorial_imports.py
 - Tutorial script functionality
 - Scenario creation (with API compatibility handling)
 
-### `verify_binder.py`
-Verifies Binder configuration and setup.
-
-**Usage:**
-```bash
-python3 .github/scripts/verify_binder.py
-```
-
-**What it checks:**
-- Binder configuration files exist (`requirements.txt`, `postBuild`, `runtime.txt`)
-- README contains Binder badge
-- Tutorial files are present
-
 ### `verify_docs.py`
 Verifies documentation setup and build readiness.
 
@@ -67,12 +54,10 @@ python3 ../.github/scripts/verify_build.py
 These scripts are called by the following workflows:
 
 - **`deploy-docs.yml`**: 
-  - `verify_binder.py` - Binder configuration verification
   - `verify_build.py` - Build output verification
   - `test_tutorial_imports.py` - Tutorial functionality testing
 
 - **`test-docs.yml`**: 
-  - `verify_binder.py` - Binder configuration testing (optional)
   - `test_tutorial_imports.py` - Tutorial functionality testing (optional)
   - `verify_docs.py` - Documentation setup verification
 

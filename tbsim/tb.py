@@ -44,7 +44,7 @@ class TBS(IntEnum):
     ACTIVE_EXPTB    = 5     # Active TB, extra-pulmonary
     DEAD            = 8     # TB death
     PROTECTED       = 100
-    
+
     # region Convenience methods for all states
   
     @staticmethod
@@ -90,6 +90,11 @@ class TBS(IntEnum):
                           ACTIVE_PRESYMP, ACTIVE_SMPOS, ACTIVE_SMNEG, and ACTIVE_EXPTB.
         """
         return np.array([TBS.LATENT_SLOW, TBS.LATENT_FAST, TBS.ACTIVE_PRESYMP, TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+    
+    @staticmethod
+    def care_seeking_eligible():
+        """Get active TB states eligible for care-seeking (excludes ACTIVE_PRESYMP)."""
+        return np.array([TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
     # endregion
     
 

@@ -42,7 +42,7 @@ setup(
         'sciris>=3.1.0',
         'matplotlib',
         'numba',
-        'starsim>=3.0.0',
+        'starsim==3.0.0',
         'wheel',
         'setuptools',
         'seaborn',

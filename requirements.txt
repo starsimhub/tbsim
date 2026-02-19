@@ -78,7 +78,7 @@ six==1.17.0
 smmap==5.0.2
 SQLAlchemy==2.0.42
 stack-data==0.6.3
-starsim==3.0.1
+starsim==3.0.0
 tornado==6.5.1
 tqdm==4.67.1
 traitlets==5.14.3
