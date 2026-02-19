@@ -182,12 +182,12 @@ def test_scaled_rate_zero_rr():
 
 def test_scaled_rate_mean_waiting_time():
     """make_scaled_rate with rr=1 has mean waiting time 1/λ; with rr=2, mean ≈ 1/(2λ)."""
-    from tbsim.tb_lshtm import _get_rate_from_base
+    from tbsim.tb_lshtm import ScaledRate
     sim = make_lshtm_sim(agents=500, pars={"init_prev": ss.bernoulli(0)})
     sim.init(seed=42)
     tb = sim.diseases[0]
     base = tb.pars.inf_cle
-    lam = _get_rate_from_base(base)
+    lam = ScaledRate._get_rate_from_base(base)
     uids = ss.uids(np.arange(500))
     # rr=1: mean T should be 1/lam
     scaled1 = make_scaled_rate(base, lambda uids: np.ones(len(uids)))

@@ -37,14 +37,7 @@ class TBSL(IntEnum):
         return np.array([TBSL.SYMPTOMATIC])
 
 
-def _get_rate_from_base(base_rate):
-    # ss.expon stores scale=1/rate; try kwds first, fall back to positional args
-    try:
-        dist = base_rate.dist
-        scale = dist.kwds.get('scale') or dist.args[0]
-        return 1.0 / scale
-    except Exception as e:
-        raise ValueError(f'Cannot extract rate from base_rate: {base_rate!r}') from e
+
 
 
 class ScaledRate:
@@ -54,11 +47,20 @@ class ScaledRate:
         self._base_rate = base_rate
         self._rr_callable = rr_callable
 
+    @staticmethod
+    def _get_rate_from_base(base_rate):
+        try:
+            dist = base_rate.dist
+            scale = dist.kwds.get('scale') or dist.args[0]
+            return 1.0 / scale
+        except Exception as e:
+            raise ValueError(f'Cannot extract rate from base_rate: {base_rate!r}') from e
+
     def sample_waiting_times(self, uids):
         # Per-agent rate ratio from callable (e.g. rr_activation[uids]); rr_i=0 => never transition
         rr = np.asarray(self._rr_callable(uids), dtype=float)
         # Base rate = 1/scale from expon; effective_rate_i = base * rr_i
-        base_rate_val = _get_rate_from_base(self._base_rate)
+        base_rate_val = self._get_rate_from_base(self._base_rate)
         effective_rate = base_rate_val * rr
         # Inverse-transform: u ~ U(0,1) => T = -log(u)/λ ~ Exp(λ)
         u = self._base_rate.rand(len(uids))
