@@ -14,7 +14,6 @@ from .tb_drug_types import TBDrugType, TBDrugParameters, TBDrugTypeParameters, g
 from .tb_health_seeking import HealthSeekingBehavior
 from .tb_diagnostic import TBDiagnostic, EnhancedTBDiagnostic
 # from .enhanced_tb_diagnostic import EnhancedTBDiagnostic
-from .healthseeking import HealthSeekingBehavior as HealthSeeking
 from .interventions import TBVaccinationCampaign
 
 # Export all classes
@@ -36,6 +35,5 @@ __all__ = [
     'TBDiagnostic',
     'EnhancedTBDiagnostic',
     'TBDiagnosticErrors',  # Export the error class
-    'HealthSeeking',
     'TBVaccinationCampaign',
 ] 
