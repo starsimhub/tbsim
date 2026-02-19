@@ -73,11 +73,11 @@ def test_tb_lshtm_initialization():
     """TB_LSHTM initializes with default pars and state types."""
     tb = TB_LSHTM()
     assert tb.pars.beta is not None
-    assert tb.pars.kappa == 0.82
-    assert tb.pars.pi == 0.21
-    assert tb.pars.rho == 3.15
+    assert tb.pars.trans_asymp == 0.82
+    assert tb.pars.rr_rec == 0.21
+    assert tb.pars.rr_treat == 3.15
     assert hasattr(tb.pars, "inf_cle") and hasattr(tb.pars, "inf_non") and hasattr(tb.pars, "inf_asy")
-    assert hasattr(tb.pars, "mu_tb") and hasattr(tb.pars, "theta") and hasattr(tb.pars, "delta")
+    assert hasattr(tb.pars, "sym_dead") and hasattr(tb.pars, "sym_treat") and hasattr(tb.pars, "complete_rate")
 
 
 def test_tb_lshtm_initial_states_after_init():
@@ -100,10 +100,10 @@ def test_tb_lshtm_initial_states_after_init():
 
 
 def test_tb_lshtm_acute_initialization():
-    """TB_LSHTM_Acute adds acu_inf and alpha pars."""
+    """TB_LSHTM_Acute adds rate_acute_latent and trans_acute pars."""
     tb = TB_LSHTM_Acute()
-    assert hasattr(tb.pars, "acu_inf")
-    assert tb.pars.alpha == 0.9
+    assert hasattr(tb.pars, "rate_acute_latent")
+    assert tb.pars.trans_acute == 0.9
 
 
 # --- Infectious property ---
@@ -182,12 +182,12 @@ def test_scaled_rate_zero_rr():
 
 def test_scaled_rate_mean_waiting_time():
     """make_scaled_rate with rr=1 has mean waiting time 1/λ; with rr=2, mean ≈ 1/(2λ)."""
-    from tbsim.tb_lshtm import _get_rate_from_base
+    from tbsim.tb_lshtm import ScaledRate
     sim = make_lshtm_sim(agents=500, pars={"init_prev": ss.bernoulli(0)})
     sim.init(seed=42)
     tb = sim.diseases[0]
     base = tb.pars.inf_cle
-    lam = _get_rate_from_base(base)
+    lam = ScaledRate._get_rate_from_base(base)
     uids = ss.uids(np.arange(500))
     # rr=1: mean T should be 1/lam
     scaled1 = make_scaled_rate(base, lambda uids: np.ones(len(uids)))
@@ -514,25 +514,22 @@ def test_susceptible_only_cleared_recovered_treated_or_never_infected():
 
 
 def test_rel_sus_rel_trans_after_step():
-    """After step, RECOVERED have rel_sus=pi, TREATED have rel_sus=rho, ASYMPTOMATIC have rel_trans=kappa."""
+    """After step, RECOVERED have rel_sus=rr_rec (π pi), TREATED rel_sus=rr_treat (ρ rho), ASYMPTOMATIC rel_trans=trans_asymp (κ kappa)."""
     sim = make_lshtm_sim(agents=60)
     sim.init()
     tb = sim.diseases[0]
-    # Force some agents into each state and run one step with no one due (so only rel_sus/rel_trans get set for others we don't touch)
-    # Easier: set state and call the part of step that sets rel_sus/rel_trans by hand, or run until we have RECOVERED/TREATED/ASYMPTOMATIC
-    # Instead: run a short sim, then for any agent in RECOVERED, check rel_sus==pi; TREATED rel_sus==rho; ASYMPTOMATIC rel_trans==kappa
     sim.run()
     tb = sim.diseases[0]
-    pi, rho, kappa = tb.pars.pi, tb.pars.rho, tb.pars.kappa
+    rr_rec, rr_treat, trans_asymp = tb.pars.rr_rec, tb.pars.rr_treat, tb.pars.trans_asymp
     recovered_uids = ss.uids(tb.state == TBSL.RECOVERED)
     treated_uids = ss.uids(tb.state == TBSL.TREATED)
     asymp_uids = ss.uids(tb.state == TBSL.ASYMPTOMATIC)
     if len(recovered_uids) > 0:
-        assert np.allclose(tb.rel_sus[recovered_uids], pi)
+        assert np.allclose(tb.rel_sus[recovered_uids], rr_rec)
     if len(treated_uids) > 0:
-        assert np.allclose(tb.rel_sus[treated_uids], rho)
+        assert np.allclose(tb.rel_sus[treated_uids], rr_treat)
     if len(asymp_uids) > 0:
-        assert np.allclose(tb.rel_trans[asymp_uids], kappa)
+        assert np.allclose(tb.rel_trans[asymp_uids], trans_asymp)
 
 
 def test_start_treatment_mixed_latent_active_ignores_cleared():
