@@ -1,7 +1,6 @@
 import numpy as np
 import starsim as ss
 from tbsim import TBS
-from .interventions_eh import TBDiagnosticErrors
 
 __all__ = ['TBDiagnostic', 'EnhancedTBDiagnostic']
 
@@ -211,27 +210,6 @@ class TBDiagnostic(ss.Intervention):
         sim = self.sim
         ppl = sim.people
         tb = sim.diseases.tb
-
-        # # Error handling: Check required simulation components
-        # assert hasattr(ppl, 'sought_care'), TBDiagnosticErrors.SOUGHT_CARE_MISSING
-        # assert hasattr(ppl, 'diagnosed'), TBDiagnosticErrors.DIAGNOSED_MISSING
-        # assert hasattr(ppl, 'alive'), TBDiagnosticErrors.ALIVE_MISSING
-        # assert hasattr(ppl, 'tested'), TBDiagnosticErrors.TESTED_MISSING
-        # assert hasattr(ppl, 'n_times_tested'), TBDiagnosticErrors.N_TIMES_TESTED_MISSING
-        # assert hasattr(ppl, 'test_result'), TBDiagnosticErrors.TEST_RESULT_MISSING
-        # assert hasattr(ppl, 'care_seeking_multiplier'), TBDiagnosticErrors.CARE_SEEKING_MULTIPLIER_MISSING
-        # assert hasattr(ppl, 'multiplier_applied'), TBDiagnosticErrors.MULTIPLIER_APPLIED_MISSING
-
-        # # Error handling: Check TB disease module
-        # assert hasattr(sim, 'diseases'), TBDiagnosticErrors.DISEASES_MISSING
-        # assert hasattr(sim.diseases, 'tb'), TBDiagnosticErrors.TB_DISEASE_MISSING
-        # assert hasattr(tb, 'state'), TBDiagnosticErrors.TB_STATE_MISSING
-
-        # # Error handling: Check parameter validity
-        # assert 0.0 <= self.pars.coverage <= 1.0, TBDiagnosticErrors.coverage_invalid(self.pars.coverage)
-        # assert 0.0 <= self.pars.sensitivity <= 1.0, TBDiagnosticErrors.sensitivity_invalid(self.pars.sensitivity)
-        # assert 0.0 <= self.pars.specificity <= 1.0, TBDiagnosticErrors.specificity_invalid(self.pars.specificity)
-        # assert self.pars.care_seeking_multiplier >= 1.0, TBDiagnosticErrors.care_seeking_multiplier_invalid(self.pars.care_seeking_multiplier)
 
         # Find people who sought care but haven't been tested
         # eligible = ppl.sought_care & (~ppl.tested) & ppl.alive

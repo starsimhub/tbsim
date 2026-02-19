@@ -9,7 +9,7 @@ import pandas as pd
 import os
 import argparse
 import sciris as sc
-import tbsim.config as cfg
+import tbsim.utils.config as cfg
 
 # Suppress warning from seaborn
 import warnings
