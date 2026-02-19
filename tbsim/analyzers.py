@@ -72,7 +72,7 @@ import pandas as pd
 import starsim as ss
 import numpy as np
 import os
-import tbsim.config as cfg
+import tbsim.utils.config as cfg
 import datetime as ddtt
 import tbsim as mtb
 from scipy import stats

@@ -32,9 +32,6 @@ Available Intervention Types
 **Enhanced Diagnostics** (`tbsim.interventions.enhanced_tb_diagnostic`)
    Advanced diagnostics with stratified parameters and multiple methods
 
-**Health-Seeking Behavior** (`tbsim.interventions.healthseeking`)
-   Modeling of care-seeking behavior for TB cases
-
 **TB Health-Seeking** (`tbsim.interventions.tb_health_seeking`)
    TB-specific health-seeking with rate-based probabilities
 
@@ -70,7 +67,6 @@ Subpackages
    tbsim.interventions.tb_treatment
    tbsim.interventions.tb_diagnostic
    tbsim.interventions.enhanced_tb_diagnostic
-   tbsim.interventions.healthseeking
    tbsim.interventions.tb_health_seeking
    tbsim.interventions.tb_drug_types
 

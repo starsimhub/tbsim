@@ -3,7 +3,6 @@ import starsim as ss
 import sciris as sc
 import logging
 import datetime
-from tbsim.wrappers import Agents
 from tbsim.tb import TBS
 
 __all__ = ['BCGProtection']
