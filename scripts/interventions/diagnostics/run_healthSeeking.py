@@ -8,7 +8,7 @@ import numpy as np
 import os, sys
 scripts_dir = os.path.join(os.getcwd(), '..', '..', 'scripts')
 sys.path.append(scripts_dir)
-import tbsim.utils.plots as pl
+import tbsim.plots as pl
 
 # Create and run the sim
 sim = ss.Sim(

@@ -1,7 +1,7 @@
 import tbsim as mtb
 import starsim as ss
 import sciris as sc
-import tbsim.utils.plots as pl
+import tbsim.plots as pl
 import pandas as pd
 
 # Simple default parameters

@@ -6,7 +6,7 @@ This module provides comprehensive plotting and visualization tools for TBsim si
 Main Plots Module
 -----------------
 
-.. automodule:: tbsim.utils.plots
+.. automodule:: tbsim.plots
    :members:
    :undoc-members:
    :show-inheritance:
@@ -27,7 +27,7 @@ Basic result plotting:
 
 .. code-block:: python
 
-   from tbsim.utils.plots import plot_results
+   from tbsim.plots import plot_results
    
    # Plot basic simulation results
    plot_results(sim_results)
@@ -43,7 +43,7 @@ Combined result plotting:
 
 .. code-block:: python
 
-   from tbsim.utils.plots import plot_combined
+   from tbsim.plots import plot_combined
    
    # Plot multiple simulation results
    plot_combined(
@@ -55,7 +55,7 @@ Custom plotting:
 
 .. code-block:: python
 
-   from tbsim.utils.plots import create_custom_plot
+   from tbsim.plots import create_custom_plot
    
    # Create custom visualization
    fig = create_custom_plot(

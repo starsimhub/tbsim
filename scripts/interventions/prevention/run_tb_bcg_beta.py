@@ -213,7 +213,7 @@ def get_scenarios():
 
 def run_scenarios(plot=True):
     """Run all scenarios and optionally plot results."""
-    import tbsim.utils.plots as pl
+    import tbsim.plots as pl
     
     scenarios = get_scenarios()
     results = {}

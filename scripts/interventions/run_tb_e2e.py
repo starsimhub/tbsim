@@ -908,7 +908,7 @@ def run_scenarios(plot=True, analyze=True, store_results=True):
         - results: Dictionary mapping scenario names to flattened simulation results
         - analysis_results: Dictionary mapping scenario names to analysis metrics
     """
-    import tbsim.utils.plots as pl
+    import tbsim.plots as pl
     
     scenarios = get_scenarios()
     results = {}

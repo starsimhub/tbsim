@@ -9,7 +9,6 @@ import pandas as pd
 import os
 import argparse
 import sciris as sc
-import tbsim.utils.config as cfg
 
 # Suppress warning from seaborn
 import warnings
@@ -103,7 +102,7 @@ def run_scenarios(n_agents=default_n_agents, n_seeds=default_n_rand_seeds):
     print('Timings:', times)
 
     df = pd.concat(results)
-    filename = os.path.join(cfg.create_res_dir("results"), "results.csv")
+    filename = sc.makefilepath(filename='results.csv', folder='results', makedirs=True)
     df.to_csv(filename)
     return df, filename
 

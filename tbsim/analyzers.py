@@ -72,7 +72,7 @@ import pandas as pd
 import starsim as ss
 import numpy as np
 import os
-import tbsim.utils.config as cfg
+import sciris as sc
 import datetime as ddtt
 import tbsim as mtb
 from scipy import stats
@@ -2796,7 +2796,7 @@ class DwtAnalyzer(ss.Analyzer, DwtPlotter):
         - CSV: All dwell time data with columns for analysis
         - JSON: Simulation parameters and configuration
         """
-        resdir = os.path.dirname(cfg.create_res_dir())
+        resdir = sc.makefilepath(folder='results', makedirs=True)
         t = ddtt.datetime.now()
         prefix = f'{Utils.to_filename_friendly(self.scenario_name)}'
         if prefix == '' or prefix is None: 
