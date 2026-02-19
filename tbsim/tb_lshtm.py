@@ -1,10 +1,10 @@
 """LSHTM TB natural history model. State definitions and transition diagram are in the API docs (tbsim.tb_lshtm)."""
 
+from enum import IntEnum
 import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
 
-from enum import IntEnum
 
 __all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL']
 
