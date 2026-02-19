@@ -24,6 +24,10 @@ class HealthSeekingBehavior(ss.Intervention):
         )
         self.update_pars(pars=pars, **kwargs)
 
+        # Ensure prob is a Dist (created once, not every step)
+        if not isinstance(self.pars.prob, ss.Dist):
+            self.pars.prob = ss.bernoulli(p=self.pars.prob)
+
     def step(self):
         sim = self.sim
         t = sim.now
@@ -41,14 +45,7 @@ class HealthSeekingBehavior(ss.Intervention):
         active_uids = active_tb.uids
         not_yet_sought = active_uids[~ppl.sought_care[active_uids]]
 
-        # Initialize or extract a working distribution
-        if isinstance(self.pars.prob, ss.Dist):
-            dist = self.pars.prob
-        else:
-            dist = ss.bernoulli(p=self.pars.prob)
-
-        dist.init(sim)  # Explicitly initialize with the simulation context
-        seeking_uids = dist.filter(not_yet_sought)
+        seeking_uids = self.pars.prob.filter(not_yet_sought)
 
         if len(seeking_uids) == 0:
             return
