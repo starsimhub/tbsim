@@ -1,6 +1,8 @@
 import starsim as ss 
 
 __all__ = ['BetaByYear']
+
+
 class BetaByYear(ss.Intervention):
     """
     A transmission reduction intervention that modifies the tuberculosis transmission rate (beta)
