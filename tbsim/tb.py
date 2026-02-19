@@ -204,63 +204,16 @@ class TB(ss.Infection):
             ss.FloatArr('reltrans_het', default=1.0),                  # Individual-level heterogeneity on infectiousness
         )
 
-        # Initialize probability objects for state transitions
-        self._init_transition_probabilities()
+        # Create bernoulli distributions with dynamic probability callables
+        self.dist_latent_to_presym = ss.bernoulli(p=self.p_latent_to_presym)
+        self.dist_presym_to_clear  = ss.bernoulli(p=self.p_presym_to_clear)
+        self.dist_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
+        self.dist_active_to_clear  = ss.bernoulli(p=self.p_active_to_clear)
+        self.dist_active_to_death  = ss.bernoulli(p=self.p_active_to_death)
 
-        # AI, and ME insist that these get overridden by the dynamic probabilities
-        # self.p_latent_to_presym = ss.bernoulli(p=self.p_latent_to_presym)
-        # self.p_presym_to_clear = ss.bernoulli(p=self.p_presym_to_clear)
-        # self.p_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
-        # self.p_active_to_clear = ss.bernoulli(p=self.p_active_to_clear)
-        # self.p_active_to_death = ss.bernoulli(p=self.p_active_to_death)
-        # return
-
-    def _init_transition_probabilities(self):
-        """Initialize probability objects for state transitions.
-        
-        This method is a placeholder for future dynamic probability initialization.
-        Currently, all transition probabilities are calculated on-demand in the
-        individual probability methods (p_latent_to_presym, p_presym_to_clear, etc.).
-        
-        The method exists to maintain consistency with the original design pattern
-        and can be extended in the future to pre-calculate or cache probability
-        objects for performance optimization.
-        """
-        # These will be calculated dynamically in the transition methods
-        pass
-
+    @staticmethod
     def p_latent_to_presym(self, sim, uids):
-        """
-        Calculate probability of transition from latent to pre-symptomatic TB.
-        
-        This method computes the daily probability that individuals in latent TB states
-        will progress to active pre-symptomatic TB. The calculation uses different
-        base rates for slow vs. fast progressors and applies individual risk modifiers.
-        
-        **Mathematical Details:**
-        - Slow progressors: rate_LS_to_presym = 3e-5 per day
-        - Fast progressors: rate_LF_to_presym = 6e-3 per day  
-        - Individual risk: rate *= rr_activation[uids]
-        - Final probability: 1 - exp(-rate * dt)
-        
-        **State Requirements:**
-        All individuals must be in TBS.LATENT_SLOW or TBS.LATENT_FAST states.
-        
-        Args:
-            sim (starsim.Sim): Simulation object containing time step information
-            uids (numpy.ndarray): Array of individual IDs to evaluate (must be in latent states)
-            
-        Returns:
-            numpy.ndarray: Daily transition probabilities for each individual (0.0 to 1.0)
-            
-        Raises:
-            AssertionError: If any individuals are not in latent states (LATENT_SLOW or LATENT_FAST)
-            
-        Example:
-            >>> probs = tb.p_latent_to_presym(sim, latent_uids)
-            >>> transition_mask = np.random.random(len(probs)) < probs
-            >>> new_presymp_uids = latent_uids[transition_mask]
-        """
+        """ Calculate probability of latent → pre-symptomatic transition. """
         # Validate input states
         assert np.isin(self.state[uids], TBS.all_latent()).all(), "All individuals must be in latent states"
         
@@ -284,40 +237,9 @@ class TB(ss.Infection):
         prob = rate.to_prob()
         return prob
 
+    @staticmethod
     def p_presym_to_clear(self, sim, uids):
-        """
-        Calculate probability of transition from pre-symptomatic to clearance.
-        
-        This method computes the daily probability that individuals in pre-symptomatic
-        TB will clear the infection. The probability is zero for untreated individuals
-        and follows the treatment clearance rate for those on treatment.
-        
-        **Mathematical Details:**
-        - Untreated individuals: probability = 0.0 (no spontaneous clearance)
-        - Treated individuals: rate_treatment_to_clear = 6 per year (2-month treatment duration)
-        - Final probability: 1 - exp(-rate * dt) for treated individuals
-        
-        **State Requirements:**
-        All individuals must be in TBS.ACTIVE_PRESYMP state.
-        
-        **Treatment Dependency:**
-        This transition only occurs for individuals with on_treatment = True.
-        
-        Args:
-            sim (starsim.Sim): Simulation object containing time step information
-            uids (numpy.ndarray): Array of individual IDs to evaluate (must be pre-symptomatic)
-            
-        Returns:
-            numpy.ndarray: Daily clearance probabilities for each individual (0.0 for untreated, >0.0 for treated)
-            
-        Raises:
-            AssertionError: If any individuals are not in pre-symptomatic state (ACTIVE_PRESYMP)
-            
-        Example:
-            >>> probs = tb.p_presym_to_clear(sim, presym_uids)
-            >>> clear_mask = np.random.random(len(probs)) < probs
-            >>> cleared_uids = presym_uids[clear_mask]  # Only treated individuals will clear
-        """
+        """ Calculate probability of pre-symptomatic → clearance (treatment only). """
         # Validate input states
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "All individuals must be in pre-symptomatic state"
         
@@ -334,42 +256,9 @@ class TB(ss.Infection):
         prob = rate.to_prob()
         return prob
 
+    @staticmethod
     def p_presym_to_active(self, sim, uids):
-        """
-        Calculate probability of transition from pre-symptomatic to active TB.
-        
-        This method computes the daily probability that individuals in pre-symptomatic
-        TB will progress to symptomatic active TB. The probability is uniform for all
-        individuals in this state, representing the natural progression of disease.
-        
-        **Mathematical Details:**
-        - Base rate: rate_presym_to_active = 3e-2 per day
-        - No individual risk modifiers applied (uniform progression)
-        - Final probability: 1 - exp(-rate * dt)
-        
-        **State Requirements:**
-        All individuals must be in TBS.ACTIVE_PRESYMP state.
-        
-        **Active State Assignment:**
-        Upon transition, individuals are assigned to specific active states based on
-        their pre-determined active_tb_state (SMPOS, SMNEG, or EXPTB).
-        
-        Args:
-            sim (starsim.Sim): Simulation object containing time step information
-            uids (numpy.ndarray): Array of individual IDs to evaluate (must be pre-symptomatic)
-            
-        Returns:
-            numpy.ndarray: Daily progression probabilities for each individual (uniform values)
-            
-        Raises:
-            AssertionError: If any individuals are not in pre-symptomatic state (ACTIVE_PRESYMP)
-            
-        Example:
-            >>> probs = tb.p_presym_to_active(sim, presym_uids)
-            >>> active_mask = np.random.random(len(probs)) < probs
-            >>> new_active_uids = presym_uids[active_mask]
-            >>> # Assign specific active states based on active_tb_state[new_active_uids]
-        """
+        """ Calculate probability of pre-symptomatic → active TB transition. """
         # Validate input states
         assert (self.state[uids] == TBS.ACTIVE_PRESYMP).all(), "All individuals must be in pre-symptomatic state"
         
@@ -385,45 +274,9 @@ class TB(ss.Infection):
         prob = rate.to_prob()
         return prob
 
+    @staticmethod
     def p_active_to_clear(self, sim, uids):
-        """
-        Calculate probability of transition from active TB to clearance.
-        
-        This method computes the daily probability that individuals with active TB
-        will clear the infection. The probability depends on treatment status and
-        includes individual risk modifiers for natural clearance.
-        
-        **Mathematical Details:**
-        - Natural clearance: rate_active_to_clear = 2.4e-4 per day
-        - Treatment clearance: rate_treatment_to_clear = 6 per year (2-month duration)
-        - Individual risk: rate *= rr_clearance[uids]
-        - Final probability: 1 - exp(-rate * dt)
-        
-        **State Requirements:**
-        All individuals must be in active TB states (ACTIVE_SMPOS, ACTIVE_SMNEG, or ACTIVE_EXPTB).
-        
-        **Treatment Effect:**
-        Treated individuals use the higher treatment clearance rate instead of natural clearance.
-        
-        **Post-Clearance State:**
-        Upon clearance, individuals return to TBS.NONE (susceptible) and can be reinfected.
-        
-        Args:
-            sim (starsim.Sim): Simulation object containing time step information
-            uids (numpy.ndarray): Array of individual IDs to evaluate (must be in active states)
-            
-        Returns:
-            numpy.ndarray: Daily clearance probabilities for each individual (varies by treatment status)
-            
-        Raises:
-            AssertionError: If any individuals are not in active states (SMPOS, SMNEG, or EXPTB)
-            
-        Example:
-            >>> probs = tb.p_active_to_clear(sim, active_uids)
-            >>> clear_mask = np.random.random(len(probs)) < probs
-            >>> cleared_uids = active_uids[clear_mask]
-            >>> # These individuals will return to susceptible state
-        """
+        """ Calculate probability of active TB → clearance (natural or treatment). """
         # Validate input states
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all(), "All individuals must be in active states"
         
@@ -446,46 +299,9 @@ class TB(ss.Infection):
         prob = rate.to_prob()
         return prob
 
+    @staticmethod
     def p_active_to_death(self, sim, uids):
-        """
-        Calculate probability of transition from active TB to death.
-        
-        This method computes the daily probability that individuals with active TB
-        will die from the disease. The probability varies significantly by active TB type
-        and includes individual risk modifiers.
-        
-        **Mathematical Details:**
-        - Smear positive: rate_smpos_to_dead = 4.5e-4 per day (highest mortality)
-        - Smear negative: rate_smneg_to_dead = 0.3 * 4.5e-4 per day (30% of smear positive)
-        - Extra-pulmonary: rate_exptb_to_dead = 0.15 * 4.5e-4 per day (15% of smear positive)
-        - Individual risk: rate *= rr_death[uids]
-        - Final probability: 1 - exp(-rate * dt)
-        
-        **State Requirements:**
-        All individuals must be in active TB states (ACTIVE_SMPOS, ACTIVE_SMNEG, or ACTIVE_EXPTB).
-        
-        **Treatment Effect:**
-        Treated individuals have rr_death = 0, effectively preventing TB mortality.
-        
-        **Death Process:**
-        Upon death, individuals are marked as TBS.DEAD and removed from transmission.
-        
-        Args:
-            sim (starsim.Sim): Simulation object containing time step information
-            uids (numpy.ndarray): Array of individual IDs to evaluate (must be in active states)
-            
-        Returns:
-            numpy.ndarray: Daily death probabilities for each individual (varies by TB type and treatment)
-            
-        Raises:
-            AssertionError: If any individuals are not in active states (SMPOS, SMNEG, or EXPTB)
-            
-        Example:
-            >>> probs = tb.p_active_to_death(sim, active_uids)
-            >>> death_mask = np.random.random(len(probs)) < probs
-            >>> death_uids = active_uids[death_mask]
-            >>> # These individuals will be marked for death by the simulation framework
-        """
+        """ Calculate probability of active TB → death (varies by TB type). """
         # Validate input states
         assert np.isin(self.state[uids], [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB]).all(), "All individuals must be in active states"
         
@@ -668,13 +484,7 @@ class TB(ss.Infection):
 
         # Latent --> active pre-symptomatic
         latent_uids = (((self.state == TBS.LATENT_SLOW) | (self.state == TBS.LATENT_FAST))).uids
-        if len(latent_uids):
-            probs = self.p_latent_to_presym(self.sim, latent_uids)
-            # Convert probabilities to boolean array for indexing
-            transition_mask = np.random.random(len(probs)) < probs
-            new_presymp_uids = latent_uids[transition_mask]
-        else:
-            new_presymp_uids = np.array([], dtype=int)
+        new_presymp_uids = self.dist_latent_to_presym.filter(latent_uids)
         if len(new_presymp_uids):
             self.state[new_presymp_uids] = TBS.ACTIVE_PRESYMP
             self.ti_cur[new_presymp_uids] = ti
@@ -685,32 +495,17 @@ class TB(ss.Infection):
 
         # Pre-symptomatic --> Active or Clear
         presym_uids = (self.state == TBS.ACTIVE_PRESYMP).uids
-        new_clear_presymp_uids = np.array([], dtype=int)
-        new_active_uids = np.array([], dtype=int)
-        if len(presym_uids):
-            # Pre-symptomatic --> Clear (if on treatment)
-            clear_probs = self.p_presym_to_clear(self.sim, presym_uids)
-            clear_mask = np.random.random(len(clear_probs)) < clear_probs
-            new_clear_presymp_uids = presym_uids[clear_mask]
-
-            # Pre-symptomatic --> Active
-            active_probs = self.p_presym_to_active(self.sim, presym_uids)
-            active_mask = np.random.random(len(active_probs)) < active_probs
-            new_active_uids = presym_uids[active_mask]
-            if len(new_active_uids):
-                active_state = self.active_tb_state[new_active_uids] 
-                self.state[new_active_uids] = active_state
-                self.ti_cur[new_active_uids] = ti
-                self.ti_active[new_active_uids] = ti
+        new_clear_presymp_uids = self.dist_presym_to_clear.filter(presym_uids)
+        new_active_uids = self.dist_presym_to_active.filter(presym_uids)
+        if len(new_active_uids):
+            active_state = self.active_tb_state[new_active_uids]
+            self.state[new_active_uids] = active_state
+            self.ti_cur[new_active_uids] = ti
+            self.ti_active[new_active_uids] = ti
 
         # Active --> Susceptible via natural recovery or treatment (clear)
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids
-        if len(active_uids):
-            clear_probs = self.p_active_to_clear(self.sim, active_uids)
-            clear_mask = np.random.random(len(clear_probs)) < clear_probs
-            new_clear_active_uids = active_uids[clear_mask]
-        else:
-            new_clear_active_uids = np.array([], dtype=int)
+        new_clear_active_uids = self.dist_active_to_clear.filter(active_uids)
         new_clear_uids = ss.uids.cat(new_clear_presymp_uids, new_clear_active_uids)
         if len(new_clear_uids):
             # Set state and reset timers
@@ -725,12 +520,7 @@ class TB(ss.Infection):
 
         # Active --> Death
         active_uids = (((self.state == TBS.ACTIVE_SMPOS) | (self.state == TBS.ACTIVE_SMNEG) | (self.state == TBS.ACTIVE_EXPTB))).uids # Recompute after clear
-        if len(active_uids):
-            death_probs = self.p_active_to_death(self.sim, active_uids)
-            death_mask = np.random.random(len(death_probs)) < death_probs
-            new_death_uids = active_uids[death_mask]
-        else:
-            new_death_uids = np.array([], dtype=int)
+        new_death_uids = self.dist_active_to_death.filter(active_uids)
         if len(new_death_uids):
             self.sim.people.request_death(new_death_uids)
             self.state[new_death_uids] = TBS.DEAD
