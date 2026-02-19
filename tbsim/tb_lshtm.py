@@ -3,7 +3,6 @@
 import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
-import pandas as pd
 
 from enum import IntEnum
 from types import SimpleNamespace
@@ -19,7 +18,7 @@ class TBSL(IntEnum):
     - Transitions are driven by exponential rates in :class:`TB_LSHTM`
       (and :class:`TB_LSHTM_Acute`).
     """
-    SUSCEPTIBLE     = -1    # No TB; never infected or cleared/recovered/treated
+    SUSCEPTIBLE     = -1    # Never infected (agents who clear/recover/treat remain in their last state, not here)
     INFECTION       = 0     # Latent infection (not yet active TB)
     CLEARED         = 1     # Cleared infection without developing active TB
     NON_INFECTIOUS  = 2     # Non-infectious TB (early/smear-negative, corresponds to LSHTM diagram)
@@ -28,7 +27,7 @@ class TBSL(IntEnum):
     SYMPTOMATIC     = 5     # Active TB, symptomatic (infectious)
     TREATMENT       = 6     # On TB treatment
     TREATED         = 7     # Completed treatment (susceptible to reinfection)
-    DEAD            = 8     # TB-related death
+    DEAD            = 8     # Dead (TB-caused via sym_dead; general mortality via step_die also sets this)
     ACUTE           = 9     # Acute infection immediately after exposure (TB_LSHTM_Acute only)
 
     @staticmethod
@@ -53,12 +52,11 @@ def make_scaled_rate(base_rate, rr_callable):
     def sample_waiting_times(uids):
         # Per-agent rate ratio from callable (e.g. rr_activation[uids]); rr_i=0 => never transition
         rr = np.asarray(rr_callable(uids), dtype=float)
-        n = len(uids)
         # Base rate = 1/scale from expon; effective_rate_i = base * rr_i
         base_rate_val = _get_rate_from_base(base_rate)
         effective_rate = base_rate_val * rr
         # Inverse-transform: u ~ U(0,1) => T = -log(u)/λ ~ Exp(λ)
-        u = base_rate.rand(n)
+        u = base_rate.rand(len(uids))
         # rr=0 => div by 0; set t=inf (never transition), suppress warnings
         with np.errstate(divide='ignore', invalid='ignore'):
             t = np.where(rr > 0, -np.log(u) / effective_rate, np.inf)
@@ -73,26 +71,26 @@ class TB_LSHTM(ss.Infection):
     States in :class:`TBSL` span the spectrum from susceptibility to active disease and treatment.  
     Infectious states are :class:`TBSL.ASYMPTOMATIC` and :class:`TBSL.SYMPTOMATIC`; the force
     of infection depends on :attr:`pars.beta` and the prevalence of those states, with
-    :attr:`pars.kappa` giving the relative infectiousness of asymptomatic vs symptomatic TB.
+    :attr:`pars.trans_asymp` (κ kappa) giving the relative infectiousness of asymptomatic vs symptomatic TB.
     Reinfectable states (:class:`TBSL.CLEARED`, :class:`TBSL.RECOVERED`, :class:`TBSL.TREATED`) use
-    :attr:`pars.pi` and :attr:`pars.rho`. Per-agent modifiers ``rr_activation``, ``rr_clearance``,
+    :attr:`pars.rr_rec` (π pi) and :attr:`pars.rr_treat` (ρ rho). Per-agent modifiers ``rr_activation``, ``rr_clearance``,
     ``rr_death`` scale selected rates. Interventions call :meth:`start_treatment`.
 
     Parameters (pars)
     -----------------
     *Transmission and reinfection*
 
-    - ``init_prev``:  Initial seed infections (prevalence). 
-    - ``beta``:       Transmission rate per year. 
-    - ``kappa``:      Relative transmissibility, asymptomatic vs symptomatic. 
-    - ``pi``:         Relative risk of reinfection for RECOVERED.
-    - ``rho``:        Relative risk of reinfection for TREATED.
+    - ``init_prev``:   Initial seed infections (prevalence). 
+    - ``beta``:        Transmission rate per year. 
+    - ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (κ kappa) 
+    - ``rr_rec``:      Relative risk of reinfection for RECOVERED.  (π pi) 
+    - ``rr_treat``:    Relative risk of reinfection for TREATED. (ρ rho) 
 
     *From INFECTION (latent)*
 
-    - ``inf_cle``:    Infection → Cleared (no active TB). 
-    - ``inf_non``:    Infection → Non-infectious TB. 
-    - ``inf_asy``:    Infection → Asymptomatic TB. 
+    - ``inf_cle``:     Infection → Cleared (no active TB). 
+    - ``inf_non``:     Infection → Non-infectious TB. 
+    - ``inf_asy``:     Infection → Asymptomatic TB. 
 
     *From NON_INFECTIOUS*
 
@@ -106,19 +104,18 @@ class TB_LSHTM(ss.Infection):
 
     *From SYMPTOMATIC*
 
-    - ``sym_asy``:    Symptomatic → Asymptomatic. 
-    - ``theta``:      Symptomatic → Treatment. 
-    - ``mu_tb``:      Symptomatic → Dead (TB-specific mortality).
+    - ``sym_asy``:     Symptomatic → Asymptomatic. 
+    - ``sym_treat``:   Symptomatic → Treatment. (θ theta)
+    - ``sym_dead``:    Symptomatic → Dead (TB-specific mortality, μ_TB).
 
     *From TREATMENT*
 
-    - ``phi``:        Treatment → Symptomatic (failure). 
-    - ``delta``:      Treatment → Treated (completion). 
+    - ``fail_rate``:     Treatment → Symptomatic (failure). (φ phi) 
+    - ``complete_rate``: Treatment → Treated (completion).  (δ delta) 
 
-    *Background*
+    *Background (general mortality is handled by* ``ss.Deaths`` *demographics, not this module)*
 
-    - ``mu``:              Background mortality (per year). 
-    - ``cxr_asymp_sens``:  CXR sensitivity for screening asymptomatic (0–1). 
+    - ``cxr_asymp_sens``:   CXR sensitivity for screening asymptomatic (0–1). 
 
     Agent states (array-like, one per agent)
     ---------------------------------------
@@ -163,10 +160,10 @@ class TB_LSHTM(ss.Infection):
         # --- Transmission and reinfection ---
         self.define_pars(
             init_prev=ss.bernoulli(0.01),       # Initial seed infections (prevalence)
-            beta=ss.peryear(0.25),              # Transmission rate per year (per-contact prob equivalent)
-            kappa=0.82,                         # Relative transmission from asymptomatic vs symptomatic
-            pi=0.21,                            # Relative risk of reinfection after recovery (non-infectious)
-            rho=3.15,                           # Relative risk of reinfection after treatment completion
+            beta=ss.peryear(0.25),              # Transmission rate per year
+            trans_asymp=0.82,                   # κ kappa: rel. transmissibility asymptomatic vs symptomatic
+            rr_rec=0.21,                        # π pi: RR reinfection after recovery
+            rr_treat=3.15,                      # ρ rho: RR reinfection after treatment
             # --- From INFECTION (latent) ---
             inf_cle=ss.years(ss.expon(1/1.90)),  # Clear infection (no active TB)
             inf_non=ss.years(ss.expon(1/0.16)),  # Progress to non-infectious TB
@@ -178,18 +175,17 @@ class TB_LSHTM(ss.Infection):
             asy_non=ss.years(ss.expon(1/1.66)),  # Revert to non-infectious
             asy_sym=ss.years(ss.expon(1/0.88)),  # Progress to symptomatic
             # --- From SYMPTOMATIC ---
-            sym_asy=ss.years(ss.expon(1/0.54)),  # Recover to asymptomatic
-            theta=ss.years(ss.expon(1/0.46)),   # Start treatment
-            mu_tb=ss.years(ss.expon(1/0.34)),    # TB-specific mortality
+            sym_asy=ss.years(ss.expon(1/0.54)),  # Regress to asymptomatic (still active, not recovered)
+            sym_treat=ss.years(ss.expon(1/0.46)),   # θ theta: symptomatic → treatment
+            sym_dead=ss.years(ss.expon(1/0.34)),    # μ_TB: symptomatic → dead (TB mortality)
             # --- From TREATMENT ---
-            phi=ss.years(ss.expon(1/0.63)),     # Treatment failure (back to symptomatic)
-            delta=ss.years(ss.expon(1/2.00)),   # Treatment completion (→ TREATED)
+            fail_rate=ss.years(ss.expon(1/0.63)),   # φ phi: treatment failure (→ symptomatic)
+            complete_rate=ss.years(ss.expon(1/2.00)),  # δ delta: treatment completion (→ treated)
             # --- Background ---
-            mu=ss.years(ss.expon(1/0.014)),    # Background mortality (per year)
             cxr_asymp_sens=1.0,                 # CXR sensitivity for screening asymptomatic (0–1)
             # --- For ACUTE ---
-            acu_inf=None, 
-            alpha=None,                          
+            rate_acute_latent=None,             # ACUTE → INFECTION
+            trans_acute=None,                   # α alpha: rel. transmissibility acute vs symptomatic
         )
         self.update_pars(pars, **kwargs)
 
@@ -334,7 +330,6 @@ class TB_LSHTM(ss.Infection):
         calls set_prognoses for newly infected agents.
         """
         super().step()
-        p = self.pars
         ti = self.ti
 
         # Agents whose scheduled transition time has arrived (ti_next <= ti)
@@ -343,7 +338,11 @@ class TB_LSHTM(ss.Infection):
             return
 
         # --- Record outcomes from state_next *before* we overwrite state ---
-        new_asymp_uids = uids[self.state_next[uids] == TBSL.ASYMPTOMATIC]
+        # Only count first entry to ASYMPTOMATIC from non-active states; exclude SYMPTOMATIC → ASYMPTOMATIC (regression)
+        new_asymp_uids = uids[
+            (self.state_next[uids] == TBSL.ASYMPTOMATIC) &
+            (self.state[uids] != TBSL.SYMPTOMATIC)
+        ]
         self.results['new_active'][ti] = len(new_asymp_uids)
         self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_asymp_uids] >= 15)
 
@@ -367,14 +366,14 @@ class TB_LSHTM(ss.Infection):
         self.results['new_deaths'][ti] = len(new_death_uids)
         self.results['new_deaths_15+'][ti] = np.count_nonzero(self.sim.people.age[new_death_uids] >= 15)
 
-        # rel_sus: multiplier for susceptibility when base computes transmission; RECOVERED/TREATED at higher risk
+        # rel_sus: multiplier for susceptibility; RECOVERED/TREATED at higher risk (π pi, ρ rho)
         self.rel_sus[uids] = 1
-        self.rel_sus[uids[self.state[uids] == TBSL.RECOVERED]] = self.pars.pi
-        self.rel_sus[uids[self.state[uids] == TBSL.TREATED]] = self.pars.rho
+        self.rel_sus[uids[self.state[uids] == TBSL.RECOVERED]] = self.pars.rr_rec
+        self.rel_sus[uids[self.state[uids] == TBSL.TREATED]] = self.pars.rr_treat
 
-        # rel_trans: multiplier for infectiousness; ASYMPTOMATIC < SYMPTOMATIC (kappa typically < 1)
+        # rel_trans: multiplier for infectiousness; ASYMPTOMATIC < SYMPTOMATIC (κ kappa typically < 1)
         self.rel_trans[uids] = 1
-        self.rel_trans[uids[self.state[uids] == TBSL.ASYMPTOMATIC]] = self.pars.kappa
+        self.rel_trans[uids[self.state[uids] == TBSL.ASYMPTOMATIC]] = self.pars.trans_asymp
 
         # --- Schedule next transition: only states with spontaneous exits get a new (state_next, ti_next) ---
         # rr_activation: INFECTION → NON_INFECTIOUS or ASYMPTOMATIC (infection-to-active)
@@ -403,15 +402,15 @@ class TB_LSHTM(ss.Infection):
         u = uids[self.state[uids] == TBSL.SYMPTOMATIC]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
             TBSL.ASYMPTOMATIC: self.pars.sym_asy,
-            TBSL.TREATMENT: self.pars.theta,
-            TBSL.DEAD: make_scaled_rate(self.pars.mu_tb, lambda uids: self.rr_death[uids]),
+            TBSL.TREATMENT: self.pars.sym_treat,
+            TBSL.DEAD: make_scaled_rate(self.pars.sym_dead, lambda uids: self.rr_death[uids]),
         })
 
         # TREATMENT → SYMPTOMATIC (failure) or TREATED (completion)
         u = uids[self.state[uids] == TBSL.TREATMENT]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.SYMPTOMATIC: self.pars.phi,
-            TBSL.TREATED: self.pars.delta
+            TBSL.SYMPTOMATIC: self.pars.fail_rate,
+            TBSL.TREATED: self.pars.complete_rate
         })
 
         # CLEARED, RECOVERED, TREATED: no scheduled transition; reinfection via transmission only
@@ -517,7 +516,7 @@ class TB_LSHTM(ss.Infection):
             ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
             ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'), 
 
-            ss.Result('n_detectable_15+', dtype=int, label='Symptomatic plus cxr_asymp_sens * Asymptomatic (15+)'),
+            ss.Result('n_detectable_15+', dtype=float, scale=False, label='Symptomatic plus cxr_asymp_sens * Asymptomatic (15+)'),
         )
         return
 
@@ -604,14 +603,14 @@ class TB_LSHTM_Acute(TB_LSHTM):
 
     Extends :class:`TB_LSHTM` by inserting an ACUTE state between infection and
     the usual INFECTION (latent) state. New infections enter ACUTE first, then
-    transition to INFECTION at rate :attr:`pars.acu_inf`. Acute cases are
-    infectious with relative transmissibility :attr:`pars.alpha`. All other
+    transition to INFECTION at rate :attr:`pars.rate_acute_latent`. Acute cases are
+    infectious with relative transmissibility :attr:`pars.trans_acute` (α alpha). All other
     states and transitions match :class:`TB_LSHTM`.
 
     State flow (difference from base)
     ---------------------------------
     - Transmission → ACUTE (not INFECTION).
-    - From ACUTE the only spontaneous transition is ACUTE → INFECTION.
+    - From ACUTE the only spontaneous transition is ACUTE → INFECTION at rate_acute_latent.
     - Once in INFECTION, flow is as in the base (CLEARED, NON_INFECTIOUS, ASYMPTOMATIC, etc.).
     - Reinfection of CLEARED/RECOVERED/TREATED again leads to ACUTE.
     - When :meth:`start_treatment` is called, both ACUTE and INFECTION (latent)
@@ -625,7 +624,7 @@ class TB_LSHTM_Acute(TB_LSHTM):
         Parameters
         ----------
         pars : dict, optional
-            Override parameters (e.g. ``acu_inf``, ``alpha``).
+            Override parameters (e.g. ``rate_acute_latent``, ``trans_acute``).
         **kwargs
             Passed to base.
         """
@@ -633,8 +632,8 @@ class TB_LSHTM_Acute(TB_LSHTM):
 
         # ACUTE is a brief infectious state before latent (INFECTION); reinfection leads to ACUTE
         self.define_pars(
-            acu_inf=ss.years(ss.expon(1/4.0)),  # Rate: ACUTE → INFECTION (per year)
-            alpha=0.9,                          # Relative transmission from acute vs symptomatic
+            rate_acute_latent=ss.years(ss.expon(1/4.0)),  # ACUTE → INFECTION (per year)
+            trans_acute=0.9,                              # α alpha: rel. transmissibility acute vs symptomatic
         )
         self.update_pars(pars, **kwargs)
         return
@@ -652,10 +651,11 @@ class TB_LSHTM_Acute(TB_LSHTM):
         """
         Set prognoses for newly infected agents; they enter ACUTE (not INFECTION).
 
-        Same as base except initial state is ACUTE and first transition is
-        ACUTE → INFECTION at rate acu_inf.
+        Skips TB_LSHTM.set_prognoses (which would set state=INFECTION) and calls
+        ss.Infection.set_prognoses directly, then sets ACUTE state and schedules
+        ACUTE → INFECTION transition.
         """
-        super().set_prognoses(uids, sources)
+        super(TB_LSHTM, self).set_prognoses(uids, sources)
         if len(uids) == 0:
             return
 
@@ -668,7 +668,7 @@ class TB_LSHTM_Acute(TB_LSHTM):
 
         # Single possible transition: ACUTE → INFECTION
         self.state_next[uids], self.ti_next[uids] = self.transition(uids, to={
-            TBSL.INFECTION: self.pars.acu_inf,
+            TBSL.INFECTION: self.pars.rate_acute_latent,
         })
 
         return
@@ -687,7 +687,6 @@ class TB_LSHTM_Acute(TB_LSHTM):
         without going through a subclass step().
         """
         super(TB_LSHTM, self).step()
-        p = self.pars
         ti = self.ti
 
         uids = ss.uids(ti >= self.ti_next)
@@ -695,7 +694,11 @@ class TB_LSHTM_Acute(TB_LSHTM):
             return
 
         # Record new active (transition into ASYMPTOMATIC) from state_next before overwriting
-        new_asymp_uids = uids[self.state_next[uids] == TBSL.ASYMPTOMATIC]
+        # Exclude SYMPTOMATIC → ASYMPTOMATIC regression; only first entry to active disease counts
+        new_asymp_uids = uids[
+            (self.state_next[uids] == TBSL.ASYMPTOMATIC) &
+            (self.state[uids] != TBSL.SYMPTOMATIC)
+        ]
         self.results['new_active'][ti] = len(new_asymp_uids)
         self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_asymp_uids] >= 15)
 
@@ -717,18 +720,18 @@ class TB_LSHTM_Acute(TB_LSHTM):
         self.results['new_deaths_15+'][ti] = np.count_nonzero(self.sim.people.age[new_death_uids] >= 15)
 
         self.rel_sus[uids] = 1
-        self.rel_sus[uids[self.state[uids] == TBSL.RECOVERED]] = self.pars.pi
-        self.rel_sus[uids[self.state[uids] == TBSL.TREATED]] = self.pars.rho
+        self.rel_sus[uids[self.state[uids] == TBSL.RECOVERED]] = self.pars.rr_rec
+        self.rel_sus[uids[self.state[uids] == TBSL.TREATED]] = self.pars.rr_treat
 
-        # rel_trans: ACUTE (alpha) and ASYMPTOMATIC (kappa) both infectious
+        # rel_trans: ACUTE (α alpha) and ASYMPTOMATIC (κ kappa) both infectious
         self.rel_trans[uids] = 1
-        self.rel_trans[uids[self.state[uids] == TBSL.ACUTE]] = self.pars.alpha
-        self.rel_trans[uids[self.state[uids] == TBSL.ASYMPTOMATIC]] = self.pars.kappa
+        self.rel_trans[uids[self.state[uids] == TBSL.ACUTE]] = self.pars.trans_acute
+        self.rel_trans[uids[self.state[uids] == TBSL.ASYMPTOMATIC]] = self.pars.trans_asymp
 
         # ACUTE → INFECTION (single possible transition from acute)
         u = uids[self.state[uids] == TBSL.ACUTE]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.INFECTION: self.pars.acu_inf,
+            TBSL.INFECTION: self.pars.rate_acute_latent,
         })
 
         # INFECTION → CLEARED, NON_INFECTIOUS, or ASYMPTOMATIC (same as base)
@@ -757,20 +760,21 @@ class TB_LSHTM_Acute(TB_LSHTM):
         u = uids[self.state[uids] == TBSL.SYMPTOMATIC]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
             TBSL.ASYMPTOMATIC: self.pars.sym_asy,
-            TBSL.TREATMENT: self.pars.theta,
-            TBSL.DEAD: make_scaled_rate(self.pars.mu_tb, lambda uids: self.rr_death[uids]),
+            TBSL.TREATMENT: self.pars.sym_treat,
+            TBSL.DEAD: make_scaled_rate(self.pars.sym_dead, lambda uids: self.rr_death[uids]),
         })
 
         # TREATMENT → SYMPTOMATIC (failure) or TREATED (completion)
         u = uids[self.state[uids] == TBSL.TREATMENT]
         self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.SYMPTOMATIC: self.pars.phi,
-            TBSL.TREATED: self.pars.delta
+            TBSL.SYMPTOMATIC: self.pars.fail_rate,
+            TBSL.TREATED: self.pars.complete_rate
         })
-        # Set default risk modifiers to 1.0
-        self.rr_activation[u] = 1
-        self.rr_clearance[u] = 1
-        self.rr_death[u] = 1
+
+        # Reset rate multipliers for all agents that transitioned this step
+        self.rr_activation[uids] = 1
+        self.rr_clearance[uids] = 1
+        self.rr_death[uids] = 1
 
         # CLEARED, RECOVERED, TREATED: next change is reinfection → ACUTE (via transmission)
         return
