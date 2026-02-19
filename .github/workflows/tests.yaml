@@ -1,0 +1,39 @@
+name: TBsim CI tests
+on:
+  push:
+    branches:
+      - main
+    tags: v*
+  pull_request:
+
+jobs:
+  test:
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        os: ['ubuntu-latest']
+        python-version: ['3.13']
+    runs-on: ${{ matrix.os }}
+    name: Install and test
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - uses: actions/setup-python@master
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+      - name: Install TBsim
+        run: pip install -e .
+      - name: Install tests
+        working-directory: ./tests
+        run: pip install -r requirements.txt
+      - name: Run tests
+        working-directory: ./tests
+        run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: './tests/test-results.xml'
