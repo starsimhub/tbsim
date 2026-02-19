@@ -5,7 +5,6 @@ import starsim as ss
 import matplotlib.pyplot as plt
 
 from enum import IntEnum
-from types import SimpleNamespace
 
 __all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL']
 
@@ -48,20 +47,29 @@ def _get_rate_from_base(base_rate):
         raise ValueError(f'Cannot extract rate from base_rate: {base_rate!r}') from e
 
 
-def make_scaled_rate(base_rate, rr_callable):
-    def sample_waiting_times(uids):
+class ScaledRate:
+    """A rate distribution scaled per-agent by a risk-ratio callable."""
+
+    def __init__(self, base_rate, rr_callable):
+        self._base_rate = base_rate
+        self._rr_callable = rr_callable
+
+    def sample_waiting_times(self, uids):
         # Per-agent rate ratio from callable (e.g. rr_activation[uids]); rr_i=0 => never transition
-        rr = np.asarray(rr_callable(uids), dtype=float)
+        rr = np.asarray(self._rr_callable(uids), dtype=float)
         # Base rate = 1/scale from expon; effective_rate_i = base * rr_i
-        base_rate_val = _get_rate_from_base(base_rate)
+        base_rate_val = _get_rate_from_base(self._base_rate)
         effective_rate = base_rate_val * rr
         # Inverse-transform: u ~ U(0,1) => T = -log(u)/λ ~ Exp(λ)
-        u = base_rate.rand(len(uids))
+        u = self._base_rate.rand(len(uids))
         # rr=0 => div by 0; set t=inf (never transition), suppress warnings
         with np.errstate(divide='ignore', invalid='ignore'):
             t = np.where(rr > 0, -np.log(u) / effective_rate, np.inf)
         return t
-    return SimpleNamespace(sample_waiting_times=sample_waiting_times)
+
+
+def make_scaled_rate(base_rate, rr_callable):
+    return ScaledRate(base_rate, rr_callable)
 
 
 class TB_LSHTM(ss.Infection):
@@ -300,7 +308,7 @@ class TB_LSHTM(ss.Infection):
         # One row per possible destination; column j = transition time for uids[j]
         ti_state = np.zeros((len(to), len(uids)))
         for idx, rate in enumerate(to.values()):
-            draw = rate.sample_waiting_times(uids) if hasattr(rate, 'sample_waiting_times') else rate.rvs(uids)
+            draw = rate.sample_waiting_times(uids) if isinstance(rate, ScaledRate) else rate.rvs(uids)
             ti_state[idx, :] = ti + draw
 
         # Soonest transition wins (index into keys gives next state)
