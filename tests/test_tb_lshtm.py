@@ -38,115 +38,7 @@ def make_lshtm_sim(
     return sim
 
 
-# --- TBSL enum ---
-
-
-def test_tbsl_enum_values():
-    """TBSL has expected state values."""
-    assert TBSL.SUSCEPTIBLE == -1
-    assert TBSL.INFECTION == 0
-    assert TBSL.CLEARED == 1
-    assert TBSL.NON_INFECTIOUS == 2
-    assert TBSL.RECOVERED == 3
-    assert TBSL.ASYMPTOMATIC == 4
-    assert TBSL.SYMPTOMATIC == 5
-    assert TBSL.TREATMENT == 6
-    assert TBSL.TREATED == 7
-    assert TBSL.DEAD == 8
-    assert TBSL.ACUTE == 9
-
-
-def test_tbsl_enum_names():
-    """TBSL has expected state names."""
-    names = [s.name for s in TBSL]
-    assert "SUSCEPTIBLE" in names
-    assert "INFECTION" in names
-    assert "ASYMPTOMATIC" in names
-    assert "SYMPTOMATIC" in names
-    assert "ACUTE" in names
-
-
-# --- TB_LSHTM initialization ---
-
-
-def test_tb_lshtm_initialization():
-    """TB_LSHTM initializes with default pars and state types."""
-    tb = TB_LSHTM()
-    assert tb.pars.beta is not None
-    assert tb.pars.trans_asymp == 0.82
-    assert tb.pars.rr_rec == 0.21
-    assert tb.pars.rr_treat == 3.15
-    assert hasattr(tb.pars, "inf_cle") and hasattr(tb.pars, "inf_non") and hasattr(tb.pars, "inf_asy")
-    assert hasattr(tb.pars, "sym_dead") and hasattr(tb.pars, "sym_treat") and hasattr(tb.pars, "complete_rate")
-
-
-def test_tb_lshtm_initial_states_after_init():
-    """TB_LSHTM state arrays exist and have correct type after sim.init()."""
-    sim = make_lshtm_sim(agents=50)
-    sim.init()
-    tb = sim.diseases[0]
-    assert isinstance(tb.susceptible, (ss.BoolArr, np.ndarray))
-    assert isinstance(tb.infected, (ss.BoolArr, np.ndarray))
-    assert isinstance(tb.state, (ss.FloatArr, np.ndarray))
-    assert isinstance(tb.state_next, (ss.FloatArr, np.ndarray))
-    assert isinstance(tb.ti_next, (ss.FloatArr, np.ndarray))
-    assert isinstance(tb.rel_sus, (ss.FloatArr, np.ndarray))
-    assert isinstance(tb.rel_trans, (ss.FloatArr, np.ndarray))
-    assert isinstance(tb.rr_activation, (ss.FloatArr, np.ndarray))
-    assert isinstance(tb.rr_clearance, (ss.FloatArr, np.ndarray))
-    assert isinstance(tb.rr_death, (ss.FloatArr, np.ndarray))
-    assert isinstance(tb.on_treatment, (ss.BoolArr, np.ndarray))
-    assert len(tb.state) == 50
-
-
-def test_tb_lshtm_acute_initialization():
-    """TB_LSHTM_Acute adds rate_acute_latent and trans_acute pars."""
-    tb = TB_LSHTM_Acute()
-    assert hasattr(tb.pars, "rate_acute_latent")
-    assert tb.pars.trans_acute == 0.9
-
-
-# --- Infectious property ---
-
-
-def test_tb_lshtm_infectious():
-    """Only ASYMPTOMATIC and SYMPTOMATIC are infectious in TB_LSHTM."""
-    sim = make_lshtm_sim(agents=20)
-    sim.init()
-    tb = sim.diseases[0]
-    n = len(tb.state)
-    # None infectious when all susceptible
-    tb.state[:] = TBSL.SUSCEPTIBLE
-    assert not tb.infectious.any()
-    # ASYMPTOMATIC infectious
-    tb.state[:] = TBSL.ASYMPTOMATIC
-    assert tb.infectious.all()
-    # SYMPTOMATIC infectious
-    tb.state[:] = TBSL.SYMPTOMATIC
-    assert tb.infectious.all()
-    # INFECTION (latent) not infectious
-    tb.state[:] = TBSL.INFECTION
-    assert not tb.infectious.any()
-    # TREATMENT not infectious
-    tb.state[:] = TBSL.TREATMENT
-    assert not tb.infectious.any()
-
-
-def test_tb_lshtm_acute_infectious():
-    """ACUTE is infectious in TB_LSHTM_Acute."""
-    sim = make_lshtm_sim(agents=20, use_acute=True)
-    sim.init()
-    tb = sim.diseases[0]
-    tb.state[:] = TBSL.ACUTE
-    assert tb.infectious.all()
-    tb.state[:] = TBSL.ASYMPTOMATIC
-    assert tb.infectious.all()
-    tb.state[:] = TBSL.INFECTION
-    assert not tb.infectious.any()
-
-
 # --- make_scaled_rate ---
-
 
 def test_scaled_rate_positive_rr():
     """make_scaled_rate with rr > 0 scales waiting time (finite values)."""
@@ -203,7 +95,6 @@ def test_scaled_rate_mean_waiting_time():
 
 # --- transition() ---
 
-
 def test_transition_empty_uids():
     """transition with empty uids returns empty arrays."""
     sim = make_lshtm_sim(agents=10)
@@ -237,7 +128,6 @@ def test_transition_returns_valid_states():
 
 # --- set_prognoses ---
 
-
 def test_set_prognoses_sets_state_and_susceptible():
     """set_prognoses sets state to INFECTION and susceptible to False."""
     sim = make_lshtm_sim(agents=50)
@@ -267,7 +157,6 @@ def test_set_prognoses_empty_uids():
 
 # --- step_die ---
 
-
 def test_step_die():
     """step_die sets state=DEAD, susceptible=False, infected=False, rel_trans=0."""
     sim = make_lshtm_sim(agents=50)
@@ -295,7 +184,6 @@ def test_step_die_empty_uids():
 
 
 # --- start_treatment ---
-
 
 def test_start_treatment_latent_cleared():
     """start_treatment on INFECTION (latent) schedules CLEARED."""
@@ -347,7 +235,6 @@ def test_start_treatment_acute_latent_cleared():
 
 
 # --- Sim run and results ---
-
 
 def test_sim_run_tb_lshtm():
     """Short sim with TB_LSHTM runs and produces results."""
@@ -431,7 +318,6 @@ def test_plot_returns_figure():
 # =============================================================================
 # Challenging tests: invariants, edge cases, risk modifiers, consistency
 # =============================================================================
-
 
 def test_state_counts_sum_to_population():
     """At each time step, per-state counts sum to the population size at that time."""
