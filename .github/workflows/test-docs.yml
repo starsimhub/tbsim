@@ -1,0 +1,59 @@
+name: Test Documentation Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_tutorial:
+        description: 'Test tutorial functionality'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  test-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: Install tbsim package
+        run: |
+          pip install -e .
+          pip freeze
+
+      - name: Install documentation dependencies
+        working-directory: ./docs
+        run: |
+          pip install -r requirements.txt
+          pip freeze
+
+      - name: Test tutorial functionality
+        if: ${{ github.event.inputs.test_tutorial }}
+        run: python .github/scripts/test_tutorial_imports.py
+
+      - name: Test documentation setup
+        run: python .github/scripts/verify_docs.py
+
+      - name: Summary
+        run: |
+          echo "=== Test Summary ==="
+          echo "✅ Repository structure verified"
+          echo "✅ Dependencies installed"
+          if [ "${{ github.event.inputs.test_tutorial }}" = "true" ]; then
+            echo "✅ Tutorial functionality tested"
+          fi
+          echo "✅ Documentation build environment ready"
+          echo ""
+          echo "Next steps:"
+          echo "- Use the 'deploy-docs' workflow for full documentation build and deployment"
+          echo "- Review tutorial: docs/tutorials/tb_interventions_tutorial.ipynb"
