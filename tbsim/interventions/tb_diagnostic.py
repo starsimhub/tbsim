@@ -1,7 +1,6 @@
 import numpy as np
 import starsim as ss
 from tbsim import TBS
-from .interventions_eh import TBDiagnosticErrors
 
 __all__ = ['TBDiagnostic', 'EnhancedTBDiagnostic']
 
@@ -147,6 +146,12 @@ class TBDiagnostic(ss.Intervention):
         )
         self.update_pars(pars=pars, **kwargs)
 
+        # Create distributions once (avoid recreating every step)
+        if not isinstance(self.pars.coverage, ss.Dist):
+            self.dist_coverage = ss.bernoulli(p=self.pars.coverage)
+        self.dist_sensitivity = ss.bernoulli(p=self.pars.sensitivity)
+        self.dist_false_positive = ss.bernoulli(p=1 - self.pars.specificity)
+
         # Temporary state for update_results
         self.tested_this_step = []
         self.test_result_this_step = []
@@ -206,27 +211,6 @@ class TBDiagnostic(ss.Intervention):
         ppl = sim.people
         tb = sim.diseases.tb
 
-        # # Error handling: Check required simulation components
-        # assert hasattr(ppl, 'sought_care'), TBDiagnosticErrors.SOUGHT_CARE_MISSING
-        # assert hasattr(ppl, 'diagnosed'), TBDiagnosticErrors.DIAGNOSED_MISSING
-        # assert hasattr(ppl, 'alive'), TBDiagnosticErrors.ALIVE_MISSING
-        # assert hasattr(ppl, 'tested'), TBDiagnosticErrors.TESTED_MISSING
-        # assert hasattr(ppl, 'n_times_tested'), TBDiagnosticErrors.N_TIMES_TESTED_MISSING
-        # assert hasattr(ppl, 'test_result'), TBDiagnosticErrors.TEST_RESULT_MISSING
-        # assert hasattr(ppl, 'care_seeking_multiplier'), TBDiagnosticErrors.CARE_SEEKING_MULTIPLIER_MISSING
-        # assert hasattr(ppl, 'multiplier_applied'), TBDiagnosticErrors.MULTIPLIER_APPLIED_MISSING
-
-        # # Error handling: Check TB disease module
-        # assert hasattr(sim, 'diseases'), TBDiagnosticErrors.DISEASES_MISSING
-        # assert hasattr(sim.diseases, 'tb'), TBDiagnosticErrors.TB_DISEASE_MISSING
-        # assert hasattr(tb, 'state'), TBDiagnosticErrors.TB_STATE_MISSING
-
-        # # Error handling: Check parameter validity
-        # assert 0.0 <= self.pars.coverage <= 1.0, TBDiagnosticErrors.coverage_invalid(self.pars.coverage)
-        # assert 0.0 <= self.pars.sensitivity <= 1.0, TBDiagnosticErrors.sensitivity_invalid(self.pars.sensitivity)
-        # assert 0.0 <= self.pars.specificity <= 1.0, TBDiagnosticErrors.specificity_invalid(self.pars.specificity)
-        # assert self.pars.care_seeking_multiplier >= 1.0, TBDiagnosticErrors.care_seeking_multiplier_invalid(self.pars.care_seeking_multiplier)
-
         # Find people who sought care but haven't been tested
         # eligible = ppl.sought_care & (~ppl.tested) & ppl.alive
         eligible = ppl.sought_care & (~ppl.diagnosed) & ppl.alive  # Avoids excluding once-tested people
@@ -238,8 +222,7 @@ class TBDiagnostic(ss.Intervention):
         if isinstance(self.pars.coverage, ss.Dist):
             selected = self.pars.coverage.filter(uids)
         else:
-            # Use starsim bernoulli distribution for coverage selection
-            selected = ss.bernoulli(self.pars.coverage, strict=False).filter(uids)
+            selected = self.dist_coverage.filter(uids)
         if len(selected) == 0:
             return
 
@@ -249,28 +232,20 @@ class TBDiagnostic(ss.Intervention):
                                      TBS.ACTIVE_SMNEG,
                                      TBS.ACTIVE_EXPTB])
 
-        # Apply test sensitivity and specificity logic
-        # For true TB cases: test positive with probability = sensitivity
-        # For non-TB cases: test positive with probability = (1 - specificity)
+        # Apply test sensitivity and specificity
         test_positive = np.zeros(len(selected), dtype=bool)
-        
-        # Handle true TB cases with sensitivity
+
+        # True TB cases: test positive with probability = sensitivity
         tb_cases = selected[has_tb]
         if len(tb_cases) > 0:
-            try:
-                tb_test_positive = ss.bernoulli(self.pars.sensitivity, strict=False).filter(tb_cases)
-                test_positive[has_tb] = np.isin(selected[has_tb], tb_test_positive)
-            except Exception as e:
-                raise AssertionError(TBDiagnosticErrors.sensitivity_test_failed(e, self.pars.sensitivity))
-        
-        # Handle non-TB cases with specificity (test positive with prob = 1-specificity)
+            tb_test_positive = self.dist_sensitivity.filter(tb_cases)
+            test_positive[has_tb] = np.isin(selected[has_tb], tb_test_positive)
+
+        # Non-TB cases: test positive with probability = 1 - specificity
         non_tb_cases = selected[~has_tb]
         if len(non_tb_cases) > 0:
-            try:
-                non_tb_test_positive = ss.bernoulli(1 - self.pars.specificity, strict=False).filter(non_tb_cases)
-                test_positive[~has_tb] = np.isin(selected[~has_tb], non_tb_test_positive)
-            except Exception as e:
-                raise AssertionError(TBDiagnosticErrors.specificity_test_failed(e, self.pars.specificity))
+            non_tb_test_positive = self.dist_false_positive.filter(non_tb_cases)
+            test_positive[~has_tb] = np.isin(selected[~has_tb], non_tb_test_positive)
         
         # Error handling: Check test result validity
         assert len(test_positive) == len(selected), TBDiagnosticErrors.test_result_length_mismatch(len(selected), len(test_positive))
@@ -479,6 +454,11 @@ class EnhancedTBDiagnostic(ss.Intervention):
         )
         self.update_pars(pars=pars, **kwargs)
 
+        # Create distributions once
+        if not isinstance(self.pars.coverage, ss.Dist):
+            self.dist_coverage = ss.bernoulli(p=self.pars.coverage)
+        self.dist_test_positive = ss.bernoulli(p=self.p_test_positive)
+
         # Temporary state for update_results
         self.tested_this_step = []
         self.test_result_this_step = []
@@ -552,6 +532,31 @@ class EnhancedTBDiagnostic(ss.Intervention):
         else:
             return "Xpert_Baseline"
 
+    @staticmethod
+    def p_test_positive(self, sim, uids):
+        """ Calculate per-individual probability of a positive test result. """
+        tb = sim.diseases.tb
+        ppl = sim.people
+        tb_states = tb.state[uids]
+        ages = ppl.age[uids]
+        has_tb = np.isin(tb_states, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+
+        hiv_states = None
+        if hasattr(sim.diseases, 'hiv'):
+            hiv_states = sim.diseases.hiv.state[uids]
+
+        p = np.zeros(len(uids), dtype=float)
+        for i in range(len(uids)):
+            age_i = float(ages[i])
+            tb_state_i = tb_states[i]
+            hiv_state_i = hiv_states[i] if hiv_states is not None else None
+            sensitivity, specificity = self._get_diagnostic_parameters(uids[i], age_i, tb_state_i, hiv_state_i)
+            if has_tb[i]:
+                p[i] = sensitivity
+            else:
+                p[i] = 1 - specificity
+        return p
+
     def step(self):
         sim = self.sim
         ppl = sim.people
@@ -567,14 +572,14 @@ class EnhancedTBDiagnostic(ss.Intervention):
         if isinstance(self.pars.coverage, ss.Dist):
             selected = self.pars.coverage.filter(uids)
         else:
-            selected = ss.bernoulli(self.pars.coverage, strict=False).filter(uids)
+            selected = self.dist_coverage.filter(uids)
         if len(selected) == 0:
             return
 
         # Get TB and HIV states for selected individuals
         tb_states = tb.state[selected]
         ages = ppl.age[selected]
-        
+
         # Get HIV state if HIV disease exists
         hiv_states = None
         if hasattr(sim.diseases, 'hiv'):
@@ -585,34 +590,18 @@ class EnhancedTBDiagnostic(ss.Intervention):
                                      TBS.ACTIVE_SMNEG,
                                      TBS.ACTIVE_EXPTB])
 
-        # Apply diagnostic testing with individual-specific parameters
-        test_positive = np.zeros(len(selected), dtype=bool)
-        diagnostic_methods = []
+        # Apply diagnostic testing — bernoulli with per-individual probabilities
+        test_positive_uids = self.dist_test_positive.filter(selected)
+        test_positive = np.isin(selected, test_positive_uids)
 
+        # Determine diagnostic methods used (for result tracking)
+        diagnostic_methods = []
         for i, uid in enumerate(selected):
             age_i = float(ages[i])
             tb_state_i = tb_states[i]
             hiv_state_i = hiv_states[i] if hiv_states is not None else None
-            
-            # Get sensitivity/specificity for this individual
-            sensitivity, specificity = self._get_diagnostic_parameters(
-                uid, age_i, tb_state_i, hiv_state_i
-            )
-            
-            # Determine diagnostic method used
-            method = self._determine_diagnostic_method(
-                uid, age_i, tb_state_i, hiv_state_i
-            )
+            method = self._determine_diagnostic_method(uid, age_i, tb_state_i, hiv_state_i)
             diagnostic_methods.append(method)
-            
-            # Apply test logic
-            rand = np.random.rand()
-            has_tbi = has_tb[i]
-            
-            if has_tbi:
-                test_positive[i] = rand < sensitivity
-            else:
-                test_positive[i] = rand > (1 - specificity)
 
         # Update person state
         ppl.tested[selected] = True

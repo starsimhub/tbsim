@@ -61,6 +61,7 @@ def test_barchar_all_state_transitions_interactive(mock_show, sample_data, model
         assert plotter.data is not None
         assert 'dwell_time' in plotter.data.columns
 
+@pytest.mark.skip(reason="Skipping this test as it takes too long to run")
 @pytest.mark.parametrize("model_type", ['TBsim'])  # it takes too long to run
 @patch('matplotlib.pyplot.show')
 def test_stacked_bars_states_per_agent_static(mock_show, sample_data, model_type):

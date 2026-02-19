@@ -33,6 +33,7 @@ setup(
     keywords=["agent-based model", "simulation", "disease", "epidemiology"],
     platforms=["OS Independent"],
     classifiers=CLASSIFIERS,
+    python_requires='>=3.11',
     packages=find_packages(),
     include_package_data=True,
     install_requires=[

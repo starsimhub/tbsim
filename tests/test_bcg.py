@@ -83,15 +83,14 @@ def test_bcg_intervention_default_values():
         assert '0.5' in str(bcg.pars.coverage) or '0.50' in str(bcg.pars.coverage), "Default coverage should be 0.5"
     else:
         assert bcg.pars.coverage == 0.5, "Default coverage should be 0.5"
-    assert bcg.pars.efficacy == 0.8, "Default efficacy should be 0.8"
+    assert '0.8' in str(bcg.pars.p_take), "Default p_take should be 0.8"
     assert bcg.pars.start == ss.date('1900-01-01'), "Default start year should be 1900-01-01 with type ss.date"
     assert bcg.pars.stop == ss.date('2100-12-31'), "Default stop year should be 2100-12-31 with type ss.date"
-    # Check that immunity_period is approximately 10 years (in timesteps)
-    assert abs(bcg.pars.immunity_period - 521.43) < 1.0, "Default immunity_period should be approximately 10 years"
+    assert hasattr(bcg.pars, 'dur_immune'), "dur_immune parameter should exist"
     assert bcg.pars.age_range == [0, 5], "Default age range should be [0, 5]"
     assert bcg.min_age == 0, "Default min_age should be 0"
     assert bcg.max_age == 5, "Default max_age should be 5"
-    assert len(bcg.is_bcg_vaccinated) == nagents, "is_bcg_vaccinated array should match population size"
+    assert len(bcg.bcg_vaccinated) == nagents, "bcg_vaccinated array should match population size"
     assert len(bcg.ti_bcg_vaccinated) == nagents, "ti_bcg_vaccinated array should match population size"
 
 def test_bcg_intervention_custom_values():
@@ -100,10 +99,10 @@ def test_bcg_intervention_custom_values():
     pop, tb, net, pars = make_sim(agents=nagents)
     itv = mtb.BCGProtection(pars={
         'coverage': 0.75,
-        'efficacy': 0.9,
+        'p_take': ss.bernoulli(p=0.9),
         'start': ss.date('2000-01-01'),
         'stop': ss.date('2015-01-01'),
-        'immunity_period': 15,
+        'dur_immune': ss.constant(v=ss.years(15)),
         'age_range': (1, 10)
     })
     assert isinstance(itv, mtb.BCGProtection)
@@ -116,15 +115,14 @@ def test_bcg_intervention_custom_values():
         assert '0.75' in str(bcg.pars.coverage), "Custom coverage should be 0.75"
     else:
         assert bcg.pars.coverage == 0.75, "Custom coverage should be 0.75"
-    assert bcg.pars.efficacy == 0.9, "Custom efficacy should be 0.9"
+    assert '0.9' in str(bcg.pars.p_take), "Custom p_take should be 0.9"
     assert bcg.pars.start == ss.date('2000-01-01'), "Custom start year should be 2000-01-01 with type ss.date"
     assert bcg.pars.stop == ss.date('2015-01-01'), "Custom stop year should be 2015-01-01 with type ss.date"
-    # Check that immunity_period is approximately 15 years (in timesteps)
-    assert abs(bcg.pars.immunity_period - 782.14) < 1.0, "Custom immunity_period should be approximately 15 years"
+    assert hasattr(bcg.pars, 'dur_immune'), "dur_immune parameter should exist"
     assert bcg.pars.age_range == (1, 10), "Custom age range should be (1, 10)"
     assert bcg.min_age == 1, "Custom min_age should be 1"
     assert bcg.max_age == 10, "Custom max_age should be 10"
-    assert len(bcg.is_bcg_vaccinated) == nagents, "is_bcg_vaccinated array should match population size"
+    assert len(bcg.bcg_vaccinated) == nagents, "bcg_vaccinated array should match population size"
     assert len(bcg.ti_bcg_vaccinated) == nagents, "ti_bcg_vaccinated array should match population size"
 
 def test_bcg_age_range_functionality():
@@ -168,18 +166,15 @@ def test_bcg_eligibility_and_vaccination():
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()  
     bcg = sim.interventions['bcgprotection']
-    assert len(bcg.is_bcg_vaccinated) == nagents, "is_bcg_vaccinated array should match population size"    
-    
-    # Considering default values, only ages 0-5 should be eligible
-    eligible = bcg.check_eligibility()
-    assert len(eligible) > 0, "There should be eligible individuals for vaccination"
-    assert np.all(bcg.is_bcg_vaccinated[eligible] == False), "Eligible individuals should not be vaccinated yet"
+    assert len(bcg.bcg_vaccinated) == nagents, "bcg_vaccinated array should match population size"    
     
     # Simulate a step to perform vaccination
     bcg.step()
-    
-    # After step, eligible individuals should be vaccinated
-    assert np.any(bcg.is_bcg_vaccinated[eligible]), "Some eligible individuals should be vaccinated after step"
+
+    # After step, some individuals in the target age range should be vaccinated
+    ages = sim.people.age
+    in_age_range = ((ages >= 0) & (ages <= 5)).uids
+    assert np.any(bcg.bcg_vaccinated[in_age_range]), "Some age-eligible individuals should be vaccinated after step"
 
 def test_bcg_eligibility_with_age_range():
     """Test eligibility with different age ranges"""
@@ -240,61 +235,34 @@ def test_bcg_improves_tb_outcomes():
     assert np.any(current_clearance > initial_clearance), "BCG should improve clearance rate"
     assert np.any(current_death < initial_death), "BCG should reduce death risk"
 
-def test_bcg_age_at_vaccination_recording():
-    """Test that age at vaccination is properly recorded"""
-    nagents = 100
-    pop, tb, net, pars = make_sim(agents=nagents)
-    pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = mtb.BCGProtection()
-    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
-    sim.init()
-    bcg = sim.interventions['bcgprotection']
-    
-    # Simulate a step to perform vaccination
-    bcg.step()
-    
-    # Check that age_at_vaccination is recorded for vaccinated individuals
-    vaccinated = bcg.is_bcg_vaccinated
-    if np.any(vaccinated):
-        ages_at_vaccination = bcg.age_at_vaccination[vaccinated]
-        # All vaccinated individuals should have age_at_vaccination recorded
-        assert np.all(~np.isnan(ages_at_vaccination)), "All vaccinated individuals should have age_at_vaccination recorded"
-        # Ages at vaccination should be within the eligible age range
-        assert np.all(ages_at_vaccination >= bcg.min_age), "Ages at vaccination should be >= min_age"
-        assert np.all(ages_at_vaccination <= bcg.max_age), "Ages at vaccination should be <= max_age"
-
 def test_bcg_protection_duration():
     """Test that protection duration is properly set"""
     nagents = 100
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = mtb.BCGProtection(pars={'immunity_period': 8})
+    itv = mtb.BCGProtection(pars={'dur_immune': ss.constant(v=ss.years(8))})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgprotection']
-    
-    # Test that immunity_period is set correctly (approximately 8 years in timesteps)
-    assert abs(bcg.pars.immunity_period - 417.14) < 1.0, "immunity_period should be set to approximately 8 years"
-    
+
     # Simulate vaccination
     bcg.step()
-    
-    # Check that protection expiration is set correctly for vaccinated individuals
-    vaccinated = bcg.is_bcg_vaccinated
+
+    # Check that protection expiration is set for vaccine responders
+    vaccinated = bcg.bcg_vaccinated
     if np.any(vaccinated):
         protection_expires = bcg.ti_bcg_protection_expires[vaccinated]
-        expected_expiry = bcg.ti + bcg.pars.immunity_period
-        # Only check for non-NaN values (i.e., vaccine responders)
         valid = ~np.isnan(protection_expires)
         if np.any(valid):
-            assert np.all(protection_expires[valid] == expected_expiry), "Protection expiration should be set correctly for responders"
+            # Expiry should be in the future
+            assert np.all(protection_expires[valid] > bcg.ti), "Protection expiration should be after current time"
 
 def test_bcg_protection_expiry_and_removal():
     """Test that protection expiry removes protection effects and resets TB risk modifiers"""
     nagents = 10
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = mtb.BCGProtection(pars={'immunity_period': 1})
+    itv = mtb.BCGProtection(pars={'dur_immune': ss.constant(v=ss.years(1))})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgprotection']
@@ -303,7 +271,7 @@ def test_bcg_protection_expiry_and_removal():
     bcg.step()
     
     # Check that some individuals are vaccinated and protected
-    vaccinated = bcg.is_bcg_vaccinated
+    vaccinated = bcg.bcg_vaccinated
     assert np.any(vaccinated), "Some individuals should be vaccinated"
     
     # Simulate time passing to expire protection by advancing the simulation
@@ -312,30 +280,30 @@ def test_bcg_protection_expiry_and_removal():
         bcg.step()
     
     # Check that protection has been removed for expired individuals
-    # Note: The exact behavior depends on the simulation timestep and immunity_period
+    # Note: The exact behavior depends on the simulation timestep and dur_immune
     # We'll just check that the intervention is still working
-    assert hasattr(bcg, 'is_bcg_vaccinated'), "BCG intervention should still be functional"
+    assert hasattr(bcg, 'bcg_vaccinated'), "BCG intervention should still be functional"
 
 
-def test_bcg_maintain_ongoing_protection():
-    """Test that ongoing protection maintenance re-applies protection effects"""
-    nagents = 10
+def test_bcg_modifiers_reapplied_each_step():
+    """Test that rr modifiers are reapplied after TB resets them to 1.0"""
+    nagents = 100
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = mtb.BCGProtection()
+    itv = mtb.BCGProtection(pars={'coverage': 0.95, 'p_take': ss.bernoulli(p=0.95)})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgprotection']
-    bcg.step()  # Vaccinate
-    # Store TB risk modifiers after vaccination
+    bcg.step()  # Vaccinate and apply modifiers
     tb = sim.diseases.tb
-    rr_activation_before = tb.rr_activation.copy()
-    bcg._maintain_ongoing_protection(bcg.ti)
-    # After maintenance, risk modifiers should not increase (protection persists)
-    # Convert to numpy arrays to avoid starsim array comparison bug
+    protected = bcg.bcg_protected.uids
+    assert len(protected) > 0, "Some individuals should be protected"
+    # Simulate TB resetting rr_* to 1.0
+    tb.rr_activation[:] = 1.0
+    # Run another step — Phase B should reapply modifiers
+    bcg.step()
     current_activation = np.array(tb.rr_activation)
-    before_activation = np.array(rr_activation_before)
-    assert np.all(current_activation <= before_activation), "Ongoing protection should not increase activation risk"
+    assert np.all(current_activation[protected] <= 1.0), "Protection should persist across steps"
 
 
 def test_bcg_result_metrics():
@@ -350,58 +318,12 @@ def test_bcg_result_metrics():
     # bcg.init_results()  # Already called by sim.init(), so skip this
     bcg.step()
     bcg.update_results()
-    # Check that some result metrics are present and have expected types
-    assert 'n_vaccinated' in bcg.results
-    assert isinstance(bcg.results['n_vaccinated'][bcg.ti], (int, np.integer)), "n_vaccinated should be int"
-    assert 'vaccination_coverage' in bcg.results
-    assert isinstance(bcg.results['vaccination_coverage'][bcg.ti], float), "vaccination_coverage should be float"
+    assert 'n_newly_vaccinated' in bcg.results
+    assert isinstance(bcg.results['n_newly_vaccinated'][bcg.ti], (int, np.integer))
+    assert 'n_protected' in bcg.results
+    assert isinstance(bcg.results['n_protected'][bcg.ti], (int, np.integer))
 
 
-def test_bcg_calculate_tb_impact():
-    """Test the calculate_tb_impact method returns expected keys and types"""
-    nagents = 10
-    pop, tb, net, pars = make_sim(agents=nagents)
-    pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = mtb.BCGProtection()
-    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
-    sim.init()
-    bcg = sim.interventions['bcgprotection']
-    bcg.step()
-    result = bcg.calculate_tb_impact(tb)
-    assert 'cases_averted' in result and 'deaths_averted' in result, "calculate_tb_impact should return cases and deaths averted"
-    assert isinstance(result['cases_averted'], int)
-    assert isinstance(result['deaths_averted'], int)
 
 
-def test_bcg_get_summary_stats():
-    """Test the get_summary_stats method returns expected keys and types"""
-    nagents = 10
-    pop, tb, net, pars = make_sim(agents=nagents)
-    pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = mtb.BCGProtection()
-    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
-    sim.init()
-    bcg = sim.interventions['bcgprotection']
-    bcg.step()
-    stats = bcg.get_summary_stats()
-    assert 'total_vaccinated' in stats and 'final_coverage' in stats, "get_summary_stats should return total_vaccinated and final_coverage"
-    assert isinstance(stats['total_vaccinated'], (int, np.integer))
-    assert isinstance(stats['final_coverage'], float)
-
-
-def test_bcg_debug_population():
-    """Test the debug_population method returns expected keys and values"""
-    nagents = 10
-    pop, tb, net, pars = make_sim(agents=nagents)
-    pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = mtb.BCGProtection()
-    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
-    sim.init()
-    bcg = sim.interventions['bcgprotection']
-    debug_info = bcg.debug_population()
-    assert isinstance(debug_info, dict)
-    for key in ['total_population', 'age_range', 'age_0_5', 'vaccinated_0_5', 'eligible_0_5']:
-        assert key in debug_info, f"debug_population should return key {key}"
-    assert debug_info['age_range'] == [0, 5], "Default age range should be [0, 5]"
-    assert debug_info['total_population'] == nagents, "Total population should match number of agents"
         

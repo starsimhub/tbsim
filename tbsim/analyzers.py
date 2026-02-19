@@ -72,7 +72,7 @@ import pandas as pd
 import starsim as ss
 import numpy as np
 import os
-import tbsim.config as cfg
+import tbsim.utils.config as cfg
 import datetime as ddtt
 import tbsim as mtb
 from scipy import stats
@@ -1941,7 +1941,7 @@ class DwtPlotter:
         plt.grid(True)
         plt.show()
 
-    def __generate_reinfection_data__(self, file_path=None, target_states=[], scenario=''): 
+    def __generate_reinfection_data__(self, file_path=None, target_states=[], scenario='', save=False): 
         """
         Generate reinfection analysis data from dwell time logs.
         
@@ -2005,7 +2005,8 @@ class DwtPlotter:
         df = df.loc[df.groupby('agent_id')['infection_num'].idxmax()]
 
         df = df.sort_values(by=['agent_id', 'entry_time'])
-        df.to_csv(reinfection_file_name, index=False)
+        if save:
+            df.to_csv(reinfection_file_name, index=False)
  
         return df, total_count
         

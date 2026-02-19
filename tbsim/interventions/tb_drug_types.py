@@ -13,7 +13,7 @@ The module provides:
 Example:
     >>> from tbsim.interventions import get_dots_parameters, TBDrugType
     >>> dots_params = get_dots_parameters()
-    >>> print(f"DOTS cure rate: {dots_params.cure_rate}")
+    >>> print(f"DOTS cure rate: {dots_params.cure_prob}")
     >>> first_line_params = get_drug_parameters(TBDrugType.FIRST_LINE_COMBO)
     >>> print(f"First line cost: ${first_line_params.cost_per_course}")
 
@@ -114,7 +114,7 @@ class TBDrugParameters:
         drug_name: Human-readable name of the drug regimen
         drug_type: TBDrugType enum value for this drug
         inactivation_rate: Rate at which the drug inactivates TB bacteria
-        cure_rate: Probability of successful cure with this drug
+        cure_prob: Probability of successful cure with this drug
         resistance_rate: Rate at which resistance develops to this drug
         relapse_rate: Rate of relapse after successful treatment
         mortality_rate: Reduction in mortality rate due to treatment
@@ -125,8 +125,8 @@ class TBDrugParameters:
     
     Example:
         >>> params = TBDrugParameters("Test Drug", TBDrugType.DOTS)
-        >>> params.configure({'cure_rate': 0.85, 'duration': 180})
-        >>> print(f"Cure rate: {params.cure_rate}")
+        >>> params.configure({'cure_prob': 0.85, 'duration': 180})
+        >>> print(f"Cure rate: {params.cure_prob}")
     """
     
     def __init__(self, drug_name: str, drug_type: TBDrugType):
@@ -149,7 +149,7 @@ class TBDrugParameters:
         
         # Core drug effect parameters (matching EMOD-Generic)
         self.inactivation_rate = 0.0      # Rate of drug inactivation
-        self.cure_rate = 0.0              # Rate of cure/clearance
+        self.cure_prob = 0.0              # Rate of cure/clearance
         self.resistance_rate = 0.0        # Rate of resistance development
         self.relapse_rate = 0.0           # Rate of relapse after treatment
         self.mortality_rate = 0.0         # Rate of mortality reduction
@@ -174,11 +174,11 @@ class TBDrugParameters:
         Example:
             >>> params = TBDrugParameters("Test", TBDrugType.DOTS)
             >>> params.configure({
-            ...     'cure_rate': 0.85,
+            ...     'cure_prob': 0.85,
             ...     'duration': 180,
             ...     'cost_per_course': 100
             ... })
-            >>> params.cure_rate
+            >>> params.cure_prob
             0.85
         """
         for key, value in parameters.items():
@@ -257,7 +257,7 @@ class TBDrugTypeParameters:
     
     Example:
         >>> dots_params = TBDrugTypeParameters.create_dots_parameters()
-        >>> print(f"DOTS cure rate: {dots_params.cure_rate}")
+        >>> print(f"DOTS cure rate: {dots_params.cure_prob}")
         >>> all_params = TBDrugTypeParameters.get_all_parameter_sets()
         >>> len(all_params)
         7
@@ -282,7 +282,7 @@ class TBDrugTypeParameters:
             
         Example:
             >>> params = TBDrugTypeParameters.create_dots_parameters()
-            >>> params.cure_rate
+            >>> params.cure_prob
             0.85
             >>> params.duration
             180.0
@@ -290,7 +290,7 @@ class TBDrugTypeParameters:
         params = TBDrugParameters("DOTS", TBDrugType.DOTS)
         params.configure({
             'inactivation_rate': 0.1,      # 10% inactivation rate
-            'cure_rate': 0.85,             # 85% cure rate
+            'cure_prob': 0.85,             # 85% cure rate
             'resistance_rate': 0.02,       # 2% resistance development
             'relapse_rate': 0.05,          # 5% relapse rate
             'mortality_rate': 0.8,         # 80% mortality reduction
@@ -319,7 +319,7 @@ class TBDrugTypeParameters:
             
         Example:
             >>> params = TBDrugTypeParameters.create_dots_improved_parameters()
-            >>> params.cure_rate
+            >>> params.cure_prob
             0.9
             >>> params.adherence_rate
             0.9
@@ -327,7 +327,7 @@ class TBDrugTypeParameters:
         params = TBDrugParameters("DOTS_IMPROVED", TBDrugType.DOTS_IMPROVED)
         params.configure({
             'inactivation_rate': 0.08,     # 8% inactivation rate
-            'cure_rate': 0.90,             # 90% cure rate
+            'cure_prob': 0.90,             # 90% cure rate
             'resistance_rate': 0.015,      # 1.5% resistance development
             'relapse_rate': 0.03,          # 3% relapse rate
             'mortality_rate': 0.85,        # 85% mortality reduction
@@ -356,7 +356,7 @@ class TBDrugTypeParameters:
             
         Example:
             >>> params = TBDrugTypeParameters.create_empiric_treatment_parameters()
-            >>> params.cure_rate
+            >>> params.cure_prob
             0.7
             >>> params.resistance_rate
             0.05
@@ -364,7 +364,7 @@ class TBDrugTypeParameters:
         params = TBDrugParameters("EMPIRIC_TREATMENT", TBDrugType.EMPIRIC_TREATMENT)
         params.configure({
             'inactivation_rate': 0.15,     # 15% inactivation rate
-            'cure_rate': 0.70,             # 70% cure rate
+            'cure_prob': 0.70,             # 70% cure rate
             'resistance_rate': 0.05,       # 5% resistance development
             'relapse_rate': 0.10,          # 10% relapse rate
             'mortality_rate': 0.60,        # 60% mortality reduction
@@ -393,7 +393,7 @@ class TBDrugTypeParameters:
             
         Example:
             >>> params = TBDrugTypeParameters.create_first_line_combo_parameters()
-            >>> params.cure_rate
+            >>> params.cure_prob
             0.95
             >>> params.resistance_rate
             0.01
@@ -401,7 +401,7 @@ class TBDrugTypeParameters:
         params = TBDrugParameters("FIRST_LINE_COMBO", TBDrugType.FIRST_LINE_COMBO)
         params.configure({
             'inactivation_rate': 0.05,     # 5% inactivation rate
-            'cure_rate': 0.95,             # 95% cure rate
+            'cure_prob': 0.95,             # 95% cure rate
             'resistance_rate': 0.01,       # 1% resistance development
             'relapse_rate': 0.02,          # 2% relapse rate
             'mortality_rate': 0.90,        # 90% mortality reduction
@@ -429,7 +429,7 @@ class TBDrugTypeParameters:
             
         Example:
             >>> params = TBDrugTypeParameters.create_second_line_combo_parameters()
-            >>> params.cure_rate
+            >>> params.cure_prob
             0.75
             >>> params.duration
             240.0
@@ -437,7 +437,7 @@ class TBDrugTypeParameters:
         params = TBDrugParameters("SECOND_LINE_COMBO", TBDrugType.SECOND_LINE_COMBO)
         params.configure({
             'inactivation_rate': 0.12,     # 12% inactivation rate
-            'cure_rate': 0.75,             # 75% cure rate
+            'cure_prob': 0.75,             # 75% cure rate
             'resistance_rate': 0.03,       # 3% resistance development
             'relapse_rate': 0.08,          # 8% relapse rate
             'mortality_rate': 0.70,        # 70% mortality reduction
@@ -465,7 +465,7 @@ class TBDrugTypeParameters:
             
         Example:
             >>> params = TBDrugTypeParameters.create_third_line_combo_parameters()
-            >>> params.cure_rate
+            >>> params.cure_prob
             0.6
             >>> params.cost_per_course
             1000.0
@@ -473,7 +473,7 @@ class TBDrugTypeParameters:
         params = TBDrugParameters("THIRD_LINE_COMBO", TBDrugType.THIRD_LINE_COMBO)
         params.configure({
             'inactivation_rate': 0.20,     # 20% inactivation rate
-            'cure_rate': 0.60,             # 60% cure rate
+            'cure_prob': 0.60,             # 60% cure rate
             'resistance_rate': 0.08,       # 8% resistance development
             'relapse_rate': 0.15,          # 15% relapse rate
             'mortality_rate': 0.50,        # 50% mortality reduction
@@ -502,7 +502,7 @@ class TBDrugTypeParameters:
             
         Example:
             >>> params = TBDrugTypeParameters.create_latent_treatment_parameters()
-            >>> params.cure_rate
+            >>> params.cure_prob
             0.9
             >>> params.duration
             90.0
@@ -510,7 +510,7 @@ class TBDrugTypeParameters:
         params = TBDrugParameters("LATENT_TREATMENT", TBDrugType.LATENT_TREATMENT)
         params.configure({
             'inactivation_rate': 0.02,     # 2% inactivation rate
-            'cure_rate': 0.90,             # 90% prevention of activation
+            'cure_prob': 0.90,             # 90% prevention of activation
             'resistance_rate': 0.005,      # 0.5% resistance development
             'relapse_rate': 0.01,          # 1% relapse rate
             'mortality_rate': 0.95,        # 95% mortality reduction
@@ -541,7 +541,7 @@ class TBDrugTypeParameters:
             >>> params = TBDrugTypeParameters.create_parameters_for_type(TBDrugType.DOTS)
             >>> params.drug_type
             <TBDrugType.DOTS: 1>
-            >>> params.cure_rate
+            >>> params.cure_prob
             0.85
         """
         factory_methods = {
@@ -574,9 +574,9 @@ class TBDrugTypeParameters:
             >>> all_params = TBDrugTypeParameters.get_all_parameter_sets()
             >>> len(all_params)
             7
-            >>> all_params[TBDrugType.DOTS].cure_rate
+            >>> all_params[TBDrugType.DOTS].cure_prob
             0.85
-            >>> all_params[TBDrugType.FIRST_LINE_COMBO].cure_rate
+            >>> all_params[TBDrugType.FIRST_LINE_COMBO].cure_prob
             0.95
         """
         return {
@@ -597,7 +597,7 @@ def get_dots_parameters() -> TBDrugParameters:
         
     Example:
         >>> dots_params = get_dots_parameters()
-        >>> print(f"DOTS cure rate: {dots_params.cure_rate}")
+        >>> print(f"DOTS cure rate: {dots_params.cure_prob}")
         >>> print(f"DOTS duration: {dots_params.duration} days")
     """
     return TBDrugTypeParameters.create_dots_parameters()
@@ -616,7 +616,7 @@ def get_drug_parameters(drug_type: TBDrugType) -> TBDrugParameters:
         
     Example:
         >>> first_line_params = get_drug_parameters(TBDrugType.FIRST_LINE_COMBO)
-        >>> print(f"First line cure rate: {first_line_params.cure_rate}")
+        >>> print(f"First line cure rate: {first_line_params.cure_prob}")
         >>> print(f"First line cost: ${first_line_params.cost_per_course}")
     """
     return TBDrugTypeParameters.create_parameters_for_type(drug_type)
@@ -635,6 +635,6 @@ def get_all_drug_parameters() -> Dict[TBDrugType, TBDrugParameters]:
     Example:
         >>> all_params = get_all_drug_parameters()
         >>> for drug_type, params in all_params.items():
-        ...     print(f"{drug_type.name}: {params.cure_rate:.3f} cure rate, ${params.cost_per_course:.0f} cost")
+        ...     print(f"{drug_type.name}: {params.cure_prob:.3f} cure rate, ${params.cost_per_course:.0f} cost")
     """
     return TBDrugTypeParameters.get_all_parameter_sets()
