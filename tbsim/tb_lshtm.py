@@ -75,7 +75,6 @@ def make_scaled_rate(base_rate, rr_callable):
 
 
 class TB_LSHTM(ss.Infection):
-    #region IDE Collapsable section for documentation
     """
     Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al. 2025). 
     States in :class:`TBSL` span the spectrum from susceptibility to active disease and treatment.  
@@ -162,7 +161,6 @@ class TB_LSHTM(ss.Infection):
        https://doi.org/10.1371/journal.pgph.0005050
 
     """
-    #endregion Documentation
 
     def __init__(self, pars=None, **kwargs):
         super().__init__(name=kwargs.pop('name', None), label=kwargs.pop('label', None))

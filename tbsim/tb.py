@@ -45,8 +45,7 @@ class TBS(IntEnum):
     DEAD            = 8     # TB death
     PROTECTED       = 100
 
-    # region Convenience methods for all states
-  
+    # Convenience methods for all states
     @staticmethod
     def all():
         """
@@ -95,7 +94,6 @@ class TBS(IntEnum):
     def care_seeking_eligible():
         """Get active TB states eligible for care-seeking (excludes ACTIVE_PRESYMP)."""
         return np.array([TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
-    # endregion
     
 
 class TB(ss.Infection):
