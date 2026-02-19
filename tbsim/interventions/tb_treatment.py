@@ -18,11 +18,13 @@ class TBTreatment(ss.Intervention):
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
         self.define_pars(
-            treatment_success_rate=0.85,
+            treatment_success_prob=0.85,
             reseek_multiplier=2.0,
             reset_flags=True,
         )
         self.update_pars(pars=pars, **kwargs)
+
+        self.dist_treatment_success = ss.bernoulli(p=self.pars.treatment_success_prob)
 
         # Storage for results
         self.new_treated = []
@@ -48,9 +50,7 @@ class TBTreatment(ss.Intervention):
         # Treatment outcomes
         tx_uids = uids[tb.on_treatment[uids]]
         ppl.n_times_treated[tx_uids] += 1
-        rand = np.random.rand(len(tx_uids))
-        success_uids = tx_uids[rand < self.pars.treatment_success_rate]
-        failure_uids = tx_uids[rand >= self.pars.treatment_success_rate]
+        success_uids, failure_uids = self.dist_treatment_success.filter(tx_uids, both=True)
 
         # Update success: instant clearance via TB logic
         tb.state[success_uids] = TBS.NONE
@@ -197,15 +197,17 @@ class EnhancedTBTreatment(ss.Intervention):
         # Default to DOTS treatment
         self.define_pars(
             drug_type=TBDrugType.DOTS,
-            treatment_success_rate=0.85,
+            treatment_success_prob=0.85,
             reseek_multiplier=2.0,
             reset_flags=True,
         )
         self.update_pars(pars=pars, **kwargs)
-        
+
         # Get drug parameters based on selected drug type
         self.drug_parameters = TBDrugTypeParameters.create_parameters_for_type(self.pars.drug_type)
-        
+
+        self.dist_treatment_success = ss.bernoulli(p=self.drug_parameters.cure_prob)
+
         # Storage for results tracking
         self.new_treated = []
         self.successes = []
@@ -250,11 +252,8 @@ class EnhancedTBTreatment(ss.Intervention):
         tx_uids = uids[tb.on_treatment[uids]]
         ppl.n_times_treated[tx_uids] += 1
         
-        # Use drug-specific success rate for outcome determination
-        success_rate = self.drug_parameters.cure_rate
-        rand = np.random.rand(len(tx_uids))
-        success_uids = tx_uids[rand < success_rate]
-        failure_uids = tx_uids[rand >= success_rate]
+        # Treatment outcomes based on drug-specific success probability
+        success_uids, failure_uids = self.dist_treatment_success.filter(tx_uids, both=True)
         
         # Update successful treatment outcomes
         # Clear TB infection and restore susceptibility

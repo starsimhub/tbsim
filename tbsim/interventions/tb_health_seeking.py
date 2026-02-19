@@ -33,6 +33,9 @@ class HealthSeekingBehavior(ss.Intervention):
         )
         self.update_pars(pars=pars, **kwargs)
 
+        self.dist_care_seeking = ss.bernoulli(p=self.p_care_seeking)
+
+    @staticmethod
     def p_care_seeking(self, sim, uids):
         """ Calculate the probability of care-seeking for individuals."""
         # Get the base rate and unit from the TimePar object
@@ -65,8 +68,7 @@ class HealthSeekingBehavior(ss.Intervention):
                                 (tb.state == TBS.ACTIVE_SMNEG) |
                                 (tb.state == TBS.ACTIVE_EXPTB)) &
                                 ~ppl.sought_care & ppl.alive).uids
-        sought_probs = self.p_care_seeking(self.sim, not_yet_sought_uids)
-        sought_care_uids = not_yet_sought_uids[np.random.rand(len(not_yet_sought_uids)) < sought_probs]
+        sought_care_uids = self.dist_care_seeking.filter(not_yet_sought_uids)
         self.new_seekers_this_step = sought_care_uids
 
         if len(sought_care_uids) > 0:

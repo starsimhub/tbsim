@@ -75,11 +75,31 @@ class HIV(ss.Disease):
         
         # Define extra attributes for Agents of this disease.
         self.define_states(
-            ss.FloatArr('state', default=HIVState.ATRISK),  # Column name to store HIV state.   
+            ss.FloatArr('state', default=HIVState.ATRISK),  # Column name to store HIV state.
             ss.BoolArr('on_ART', default=False),            # Column name to store Whether agent is on ART.
         )
+
+        self.dist_acute_to_latent = ss.bernoulli(p=self.p_acute_to_latent)
+        self.dist_latent_to_aids  = ss.bernoulli(p=self.p_latent_to_aids)
+
         return
         
+    @staticmethod
+    def p_acute_to_latent(self, sim, uids):
+        """ Calculate probability of HIV ACUTE → LATENT transition. """
+        acute_to_latent = self.pars.acute_to_latent.to_prob()
+        art_factor = self.pars['art_progression_factor']
+        art_multiplier = np.where(self.on_ART[uids], art_factor, 1.0)
+        return acute_to_latent * art_multiplier
+
+    @staticmethod
+    def p_latent_to_aids(self, sim, uids):
+        """ Calculate probability of HIV LATENT → AIDS transition. """
+        latent_to_aids = self.pars.latent_to_aids.to_prob()
+        art_factor = self.pars['art_progression_factor']
+        art_multiplier = np.where(self.on_ART[uids], art_factor, 1.0)
+        return latent_to_aids * art_multiplier
+
     def set_prognoses(self ):   
         """
         Initialize HIV infection and ART status for agents in the simulation.
@@ -134,29 +154,16 @@ class HIV(ss.Disease):
             self.set_prognoses()
             return
         
-        dt = self.sim.t.dt if hasattr(self.sim.t, 'dt') else 1.0  # dt in weeks (default=1)
         uids = self.sim.people.auids
         current = self.state[uids].copy()
-        
-        # ART factor for progression:
-        art_factor = self.pars['art_progression_factor']
 
-       
-        # HIV → LATENT:
-        acute_to_latent = self.pars.acute_to_latent.to_prob()  # Convert to probability for Starsim 3.0
+        # HIV ACUTE → LATENT:
         hiv_ids = uids[current == HIVState.ACUTE]
-        art_multiplier = np.where(self.on_ART[hiv_ids], art_factor, 1.0) # Apply ART factor
-        effective_p = acute_to_latent*art_multiplier
-        rand_vals = np.random.rand(hiv_ids.size)
-        self.state[hiv_ids[rand_vals < effective_p]] = HIVState.LATENT
-        
-        # LATENT → AIDS:
-        latent_to_aids = self.pars.latent_to_aids.to_prob()  # Convert to probability for Starsim 3.0
+        self.state[self.dist_acute_to_latent.filter(hiv_ids)] = HIVState.LATENT
+
+        # HIV LATENT → AIDS:
         latent_ids = uids[current == HIVState.LATENT]
-        art_multiplier = np.where(self.on_ART[latent_ids], art_factor, 1.0)  # Apply ART factor
-        effective_p = latent_to_aids*art_multiplier
-        rand_vals = np.random.rand(latent_ids.size)
-        self.state[latent_ids[rand_vals<effective_p]] = HIVState.AIDS
+        self.state[self.dist_latent_to_aids.filter(latent_ids)] = HIVState.AIDS
 
     
     def init_results(self):
