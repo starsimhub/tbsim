@@ -16,15 +16,6 @@ class HealthSeekingBehavior(ss.Intervention):
     """
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
-
-        # # For old code with probability
-        # self.define_pars(
-        #     prob = 0.1,         # Daily probability of seeking care if active
-        #     start = None,       # Optional start time
-        #     stop = None,        # Optional stop time
-        #     single_use = True,  # Whether to expire after seeking care
-        # )
-        # For new code with initial care-seeking rate
         self.define_pars(
             initial_care_seeking_rate = ss.perday(0.1),
             start = None,
@@ -63,7 +54,6 @@ class HealthSeekingBehavior(ss.Intervention):
             return
 
 
-        # ***** New code with initial care-seeking rate *****
         not_yet_sought_uids = (((tb.state == TBS.ACTIVE_SMPOS) |
                                 (tb.state == TBS.ACTIVE_SMNEG) |
                                 (tb.state == TBS.ACTIVE_EXPTB)) &
