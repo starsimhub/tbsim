@@ -1,5 +1,0 @@
-quarto-cli
-jupyter
-jupyterlab-quarto
-ipykernel
-jupyterlab

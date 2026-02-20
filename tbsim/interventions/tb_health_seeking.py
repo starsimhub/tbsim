@@ -96,5 +96,4 @@ class HealthSeekingBehavior(ss.Intervention):
         self.new_seekers_this_step = []
 
 
-# Sample usage:
-# scripts/interventions/run_healthSeeking.py
+# Sample usage: see tbsim_examples/run_tb_interventions.py
