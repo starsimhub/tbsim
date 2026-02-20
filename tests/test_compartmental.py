@@ -173,3 +173,8 @@ class TB_R(sc.prettyobj):
 
         self.results = results
         return results
+
+
+class TB_R_SS(ss.Module):
+    
+    def __init__(self, **kwargs):
