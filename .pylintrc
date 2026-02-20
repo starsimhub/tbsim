@@ -92,6 +92,7 @@ disable=raw-checker-failed,
         C0411, # Starsim: allow different import order
         C0412, # Starsim: allow ungrouped imports
         C0413, # Starsim: allow imports not at the top
+        E251,  # Starsim: allow dict key spacing
         E1101, # Starsim: don't check class membership (dynamic classes)
         R1705, # Starsim: allow else-return
         R1711, # Starsim: empty return
