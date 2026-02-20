@@ -316,6 +316,11 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
         print(f"Warning: {style} style not found. Using default style.")
         plt.style.use('default')
 
+    # normalize all keys to strings so numeric/other types from flatten() become string column names
+    flat_results = {
+        label: {str(k): v for k, v in flat.items()}
+        for label, flat in flat_results.items()
+    }
     # collect & filter metric names
     all_metrics = {m for flat in flat_results.values() for m in flat}
     if keywords is not None:
