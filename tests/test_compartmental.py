@@ -108,8 +108,8 @@ default_pars = sc.objdict(
 # Define literal Python translation of R model
 class TB_R(sc.prettyobj):
     
-    def __init__(self, pars=default_pars, **kwargs):
-        self.pars = pars
+    def __init__(self, **kwargs):
+        self.pars = default_pars
         self.pars.update(kwargs)
         return
 
@@ -119,11 +119,11 @@ class TB_R(sc.prettyobj):
         # Forcing functions (piecewise linear interpolation, constant extrapolation)
         # Equivalent to R's approxfun(method="linear", rule=2)
         mutb_times  = [1500, 1999, 2020]
-        mutb_vals   = [p['mutb_ini'],  p['mutb_ini'],  p['mutb_fin']]
+        mutb_vals   = [p.mutb_ini,  p.mutb_ini,  p.mutb_fin]
         theta_times = [1500, 1999, 2020]
-        theta_vals  = [p['theta_ini'], p['theta_ini'], p['theta_fin']]
+        theta_vals  = [p.theta_ini, p.theta_ini, p.theta_fin]
         phi_times   = [1500, 1999, 2020]
-        phi_vals    = [p['phi_ini'],   p['phi_ini'],   p['phi_fin']]
+        phi_vals    = [p.phi_ini,   p.phi_ini,   p.phi_fin]
 
         def force_mutb(t):  return np.interp(t, mutb_times, mutb_vals)
         def force_theta(t): return np.interp(t, theta_times, theta_vals)
@@ -136,17 +136,17 @@ class TB_R(sc.prettyobj):
             mutb  = force_mutb(t)
             theta = force_theta(t)
             phi   = force_phi(t)
-            foi   = (p['beta'] / N) * (p['kappa'] * SUB + CLN)  # Force of infection
+            foi   = (p.beta / p.N) * (p.kappa * SUB + CLN)  # Force of infection
 
-            dSUS = (mu * N) + (mutb * CLN) - foi * SUS - mu * SUS
-            dINF = foi * (SUS + CLE + p['pi'] * REC + p['rho'] * TRE) - p['infcle'] * INF - p['infmin'] * INF - p['infsub'] * INF - mu * INF
-            dCLE = p['infcle'] * INF - foi * CLE - mu * CLE
-            dREC = p['minrec'] * MIN - foi * (p['pi'] * REC) - mu * REC
-            dMIN = p['infmin'] * INF + p['submin'] * SUB - p['minrec'] * MIN - p['minsub'] * MIN - mu * MIN
-            dSUB = p['infsub'] * INF + p['minsub'] * MIN + p['clnsub'] * CLN - p['submin'] * SUB - p['subcln'] * SUB - mu * SUB
-            dCLN = p['subcln'] * SUB - p['clnsub'] * CLN - theta * CLN + phi * TXT - mutb * CLN - mu * CLN
-            dTXT = theta * CLN - phi * TXT - delta * TXT - mu * TXT
-            dTRE = delta * TXT - foi * (p['rho'] * TRE) - mu * TRE
+            dSUS = (p.mu * p.N) + (mutb * CLN) - foi * SUS - p.mu * SUS
+            dINF = foi * (SUS + CLE + p.pi * REC + p.rho * TRE) - p.infcle * INF - p.infmin * INF - p.infsub * INF - p.mu * INF
+            dCLE = p.infcle * INF - foi * CLE - p.mu * CLE
+            dREC = p.minrec * MIN - foi * (p.pi * REC) - p.mu * REC
+            dMIN = p.infmin * INF + p.submin * SUB - p.minrec * MIN - p.minsub * MIN - p.mu * MIN
+            dSUB = p.infsub * INF + p.minsub * MIN + p.clnsub * CLN - p.submin * SUB - p.subcln * SUB - p.mu * SUB
+            dCLN = p.subcln * SUB - p.clnsub * CLN - theta * CLN + phi * TXT - mutb * CLN - p.mu * CLN
+            dTXT = theta * CLN - phi * TXT - p.delta * TXT - p.mu * TXT
+            dTRE = p.delta * TXT - foi * (p.rho * TRE) - p.mu * TRE
 
             return [dSUS, dINF, dCLE, dREC, dMIN, dSUB, dCLN, dTXT, dTRE]
 
@@ -166,10 +166,10 @@ class TB_R(sc.prettyobj):
         # Derived quantities (matching R output columns)
         mutb_arr  = np.array([force_mutb(t) for t in times])
         theta_arr = np.array([force_theta(t) for t in times])
-        results['TBc'] = results.SUB + results.CLN                    # TB prevalence (per 100k)
-        results['Mor'] = mutb_arr * results.CLN                       # TB mortality (per 100k)
-        results['Dxs'] = theta_arr * results.CLN                      # TB notifications (per 100k)
-        results['Spr'] = results.SUB / (results.SUB + results.CLN)    # Proportion subclinical TB (%)
+        results.TBc = results.SUB + results.CLN                    # TB prevalence (per 100k)
+        results.Mor = mutb_arr * results.CLN                       # TB mortality (per 100k)
+        results.Dxs = theta_arr * results.CLN                      # TB notifications (per 100k)
+        results.Spr = results.SUB / (results.SUB + results.CLN)    # Proportion subclinical TB (%)
 
         self.results = results
         return results
