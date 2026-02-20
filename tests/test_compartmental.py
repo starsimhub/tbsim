@@ -77,6 +77,7 @@ ode <- function(parms, end_time = 2020) {
 import numpy as np
 import sciris as sc
 import starsim as ss
+import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 
 # Default parameters; identical to above
@@ -173,6 +174,29 @@ class TB_R(sc.prettyobj):
 
         self.results = results
         return results
+
+    def plot(self, **kwargs):
+        """ Plot all results, each in a separate axes """
+        res = self.results
+        labels = sc.objdict(
+            SUS='Susceptible', INF='Infected', CLE='Cleared', REC='Recovered',
+            MIN='Minimal', SUB='Subclinical', CLN='Clinical', TXT='On treatment',
+            TRE='Treated', TBc='TB prevalence', Mor='TB mortality',
+            Dxs='TB notifications', Spr='Proportion subclinical',
+        )
+        kw = sc.mergedicts(dict(lw=2, alpha=0.8), kwargs)
+        with sc.options.with_style('fancy'):
+            fig, axs = sc.getrowscols(len(labels), make=True)
+            for ax, key in zip(axs.flatten(), labels):
+                ax.plot(res.time, res[key], **kw)
+                ax.set_title(labels[key])
+                ax.set_xlabel('Year')
+                sc.boxoff(ax)
+                sc.commaticks(ax)
+                if res[key].min() >= 0:
+                    ax.set_ylim(bottom=0)
+            sc.figlayout()
+        return fig
 
 
 class TB_R_SS(ss.Module):
@@ -317,4 +341,18 @@ class TB_R_SS(ss.Module):
         self.results['Dxs'][ti] = self.force_theta(self.now) * self.CLN
         self.results['Spr'][ti] = self.SUB / tb_prev if tb_prev > 0 else 0
         return
+
+    def plot(self, **kwargs):
+        """ Plot all results, each in a separate axes """
+        results = list(self.results.all_results)
+        kw = sc.mergedicts(dict(lw=2, alpha=0.8), kwargs)
+        with sc.options.with_style('fancy'):
+            fig = plt.figure()
+            nrows, ncols = sc.getrowscols(len(results))
+            for i, res in enumerate(results):
+                ax = plt.subplot(nrows, ncols, i + 1)
+                res.plot(ax=ax, **kw)
+                sc.boxoff(ax)
+            sc.figlayout()
+        return ss.return_fig(fig)
   
