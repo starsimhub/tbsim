@@ -59,8 +59,7 @@ Running Tutorials
 
 All tutorials can be run:
 
-1. **Online**: Using the Binder environment (recommended for beginners)
-2. **Locally**: After installing TBsim and its dependencies
-3. **In Jupyter**: Open the .ipynb files in Jupyter Notebook or JupyterLab
+1. **Locally**: After installing TBsim and its dependencies
+2. **In Jupyter**: Open the .ipynb files in Jupyter Notebook or JupyterLab
 
 For the best experience, we recommend starting with the basic tutorials and progressing to more advanced topics as you become familiar with the framework.
