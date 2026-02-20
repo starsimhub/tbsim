@@ -176,5 +176,145 @@ class TB_R(sc.prettyobj):
 
 
 class TB_R_SS(ss.Module):
-    
+    """ Compartmental Starsim implementation of the LSHTM TB model (Euler integration) """
+
     def __init__(self, **kwargs):
+        super().__init__()
+        self.define_pars(
+            beta      = 9,       # Contact (per person/year) parameter
+            kappa     = 0.75,    # Relative infectiousness
+            infcle    = 1.83,    # Infected -> Cleared
+            infmin    = 0.21,    # Infected -> Minimal
+            minrec    = 0.16,    # Minimal -> Recovered
+            pi        = 0.21,    # Protection from reinfection
+            minsub    = 0.25,    # Minimal -> Subclinical
+            infsub    = 0.07,    # Infected -> Subclinical
+            submin    = 1.58,    # Subclinical -> Minimal
+            subcln    = 0.77,    # Subclinical -> Clinical
+            clnsub    = 0.53,    # Clinical -> Subclinical
+            mutb_ini  = 0.3,     # TB mortality (Initial)
+            mutb_fin  = 0.23,    # TB mortality (Final)
+            theta_ini = 0.44,    # Diagnosis (Initial)
+            theta_fin = 0.9,     # Diagnosis (Final)
+            phi_ini   = 0.69,    # Treatment failure (Initial)
+            phi_fin   = 0.09,    # Treatment failure (Final)
+            rho       = 3.25,    # Risk of reinfection
+            N         = 1e5,     # Population size
+            mu        = 1/70,    # Mortality rate
+            delta     = 2,       # Treatment duration (6 months)
+        )
+        self.update_pars(**kwargs)
+
+        # Compartments (scalars, not per-agent states)
+        self.SUS = 0
+        self.INF = 0
+        self.CLE = 0
+        self.REC = 0
+        self.MIN = 0
+        self.SUB = 0
+        self.CLN = 0
+        self.TXT = 0
+        self.TRE = 0
+        return
+
+    def force_mutb(self, t):
+        """ Forcing function for TB mortality (piecewise linear, constant extrapolation) """
+        p = self.pars
+        return np.interp(t, [1500, 1999, 2020], [p.mutb_ini, p.mutb_ini, p.mutb_fin])
+
+    def force_theta(self, t):
+        """ Forcing function for diagnosis rate """
+        p = self.pars
+        return np.interp(t, [1500, 1999, 2020], [p.theta_ini, p.theta_ini, p.theta_fin])
+
+    def force_phi(self, t):
+        """ Forcing function for treatment failure rate """
+        p = self.pars
+        return np.interp(t, [1500, 1999, 2020], [p.phi_ini, p.phi_ini, p.phi_fin])
+
+    def init_post(self):
+        """ Set initial conditions """
+        super().init_post()
+        p = self.pars
+        init_cln = 1e3
+        self.SUS = p.N - init_cln
+        self.CLN = init_cln
+        return
+
+    def step(self):
+        """ Euler integration of the ODE system """
+        p = self.pars
+        t = self.now
+        dt = float(self.dt)
+
+        # Time-varying parameters
+        mutb  = self.force_mutb(t)
+        theta = self.force_theta(t)
+        phi   = self.force_phi(t)
+        foi   = (p.beta / p.N) * (p.kappa * self.SUB + self.CLN)  # Force of infection
+
+        # Compute derivatives (matching R ODE)
+        dSUS = (p.mu * p.N) + (mutb * self.CLN) - foi * self.SUS - p.mu * self.SUS
+        dINF = foi * (self.SUS + self.CLE + p.pi * self.REC + p.rho * self.TRE) - p.infcle * self.INF - p.infmin * self.INF - p.infsub * self.INF - p.mu * self.INF
+        dCLE = p.infcle * self.INF - foi * self.CLE - p.mu * self.CLE
+        dREC = p.minrec * self.MIN - foi * (p.pi * self.REC) - p.mu * self.REC
+        dMIN = p.infmin * self.INF + p.submin * self.SUB - p.minrec * self.MIN - p.minsub * self.MIN - p.mu * self.MIN
+        dSUB = p.infsub * self.INF + p.minsub * self.MIN + p.clnsub * self.CLN - p.submin * self.SUB - p.subcln * self.SUB - p.mu * self.SUB
+        dCLN = p.subcln * self.SUB - p.clnsub * self.CLN - theta * self.CLN + phi * self.TXT - mutb * self.CLN - p.mu * self.CLN
+        dTXT = theta * self.CLN - phi * self.TXT - p.delta * self.TXT - p.mu * self.TXT
+        dTRE = p.delta * self.TXT - foi * (p.rho * self.TRE) - p.mu * self.TRE
+
+        # Euler update
+        self.SUS += dSUS * dt
+        self.INF += dINF * dt
+        self.CLE += dCLE * dt
+        self.REC += dREC * dt
+        self.MIN += dMIN * dt
+        self.SUB += dSUB * dt
+        self.CLN += dCLN * dt
+        self.TXT += dTXT * dt
+        self.TRE += dTRE * dt
+        return
+
+    def init_results(self):
+        """ Initialize results """
+        super().init_results()
+        self.define_results(
+            ss.Result('SUS', label='Susceptible'),
+            ss.Result('INF', label='Infected'),
+            ss.Result('CLE', label='Cleared'),
+            ss.Result('REC', label='Recovered'),
+            ss.Result('MIN', label='Minimal'),
+            ss.Result('SUB', label='Subclinical'),
+            ss.Result('CLN', label='Clinical'),
+            ss.Result('TXT', label='On treatment'),
+            ss.Result('TRE', label='Treated'),
+            ss.Result('TBc', label='TB prevalence'),
+            ss.Result('Mor', label='TB mortality'),
+            ss.Result('Dxs', label='TB notifications'),
+            ss.Result('Spr', label='Proportion subclinical', scale=False),
+        )
+        return
+
+    def update_results(self):
+        """ Store the current state """
+        super().update_results()
+        ti = self.ti
+        self.results['SUS'][ti] = self.SUS
+        self.results['INF'][ti] = self.INF
+        self.results['CLE'][ti] = self.CLE
+        self.results['REC'][ti] = self.REC
+        self.results['MIN'][ti] = self.MIN
+        self.results['SUB'][ti] = self.SUB
+        self.results['CLN'][ti] = self.CLN
+        self.results['TXT'][ti] = self.TXT
+        self.results['TRE'][ti] = self.TRE
+
+        # Derived quantities
+        tb_prev = self.SUB + self.CLN
+        self.results['TBc'][ti] = tb_prev
+        self.results['Mor'][ti] = self.force_mutb(self.now) * self.CLN
+        self.results['Dxs'][ti] = self.force_theta(self.now) * self.CLN
+        self.results['Spr'][ti] = self.SUB / tb_prev if tb_prev > 0 else 0
+        return
+  
