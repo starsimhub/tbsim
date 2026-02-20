@@ -119,12 +119,12 @@ Running multiple parameter combinations:
 Script Examples
 --------------
 
-The `scripts/` directory contains many ready-to-run examples:
+The ``tbsim_examples/`` directory contains ready-to-run examples:
 
-- **Basic TB**: `run_tb.py` - Simple TB simulation
-- **Interventions**: `run_tb_interventions.py` - TB with various interventions
-- **Comorbidities**: `run_tb_and_malnutrition.py` - TB and malnutrition
-- **HIV Integration**: `run_tbhiv_scens.py` - TB-HIV scenarios
-- **Calibration**: `tb_calibration_south_africa.py` - Parameter fitting
+- **Basic TB**: ``run_tb.py`` - Simple TB simulation
+- **LSHTM Model**: ``run_tb_lshtm.py`` - Spectrum of TB disease natural history
+- **Malnutrition**: ``run_malnutrition.py`` - TB and malnutrition comorbidity
+- **TB-HIV**: ``run_tbhiv.py`` - TB-HIV coinfection model
+- **Interventions**: ``run_tb_interventions.py`` - BCG, TPT, and beta scenarios
 
 For more detailed tutorials and step-by-step guides, see the :doc:`tutorials` section.

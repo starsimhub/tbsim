@@ -20,10 +20,7 @@ Analysis and Visualization
    :maxdepth: 2
 
    api/tbsim.analyzers
-   api/tbsim.utils
-   api/tbsim.utils.demographics
-   api/tbsim.utils.plots
-   api/tbsim.utils.probabilities
+   api/tbsim.plots
 
 Interventions
 -------------
@@ -60,11 +57,7 @@ Configuration and Support
 .. toctree::
    :maxdepth: 2
 
-   api/tbsim.config
-   api/tbsim.misc
-   api/tbsim.misc.tbterms
    api/tbsim.version
-   api/tbsim.wrappers
 
 Data and Utilities
 ------------------
@@ -92,16 +85,10 @@ Module Overview
 **Comorbidities** (`tbsim.comorbidities.*`)
    Modeling of HIV, malnutrition, and other co-occurring conditions with bidirectional interactions with TB dynamics.
 
-**Utilities** (`tbsim.utils.*`)
-   Helper functions for demographics, plotting, probability calculations, and data processing.
-
-**Configuration** (`tbsim.config`)
-   Parameter management, simulation configuration, and result directory creation utilities.
+**Plots** (`tbsim.plots`)
+   Plotting and visualization tools for simulation results.
 
 **Data** (`tbsim.data`)
-   Data extraction, processing utilities, and anthropometric reference data for malnutrition modeling.
-
-**Miscellaneous** (`tbsim.misc.*`)
-   TB terminology definitions, version information, and additional utility functions.
+   Anthropometric reference data for malnutrition modeling.
 
 For detailed information about each module, click on the links above or use the search functionality. All documentation is automatically generated from Python docstrings to ensure accuracy and completeness. 

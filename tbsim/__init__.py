@@ -8,9 +8,8 @@ from .comorbidities.hiv.hiv import *
 from .comorbidities.hiv.intervention import *
 from .comorbidities.hiv.tb_hiv_cnn import *
 from .comorbidities.malnutrition.tb_malnut_cnn import *
-from .utils.config import *
 from .interventions import *
 from .networks import *
 from .analyzers import *
-from .utils.plots import *
+from .plots import *
 from .people import TBPeople
