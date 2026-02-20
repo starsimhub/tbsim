@@ -1,57 +1,60 @@
-
 import tbsim as mtb
 import starsim as ss
 import matplotlib.pyplot as plt
-import sciris as sc
 import numpy as np
 
-import os, sys
-scripts_dir = os.path.join(os.getcwd(), '..', '..', 'scripts')
-sys.path.append(scripts_dir)
-import tbsim.utils.plots as pl
-
-# Create and run the sim
 sim = ss.Sim(
-    people=ss.People(n_agents=1000, extra_states=mtb.get_extrastates()),
+    people=ss.People(n_agents=1000),
     diseases=mtb.TB({'init_prev': ss.bernoulli(0.25)}),
-    interventions=[
-        # mtb.HealthSeekingBehavior(pars={'prob': ss.bernoulli(p=0.1)})  # For old code with probability
-        mtb.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.1)})  # For new code with initial care-seeking rate
-    ],
-    networks=ss.RandomNet({'n_contacts': ss.poisson(lam=2), 'dur': 0}),
-    pars=dict(start=ss.date(2000), stop=ss.date(2020), dt=ss.months(6)),
+    networks=ss.RandomNet(),
+    interventions=mtb.HealthSeekingBehavior(pars={
+        'initial_care_seeking_rate': ss.perday(0.05),
+        'single_use': False,
+    }),
+    pars=dict(start=ss.date(2000), stop=ss.date(2020), dt=ss.months(1)),
 )
 sim.run()
 
-# Flatten results into format expected by plot_results()
-flat_results = {'TB + HSB': sim.results.flatten()}
-
-# Plot all matching metrics (you can adjust keywords below)
-pl.plot_results(
-    flat_results,
-    keywords=['active', 'sought', 'eligible', 'incidence'],
-    exclude=(),
-    n_cols=2,
-    cmap='viridis',
-    dark=False,
-    heightfold=2,
-    style='default',
-    title='TB + Health-Seeking Behavior'
-)
-
-# Custom plot for new_sought_care + optional cumulative view
+tb  = sim.results['tb']
 hsb = sim.results['healthseekingbehavior']
-timevec = hsb['new_sought_care'].timevec
-new_sought = hsb['new_sought_care'].values
-cum_sought = np.cumsum(new_sought)
+t   = tb['n_active'].timevec
 
-plt.figure(figsize=(10, 5))
-plt.plot(timevec, new_sought, label='New sought care (this step)', linestyle='-', marker='o')
-plt.plot(timevec, cum_sought, label='Cumulative sought care', linestyle='--')
-plt.xlabel('Time')
-plt.ylabel('Number of People')
-plt.title('New and Cumulative Health-Seeking Behavior Over Time')
-plt.legend()
-plt.grid(True)
+# TB states
+fig, panels = plt.subplots(1, 2, figsize=(12, 4))
+
+for key in ['n_active_smpos', 'n_active_smneg', 'n_active_exptb']:
+    if key in tb:
+        panels[0].plot(t, tb[key].values, label=key.replace('n_active_', ''))
+panels[0].set_title('Active TB states')
+panels[0].set_ylabel('Count')
+panels[0].legend()
+
+panels[1].plot(t, tb['n_infectious'].values, label='Infectious')
+panels[1].set_title('Infectious')
+panels[1].set_ylabel('Count')
+panels[1].legend()
+
+plt.tight_layout()
+plt.show()
+
+# Health-seeking
+t_hsb      = hsb['n_sought_care'].timevec
+n_sought   = hsb['n_sought_care'].values
+new_sought = hsb['new_sought_care'].values
+n_eligible = hsb['n_eligible'].values
+
+fig, panels = plt.subplots(1, 2, figsize=(12, 4))
+
+panels[0].plot(t_hsb, n_sought, label='Cumulative sought care')
+panels[0].plot(t_hsb, new_sought, label='New per step', linestyle='--')
+panels[0].set_title('Health-seeking')
+panels[0].set_ylabel('People')
+panels[0].legend()
+
+panels[1].plot(t_hsb, n_eligible, label='Eligible (not yet sought)')
+panels[1].set_title('Eligible for care-seeking')
+panels[1].set_ylabel('People')
+panels[1].legend()
+
 plt.tight_layout()
 plt.show()
