@@ -47,9 +47,8 @@ Comorbidities
 .. toctree::
    :maxdepth: 2
 
-   api/tbsim.comorbidities
-   api/tbsim.comorbidities.hiv
-   api/tbsim.comorbidities.malnutrition
+   api/tbsim.hiv
+   api/tbsim.malnutrition
 
 Configuration and Support
 -------------------------
@@ -82,7 +81,7 @@ Module Overview
 **Interventions** (`tbsim.interventions.*`)
    Various intervention modules for TB control and prevention, including DOTS implementation, BCG vaccination, enhanced diagnostics, and treatment protocols.
 
-**Comorbidities** (`tbsim.comorbidities.*`)
+**Comorbidities** (`tbsim.comorbidities.hiv`, `tbsim.comorbidities.malnutrition`)
    Modeling of HIV, malnutrition, and other co-occurring conditions with bidirectional interactions with TB dynamics.
 
 **Plots** (`tbsim.plots`)
