@@ -126,6 +126,58 @@ def test_transition_returns_valid_states():
     assert np.all(ti_next >= tb.ti)
 
 
+def test_dt_independence_prevalence():
+    """
+    Verify Issue #162 for TB_LSHTM: dt size should not alter trajectory.
+
+    TB_LSHTM uses time-to-event (ti_next = ti + draw); Starsim's convert_timepars
+    ensures durations are in steps. dt=1 and dt=7 over the same period yield similar outcomes.
+    """
+    np.random.seed(123)
+    sim_dt1 = make_lshtm_sim(agents=500, start=ss.date("2000-01-01"), stop=ss.date("2010-01-01"), dt=ss.days(1))
+    sim_dt1.run()
+    res1 = sim_dt1.results[sim_dt1.diseases[0].name]
+
+    np.random.seed(123)
+    sim_dt7 = make_lshtm_sim(agents=500, start=ss.date("2000-01-01"), stop=ss.date("2010-01-01"), dt=ss.days(7))
+    sim_dt7.run()
+    res7 = sim_dt7.results[sim_dt7.diseases[0].name]
+
+    # Use cum_active (more robust than prevalence when epidemic is small)
+    c1 = res1["cum_active"][-1]
+    c7 = res7["cum_active"][-1]
+    ratio = c7 / c1 if c1 > 1 else 1.0
+    assert 0.2 <= ratio <= 5.0, (
+        f"dt-independence violated: dt=1 cum_active={c1}, dt=7 cum_active={c7}, ratio={ratio:.2f}."
+    )
+
+
+def test_dt_dependence_7d_vs_1month():
+    """
+    LSHTM relies on dt (via convert_timepars). Coarser dt → fewer steps and different trajectory.
+    Compare dt=7 days vs dt=1 month: step counts must differ; outcomes should still be plausible.
+    """
+    np.random.seed(42)
+    sim_7d = make_lshtm_sim(agents=500, start=ss.date("2000-01-01"), stop=ss.date("2010-01-01"), dt=ss.days(7))
+    sim_7d.run()
+    np.random.seed(42)
+    sim_1m = make_lshtm_sim(agents=500, start=ss.date("2000-01-01"), stop=ss.date("2010-01-01"), dt=ss.months(1))
+    sim_1m.run()
+
+    n_7d = sim_7d.t.npts
+    n_1m = sim_1m.t.npts
+    assert n_1m < n_7d, f"Coarser dt (1 month) must have fewer steps: got n_7d={n_7d}, n_1m={n_1m}"
+
+    res_7d = sim_7d.results[sim_7d.diseases[0].name]
+    res_1m = sim_1m.results[sim_1m.diseases[0].name]
+    c_7d = res_7d["cum_active"][-1]
+    c_1m = res_1m["cum_active"][-1]
+    ratio = c_1m / c_7d if c_7d > 1 else 1.0
+    assert 0.15 <= ratio <= 7.0, (
+        f"dt=7d vs 1 month: cum_active 7d={c_7d}, 1m={c_1m}, ratio={ratio:.2f}; should be in plausible range."
+    )
+
+
 # --- set_prognoses ---
 
 def test_set_prognoses_sets_state_and_susceptible():
