@@ -10,20 +10,8 @@ Prerequisites
 - pip package manager
 - Git (for development installation)
 
-Option 1: Online Environment (Recommended for Beginners)
--------------------------------------------------------
-
-The easiest way to get started is to use the online Binder environment:
-
-1. Click the Binder badge in the main README
-2. Wait for the environment to build (2-3 minutes)
-3. Navigate to the tutorials directory
-4. Open any tutorial notebook and start exploring
-
-This option requires no local setup and provides a fully configured environment.
-
-Option 2: Local Installation
-----------------------------
+Local Installation
+------------------
 
 Clone and install TBsim locally:
 
@@ -33,8 +21,8 @@ Clone and install TBsim locally:
    cd tbsim
    pip install -e .
 
-Option 3: Development Installation
----------------------------------
+Development Installation
+------------------------
 
 For developers who want to work with the latest features:
 

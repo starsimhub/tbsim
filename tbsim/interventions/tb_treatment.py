@@ -437,7 +437,6 @@ def create_first_line_treatment(pars=None, **kwargs) -> EnhancedTBTreatment:
 
 
 if __name__ == '__main__':
-    # run scripts/interventions/run_tb_treatment.py 
-    import scripts.interventions.run_tb_treatment as run_tb_treatment
+    pass
     
     run_tb_treatment.run()

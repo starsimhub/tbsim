@@ -4,7 +4,7 @@ import numpy as np
 from unittest import mock
 import matplotlib
 import sys
-from tbsim.utils import plots
+from tbsim import plots
 import tempfile
 import os
 import shutil
@@ -37,8 +37,8 @@ def flat_results():
         }
     }
     
-@mock.patch('tbsim.utils.plots.sc')
-@mock.patch('tbsim.utils.plots.plt.show')
+@mock.patch('tbsim.plots.sc')
+@mock.patch('tbsim.plots.plt.show')
 def test_plot_results_creates_valid_png(mock_show, mock_sc, tmp_path, flat_results):
     # This test checks that the saved file is a valid PNG image
     import PIL.Image
@@ -59,8 +59,8 @@ def test_plot_results_creates_valid_png(mock_show, mock_sc, tmp_path, flat_resul
         assert img.format == "PNG"
     assert mock_show.called
             
-@mock.patch('tbsim.utils.plots.sc')
-@mock.patch('tbsim.utils.plots.plt.show')
+@mock.patch('tbsim.plots.sc')
+@mock.patch('tbsim.plots.plt.show')
 def test_plot_results_custom_outdir(mock_show, mock_sc, flat_results, tmp_path):
     mock_sc.now.return_value = '20240101_120000'
     mock_sc.thisdir.return_value = str(tmp_path)
@@ -75,8 +75,8 @@ def test_plot_results_custom_outdir(mock_show, mock_sc, flat_results, tmp_path):
     assert files[0].is_file()
     assert mock_show.called
 
-@mock.patch('tbsim.utils.plots.sc')
-@mock.patch('tbsim.utils.plots.plt.show')
+@mock.patch('tbsim.plots.sc')
+@mock.patch('tbsim.plots.plt.show')
 def test_plot_results_savefig_false(mock_show, mock_sc, flat_results, tmp_path):
     mock_sc.now.return_value = '20240101_120000'
     mock_sc.thisdir.return_value = str(tmp_path)
@@ -86,24 +86,24 @@ def test_plot_results_savefig_false(mock_show, mock_sc, flat_results, tmp_path):
     assert not outdir.exists()
     assert mock_show.called
 
-@mock.patch('tbsim.utils.plots.sc')
-@mock.patch('tbsim.utils.plots.plt.show')
+@mock.patch('tbsim.plots.sc')
+@mock.patch('tbsim.plots.plt.show')
 def test_plot_results_dark_theme(mock_show, mock_sc, flat_results, tmp_path):
     mock_sc.now.return_value = '20240101_120000'
     mock_sc.thisdir.return_value = str(tmp_path)
     plots.plot_results(flat_results, dark=True, savefig=False)
     assert mock_show.called
 
-@mock.patch('tbsim.utils.plots.sc')
-@mock.patch('tbsim.utils.plots.plt.show')
+@mock.patch('tbsim.plots.sc')
+@mock.patch('tbsim.plots.plt.show')
 def test_plot_results_light_theme(mock_show, mock_sc, flat_results, tmp_path):
     mock_sc.now.return_value = '20240101_120000'
     mock_sc.thisdir.return_value = str(tmp_path)
     plots.plot_results(flat_results, dark=False, savefig=False)
     assert mock_show.called
 
-@mock.patch('tbsim.utils.plots.sc')
-@mock.patch('tbsim.utils.plots.plt.show')
+@mock.patch('tbsim.plots.sc')
+@mock.patch('tbsim.plots.plt.show')
 def test_plot_results_multiple_metrics_and_scenarios(mock_show, mock_sc, flat_results, tmp_path):
     mock_sc.now.return_value = '20240101_120000'
     mock_sc.thisdir.return_value = str(tmp_path)
@@ -111,8 +111,8 @@ def test_plot_results_multiple_metrics_and_scenarios(mock_show, mock_sc, flat_re
     plots.plot_results(flat_results, n_cols=2, savefig=False)
     assert mock_show.called
     
-@mock.patch('tbsim.utils.plots.sc')
-@mock.patch('tbsim.utils.plots.plt.show')
+@mock.patch('tbsim.plots.sc')
+@mock.patch('tbsim.plots.plt.show')
 def test_plot_results_keywords_and_exclude(mock_show, mock_sc, flat_results):
     mock_sc.now.return_value = '20240101_120000'
     mock_sc.thisdir.return_value = '.'
@@ -120,8 +120,8 @@ def test_plot_results_keywords_and_exclude(mock_show, mock_sc, flat_results):
     plots.plot_results(flat_results, keywords=['incidence'], n_cols=1)
     assert mock_show.called
  
-@mock.patch('tbsim.utils.plots.sc')
-@mock.patch('tbsim.utils.plots.plt.show')
+@mock.patch('tbsim.plots.sc')
+@mock.patch('tbsim.plots.plt.show')
  
 def test_plot_results_no_metrics(mock_show, mock_sc, flat_results, capsys):
     mock_sc.now.return_value = '20240101_120000'
@@ -131,8 +131,8 @@ def test_plot_results_no_metrics(mock_show, mock_sc, flat_results, capsys):
     captured = capsys.readouterr()
     assert "No metrics to plot." in captured.out
  
-@mock.patch('tbsim.utils.plots.sc')
-@mock.patch('tbsim.utils.plots.plt.show')
+@mock.patch('tbsim.plots.sc')
+@mock.patch('tbsim.plots.plt.show')
 def test_plot_results_style_fallback(mock_show, mock_sc, flat_results, capsys):
     mock_sc.now.return_value = '20240101_120000'
     mock_sc.thisdir.return_value = '.'
@@ -141,11 +141,11 @@ def test_plot_results_style_fallback(mock_show, mock_sc, flat_results, capsys):
     captured = capsys.readouterr()
     assert "Warning: nonexistent_style style not found" in captured.out
  
-# @mock.patch('tbsim.utils.plots.sc')
-# @mock.patch('tbsim.utils.plots.plt.show')
+# @mock.patch('tbsim.plots.sc')
+# @mock.patch('tbsim.plots.plt.show')
 # def test_plot_results_handles_empty(flat_results, mock_show, mock_sc, capsys):
-@mock.patch('tbsim.utils.plots.plt.show')
-@mock.patch('tbsim.utils.plots.sc')
+@mock.patch('tbsim.plots.plt.show')
+@mock.patch('tbsim.plots.sc')
 def test_plot_results_handles_empty(mock_sc, mock_show, flat_results, capsys):
     mock_sc.now.return_value = '20240101_120000'
     mock_sc.thisdir.return_value = '.'

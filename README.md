@@ -37,15 +37,15 @@ TBsim is not yet released on PyPI, so you need to install from source:
 
 ### Running a sample simulation
 
-1. Navigate to the folder `scripts/basic`
+1. Navigate to the folder `tbsim_examples`
 2. Run the script:
    ```bash
-   python run_tb_lshtm.py
+   python run_tb.py
    ```
 3. Running this script should result in basic charts being displayed.
 
-## Usage 
-- Usage examples are available in the **[scripts](https://github.com/starsimhub/tbsim/tree/main/scripts)** folder.
+## Usage
+- Usage examples are available in the **[tbsim_examples](https://github.com/starsimhub/tbsim/tree/main/tbsim_examples)** folder.
 
 ## Documentation
 _TBsim_ is based on Starsim, please refer to [Starsim documentation](https://docs.idmod.org/projects/starsim/en/latest/) for additional information.
