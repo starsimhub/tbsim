@@ -1,12 +1,14 @@
 """
-BCG vaccination: Product + Intervention following the Starsim Vx pattern.
+BCG vaccination: Product + Delivery following the Starsim Vx pattern.
 
 ``BCGVx``      — vaccine product  (biological effect, per-agent state)
-``BCGRoutine`` — delivery intervention (eligibility, coverage, scheduling)
+``BCGRoutine`` — delivery intervention (thin wrapper over TBProductRoutine)
 """
 
 import numpy as np
 import starsim as ss
+
+from .interventions import TBProductRoutine
 
 __all__ = ['BCGVx', 'BCGRoutine']
 
@@ -82,8 +84,8 @@ class BCGVx(ss.Vx):
 
         return responders
 
-    def expire_protection(self):
-        """Remove protection for agents past their expiry time."""
+    def update_roster(self):
+        """Expire protection for agents past their expiry time."""
         protected_uids = self.bcg_protected.uids
         if len(protected_uids) > 0:
             expired = protected_uids[self.ti > self.ti_bcg_protection_expires[protected_uids]]
@@ -103,96 +105,33 @@ class BCGVx(ss.Vx):
 # Delivery intervention
 # ---------------------------------------------------------------------------
 
-class BCGRoutine(ss.Intervention):
+class BCGRoutine(TBProductRoutine):
     """
     Routine BCG vaccination delivery.
 
-    Handles age-based eligibility, one-time-offer semantics, coverage
-    filtering, and orchestrates per-step product operations (expiry,
-    new vaccination, modifier re-application).
+    Thin wrapper over :class:`TBProductRoutine` with pediatric defaults
+    (age 0–5, 50 % coverage).  Creates a :class:`BCGVx` product
+    automatically if none is provided.
 
     Parameters
     ----------
     product : BCGVx
         The BCG vaccine product (created automatically if not provided).
-    coverage : ss.bernoulli
-        Fraction of eligible individuals vaccinated (applied once per person).
-    start / stop : ss.date
-        Campaign window.
-    age_range : list
-        ``[min_age, max_age]`` for eligibility.
+    pars : dict
+        Overrides for delivery parameters (``coverage``, ``age_range``,
+        ``start``, ``stop``).
     """
 
     def __init__(self, product=None, pars=None, **kwargs):
-        super().__init__(**kwargs)
-
-        self.define_pars(
-            start=ss.date('1900-01-01'),
-            stop=ss.date('2100-12-31'),
-            coverage=ss.bernoulli(p=0.5),
-            age_range=[0, 5],
+        super().__init__(
+            product=product if product is not None else BCGVx(),
+            pars=pars,
+            **kwargs,
         )
-        self.update_pars(pars)
-        self.min_age = self.pars.age_range[0]
-        self.max_age = self.pars.age_range[1]
-
-        self.product = product if product is not None else BCGVx()
-
-        self.define_states(
-            ss.BoolArr('bcg_offered', default=False),
-            ss.BoolArr('bcg_vaccinated', default=False),
-            ss.FloatArr('ti_bcg_vaccinated'),
-        )
-
-    def check_eligibility(self):
-        """Select eligible individuals (coverage applied once per person)."""
-        newly_eligible = (
-            (self.sim.people.age >= self.min_age) &
-            (self.sim.people.age <= self.max_age) &
-            ~self.bcg_vaccinated &
-            ~self.bcg_offered
-        ).uids
-        self.bcg_offered[newly_eligible] = True
-        selected = self.pars.coverage.filter(newly_eligible)
-        return selected
-
-    def step(self):
-        """
-        Two-phase BCG step:
-
-        Phase A — Update vaccination roster (expire old, add new).
-        Phase B — Apply stored rr modifiers for all ``bcg_protected``.
-        """
-        now = self.sim.now
-        now_date = now.date() if hasattr(now, 'date') else now
-        if now_date < self.pars.start.date() or now_date > self.pars.stop.date():
-            return
-
-        # --- Phase A: Update vaccination roster ---
-
-        # 1. Expire protection
-        self.product.expire_protection()
-
-        # 2. New vaccinations
-        eligible = self.check_eligibility()
-        if len(eligible) > 0:
-            self.bcg_vaccinated[eligible] = True
-            self.ti_bcg_vaccinated[eligible] = self.ti
-            self.product.administer(self.sim.people, eligible)
-
-        # --- Phase B: Apply rr modifiers for all currently protected ---
-        self.product.apply_protection()
-
-    def init_results(self):
-        super().init_results()
-        if hasattr(self, 'results') and 'n_newly_vaccinated' in self.results:
-            return
-        self.define_results(
-            ss.Result('n_newly_vaccinated', dtype=int),
-            ss.Result('n_protected', dtype=int),
-        )
+        # BCG-specific defaults (age 0-5)
+        if pars is None or 'age_range' not in (pars or {}):
+            self.pars.age_range = [0, 5]
 
     def update_results(self):
-        newly_vaccinated = np.sum((self.ti_bcg_vaccinated == self.ti) & self.bcg_vaccinated)
-        self.results['n_newly_vaccinated'][self.ti] = newly_vaccinated
+        super().update_results()
         self.results['n_protected'][self.ti] = np.count_nonzero(self.product.bcg_protected)
