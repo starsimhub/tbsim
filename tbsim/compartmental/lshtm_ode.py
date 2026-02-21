@@ -1,9 +1,9 @@
 """
 Define compartmental TB models
 
-TB_ODE is an exact translation of the R model (lshtm_ode.R) into Python.
+TB_ODE is a literal translation of the R model (lshtm_ode.R) into Python, with exact integration.
 
-TB_ODE_SS is a Starsim implementation of the TB_ODE model.
+TB_SS is a Starsim implementation of the TB_ODE model, with Euler integration.
 """
 
 import numpy as np
@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 
 __all__ = ['default_pars', 'TB_ODE', 'TB_SS']
+
 
 # Default parameters
 default_pars = sc.objdict(
@@ -163,13 +164,13 @@ class TB_SS(ss.Module):
 
         # Compartment labels
         self.c_labels = sc.objdict(
-            SUS='Susceptible', 
-            INF='Infected', 
-            CLE='Cleared', 
+            SUS='Susceptible',
+            INF='Infected',
+            CLE='Cleared',
             REC='Recovered',
-            MIN='Minimal', 
-            SUB='Subclinical', 
-            CLN='Clinical', 
+            MIN='Minimal',
+            SUB='Subclinical',
+            CLN='Clinical',
             TXT='On treatment',
             TRE='Treated',
         )
@@ -246,7 +247,7 @@ class TB_SS(ss.Module):
             ss.Result('TBc', label='TB prevalence'),
             ss.Result('Mor', label='TB mortality'),
             ss.Result('Dxs', label='TB notifications'),
-            ss.Result('Spr', label='Proportion subclinical', scale=False), 
+            ss.Result('Spr', label='Proportion subclinical', scale=False),
         )
         return
 
