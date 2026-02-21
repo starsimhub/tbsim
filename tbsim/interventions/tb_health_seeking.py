@@ -21,6 +21,7 @@ class HealthSeekingBehavior(ss.Intervention):
 
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
+        
         self.define_pars(
             initial_care_seeking_rate = ss.perday(0.1),
             care_retry_steps          = None,   # the number of timesteps after which an agent can seek care again (e.g. 1 month)
@@ -35,6 +36,7 @@ class HealthSeekingBehavior(ss.Intervention):
             ss.IntArr('n_care_sought_total', default=0),    # lifetime count; never resets
             ss.FloatArr('ti_last_sought',    default=-np.inf),
         )
+        self.care_seeking_dist = ss.bernoulli(p=0)  # Placeholder; auto-initialized by the framework
 
     def init_post(self):
         super().init_post()
@@ -77,9 +79,8 @@ class HealthSeekingBehavior(ss.Intervention):
             return
 
         rate = self.pars.initial_care_seeking_rate
-        dist = ss.bernoulli(p=rate.to_prob())
-        dist.init(trace=self.name or 'HealthSeekingBehavior.care_seeking', sim=sim, module=self)
-        seeking_uids = dist.filter(ss.uids(not_yet_sought))
+        self.care_seeking_dist.set(p=rate.to_prob())
+        seeking_uids = self.care_seeking_dist.filter(ss.uids(not_yet_sought))
 
         if len(seeking_uids) == 0:
             return
