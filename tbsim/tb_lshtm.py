@@ -71,13 +71,15 @@ class ScaledRate:
 
 
 def make_scaled_rate(base_rate, rr_callable):
-    return ScaledRate(base_rate, rr_callable)
+    # return ScaledRate(base_rate, rr_callable)
+    print('Warning, ignoring rr_callable')
+    return base_rate
 
 
 class TB_LSHTM(ss.Infection):
     """
-    Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al. 2025). 
-    States in :class:`TBSL` span the spectrum from susceptibility to active disease and treatment.  
+    Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al. 2025).
+    States in :class:`TBSL` span the spectrum from susceptibility to active disease and treatment.
     Infectious states are :class:`TBSL.ASYMPTOMATIC` and :class:`TBSL.SYMPTOMATIC`; the force
     of infection depends on :attr:`pars.beta` and the prevalence of those states, with
     :attr:`pars.trans_asymp` (κ kappa) giving the relative infectiousness of asymptomatic vs symptomatic TB.
@@ -89,21 +91,21 @@ class TB_LSHTM(ss.Infection):
     -----------------
     *Transmission and reinfection*
 
-    - ``init_prev``:   Initial seed infections (prevalence). 
-    - ``beta``:        Transmission rate per year. 
-    - ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (κ kappa) 
-    - ``rr_rec``:      Relative risk of reinfection for RECOVERED.  (π pi) 
-    - ``rr_treat``:    Relative risk of reinfection for TREATED. (ρ rho) 
+    - ``init_prev``:   Initial seed infections (prevalence).
+    - ``beta``:        Transmission rate per year.
+    - ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (κ kappa)
+    - ``rr_rec``:      Relative risk of reinfection for RECOVERED.  (π pi)
+    - ``rr_treat``:    Relative risk of reinfection for TREATED. (ρ rho)
 
     *From INFECTION (latent)*
 
-    - ``inf_cle``:     Infection → Cleared (no active TB). 
-    - ``inf_non``:     Infection → Non-infectious TB. 
-    - ``inf_asy``:     Infection → Asymptomatic TB. 
+    - ``inf_cle``:     Infection → Cleared (no active TB).
+    - ``inf_non``:     Infection → Non-infectious TB.
+    - ``inf_asy``:     Infection → Asymptomatic TB.
 
     *From NON_INFECTIOUS*
 
-    - ``non_rec``:    Non-infectious → Recovered. 
+    - ``non_rec``:    Non-infectious → Recovered.
     - ``non_asy``:    Non-infectious → Asymptomatic.
 
     *From ASYMPTOMATIC*
@@ -113,18 +115,18 @@ class TB_LSHTM(ss.Infection):
 
     *From SYMPTOMATIC*
 
-    - ``sym_asy``:     Symptomatic → Asymptomatic. 
+    - ``sym_asy``:     Symptomatic → Asymptomatic.
     - ``sym_treat``:   Symptomatic → Treatment. (θ theta)
     - ``sym_dead``:    Symptomatic → Dead (TB-specific mortality, μ_TB).
 
     *From TREATMENT*
 
-    - ``fail_rate``:     Treatment → Symptomatic (failure). (φ phi) 
-    - ``complete_rate``: Treatment → Treated (completion).  (δ delta) 
+    - ``fail_rate``:     Treatment → Symptomatic (failure). (φ phi)
+    - ``complete_rate``: Treatment → Treated (completion).  (δ delta)
 
     *Background (general mortality is handled by* ``ss.Deaths`` *demographics, not this module)*
 
-    - ``cxr_asymp_sens``:   CXR sensitivity for screening asymptomatic (0–1). 
+    - ``cxr_asymp_sens``:   CXR sensitivity for screening asymptomatic (0–1).
 
     Agent states (array-like, one per agent)
     ---------------------------------------
@@ -268,51 +270,72 @@ class TB_LSHTM(ss.Infection):
 
         return
 
+    # def transition(self, uids, to):
+    #     """
+    #     Sample competing exponential transitions and return next state and time.
+
+    #     For each agent in `uids`, draws one exponential waiting time per
+    #     destination in `to`; the destination with the minimum time is chosen
+    #     (competing risks). So each agent has exactly one next state and one
+    #     transition time.
+
+    #     Parameters
+    #     ----------
+    #     uids : array-like
+    #         Agent indices to transition.
+    #     to : dict
+    #         Mapping from TBSL state -> rate-like. Keys are possible next states;
+    #         values provide waiting times per agent via the object returned by :func:`make_scaled_rate` (``.sample_waiting_times(uids)``)
+    #         or (Starsim dists) ``.rvs(uids)``.
+
+    #     Returns
+    #     -------
+    #     state_next : np.ndarray
+    #         Next state for each agent (one of the keys of `to`).
+    #     ti_next : np.ndarray
+    #         Simulated time of transition for each agent.
+
+    #     Notes
+    #     -----
+    #     Competing risks: if an agent can go to A (rate λ_A) or B (rate λ_B):
+
+    #     - Sample T_A ~ Exp(λ_A) and T_B ~ Exp(λ_B)
+    #     - Agent goes to the state whose time is smallest
+    #     - Equivalent to the usual competing-exponential formulation
+    #     """
+    #     if len(uids) == 0:
+    #         return np.array([]), np.array([])
+
+    #     ti = self.ti
+    #     # One row per possible destination; column j = transition time for uids[j]
+    #     ti_state = np.zeros((len(to), len(uids)))
+    #     for idx, rate in enumerate(to.values()):
+    #         draw = rate.sample_waiting_times(uids) if isinstance(rate, ScaledRate) else rate.rvs(uids)
+    #         ti_state[idx, :] = ti + draw
+
+    #     # Soonest transition wins (index into keys gives next state)
+    #     state_next_idx = ti_state.argmin(axis=0)
+    #     state_next = np.array(list(to.keys()))[state_next_idx]
+    #     ti_next = ti_state.min(axis=0)
+
+    #     return state_next, ti_next
+
     def transition(self, uids, to):
-        """
-        Sample competing exponential transitions and return next state and time.
-
-        For each agent in `uids`, draws one exponential waiting time per
-        destination in `to`; the destination with the minimum time is chosen
-        (competing risks). So each agent has exactly one next state and one
-        transition time.
-
-        Parameters
-        ----------
-        uids : array-like
-            Agent indices to transition.
-        to : dict
-            Mapping from TBSL state -> rate-like. Keys are possible next states;
-            values provide waiting times per agent via the object returned by :func:`make_scaled_rate` (``.sample_waiting_times(uids)``)
-            or (Starsim dists) ``.rvs(uids)``.
-
-        Returns
-        -------
-        state_next : np.ndarray
-            Next state for each agent (one of the keys of `to`).
-        ti_next : np.ndarray
-            Simulated time of transition for each agent.
-
-        Notes
-        -----
-        Competing risks: if an agent can go to A (rate λ_A) or B (rate λ_B):
-
-        - Sample T_A ~ Exp(λ_A) and T_B ~ Exp(λ_B)
-        - Agent goes to the state whose time is smallest
-        - Equivalent to the usual competing-exponential formulation
-        """
+        """ Transition between states """
         if len(uids) == 0:
             return np.array([]), np.array([])
 
+        state_next = np.full(len(uids), fill_value=TBSL.SUSCEPTIBLE)
+        ti_next = np.full(len(uids), fill_value=np.inf)
         ti = self.ti
-        # One row per possible destination; column j = transition time for uids[j]
+
+        # TODO: Consider SSA algorithm
         ti_state = np.zeros((len(to), len(uids)))
         for idx, rate in enumerate(to.values()):
-            draw = rate.sample_waiting_times(uids) if isinstance(rate, ScaledRate) else rate.rvs(uids)
-            ti_state[idx, :] = ti + draw
+            ti_state[idx,:] = ti + rate.rvs(uids)
 
-        # Soonest transition wins (index into keys gives next state)
         state_next_idx = ti_state.argmin(axis=0)
+
         state_next = np.array(list(to.keys()))[state_next_idx]
         ti_next = ti_state.min(axis=0)
 
@@ -521,8 +544,8 @@ class TB_LSHTM(ss.Infection):
             ss.Result('cum_deaths_15+',    dtype=int, label='Cumulative Deaths, 15+'),
             ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
             ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
-            ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
-            ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'), 
+            ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'),
+            ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'),
 
             ss.Result('n_detectable_15+', dtype=float, scale=False, label='Symptomatic plus cxr_asymp_sens * Asymptomatic (15+)'),
         )
