@@ -5,35 +5,30 @@ Assertions are written against the actual implementation in tbsim/tb_lshtm.py;
 no behavior is assumed beyond what is defined there.
 """
 
-import pytest
 import numpy as np
+import sciris as sc
 import starsim as ss
 import tbsim as mtb
-from tbsim import TB_LSHTM, TB_LSHTM_Acute, TBSL
-from tbsim.tb_lshtm import make_scaled_rate
+from tbsim import TBSL # Used a lot so import separately
+from tbsim.tb_lshtm import make_scaled_rate # Ditto
 
 
 def make_lshtm_sim(
-    agents=100,
+    n_agents=100,
     start=ss.date("2000-01-01"),
     stop=ss.date("2010-12-31"),
     dt=ss.days(7),
     use_acute=False,
-    pars=None,
+    pars=None, # TB parameters
+    **kwargs # Sim parameters
 ):
     """Build a minimal Sim with TB_LSHTM or TB_LSHTM_Acute."""
-    pop = ss.People(n_agents=agents)
     if use_acute:
         tb = mtb.TB_LSHTM_Acute(pars=pars)
     else:
         tb = mtb.TB_LSHTM(pars=pars)
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
-    sim = ss.Sim(
-        people=pop,
-        networks=net,
-        diseases=tb,
-        pars=dict(dt=dt, start=start, stop=stop),
-    )
+    sim = ss.Sim(n_agents=n_agents, networks=net, diseases=tb, dt=dt, start=start, stop=stop, **kwargs)
     sim.pars.verbose = 0
     return sim
 
@@ -270,7 +265,7 @@ def test_sim_run_tb_lshtm_acute():
     )
     sim.run()
     tb = sim.diseases[0]
-    assert isinstance(tb, TB_LSHTM_Acute)
+    assert isinstance(tb, mtb.TB_LSHTM_Acute)
     assert "n_infectious" in tb.results
     assert "prevalence_active" in tb.results
 
@@ -552,3 +547,29 @@ def test_on_treatment_consistent_with_state():
         (tb.state == TBSL.TREATMENT),
         err_msg="on_treatment should equal (state == TREATMENT)",
     )
+
+def test_dt_change(do_plot=False):
+    """ Check how changing dt affects the results """
+    kw = dict(
+        n_agents=10_000,
+        start=ss.date("2000-01-01"),
+        stop=ss.date("2002-01-01"),
+        pars=dict( # TB parameters
+            init_prev=0.5, # Much higher to get better statistics
+        ),
+    )
+    sims = sc.objdict()
+    sims.d1 = make_lshtm_sim(**kw, dt=ss.days(1), label='dt=day')
+    sims.d2 = make_lshtm_sim(**kw, dt=ss.days(2), label='dt=2 days')
+    sims.d7 = make_lshtm_sim(**kw, dt=ss.days(7), label='dt=week')
+    sims.d30 = make_lshtm_sim(**kw, dt='month', label='dt=month')
+
+    msim = ss.MultiSim(sims=sims.values())
+    msim.run()
+    if do_plot:
+        msim.plot()
+    return msim
+
+
+if __name__ == '__main__':
+    msim = test_dt_change(do_plot=True)
