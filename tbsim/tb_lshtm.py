@@ -40,46 +40,11 @@ class TBSL(IntEnum):
 
 
 
-class ScaledRate:
-    """A rate distribution scaled per-agent by a risk-ratio callable."""
-
-    def __init__(self, base_rate, rr_callable):
-        self._base_rate = base_rate
-        self._rr_callable = rr_callable
-
-    @staticmethod
-    def _get_rate_from_base(base_rate):
-        try:
-            dist = base_rate.dist
-            scale = dist.kwds.get('scale') or dist.args[0]
-            return 1.0 / scale
-        except Exception as e:
-            raise ValueError(f'Cannot extract rate from base_rate: {base_rate!r}') from e
-
-    def sample_waiting_times(self, uids):
-        # Per-agent rate ratio from callable (e.g. rr_activation[uids]); rr_i=0 => never transition
-        rr = np.asarray(self._rr_callable(uids), dtype=float)
-        # Base rate = 1/scale from expon; effective_rate_i = base * rr_i
-        base_rate_val = self._get_rate_from_base(self._base_rate)
-        effective_rate = base_rate_val * rr
-        # Inverse-transform: u ~ U(0,1) => T = -log(u)/λ ~ Exp(λ)
-        u = self._base_rate.rand(len(uids))
-        # rr=0 => div by 0; set t=inf (never transition), suppress warnings
-        with np.errstate(divide='ignore', invalid='ignore'):
-            t = np.where(rr > 0, -np.log(u) / effective_rate, np.inf)
-        return t
-
-
-def make_scaled_rate(base_rate, rr_callable):
-    # return ScaledRate(base_rate, rr_callable)
-    print('Warning, ignoring rr_callable')
-    return base_rate
-
 
 class TB_LSHTM(ss.Infection):
     """
-    Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al. 2025).
-    States in :class:`TBSL` span the spectrum from susceptibility to active disease and treatment.
+    Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al. 2025). 
+    States in :class:`TBSL` span the spectrum from susceptibility to active disease and treatment.  
     Infectious states are :class:`TBSL.ASYMPTOMATIC` and :class:`TBSL.SYMPTOMATIC`; the force
     of infection depends on :attr:`pars.beta` and the prevalence of those states, with
     :attr:`pars.trans_asymp` (κ kappa) giving the relative infectiousness of asymptomatic vs symptomatic TB.
@@ -91,21 +56,21 @@ class TB_LSHTM(ss.Infection):
     -----------------
     *Transmission and reinfection*
 
-    - ``init_prev``:   Initial seed infections (prevalence).
-    - ``beta``:        Transmission rate per year.
-    - ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (κ kappa)
-    - ``rr_rec``:      Relative risk of reinfection for RECOVERED.  (π pi)
-    - ``rr_treat``:    Relative risk of reinfection for TREATED. (ρ rho)
+    - ``init_prev``:   Initial seed infections (prevalence). 
+    - ``beta``:        Transmission rate per year. 
+    - ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (κ kappa) 
+    - ``rr_rec``:      Relative risk of reinfection for RECOVERED.  (π pi) 
+    - ``rr_treat``:    Relative risk of reinfection for TREATED. (ρ rho) 
 
     *From INFECTION (latent)*
 
-    - ``inf_cle``:     Infection → Cleared (no active TB).
-    - ``inf_non``:     Infection → Non-infectious TB.
-    - ``inf_asy``:     Infection → Asymptomatic TB.
+    - ``inf_cle``:     Infection → Cleared (no active TB). 
+    - ``inf_non``:     Infection → Non-infectious TB. 
+    - ``inf_asy``:     Infection → Asymptomatic TB. 
 
     *From NON_INFECTIOUS*
 
-    - ``non_rec``:    Non-infectious → Recovered.
+    - ``non_rec``:    Non-infectious → Recovered. 
     - ``non_asy``:    Non-infectious → Asymptomatic.
 
     *From ASYMPTOMATIC*
@@ -115,18 +80,18 @@ class TB_LSHTM(ss.Infection):
 
     *From SYMPTOMATIC*
 
-    - ``sym_asy``:     Symptomatic → Asymptomatic.
+    - ``sym_asy``:     Symptomatic → Asymptomatic. 
     - ``sym_treat``:   Symptomatic → Treatment. (θ theta)
     - ``sym_dead``:    Symptomatic → Dead (TB-specific mortality, μ_TB).
 
     *From TREATMENT*
 
-    - ``fail_rate``:     Treatment → Symptomatic (failure). (φ phi)
-    - ``complete_rate``: Treatment → Treated (completion).  (δ delta)
+    - ``fail_rate``:     Treatment → Symptomatic (failure). (φ phi) 
+    - ``complete_rate``: Treatment → Treated (completion).  (δ delta) 
 
     *Background (general mortality is handled by* ``ss.Deaths`` *demographics, not this module)*
 
-    - ``cxr_asymp_sens``:   CXR sensitivity for screening asymptomatic (0–1).
+    - ``cxr_asymp_sens``:   CXR sensitivity for screening asymptomatic (0–1). 
 
     Agent states (array-like, one per agent)
     ---------------------------------------
@@ -175,22 +140,22 @@ class TB_LSHTM(ss.Infection):
             rr_rec=0.21,                        # π pi: RR reinfection after recovery
             rr_treat=3.15,                      # ρ rho: RR reinfection after treatment
             # --- From INFECTION (latent) ---
-            inf_cle=ss.years(ss.expon(1/1.90)),  # Clear infection (no active TB)
-            inf_non=ss.years(ss.expon(1/0.16)),  # Progress to non-infectious TB
-            inf_asy=ss.years(ss.expon(1/0.06)),  # Progress to asymptomatic active TB
+            inf_cle=ss.peryear(1.90),            # Clear infection (no active TB)
+            inf_non=ss.peryear(0.16),            # Progress to non-infectious TB
+            inf_asy=ss.peryear(0.06),            # Progress to asymptomatic active TB
             # --- From NON_INFECTIOUS ---
-            non_rec=ss.years(ss.expon(1/0.18)),  # Recover (→ RECOVERED)
-            non_asy=ss.years(ss.expon(1/0.25)),  # Progress to asymptomatic
+            non_rec=ss.peryear(0.18),            # Recover (→ RECOVERED)
+            non_asy=ss.peryear(0.25),            # Progress to asymptomatic
             # --- From ASYMPTOMATIC ---
-            asy_non=ss.years(ss.expon(1/1.66)),  # Revert to non-infectious
-            asy_sym=ss.years(ss.expon(1/0.88)),  # Progress to symptomatic
+            asy_non=ss.peryear(1.66),            # Revert to non-infectious
+            asy_sym=ss.peryear(0.88),            # Progress to symptomatic
             # --- From SYMPTOMATIC ---
-            sym_asy=ss.years(ss.expon(1/0.54)),  # Regress to asymptomatic (still active, not recovered)
-            sym_treat=ss.years(ss.expon(1/0.46)),   # θ theta: symptomatic → treatment
-            sym_dead=ss.years(ss.expon(1/0.34)),    # μ_TB: symptomatic → dead (TB mortality)
+            sym_asy=ss.peryear(0.54),            # Regress to asymptomatic (still active, not recovered)
+            sym_treat=ss.peryear(0.46),          # θ theta: symptomatic → treatment
+            sym_dead=ss.peryear(0.34),           # μ_TB: symptomatic → dead (TB mortality)
             # --- From TREATMENT ---
-            fail_rate=ss.years(ss.expon(1/0.63)),   # φ phi: treatment failure (→ symptomatic)
-            complete_rate=ss.years(ss.expon(1/2.00)),  # δ delta: treatment completion (→ treated)
+            fail_rate=ss.peryear(0.63),          # φ phi: treatment failure (→ symptomatic)
+            complete_rate=ss.peryear(2.00),      # δ delta: treatment completion (→ treated)
             # --- Background ---
             cxr_asymp_sens=1.0,                 # CXR sensitivity for screening asymptomatic (0–1)
             # --- For ACUTE ---
@@ -198,6 +163,13 @@ class TB_LSHTM(ss.Infection):
             trans_acute=None,                   # α alpha: rel. transmissibility acute vs symptomatic
         )
         self.update_pars(pars, **kwargs)
+
+        # CRN-safe RNG distributions for per-step transition draws (one per source state)
+        self._rng_inf = ss.random(name='tb_rng_inf')   # INFECTION exits
+        self._rng_non = ss.random(name='tb_rng_non')   # NON_INFECTIOUS exits
+        self._rng_asy = ss.random(name='tb_rng_asy')   # ASYMPTOMATIC exits
+        self._rng_sym = ss.random(name='tb_rng_sym')   # SYMPTOMATIC exits
+        self._rng_trt = ss.random(name='tb_rng_trt')   # TREATMENT exits
 
         # Per-agent state: redefine base Infection states and add TB-specific ones
         self.define_states(
@@ -235,11 +207,9 @@ class TB_LSHTM(ss.Infection):
         Set prognoses for newly infected agents (called when transmission occurs).
 
         The base :class:`starsim.Infection` calls this when a susceptible agent
-        acquires infection. We:
-
-        - Mark agents infected and set state to INFECTION (latent)
-        - Schedule the first competing transition: CLEARED, NON_INFECTIOUS, or ASYMPTOMATIC
-        - Leave the actual transition to :meth:`step` when ``ti >= ti_next``
+        acquires infection. We mark agents infected and set state to INFECTION
+        (latent). No transition scheduling — :meth:`step` evaluates transitions
+        per dt each timestep.
 
         Parameters
         ----------
@@ -260,116 +230,154 @@ class TB_LSHTM(ss.Infection):
 
         self.state[uids] = TBSL.INFECTION
 
-        # Schedule first transition: latent → cleared, non-infectious, or asymptomatic
-        # rr_activation multiplies the infection-to-active rates (inf_non, inf_asy).
-        self.state_next[uids], self.ti_next[uids] = self.transition(uids, to={
-            TBSL.CLEARED: self.pars.inf_cle,
-            TBSL.NON_INFECTIOUS: make_scaled_rate(self.pars.inf_non, lambda uids: self.rr_activation[uids]),
-            TBSL.ASYMPTOMATIC: make_scaled_rate(self.pars.inf_asy, lambda uids: self.rr_activation[uids]),
-        })
-
         return
 
-    # def transition(self, uids, to):
-    #     """
-    #     Sample competing exponential transitions and return next state and time.
+    def transition(self, uids, to, rng):
+        """
+        Evaluate competing exponential transitions over one dt.
 
-    #     For each agent in `uids`, draws one exponential waiting time per
-    #     destination in `to`; the destination with the minimum time is chosen
-    #     (competing risks). So each agent has exactly one next state and one
-    #     transition time.
+        For each agent in `uids`, computes the probability of transitioning
+        to each destination in `to` during one timestep. Uses a single uniform
+        draw per agent to decide (a) whether the agent transitions and
+        (b) which destination it goes to. Directly sets ``state_next`` and
+        ``ti_next`` on agents that draw to transition.
 
-    #     Parameters
-    #     ----------
-    #     uids : array-like
-    #         Agent indices to transition.
-    #     to : dict
-    #         Mapping from TBSL state -> rate-like. Keys are possible next states;
-    #         values provide waiting times per agent via the object returned by :func:`make_scaled_rate` (``.sample_waiting_times(uids)``)
-    #         or (Starsim dists) ``.rvs(uids)``.
-
-    #     Returns
-    #     -------
-    #     state_next : np.ndarray
-    #         Next state for each agent (one of the keys of `to`).
-    #     ti_next : np.ndarray
-    #         Simulated time of transition for each agent.
-
-    #     Notes
-    #     -----
-    #     Competing risks: if an agent can go to A (rate λ_A) or B (rate λ_B):
-
-    #     - Sample T_A ~ Exp(λ_A) and T_B ~ Exp(λ_B)
-    #     - Agent goes to the state whose time is smallest
-    #     - Equivalent to the usual competing-exponential formulation
-    #     """
-    #     if len(uids) == 0:
-    #         return np.array([]), np.array([])
-
-    #     ti = self.ti
-    #     # One row per possible destination; column j = transition time for uids[j]
-    #     ti_state = np.zeros((len(to), len(uids)))
-    #     for idx, rate in enumerate(to.values()):
-    #         draw = rate.sample_waiting_times(uids) if isinstance(rate, ScaledRate) else rate.rvs(uids)
-    #         ti_state[idx, :] = ti + draw
-
-    #     # Soonest transition wins (index into keys gives next state)
-    #     state_next_idx = ti_state.argmin(axis=0)
-    #     state_next = np.array(list(to.keys()))[state_next_idx]
-    #     ti_next = ti_state.min(axis=0)
-
-    #     return state_next, ti_next
-
-    def transition(self, uids, to):
-        """ Transition between states """
+        Parameters
+        ----------
+        uids : array-like
+            Agent indices to evaluate.
+        to : dict
+            Mapping from TBSL state -> ``ss.Rate``. Keys are possible next
+            states; values are ``ss.peryear`` (or other ``ss.per``) rates,
+            either scalar (same for all agents) or with per-agent ``.value``
+            (from ``par * rr_array[uids]``).
+        rng : ss.random
+            CRN-safe uniform RNG for this source state.
+        """
         if len(uids) == 0:
-            return np.array([]), np.array([])
+            return
 
-        state_next = np.full(len(uids), fill_value=TBSL.SUSCEPTIBLE)
-        ti_next = np.full(len(uids), fill_value=np.inf)
         ti = self.ti
+        dt = self.sim.t.dt  # module dt as ss.dur
+        n = len(uids)
+        states = list(to.keys())
+        n_dest = len(states)
 
-        # TODO: Consider SSA algorithm
-        ti_state = np.zeros((len(to), len(uids)))
-        for idx, rate in enumerate(to.values()):
-            ti_state[idx,:] = ti + rate.rvs(uids)
+        # Convert each rate to dimensionless "rate per dt" using its own unit
+        rates_per_dt = np.zeros((n_dest, n))
+        for idx, rate_val in enumerate(to.values()):
+            factor = dt / rate_val.unit  # e.g. ss.days(7) / ss.years(1) = 7/365
+            v = rate_val.value
+            rates_per_dt[idx] = np.broadcast_to(v, n) * factor
 
-        state_next_idx = ti_state.argmin(axis=0)
+        # Total exit rate per agent (dimensionless, per dt)
+        total_rate_dt = rates_per_dt.sum(axis=0)
 
-        state_next = np.array(list(to.keys()))[state_next_idx]
-        ti_next = ti_state.min(axis=0)
+        # Probability of any transition in one dt
+        p_any = 1 - np.exp(-total_rate_dt)
 
-        return state_next, ti_next
+        # Build CDF bins for destination selection
+        # cum_p[i] = P(transition to state 0..i) = sum(λ_j/Λ for j<=i) * p_any
+        with np.errstate(divide='ignore', invalid='ignore'):
+            fractions = np.where(total_rate_dt > 0, rates_per_dt / total_rate_dt, 0)
+        cum_p = np.cumsum(fractions, axis=0) * p_any  # shape (n_dest, n)
+
+        # Single uniform draw per agent
+        u = rng.rvs(uids)
+
+        # Find agents that transition: u < p_any
+        transitioning = u < p_any
+        if not np.any(transitioning):
+            return
+
+        # For transitioning agents, determine destination from CDF
+        t_idx = transitioning.nonzero()[0]
+        t_uids = uids[t_idx]
+        t_u = u[t_idx]
+        t_cum_p = cum_p[:, t_idx]
+
+        # Smallest i where u < cum_p[i]
+        dest_idx = (t_u[None, :] < t_cum_p).argmax(axis=0)
+        dest_states = np.array(states)[dest_idx]
+
+        # Set state_next and ti_next for transitioning agents
+        self.state_next[t_uids] = dest_states
+        self.ti_next[t_uids] = ti
 
     def step(self):
         """
-        Advance TB state for all agents whose scheduled transition time has been reached.
+        Advance TB state machine one timestep.
 
-        Order of operations (important for correctness):
+        Order of operations:
 
-        - Find agents with ti >= ti_next (due for a transition).
-        - Record outcomes from *state_next* (new active, deaths) before overwriting state.
-        - Apply the scheduled transition: state = state_next; set susceptible/infected
-          and on_treatment from the *new* state.
-        - Process TB deaths (request_death) so they leave the population.
-        - Set rel_sus and rel_trans for the *new* state (used by base for transmission).
-        - For each current state with spontaneous transitions, call transition() to
-          schedule the next (state_next, ti_next). CLEARED/RECOVERED/TREATED have
-          no scheduled transition until reinfected (transmission).
-
-        Reinfection is not done here; the base class handles transmission and
-        calls set_prognoses for newly infected agents.
+        1. **Transmission** (via ``super().step()``): handles force of infection
+           and calls :meth:`set_prognoses` for newly infected agents.
+        2. **Evaluate transitions**: for all agents in each state, evaluate
+           competing-risk transitions over one dt. Agents that draw to
+           transition get ``state_next``/``ti_next`` set. Agents already
+           force-scheduled (e.g. by :meth:`start_treatment`) are skipped.
+        3. **Apply transitions**: agents with ``ti >= ti_next`` move to their
+           new state. Bookkeeping (infected/susceptible flags, rel_sus/rel_trans,
+           deaths, results) is done here.
+        4. **Reset RR multipliers** for agents that transitioned (external
+           modules set fresh values each step before transmission).
         """
         super().step()
         ti = self.ti
 
-        # Agents whose scheduled transition time has arrived (ti_next <= ti)
+        # --- Phase 1: Evaluate transitions for all agents in each state ---
+        # Skip agents already force-scheduled by start_treatment (ti_next <= ti)
+
+        # INFECTION → CLEARED, NON_INFECTIOUS, or ASYMPTOMATIC
+        u = ss.uids((self.state == TBSL.INFECTION) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.CLEARED:        self.pars.inf_cle,
+                TBSL.NON_INFECTIOUS: self.pars.inf_non * self.rr_activation[u],
+                TBSL.ASYMPTOMATIC:   self.pars.inf_asy * self.rr_activation[u],
+            }, rng=self._rng_inf)
+
+        # NON_INFECTIOUS → RECOVERED or ASYMPTOMATIC
+        u = ss.uids((self.state == TBSL.NON_INFECTIOUS) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.RECOVERED:    self.pars.non_rec * self.rr_clearance[u],
+                TBSL.ASYMPTOMATIC: self.pars.non_asy,
+            }, rng=self._rng_non)
+
+        # ASYMPTOMATIC → NON_INFECTIOUS or SYMPTOMATIC
+        u = ss.uids((self.state == TBSL.ASYMPTOMATIC) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.NON_INFECTIOUS: self.pars.asy_non,
+                TBSL.SYMPTOMATIC:    self.pars.asy_sym,
+            }, rng=self._rng_asy)
+
+        # SYMPTOMATIC → ASYMPTOMATIC, TREATMENT, or DEAD
+        u = ss.uids((self.state == TBSL.SYMPTOMATIC) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.ASYMPTOMATIC: self.pars.sym_asy,
+                TBSL.TREATMENT:    self.pars.sym_treat,
+                TBSL.DEAD:         self.pars.sym_dead * self.rr_death[u],
+            }, rng=self._rng_sym)
+
+        # TREATMENT → SYMPTOMATIC (failure) or TREATED (completion)
+        u = ss.uids((self.state == TBSL.TREATMENT) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.SYMPTOMATIC: self.pars.fail_rate,
+                TBSL.TREATED:     self.pars.complete_rate,
+            }, rng=self._rng_trt)
+
+        # CLEARED, RECOVERED, TREATED: no spontaneous transition; reinfection via transmission only
+
+        # --- Phase 2: Apply transitions for agents with ti_next <= ti ---
         uids = ss.uids(ti >= self.ti_next)
         if len(uids) == 0:
             return
 
-        # --- Record outcomes from state_next *before* we overwrite state ---
-        # Only count first entry to ASYMPTOMATIC from non-active states; exclude SYMPTOMATIC → ASYMPTOMATIC (regression)
+        # Record outcomes from state_next *before* overwriting state
         new_asymp_uids = uids[
             (self.state_next[uids] == TBSL.ASYMPTOMATIC) &
             (self.state[uids] != TBSL.SYMPTOMATIC)
@@ -377,76 +385,35 @@ class TB_LSHTM(ss.Infection):
         self.results['new_active'][ti] = len(new_asymp_uids)
         self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_asymp_uids] >= 15)
 
-        # Base class uses infected/susceptible for transmission; keep in sync with state
+        # Keep infected/susceptible in sync with state
         new_inf_uids = uids[self.state_next[uids] == TBSL.INFECTION]
         self.infected[new_inf_uids] = True
         new_clr_uids = uids[np.isin(self.state_next[uids], [TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED])]
         self.infected[new_clr_uids] = False
 
-        # --- Apply the scheduled transition ---
+        # Apply the transition
         self.state[uids] = self.state_next[uids]
-        self.ti_next[uids] = np.inf  # Clear until we set next transition below (avoids double-firing)
+        self.ti_next[uids] = np.inf  # Clear to avoid double-firing
         self.on_treatment[uids] = (self.state[uids] == TBSL.TREATMENT)
 
-        # Only these states are susceptible to (re)infection; transmission handles the rest
         self.susceptible[uids] = np.isin(self.state[uids], [TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED])
 
-        # --- TB deaths: request removal from population this step ---
+        # TB deaths
         new_death_uids = uids[self.state_next[uids] == TBSL.DEAD]
         self.sim.people.request_death(new_death_uids)
         self.results['new_deaths'][ti] = len(new_death_uids)
         self.results['new_deaths_15+'][ti] = np.count_nonzero(self.sim.people.age[new_death_uids] >= 15)
 
-        # rel_sus: multiplier for susceptibility; RECOVERED/TREATED at higher risk (π pi, ρ rho)
+        # rel_sus: RECOVERED/TREATED at higher risk (π pi, ρ rho)
         self.rel_sus[uids] = 1
         self.rel_sus[uids[self.state[uids] == TBSL.RECOVERED]] = self.pars.rr_rec
         self.rel_sus[uids[self.state[uids] == TBSL.TREATED]] = self.pars.rr_treat
 
-        # rel_trans: multiplier for infectiousness; ASYMPTOMATIC < SYMPTOMATIC (κ kappa typically < 1)
+        # rel_trans: ASYMPTOMATIC (κ kappa)
         self.rel_trans[uids] = 1
         self.rel_trans[uids[self.state[uids] == TBSL.ASYMPTOMATIC]] = self.pars.trans_asymp
 
-        # --- Schedule next transition: only states with spontaneous exits get a new (state_next, ti_next) ---
-        # rr_activation: INFECTION → NON_INFECTIOUS or ASYMPTOMATIC (infection-to-active)
-        u = uids[self.state[uids] == TBSL.INFECTION]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.CLEARED: self.pars.inf_cle,
-            TBSL.NON_INFECTIOUS: make_scaled_rate(self.pars.inf_non, lambda uids: self.rr_activation[uids]),
-            TBSL.ASYMPTOMATIC: make_scaled_rate(self.pars.inf_asy, lambda uids: self.rr_activation[uids]),
-        })
-
-        # rr_clearance: NON_INFECTIOUS → RECOVERED (non-infectious-to-recovered)
-        u = uids[self.state[uids] == TBSL.NON_INFECTIOUS]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.RECOVERED: make_scaled_rate(self.pars.non_rec, lambda uids: self.rr_clearance[uids]),
-            TBSL.ASYMPTOMATIC: self.pars.non_asy,
-        })
-
-        # ASYMPTOMATIC → NON_INFECTIOUS or SYMPTOMATIC (no rr modifier)
-        u = uids[self.state[uids] == TBSL.ASYMPTOMATIC]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.NON_INFECTIOUS: self.pars.asy_non,
-            TBSL.SYMPTOMATIC: self.pars.asy_sym
-        })
-
-        # rr_death: SYMPTOMATIC → DEAD (symptomatic-to-death)
-        u = uids[self.state[uids] == TBSL.SYMPTOMATIC]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.ASYMPTOMATIC: self.pars.sym_asy,
-            TBSL.TREATMENT: self.pars.sym_treat,
-            TBSL.DEAD: make_scaled_rate(self.pars.sym_dead, lambda uids: self.rr_death[uids]),
-        })
-
-        # TREATMENT → SYMPTOMATIC (failure) or TREATED (completion)
-        u = uids[self.state[uids] == TBSL.TREATMENT]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.SYMPTOMATIC: self.pars.fail_rate,
-            TBSL.TREATED: self.pars.complete_rate
-        })
-
-        # CLEARED, RECOVERED, TREATED: no scheduled transition; reinfection via transmission only
-
-        # Reset rate multipliers states to 1
+        # Reset RR multipliers (external modules set fresh values each step)
         self.rr_activation[uids] = 1
         self.rr_clearance[uids] = 1
         self.rr_death[uids] = 1
@@ -544,8 +511,8 @@ class TB_LSHTM(ss.Infection):
             ss.Result('cum_deaths_15+',    dtype=int, label='Cumulative Deaths, 15+'),
             ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
             ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
-            ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'),
-            ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'),
+            ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'), 
+            ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'), 
 
             ss.Result('n_detectable_15+', dtype=float, scale=False, label='Symptomatic plus cxr_asymp_sens * Asymptomatic (15+)'),
         )
@@ -663,10 +630,13 @@ class TB_LSHTM_Acute(TB_LSHTM):
 
         # ACUTE is a brief infectious state before latent (INFECTION); reinfection leads to ACUTE
         self.define_pars(
-            rate_acute_latent=ss.years(ss.expon(1/4.0)),  # ACUTE → INFECTION (per year)
-            trans_acute=0.9,                              # α alpha: rel. transmissibility acute vs symptomatic
+            rate_acute_latent=ss.peryear(4.0),  # ACUTE → INFECTION (per year)
+            trans_acute=0.9,                    # α alpha: rel. transmissibility acute vs symptomatic
         )
         self.update_pars(pars, **kwargs)
+
+        # CRN-safe RNG for ACUTE state transitions
+        self._rng_acu = ss.random(name='tb_rng_acu')
         return
 
     @property
@@ -683,8 +653,8 @@ class TB_LSHTM_Acute(TB_LSHTM):
         Set prognoses for newly infected agents; they enter ACUTE (not INFECTION).
 
         Skips TB_LSHTM.set_prognoses (which would set state=INFECTION) and calls
-        ss.Infection.set_prognoses directly, then sets ACUTE state and schedules
-        ACUTE → INFECTION transition.
+        ss.Infection.set_prognoses directly, then sets ACUTE state. No transition
+        scheduling — :meth:`step` evaluates transitions per dt each timestep.
         """
         super(TB_LSHTM, self).set_prognoses(uids, sources)
         if len(uids) == 0:
@@ -697,35 +667,84 @@ class TB_LSHTM_Acute(TB_LSHTM):
 
         self.state[uids] = TBSL.ACUTE
 
-        # Single possible transition: ACUTE → INFECTION
-        self.state_next[uids], self.ti_next[uids] = self.transition(uids, to={
-            TBSL.INFECTION: self.pars.rate_acute_latent,
-        })
-
         return
 
     def step(self):
         """
-        Advance TB state; same order of operations as base :meth:`TB_LSHTM.step`.
+        Advance TB state machine one timestep (acute variant).
 
-        Advance TB state; same order of operations as base :meth:`TB_LSHTM.step`. Overrides:
+        Same two-phase structure as :meth:`TB_LSHTM.step`, but:
 
-        - Treat ACUTE as infectious (infected-flag and rel_trans).
-        - Add ACUTE → INFECTION transition.
+        - Adds ACUTE → INFECTION transition evaluation.
+        - Treats ACUTE as infectious (infected-flag and rel_trans).
         - Reinfection leads to ACUTE (handled in set_prognoses).
 
-        Calls super(TB_LSHTM, self).step() to use this class's step body
-        without going through a subclass step().
+        Calls ``super(TB_LSHTM, self).step()`` for transmission (bypasses
+        TB_LSHTM.step to avoid double evaluation).
         """
         super(TB_LSHTM, self).step()
         ti = self.ti
 
+        # --- Phase 1: Evaluate transitions for all agents in each state ---
+        # Skip agents already force-scheduled by start_treatment (ti_next <= ti)
+
+        # ACUTE → INFECTION
+        u = ss.uids((self.state == TBSL.ACUTE) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.INFECTION: self.pars.rate_acute_latent,
+            }, rng=self._rng_acu)
+
+        # INFECTION → CLEARED, NON_INFECTIOUS, or ASYMPTOMATIC
+        u = ss.uids((self.state == TBSL.INFECTION) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.CLEARED:        self.pars.inf_cle,
+                TBSL.NON_INFECTIOUS: self.pars.inf_non * self.rr_activation[u],
+                TBSL.ASYMPTOMATIC:   self.pars.inf_asy * self.rr_activation[u],
+            }, rng=self._rng_inf)
+
+        # NON_INFECTIOUS → RECOVERED or ASYMPTOMATIC
+        u = ss.uids((self.state == TBSL.NON_INFECTIOUS) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.RECOVERED:    self.pars.non_rec * self.rr_clearance[u],
+                TBSL.ASYMPTOMATIC: self.pars.non_asy,
+            }, rng=self._rng_non)
+
+        # ASYMPTOMATIC → NON_INFECTIOUS or SYMPTOMATIC
+        u = ss.uids((self.state == TBSL.ASYMPTOMATIC) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.NON_INFECTIOUS: self.pars.asy_non,
+                TBSL.SYMPTOMATIC:    self.pars.asy_sym,
+            }, rng=self._rng_asy)
+
+        # SYMPTOMATIC → ASYMPTOMATIC, TREATMENT, or DEAD
+        u = ss.uids((self.state == TBSL.SYMPTOMATIC) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.ASYMPTOMATIC: self.pars.sym_asy,
+                TBSL.TREATMENT:    self.pars.sym_treat,
+                TBSL.DEAD:         self.pars.sym_dead * self.rr_death[u],
+            }, rng=self._rng_sym)
+
+        # TREATMENT → SYMPTOMATIC (failure) or TREATED (completion)
+        u = ss.uids((self.state == TBSL.TREATMENT) & (self.ti_next > ti))
+        if len(u):
+            self.transition(u, to={
+                TBSL.SYMPTOMATIC: self.pars.fail_rate,
+                TBSL.TREATED:     self.pars.complete_rate,
+            }, rng=self._rng_trt)
+
+        # CLEARED, RECOVERED, TREATED: reinfection → ACUTE (via transmission)
+
+        # --- Phase 2: Apply transitions for agents with ti_next <= ti ---
         uids = ss.uids(ti >= self.ti_next)
         if len(uids) == 0:
             return
 
-        # Record new active (transition into ASYMPTOMATIC) from state_next before overwriting
-        # Exclude SYMPTOMATIC → ASYMPTOMATIC regression; only first entry to active disease counts
+        # Record outcomes before overwriting state
         new_asymp_uids = uids[
             (self.state_next[uids] == TBSL.ASYMPTOMATIC) &
             (self.state[uids] != TBSL.SYMPTOMATIC)
@@ -733,23 +752,26 @@ class TB_LSHTM_Acute(TB_LSHTM):
         self.results['new_active'][ti] = len(new_asymp_uids)
         self.results['new_active_15+'][ti] = np.count_nonzero(self.sim.people.age[new_asymp_uids] >= 15)
 
-        # Infected flag: moving *to* ACUTE means still infected; moving to CLEARED/RECOVERED/TREATED means not
+        # Infected flag: ACUTE means still infected
         new_inf_uids = uids[self.state_next[uids] == TBSL.ACUTE]
         self.infected[new_inf_uids] = True
         new_clr_uids = uids[np.isin(self.state_next[uids], [TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED])]
         self.infected[new_clr_uids] = False
 
+        # Apply transition
         self.state[uids] = self.state_next[uids]
         self.ti_next[uids] = np.inf
         self.on_treatment[uids] = (self.state[uids] == TBSL.TREATMENT)
 
         self.susceptible[uids] = np.isin(self.state[uids], [TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED])
 
+        # TB deaths
         new_death_uids = uids[self.state_next[uids] == TBSL.DEAD]
         self.sim.people.request_death(new_death_uids)
         self.results['new_deaths'][ti] = len(new_death_uids)
         self.results['new_deaths_15+'][ti] = np.count_nonzero(self.sim.people.age[new_death_uids] >= 15)
 
+        # rel_sus
         self.rel_sus[uids] = 1
         self.rel_sus[uids[self.state[uids] == TBSL.RECOVERED]] = self.pars.rr_rec
         self.rel_sus[uids[self.state[uids] == TBSL.TREATED]] = self.pars.rr_treat
@@ -759,55 +781,11 @@ class TB_LSHTM_Acute(TB_LSHTM):
         self.rel_trans[uids[self.state[uids] == TBSL.ACUTE]] = self.pars.trans_acute
         self.rel_trans[uids[self.state[uids] == TBSL.ASYMPTOMATIC]] = self.pars.trans_asymp
 
-        # ACUTE → INFECTION (single possible transition from acute)
-        u = uids[self.state[uids] == TBSL.ACUTE]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.INFECTION: self.pars.rate_acute_latent,
-        })
-
-        # INFECTION → CLEARED, NON_INFECTIOUS, or ASYMPTOMATIC (same as base)
-        u = uids[self.state[uids] == TBSL.INFECTION]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.CLEARED: self.pars.inf_cle,
-            TBSL.NON_INFECTIOUS: make_scaled_rate(self.pars.inf_non, lambda uids: self.rr_activation[uids]),
-            TBSL.ASYMPTOMATIC: make_scaled_rate(self.pars.inf_asy, lambda uids: self.rr_activation[uids]),
-        })
-
-        # NON_INFECTIOUS → RECOVERED or ASYMPTOMATIC
-        u = uids[self.state[uids] == TBSL.NON_INFECTIOUS]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.RECOVERED: make_scaled_rate(self.pars.non_rec, lambda uids: self.rr_clearance[uids]),
-            TBSL.ASYMPTOMATIC: self.pars.non_asy,
-        })
-
-        # ASYMPTOMATIC → NON_INFECTIOUS or SYMPTOMATIC
-        u = uids[self.state[uids] == TBSL.ASYMPTOMATIC]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.NON_INFECTIOUS: self.pars.asy_non,
-            TBSL.SYMPTOMATIC: self.pars.asy_sym
-        })
-
-        # SYMPTOMATIC → ASYMPTOMATIC, TREATMENT, or TB DEATH
-        u = uids[self.state[uids] == TBSL.SYMPTOMATIC]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.ASYMPTOMATIC: self.pars.sym_asy,
-            TBSL.TREATMENT: self.pars.sym_treat,
-            TBSL.DEAD: make_scaled_rate(self.pars.sym_dead, lambda uids: self.rr_death[uids]),
-        })
-
-        # TREATMENT → SYMPTOMATIC (failure) or TREATED (completion)
-        u = uids[self.state[uids] == TBSL.TREATMENT]
-        self.state_next[u], self.ti_next[u] = self.transition(u, to={
-            TBSL.SYMPTOMATIC: self.pars.fail_rate,
-            TBSL.TREATED: self.pars.complete_rate
-        })
-
-        # Reset rate multipliers for all agents that transitioned this step
+        # Reset RR multipliers (external modules set fresh values each step)
         self.rr_activation[uids] = 1
         self.rr_clearance[uids] = 1
         self.rr_death[uids] = 1
 
-        # CLEARED, RECOVERED, TREATED: next change is reinfection → ACUTE (via transmission)
         return
 
     def start_treatment(self, uids):
