@@ -41,7 +41,8 @@ def build_tbhiv_sim(interventions=True):
     intvs = None
     if interventions:
         intvs = [mtb.HivInterventions(pars=dict(
-            mode='both',
+            use_prevalence=True,
+            use_art=True,
             prevalence=0.30,
             percent_on_ART=0.50,
             min_age=15, max_age=60,
