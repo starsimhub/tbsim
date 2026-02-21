@@ -21,22 +21,21 @@ class HealthSeekingBehavior(ss.Intervention):
 
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
-        
         self.define_pars(
             initial_care_seeking_rate = ss.perday(0.1),
-            care_retry_steps          = None,   # the number of timesteps after which an agent can seek care again (e.g. 1 month)
-            start                     = None, # if not provided will take the same value as the simulation start date
+            care_seeking_dist         = ss.bernoulli(p=0),
+            care_retry_steps          = None, 
+            start                     = None,  # if not provided will take the same value as the simulation start date
             stop                      = None,  # if not provided will take the same value as the simulation stop date
-            custom_states             = None,  # The researcher can provide a different set of desired states (e.g. for ACF during the first year of the intervention)
+            custom_states             = None, 
         )
         self.update_pars(pars=pars, **kwargs)
-
         self.define_states(
             ss.IntArr('n_care_sought',       default=0),    # times sought in current episode; resets when leaving eligible states
             ss.IntArr('n_care_sought_total', default=0),    # lifetime count; never resets
             ss.FloatArr('ti_last_sought',    default=-np.inf),
         )
-        self.care_seeking_dist = ss.bernoulli(p=0)  # Placeholder; auto-initialized by the framework
+        self.care_seeking_dist = ss.bernoulli(p=self.pars.initial_care_seeking_rate.to_prob())  
 
     def init_post(self):
         super().init_post()
@@ -48,19 +47,17 @@ class HealthSeekingBehavior(ss.Intervention):
             if enum is None:
                 raise ValueError("Could not infer care-seeking states. Provide `custom_states`.")
             self._states = enum.care_seeking_eligible()
-            
-        if self.pars.start is None: self.pars.start = self.sim.pars.start
-        if self.pars.stop is None: self.pars.stop = self.sim.pars.stop
         self._tb = tb
         self._new_seekers_count = 0
-        self._has_triggered_seek = False
+        if self.pars.start is None: self.pars.start = self.sim.t.start
+        if self.pars.stop  is None: self.pars.stop  = self.sim.t.stop
 
     def step(self):
         sim = self.sim
         ppl = sim.people
-        t   = sim.now
+        t = sim.now.date() 
 
-        if t < self.pars.start or t > self.pars.stop:
+        if t < self.pars.start.date() or t > self.pars.stop.date():
             self._new_seekers_count = 0
             return
 
@@ -79,13 +76,12 @@ class HealthSeekingBehavior(ss.Intervention):
             return
 
         rate = self.pars.initial_care_seeking_rate
-        self.care_seeking_dist.set(p=rate.to_prob())
-        seeking_uids = self.care_seeking_dist.filter(ss.uids(not_yet_sought))
+        self.pars.care_seeking_dist.set(p=rate.to_prob())
+        seeking_uids = self.pars.care_seeking_dist.filter(ss.uids(not_yet_sought))
 
         if len(seeking_uids) == 0:
             return
         self._new_seekers_count = len(seeking_uids)
-        self._has_triggered_seek = True
         self.n_care_sought[seeking_uids] += 1
         self.n_care_sought_total[seeking_uids] += 1
         self.ti_last_sought[seeking_uids] = self.ti
@@ -102,6 +98,9 @@ class HealthSeekingBehavior(ss.Intervention):
         )
 
     def update_results(self):
+        t = self.sim.now.date() 
+        if t < self.pars.start.date() or t > self.pars.stop.date():
+            return
         ppl = self.sim.people
         self.results['n_sought_care'][self.ti] = np.count_nonzero(self.n_care_sought > 0)
         self.results['n_ever_sought_care'][self.ti] = np.count_nonzero(self.n_care_sought_total > 0)

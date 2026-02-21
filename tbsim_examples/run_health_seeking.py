@@ -79,10 +79,11 @@ if __name__ == "__main__":
 
     mtb.plot_combined(
         results,
-        keywords = ["symptomatic", "sought_care", "notifications", "prevalence", "incidence"],
+        keywords = ["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"],
         title    = "Health-seeking behaviour – LSHTM TB model",
         n_cols   = 3,
         outdir   = "results",
         dark     = False,
     )
     plt.show()
+    
