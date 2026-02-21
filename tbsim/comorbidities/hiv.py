@@ -17,8 +17,29 @@ class HIVState(IntEnum):
 
 class HIV(ss.Disease):
     """
-    Simplified agent-based HIV model tracking ACUTE → LATENT → AIDS progression,
-    modified by ART status.
+    A simplified agent-based HIV disease model for use with the Starsim framework.
+
+    This model tracks HIV state progression through ACUTE, LATENT, and AIDS phases,
+    influenced by whether the agent is receiving ART (antiretroviral therapy).
+
+    Args:
+        - init_prev: Initial probability of infection (ACUTE).
+        - init_onart: Probability of being on ART at initialization (if infected).
+        - acute_to_latent: Daily transition probability from ACUTE to LATENT.
+        - latent_to_aids: Daily transition probability from LATENT to AIDS.
+        - aids_to_dead: Daily transition probability from AIDS to DEAD (unused).
+        - art_progression_factor: Multiplier applied to progression probabilities for agents on ART.
+
+    States:
+        - state: HIV progression state (ATRISK, ACUTE, LATENT, AIDS, DEAD).
+        - on_ART: Boolean indicating whether agent is on ART.
+
+    Results:
+        - hiv_prevalence: Proportion of total agents with HIV.
+        - infected: Total number of HIV-positive agents.
+        - on_art: Number of agents on ART.
+        - atrisk, acute, latent, aids: Percent of population in each state.
+        - n_active: Total number of agents in ACUTE, LATENT, or AIDS states.
     """
     def __init__(self, pars=None, **kwargs):
         super().__init__(**kwargs)
