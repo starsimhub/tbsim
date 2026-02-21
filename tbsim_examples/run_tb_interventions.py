@@ -73,12 +73,12 @@ def build_sim(scenario=None, spars=None):
     if bcg_params:
         if isinstance(bcg_params, dict):
             # Single BCG intervention
-            interventions.append(mtb.BCGProtection(pars=bcg_params))
+            interventions.append(mtb.BCGRoutine(pars=bcg_params))
         elif isinstance(bcg_params, list):
             # Multiple BCG interventions
             for i, params in enumerate(bcg_params):
                 params['name'] = f'BCG_{i}'  # Give unique name
-                interventions.append(mtb.BCGProtection(pars=params))
+                interventions.append(mtb.BCGRoutine(pars=params))
     
     # Add TPT interventions (can be single or multiple)
     tpt_params = scenario.get('tptintervention')
@@ -106,7 +106,7 @@ def build_sim(scenario=None, spars=None):
     
     # Create simulation components
     pop = ss.People(n_agents=500, age_data=age_data)
-    tb = mtb.TB(pars=tbpars)
+    tb = mtb.TB_LSHTM(pars=tbpars, name='tb')
     networks = [
         ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
         mtb.HouseholdNet()

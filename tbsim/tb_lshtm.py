@@ -373,6 +373,12 @@ class TB_LSHTM(ss.Infection):
         # CLEARED, RECOVERED, TREATED: no spontaneous transition; reinfection via transmission only
 
         # --- Phase 2: Apply transitions for agents with ti_next <= ti ---
+
+        # Reset RR multipliers for ALL agents (interventions set fresh values each step)
+        self.rr_activation[:] = 1
+        self.rr_clearance[:] = 1
+        self.rr_death[:] = 1
+
         uids = ss.uids(ti >= self.ti_next)
         if len(uids) == 0:
             return
@@ -405,18 +411,13 @@ class TB_LSHTM(ss.Infection):
         self.results['new_deaths_15+'][ti] = np.count_nonzero(self.sim.people.age[new_death_uids] >= 15)
 
         # rel_sus: RECOVERED/TREATED at higher risk (π pi, ρ rho)
-        self.rel_sus[uids] = 1
-        self.rel_sus[uids[self.state[uids] == TBSL.RECOVERED]] = self.pars.rr_rec
-        self.rel_sus[uids[self.state[uids] == TBSL.TREATED]] = self.pars.rr_treat
+        self.rel_sus[:] = 1
+        self.rel_sus[self.state == TBSL.RECOVERED] = self.pars.rr_rec
+        self.rel_sus[self.state == TBSL.TREATED] = self.pars.rr_treat
 
         # rel_trans: ASYMPTOMATIC (κ kappa)
-        self.rel_trans[uids] = 1
-        self.rel_trans[uids[self.state[uids] == TBSL.ASYMPTOMATIC]] = self.pars.trans_asymp
-
-        # Reset RR multipliers (external modules set fresh values each step)
-        self.rr_activation[uids] = 1
-        self.rr_clearance[uids] = 1
-        self.rr_death[uids] = 1
+        self.rel_trans[:] = 1
+        self.rel_trans[self.state == TBSL.ASYMPTOMATIC] = self.pars.trans_asymp
 
         return
 
