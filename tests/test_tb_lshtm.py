@@ -37,7 +37,7 @@ def make_lshtm_sim(
 
 def test_scaled_rate_positive_rr():
     """make_scaled_rate with rr > 0 scales waiting time (finite values)."""
-    sim = make_lshtm_sim(agents=5)
+    sim = make_lshtm_sim(n_agents=5)
     sim.init()
     tb = sim.diseases[0]
     # Use an already-initialized rate from the model (inf_cle)
@@ -53,7 +53,7 @@ def test_scaled_rate_positive_rr():
 
 def test_scaled_rate_zero_rr():
     """make_scaled_rate with rr=0 returns inf (never transition)."""
-    sim = make_lshtm_sim(agents=3)
+    sim = make_lshtm_sim(n_agents=3)
     sim.init()
     tb = sim.diseases[0]
     base = tb.pars.inf_cle
@@ -70,7 +70,7 @@ def test_scaled_rate_zero_rr():
 def test_scaled_rate_mean_waiting_time():
     """make_scaled_rate with rr=1 has mean waiting time 1/λ; with rr=2, mean ≈ 1/(2λ)."""
     from tbsim.tb_lshtm import ScaledRate
-    sim = make_lshtm_sim(agents=500, pars={"init_prev": ss.bernoulli(0)})
+    sim = make_lshtm_sim(n_agents=500, pars={"init_prev": ss.bernoulli(0)})
     sim.init(seed=42)
     tb = sim.diseases[0]
     base = tb.pars.inf_cle
@@ -92,7 +92,7 @@ def test_scaled_rate_mean_waiting_time():
 
 def test_transition_empty_uids():
     """transition with empty uids returns empty arrays."""
-    sim = make_lshtm_sim(agents=10)
+    sim = make_lshtm_sim(n_agents=10)
     sim.init()
     tb = sim.diseases[0]
     state_next, ti_next = tb.transition(np.array([], dtype=int), to={
@@ -105,7 +105,7 @@ def test_transition_empty_uids():
 
 def test_transition_returns_valid_states():
     """transition returns state_next in keys and ti_next >= ti."""
-    sim = make_lshtm_sim(agents=30)
+    sim = make_lshtm_sim(n_agents=30)
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids(np.arange(30))
@@ -125,7 +125,7 @@ def test_transition_returns_valid_states():
 
 def test_set_prognoses_sets_state_and_susceptible():
     """set_prognoses sets state to INFECTION and susceptible to False."""
-    sim = make_lshtm_sim(agents=50)
+    sim = make_lshtm_sim(n_agents=50)
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids([1, 2, 3, 10, 20])
@@ -144,7 +144,7 @@ def test_set_prognoses_sets_state_and_susceptible():
 
 def test_set_prognoses_empty_uids():
     """set_prognoses with empty uids does not raise."""
-    sim = make_lshtm_sim(agents=10)
+    sim = make_lshtm_sim(n_agents=10)
     sim.init()
     tb = sim.diseases[0]
     tb.set_prognoses(np.array([], dtype=int))
@@ -154,7 +154,7 @@ def test_set_prognoses_empty_uids():
 
 def test_step_die():
     """step_die sets state=DEAD, susceptible=False, infected=False, rel_trans=0."""
-    sim = make_lshtm_sim(agents=50)
+    sim = make_lshtm_sim(n_agents=50)
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids([1, 2, 3])
@@ -172,7 +172,7 @@ def test_step_die():
 
 def test_step_die_empty_uids():
     """step_die with empty uids does not raise."""
-    sim = make_lshtm_sim(agents=10)
+    sim = make_lshtm_sim(n_agents=10)
     sim.init()
     tb = sim.diseases[0]
     tb.step_die(np.array([], dtype=int))
@@ -182,7 +182,7 @@ def test_step_die_empty_uids():
 
 def test_start_treatment_latent_cleared():
     """start_treatment on INFECTION (latent) schedules CLEARED."""
-    sim = make_lshtm_sim(agents=50)
+    sim = make_lshtm_sim(n_agents=50)
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids([1, 2, 3])
@@ -196,7 +196,7 @@ def test_start_treatment_latent_cleared():
 
 def test_start_treatment_active_to_treatment():
     """start_treatment on NON_INFECTIOUS/ASYMPTOMATIC/SYMPTOMATIC schedules TREATMENT."""
-    sim = make_lshtm_sim(agents=50)
+    sim = make_lshtm_sim(n_agents=50)
     sim.init()
     tb = sim.diseases[0]
     for state in [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC]:
@@ -209,7 +209,7 @@ def test_start_treatment_active_to_treatment():
 
 def test_start_treatment_empty_uids():
     """start_treatment with empty uids does not raise."""
-    sim = make_lshtm_sim(agents=10)
+    sim = make_lshtm_sim(n_agents=10)
     sim.init()
     tb = sim.diseases[0]
     tb.start_treatment(np.array([], dtype=int))
@@ -217,7 +217,7 @@ def test_start_treatment_empty_uids():
 
 def test_start_treatment_acute_latent_cleared():
     """TB_LSHTM_Acute: start_treatment on ACUTE or INFECTION schedules CLEARED."""
-    sim = make_lshtm_sim(agents=20, use_acute=True)
+    sim = make_lshtm_sim(n_agents=20, use_acute=True)
     sim.init()
     tb = sim.diseases[0]
     uids_acute = ss.uids([0])
@@ -234,7 +234,7 @@ def test_start_treatment_acute_latent_cleared():
 def test_sim_run_tb_lshtm():
     """Short sim with TB_LSHTM runs and produces results."""
     sim = make_lshtm_sim(
-        agents=200,
+        n_agents=200,
         start=ss.date("2000-01-01"),
         stop=ss.date("2002-12-31"),
         dt=ss.days(7),
@@ -256,7 +256,7 @@ def test_sim_run_tb_lshtm():
 def test_sim_run_tb_lshtm_acute():
     """Short sim with TB_LSHTM_Acute runs and produces results."""
     sim = make_lshtm_sim(
-        agents=200,
+        n_agents=200,
         use_acute=True,
         start=ss.date("2000-01-01"),
         stop=ss.date("2002-12-31"),
@@ -272,7 +272,7 @@ def test_sim_run_tb_lshtm_acute():
 
 def test_init_results_defines_expected_keys():
     """init_results defines per-state counts and main outcome series."""
-    sim = make_lshtm_sim(agents=30)
+    sim = make_lshtm_sim(n_agents=30)
     sim.init()
     tb = sim.diseases[0]
     for state in TBSL:
@@ -291,7 +291,7 @@ def test_init_results_defines_expected_keys():
 
 def test_finalize_results_cumulative():
     """finalize_results fills cum_deaths and cum_active from new_*."""
-    sim = make_lshtm_sim(agents=50, start=ss.date("2000-01-01"), stop=ss.date("2001-12-31"))
+    sim = make_lshtm_sim(n_agents=50, start=ss.date("2000-01-01"), stop=ss.date("2001-12-31"))
     sim.run()
     tb = sim.diseases[0]
     tb.finalize_results()
@@ -301,7 +301,7 @@ def test_finalize_results_cumulative():
 
 def test_plot_returns_figure():
     """plot() returns a matplotlib Figure."""
-    sim = make_lshtm_sim(agents=50, start=ss.date("2000-01-01"), stop=ss.date("2001-12-31"))
+    sim = make_lshtm_sim(n_agents=50, start=ss.date("2000-01-01"), stop=ss.date("2001-12-31"))
     sim.run()
     tb = sim.diseases[0]
     fig = tb.plot()
@@ -316,7 +316,7 @@ def test_plot_returns_figure():
 
 def test_state_counts_sum_to_population():
     """At each time step, per-state counts sum to the population size at that time."""
-    sim = make_lshtm_sim(agents=150, start=ss.date("2000-01-01"), stop=ss.date("2003-12-31"))
+    sim = make_lshtm_sim(n_agents=150, start=ss.date("2000-01-01"), stop=ss.date("2003-12-31"))
     sim.run()
     tb = sim.diseases[0]
     # At final ti, sum of n_* must equal current population (deaths may have removed agents)
@@ -330,7 +330,7 @@ def test_state_counts_sum_to_population():
 
 def test_n_infectious_matches_infectious_states():
     """Result n_infectious equals count of agents in ASYMPTOMATIC or SYMPTOMATIC."""
-    sim = make_lshtm_sim(agents=100, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
+    sim = make_lshtm_sim(n_agents=100, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
     sim.run()
     tb = sim.diseases[0]
     for ti in range(len(tb.results["timevec"])):
@@ -347,7 +347,7 @@ def test_n_infectious_matches_infectious_states():
 
 def test_prevalence_active_in_valid_range():
     """prevalence_active is in [0, 1] when finite (implementation divides by alive count)."""
-    sim = make_lshtm_sim(agents=200, start=ss.date("2000-01-01"), stop=ss.date("2005-12-31"))
+    sim = make_lshtm_sim(n_agents=200, start=ss.date("2000-01-01"), stop=ss.date("2005-12-31"))
     sim.run()
     tb = sim.diseases[0]
     for ti in range(len(tb.results["timevec"])):
@@ -358,7 +358,7 @@ def test_prevalence_active_in_valid_range():
 
 def test_cumulative_series_non_decreasing():
     """cum_deaths and cum_active are non-decreasing over time."""
-    sim = make_lshtm_sim(agents=200, start=ss.date("2000-01-01"), stop=ss.date("2004-12-31"))
+    sim = make_lshtm_sim(n_agents=200, start=ss.date("2000-01-01"), stop=ss.date("2004-12-31"))
     sim.run()
     tb = sim.diseases[0]
     cum_d = tb.results["cum_deaths"][:]
@@ -369,7 +369,7 @@ def test_cumulative_series_non_decreasing():
 
 def test_new_events_non_negative():
     """new_deaths, new_active, new_notifications_15+ are non-negative."""
-    sim = make_lshtm_sim(agents=150, start=ss.date("2000-01-01"), stop=ss.date("2003-12-31"))
+    sim = make_lshtm_sim(n_agents=150, start=ss.date("2000-01-01"), stop=ss.date("2003-12-31"))
     sim.run()
     tb = sim.diseases[0]
     assert np.all(tb.results["new_deaths"][:] >= 0)
@@ -379,7 +379,7 @@ def test_new_events_non_negative():
 
 def test_susceptible_only_cleared_recovered_treated_or_never_infected():
     """susceptible is True only for state in SUSCEPTIBLE, CLEARED, RECOVERED, TREATED."""
-    sim = make_lshtm_sim(agents=80, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
+    sim = make_lshtm_sim(n_agents=80, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
     sim.run()
     tb = sim.diseases[0]
     susceptible_states = {TBSL.SUSCEPTIBLE, TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED}
@@ -396,7 +396,7 @@ def test_susceptible_only_cleared_recovered_treated_or_never_infected():
 
 def test_rel_sus_rel_trans_after_step():
     """After step, RECOVERED have rel_sus=rr_rec (π pi), TREATED rel_sus=rr_treat (ρ rho), ASYMPTOMATIC rel_trans=trans_asymp (κ kappa)."""
-    sim = make_lshtm_sim(agents=60)
+    sim = make_lshtm_sim(n_agents=60)
     sim.init()
     tb = sim.diseases[0]
     sim.run()
@@ -415,7 +415,7 @@ def test_rel_sus_rel_trans_after_step():
 
 def test_start_treatment_mixed_latent_active_ignores_cleared():
     """start_treatment with mix of INFECTION, SYMPTOMATIC, CLEARED: only INFECTION and SYMPTOMATIC are changed."""
-    sim = make_lshtm_sim(agents=50)
+    sim = make_lshtm_sim(n_agents=50)
     sim.init()
     tb = sim.diseases[0]
     u_inf = ss.uids([0])
@@ -441,7 +441,7 @@ def test_start_treatment_mixed_latent_active_ignores_cleared():
 
 def test_transition_single_destination_all_get_it():
     """transition with a single destination sends all uids to that state with ti_next >= ti."""
-    sim = make_lshtm_sim(agents=20)
+    sim = make_lshtm_sim(n_agents=20)
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids(np.arange(20))
@@ -454,7 +454,7 @@ def test_transition_single_destination_all_get_it():
 
 def test_step_with_no_one_due_leaves_state_unchanged():
     """When no agent has ti >= ti_next, step() does not change state."""
-    sim = make_lshtm_sim(agents=40)
+    sim = make_lshtm_sim(n_agents=40)
     sim.init()
     tb = sim.diseases[0]
     state_before = np.array(tb.state, copy=True)
@@ -466,7 +466,7 @@ def test_step_with_no_one_due_leaves_state_unchanged():
 
 def test_set_prognoses_acute_enters_acute_not_infection():
     """TB_LSHTM_Acute: set_prognoses puts new infections in ACUTE and schedules ACUTE->INFECTION."""
-    sim = make_lshtm_sim(agents=30, use_acute=True)
+    sim = make_lshtm_sim(n_agents=30, use_acute=True)
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids([1, 2, 3])
@@ -480,7 +480,7 @@ def test_set_prognoses_acute_enters_acute_not_infection():
 
 def test_rr_activation_zero_prevents_progression_to_active():
     """With rr_activation=0, latent agents only transition to CLEARED (inf_cle not scaled)."""
-    sim = make_lshtm_sim(agents=50)
+    sim = make_lshtm_sim(n_agents=50)
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids(np.arange(20))
@@ -495,7 +495,7 @@ def test_rr_activation_zero_prevents_progression_to_active():
 def test_zero_beta_no_initial_infection_no_transmission():
     """With init_prev=0 and beta=0, no one becomes infected (all remain SUSCEPTIBLE)."""
     sim = make_lshtm_sim(
-        agents=80,
+        n_agents=80,
         start=ss.date("2000-01-01"),
         stop=ss.date("2001-12-31"),
         pars={
@@ -513,7 +513,7 @@ def test_zero_beta_no_initial_infection_no_transmission():
 
 def test_detectable_15_plus_bounds():
     """n_detectable_15+ is at most n_SYMPTOMATIC_15+ + n_ASYMPTOMATIC_15+ (with cxr_sens=1)."""
-    sim = make_lshtm_sim(agents=100, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
+    sim = make_lshtm_sim(n_agents=100, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
     sim.run()
     tb = sim.diseases[0]
     for ti in range(len(tb.results["timevec"])):
@@ -528,7 +528,7 @@ def test_detectable_15_plus_bounds():
 
 def test_ti_next_inf_for_cleared_recovered_treated():
     """After step, CLEARED, RECOVERED, TREATED have ti_next=inf (no scheduled transition)."""
-    sim = make_lshtm_sim(agents=100, start=ss.date("2000-01-01"), stop=ss.date("2003-12-31"))
+    sim = make_lshtm_sim(n_agents=100, start=ss.date("2000-01-01"), stop=ss.date("2003-12-31"))
     sim.run()
     tb = sim.diseases[0]
     for state in [TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED]:
@@ -539,7 +539,7 @@ def test_ti_next_inf_for_cleared_recovered_treated():
 
 def test_on_treatment_consistent_with_state():
     """on_treatment is True iff state == TREATMENT."""
-    sim = make_lshtm_sim(agents=120, start=ss.date("2000-01-01"), stop=ss.date("2004-12-31"))
+    sim = make_lshtm_sim(n_agents=120, start=ss.date("2000-01-01"), stop=ss.date("2004-12-31"))
     sim.run()
     tb = sim.diseases[0]
     np.testing.assert_array_equal(
