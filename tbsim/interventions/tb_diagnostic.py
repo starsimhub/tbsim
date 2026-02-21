@@ -91,8 +91,8 @@ class TBDiagnostic(ss.Intervention):
     --------
     >>> sim = ss.Sim(
     ...     interventions=[
-    ...         mtb.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.1)}),
-    ...         mtb.TBDiagnostic(pars={
+    ...         tbsim.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.1)}),
+    ...         tbsim.TBDiagnostic(pars={
     ...             'coverage': 0.8,
     ...             'sensitivity': 0.85,
     ...             'specificity': 0.95,
@@ -722,16 +722,16 @@ def create_enhanced_diagnostic_scenarios():
 
 
 if __name__ == '__main__':
-    import tbsim as mtb
+    import tbsim
     import starsim as ss
     import matplotlib.pyplot as plt
 
     # Example simulation with enhanced diagnostic
     sim = ss.Sim(
-        people=ss.People(n_agents=1000, extra_states=mtb.get_extrastates()),
-        diseases=mtb.TB({'init_prev': ss.bernoulli(0.25)}),
+        people=ss.People(n_agents=1000, extra_states=tbsim.get_extrastates()),
+        diseases=tbsim.TB({'init_prev': ss.bernoulli(0.25)}),
         interventions=[
-            mtb.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.25)}),
+            tbsim.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.25)}),
             EnhancedTBDiagnostic(pars={
                 'coverage': ss.bernoulli(0.8, strict=False),
                 'use_oral_swab': True,

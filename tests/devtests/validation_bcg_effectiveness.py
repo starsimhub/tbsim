@@ -26,7 +26,7 @@ baseline TB disease indicators with BCG intervention outcomes.
 - Substantial reduction in TB mortality risk
 """
 
-import tbsim as mtb
+import tbsim
 from tbsim.interventions.bcg import BCGVx, BCGRoutine
 import starsim as ss
 import pandas as pd
@@ -52,7 +52,7 @@ def run_baseline_simulation(n_agents=500):
     """
     age_data = create_test_population()
     pop = ss.People(n_agents=n_agents, age_data=age_data)
-    tb = mtb.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     sim = ss.Sim(
@@ -94,7 +94,7 @@ def run_bcg_simulation(n_agents=500):
     """
     age_data = create_test_population()
     pop = ss.People(n_agents=n_agents, age_data=age_data)
-    tb = mtb.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     bcg = BCGRoutine(pars={
@@ -154,7 +154,7 @@ def test_bcg_individual_impact(n_agents=200):
     """
     age_data = create_test_population()
     pop = ss.People(n_agents=n_agents, age_data=age_data)
-    tb = mtb.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     bcg = BCGRoutine(pars={

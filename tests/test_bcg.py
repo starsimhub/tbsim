@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 import starsim as ss
-import tbsim as mtb
+import tbsim
 import pandas as pd
 from tbsim.interventions.bcg import BCGVx, BCGRoutine
 
@@ -14,7 +14,7 @@ from tbsim.interventions.bcg import BCGVx, BCGRoutine
 
 def make_sim(agents=20, start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'), dt=ss.days(7)):
     pop = ss.People(n_agents=agents)
-    tb = mtb.TB_LSHTM(name='tb')
+    tb = tbsim.TB_LSHTM(name='tb')
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     pars = dict(dt=dt, start=start, stop=stop)
     return pop, tb, net, pars

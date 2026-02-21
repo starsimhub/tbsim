@@ -74,7 +74,7 @@ Basic dwell time analysis:
    from tbsim.analyzers import DwtAnalyzer
    
    # Create simulation with analyzer
-   sim = ss.Sim(diseases=mtb.TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
+   sim = ss.Sim(diseases=TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
    sim.run()
    
    # Access analyzer results

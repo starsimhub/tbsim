@@ -1,5 +1,5 @@
 import starsim as ss 
-import tbsim as mtb 
+import tbsim
 import numpy as np 
 import pandas as pd
 import os
@@ -14,7 +14,7 @@ def make_tb(pars = None):
             beta = ss.per(0.1),
             init_prev = ss.bernoulli(p=0.25),
             )
-    return mtb.TB(pars=pars)
+    return tbsim.TB(pars=pars)
 
 
 def make_pop(pars = None, n_agents=500):

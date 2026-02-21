@@ -9,7 +9,7 @@ import pytest
 import numpy as np
 import pandas as pd
 import starsim as ss
-import tbsim as mtb
+import tbsim
 
 
 class TestMalnutrition:
@@ -17,13 +17,13 @@ class TestMalnutrition:
     
     def test_malnutrition_creation(self):
         """Test that Malnutrition disease can be created"""
-        nut = mtb.Malnutrition()
-        assert isinstance(nut, mtb.Malnutrition)
+        nut = tbsim.Malnutrition()
+        assert isinstance(nut, tbsim.Malnutrition)
         assert isinstance(nut, ss.Disease)
     
     def test_malnutrition_parameters(self):
         """Test that Malnutrition parameters are set correctly"""
-        nut = mtb.Malnutrition(pars=dict(
+        nut = tbsim.Malnutrition(pars=dict(
             beta=2.0,
             init_prev=0.05
         ))
@@ -32,7 +32,7 @@ class TestMalnutrition:
     
     def test_malnutrition_states(self):
         """Test that Malnutrition states are defined correctly"""
-        nut = mtb.Malnutrition()
+        nut = tbsim.Malnutrition()
         # Check that state arrays exist
         assert hasattr(nut, 'receiving_macro')
         assert hasattr(nut, 'receiving_micro')
@@ -42,7 +42,7 @@ class TestMalnutrition:
     
     def test_malnutrition_lms_data_loading(self):
         """Test that LMS data is loaded correctly"""
-        nut = mtb.Malnutrition()
+        nut = tbsim.Malnutrition()
         assert hasattr(nut, 'LMS_data')
         assert isinstance(nut.LMS_data, pd.DataFrame)
         # Check that data contains expected keys
@@ -51,7 +51,7 @@ class TestMalnutrition:
     
     def test_malnutrition_dweight_scale(self):
         """Test the dweight scale function"""
-        nut = mtb.Malnutrition()
+        nut = tbsim.Malnutrition()
 
         uids = np.array([0, 1, 2, 3, 4])
         std = nut.dweight_scale(nut, None, uids)
@@ -66,7 +66,7 @@ class TestMalnutrition:
     
     def test_malnutrition_lms_method_skip(self):
         """Test that LMS method exists but skip execution due to simulation context requirement"""
-        nut = mtb.Malnutrition()
+        nut = tbsim.Malnutrition()
         assert hasattr(nut, 'lms')
         assert callable(nut.lms)
 
@@ -76,21 +76,21 @@ class TestTBNutritionConnector:
     
     def test_connector_creation(self):
         """Test that TB_Nutrition_Connector can be created"""
-        connector = mtb.TB_Nutrition_Connector()
-        assert isinstance(connector, mtb.TB_Nutrition_Connector)
+        connector = tbsim.TB_Nutrition_Connector()
+        assert isinstance(connector, tbsim.TB_Nutrition_Connector)
         assert isinstance(connector, ss.Connector)
     
     def test_connector_parameters(self):
         """Test that connector parameters are set correctly"""
-        connector = mtb.TB_Nutrition_Connector(pars=dict(
-            rr_activation_func=mtb.TB_Nutrition_Connector.ones_rr,
-            rr_clearance_func=mtb.TB_Nutrition_Connector.ones_rr,
-            relsus_func=mtb.TB_Nutrition_Connector.compute_relsus
+        connector = tbsim.TB_Nutrition_Connector(pars=dict(
+            rr_activation_func=tbsim.TB_Nutrition_Connector.ones_rr,
+            rr_clearance_func=tbsim.TB_Nutrition_Connector.ones_rr,
+            relsus_func=tbsim.TB_Nutrition_Connector.compute_relsus
         ))
         
-        assert connector.pars['rr_activation_func'] == mtb.TB_Nutrition_Connector.ones_rr
-        assert connector.pars['rr_clearance_func'] == mtb.TB_Nutrition_Connector.ones_rr
-        assert connector.pars['relsus_func'] == mtb.TB_Nutrition_Connector.compute_relsus
+        assert connector.pars['rr_activation_func'] == tbsim.TB_Nutrition_Connector.ones_rr
+        assert connector.pars['rr_clearance_func'] == tbsim.TB_Nutrition_Connector.ones_rr
+        assert connector.pars['relsus_func'] == tbsim.TB_Nutrition_Connector.compute_relsus
     
     def test_ones_rr_function(self):
         """Test the ones_rr function returns neutral risk ratios"""
@@ -105,7 +105,7 @@ class TestTBNutritionConnector:
         nut = MockMalnutrition()
         uids = np.array([0, 1, 2, 3, 4])
         
-        rr = mtb.TB_Nutrition_Connector.ones_rr(tb, nut, uids)
+        rr = tbsim.TB_Nutrition_Connector.ones_rr(tb, nut, uids)
         assert len(rr) == 5
         assert all(r == 1.0 for r in rr)
     
@@ -125,7 +125,7 @@ class TestTBNutritionConnector:
         nut = MockMalnutrition()
         uids = np.array([0, 1, 2, 3, 4])
         
-        rel_sus = mtb.TB_Nutrition_Connector.compute_relsus(tb, nut, uids)
+        rel_sus = tbsim.TB_Nutrition_Connector.compute_relsus(tb, nut, uids)
         assert len(rel_sus) == 5
         assert all(r >= 1.0 for r in rel_sus)  # Should be >= 1.0
     
@@ -144,7 +144,7 @@ class TestTBNutritionConnector:
         nut = MockMalnutrition()
         uids = np.array([0, 1, 2, 3, 4])
         
-        rr = mtb.TB_Nutrition_Connector.supplementation_rr(tb, nut, uids, rate_ratio=0.5)
+        rr = tbsim.TB_Nutrition_Connector.supplementation_rr(tb, nut, uids, rate_ratio=0.5)
         
         assert len(rr) == 5
         # The function returns integers due to np.ones_like(uids) creating int64 array
@@ -174,7 +174,7 @@ class TestTBNutritionConnector:
         nut = MockMalnutrition()
         uids = np.array([0, 1, 2, 3, 4])
         
-        rr = mtb.TB_Nutrition_Connector.lonnroth_bmi_rr(tb, nut, uids, scale=2.0, slope=3.0, bmi50=25.0)
+        rr = tbsim.TB_Nutrition_Connector.lonnroth_bmi_rr(tb, nut, uids, scale=2.0, slope=3.0, bmi50=25.0)
         assert len(rr) == 5
         assert all(r > 0 for r in rr)  # Should be positive
         assert all(r <= 2.0 for r in rr)  # Should not exceed scale
@@ -186,26 +186,26 @@ class TestMalnutritionIntegration:
     def test_malnutrition_standalone_creation(self):
         """Test malnutrition as a standalone disease creation"""
         people = ss.People(n_agents=200)
-        nut = mtb.Malnutrition(pars=dict(
+        nut = tbsim.Malnutrition(pars=dict(
             init_prev=0.001
         ))
         
         # Test that malnutrition can be created with people
-        assert isinstance(nut, mtb.Malnutrition)
+        assert isinstance(nut, tbsim.Malnutrition)
         assert nut.pars['init_prev'] == 0.001
     
     def test_connector_creation_with_malnutrition(self):
         """Test connector creation with malnutrition"""
-        nut = mtb.Malnutrition()
-        connector = mtb.TB_Nutrition_Connector()
+        nut = tbsim.Malnutrition()
+        connector = tbsim.TB_Nutrition_Connector()
         
         # Test that both can be created together
-        assert isinstance(nut, mtb.Malnutrition)
-        assert isinstance(connector, mtb.TB_Nutrition_Connector)
+        assert isinstance(nut, tbsim.Malnutrition)
+        assert isinstance(connector, tbsim.TB_Nutrition_Connector)
     
     def test_malnutrition_state_initialization(self):
         """Test that malnutrition states are properly initialized"""
-        nut = mtb.Malnutrition()
+        nut = tbsim.Malnutrition()
         
         # Test that state arrays exist and have correct types
         assert hasattr(nut, 'receiving_macro')

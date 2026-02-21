@@ -22,7 +22,7 @@ First, import the required modules:
 
 .. code-block:: python
 
-   import tbsim as mtb
+   import tbsim
    import starsim as ss
    import sciris as sc
    import matplotlib.pyplot as plt
@@ -49,7 +49,7 @@ The ``build_tbsim()`` function creates a complete simulation with all necessary 
       pop = ss.People(n_agents=1000)
       
       # Configure TB disease module
-      tb = mtb.TB(dict(
+      tb = tbsim.TB(dict(
          dt = ss.days(7),           # Disease module time step
          beta = ss.peryear(0.0025)  # Transmission rate per year
       ))
@@ -94,11 +94,11 @@ Execute the simulation and visualize results:
       # Process and visualize results
       results = sim.results.flatten()
       results = {'basic': results}
-      mtb.plot_combined(
+      tbsim.plot_combined(
          results, 
          dark=True, 
          n_cols=3, 
-         filter=mtb.FILTERS.important_metrics
+         filter=tbsim.FILTERS.important_metrics
       )
       
       plt.show()

@@ -58,16 +58,16 @@ first_line = create_first_line_treatment()
 ### Basic DOTS Treatment
 
 ```python
-import tbsim as mtb
+import tbsim
 from tbsim.interventions import create_dots_treatment
 
 # Create simulation with DOTS treatment
 sim = ss.Sim(
-    people=ss.People(n_agents=1000, extra_states=mtb.get_extrastates()),
-    diseases=mtb.TB({'init_prev': ss.bernoulli(0.25)}),
+    people=ss.People(n_agents=1000, extra_states=tbsim.get_extrastates()),
+    diseases=tbsim.TB({'init_prev': ss.bernoulli(0.25)}),
     interventions=[
-        mtb.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.25)}),
-        mtb.TBDiagnostic(pars={'coverage': 0.8, 'sensitivity': 0.85, 'specificity': 0.95}),
+        tbsim.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.25)}),
+        tbsim.TBDiagnostic(pars={'coverage': 0.8, 'sensitivity': 0.85, 'specificity': 0.95}),
         create_dots_treatment(),  # Uses DOTS drug type
     ],
     networks=ss.RandomNet({'n_contacts': ss.poisson(lam=2), 'dur': 0}),

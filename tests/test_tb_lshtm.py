@@ -8,7 +8,7 @@ no behavior is assumed beyond what is defined there.
 import numpy as np
 import sciris as sc
 import starsim as ss
-import tbsim as mtb
+import tbsim
 from tbsim import TBSL # Used a lot so import separately
 
 
@@ -23,9 +23,9 @@ def make_lshtm_sim(
 ):
     """Build a minimal Sim with TB_LSHTM or TB_LSHTM_Acute."""
     if use_acute:
-        tb = mtb.TB_LSHTM_Acute(pars=pars)
+        tb = tbsim.TB_LSHTM_Acute(pars=pars)
     else:
-        tb = mtb.TB_LSHTM(pars=pars)
+        tb = tbsim.TB_LSHTM(pars=pars)
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=30))
     sim = ss.Sim(n_agents=n_agents, networks=net, diseases=tb, dt=dt, start=start, stop=stop, **kwargs)
     sim.pars.verbose = 0
@@ -208,7 +208,7 @@ def test_sim_run_tb_lshtm_acute():
     )
     sim.run()
     tb = sim.diseases[0]
-    assert isinstance(tb, mtb.TB_LSHTM_Acute)
+    assert isinstance(tb, tbsim.TB_LSHTM_Acute)
     assert "n_infectious" in tb.results
     assert "prevalence_active" in tb.results
 

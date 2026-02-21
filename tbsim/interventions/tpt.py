@@ -1,6 +1,6 @@
 import numpy as np
 import starsim as ss
-import tbsim as mtb
+import tbsim
 from collections import namedtuple
 from enum import Enum
 
@@ -130,7 +130,7 @@ class TPTInitiation(ss.Intervention):
         in_eligible_households = np.isin(ppl['hhid'], eligible_hhids)
         # Filter criteria: no symptoms, no active TB, not on_treatment
         no_symptoms = ppl['non_symptomatic'] & (~ppl['symptomatic'])
-        no_active_tb = (tb.state != mtb.TBS.ACTIVE_PRESYMP) & (tb.state != mtb.TBS.ACTIVE_SMPOS) & (tb.state != mtb.TBS.ACTIVE_SMNEG) & (tb.state != mtb.TBS.ACTIVE_EXPTB)
+        no_active_tb = (tb.state != tbsim.TBS.ACTIVE_PRESYMP) & (tb.state != tbsim.TBS.ACTIVE_SMPOS) & (tb.state != tbsim.TBS.ACTIVE_SMNEG) & (tb.state != tbsim.TBS.ACTIVE_EXPTB)
         not_on_treatment = ~tb.on_treatment
         
         eligible = in_eligible_households & no_symptoms & no_active_tb & not_on_treatment
@@ -167,7 +167,7 @@ class TPTInitiation(ss.Intervention):
 
             # Set TB state to PROTECTED after treatment ends
             # (Assume protection starts immediately after treatment for simplicity)
-            tb.state[tpt_candidates] = mtb.TBS.PROTECTED
+            tb.state[tpt_candidates] = tbsim.TBS.PROTECTED
 
             # Result tracking
             self.results['n_eligible'][self.ti] = np.count_nonzero(eligible)
