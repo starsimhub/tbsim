@@ -85,12 +85,12 @@ def build_sim(scenario=None, spars=None):
     if tpt_params:
         if isinstance(tpt_params, dict):
             # Single TPT intervention
-            interventions.append(tbsim.TPTInitiation(pars=tpt_params))
+            interventions.append(tbsim.TPTSimple(pars=tpt_params))
         elif isinstance(tpt_params, list):
             # Multiple TPT interventions
             for i, params in enumerate(tpt_params):
                 params['name'] = f'TPT_{i}'  # Give unique name
-                interventions.append(tbsim.TPTInitiation(pars=params))
+                interventions.append(tbsim.TPTSimple(pars=params))
     
     # Add Beta interventions (can be single or multiple)
     beta_params = scenario.get('betabyyear')
