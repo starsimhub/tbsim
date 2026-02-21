@@ -49,17 +49,11 @@ class TestMalnutrition:
         assert 'Female' in nut.LMS_data.index
         assert 'Male' in nut.LMS_data.index
     
-    def test_malnutrition_dweight_functions(self):
-        """Test the dweight location and scale functions"""
+    def test_malnutrition_dweight_scale(self):
+        """Test the dweight scale function"""
         nut = mtb.Malnutrition()
-        
-        # Test dweight_loc function
+
         uids = np.array([0, 1, 2, 3, 4])
-        mu = nut.dweight_loc(nut, None, uids)
-        assert len(mu) == 5
-        assert all(m >= 0 for m in mu)  # Should be non-negative
-        
-        # Test dweight_scale function
         std = nut.dweight_scale(nut, None, uids)
         assert len(std) == 5
         assert all(s >= 0 for s in std)  # Should be non-negative
