@@ -1,85 +1,62 @@
-"""
-Run the LSHTM model for 20 years with default parameters, 
-comparing with and without acute compartment
-"""
+"""Health-seeking sample using TB_LSHTM_Acute with prevalence maintenance."""
 
 import matplotlib.pyplot as plt
-import numpy as np
-import tbsim as mtb
 import starsim as ss
+import tbsim as mtb
 
-n_agents = 5_000
-rand_seed = 5
-sp = {
-    "start": ss.date("1990-01-01"),
-    "stop": ss.date("2010-12-31"),
-    "dt": ss.days(7),
-    "verbose": 0.002,
-    "rand_seed": rand_seed,
-}
-care_intervention = mtb.HealthSeekingBehavior(pars={"initial_care_seeking_rate": ss.perday(0.2)})
+N_AGENTS = 5_000
+
+SIM_PARS = dict(
+    start     = ss.date("1990-01-01"),
+    stop      = ss.date("2010-12-31"),
+    dt        = ss.days(7),
+    verbose   = 0.002,
+    rand_seed = 5,
+)
+
+TB_PARS = dict(
+    init_prev         = ss.bernoulli(0.25),
+    beta              = ss.peryear(0.9),
+    rate_acute_latent = ss.years(ss.expon(1 / 4.0)),
+    trans_acute       = 0.9,
+)
+
+def build_sim() -> ss.Sim:
+    return ss.Sim(
+        people=ss.People(n_agents=N_AGENTS),
+        networks=ss.RandomNet(pars={"n_contacts": ss.poisson(lam=5), "dur": 0}),
+        diseases=mtb.TB_LSHTM_Acute(pars=TB_PARS),
+        interventions=[
+            mtb.HealthSeekingBehavior(pars={
+                "initial_care_seeking_rate": ss.perday(0.03),
+                "care_retry_steps":          8,
+                # "custom_states":           [mtb.TBSL.ASYMPTOMATIC], # could be used for ACF  
+            }),
+        ],
+        demographics=[
+            ss.Births(pars={"birth_rate": 25}),
+            ss.Deaths(pars={"death_rate": 10}),
+        ],
+        pars=SIM_PARS,
+    )
 
 
-tb_params = {
-    "use_acute": True,             # True → TB_LSHTM_Acute
-    "init_prev": ss.bernoulli(0.01), # seed prevalence
-    "beta": ss.peryear(0.20),       # transmission rate
-    "trans_asymp": 0.82,           # κ kappa: asymp vs symp relative transmissibility
-    "rr_rec": 0.21,                # π pi: reinfection risk after recovery
-    "rr_treat": 3.15,              # ρ rho: reinfection risk after treatment
-    "cxr_asymp_sens": 1.0,         # CXR sensitivity for asymptomatic (0–1)
-
-    # Acute variant only (ignored if use_acute is False)
-    "rate_acute_latent": ss.years(ss.expon(1 / 4.0)),  # ACUTE → INFECTION
-    "trans_acute": 0.9,            # α alpha: relative transmissibility from acute
-}
+def print_summary(sim: ss.Sim) -> None:
+    hs = sim.interventions["healthseekingbehavior"]
+    r  = hs.results
+    print("\n=== Health-seeking summary ===")
+    print(f"  total seekers     : {int(r['n_ever_sought_care'][-1])}")
+    print(f"  total new seekers : {int(sum(r['new_sought_care']))}")
+    print(f"  peak eligible     : {int(max(r['n_eligible']))}")
 
 
-def build_lshtm_sim(tb_params, n_agents, interventions=None):
-    """Build a Starsim simulation from tb_params and n_agents (other run options are fixed)."""
-    use_acute = tb_params.get("use_acute", False)
-    skip = {"use_acute"}
-    if not use_acute:
-        skip |= {"rate_acute_latent", "trans_acute"}  # base model doesn't use these
-    infection_pars = {k: v for k, v in tb_params.items() if k not in skip}
-    if use_acute:
-        infection = mtb.TB_LSHTM_Acute(pars=infection_pars)
-    else:
-        infection = mtb.TB_LSHTM(pars=infection_pars)
+def run_and_plot() -> None:
+    sim = build_sim()
+    sim.run()
+    print_summary(sim)
+    sim.plot()
+    plt.show()
 
-    pop = ss.People(n_agents=n_agents)
-    net = ss.RandomNet(pars={"n_contacts": ss.poisson(lam=5), "dur": 0})
-
-    kwargs = dict(people=pop, networks=net, diseases=infection, pars=sp)
-    if interventions is not None:
-        kwargs["interventions"] = interventions
-    demographics = [
-        ss.Births(pars=dict(birth_rate=25)),
-        ss.Deaths(pars=dict(death_rate=10)),
-    ]
-    kwargs["demographics"] = demographics
-    sim = ss.Sim(**kwargs)
-    return sim
-
-def build_sims_acute_vs_no_acute():
-    """Build two sims: with acute (TB_LSHTM_Acute) and without acute (TB_LSHTM)."""
-    params_with_acute = {**tb_params, "use_acute": True}
-    params_no_acute = {**tb_params, "use_acute": False}
-    sim_acute = build_lshtm_sim(params_with_acute, n_agents)
-    sim_acute.label = "TB Acute"
-    sim_no_acute = build_lshtm_sim(params_no_acute, n_agents)
-    sim_no_acute.label = "LSHTM (without acute)"
-    return [sim_acute, sim_no_acute]
 
 if __name__ == "__main__":
-    sims = build_sims_acute_vs_no_acute()
-    msim = ss.MultiSim(sims=sims, label="TB_LSHTM_acute_vs_no_acute")
-    msim.run(parallel=True, shrink=False, reseed=False)
-    results = {
-        s.label: {str(k): v for k, v in s.results.flatten().items()}
-        for s in msim.sims
-    }
-    # making the keys similar to plot them combined
-    results['TB Acute'] = {k.replace("_acute", ""): v for k, v in results['TB Acute'].items()}
-    mtb.plot_combined(results, title="TB LSHTM: with acute vs without acute")
-    plt.show()
+    run_and_plot()

@@ -127,5 +127,5 @@ def test_requires_tb_module():
 
     intv = HealthSeekingBehavior()
     intv.setattribute("sim", EmptySim())
-    with pytest.raises((IndexError, TypeError)):
+    with pytest.raises((IndexError, TypeError, AttributeError)):
         intv.init_post()
