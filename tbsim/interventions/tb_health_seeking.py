@@ -1,16 +1,9 @@
 
 import numpy as np
 import starsim as ss
-from tbsim import TBS, TB
-from tbsim.tb_lshtm import TB_LSHTM, TB_LSHTM_Acute, TBSL
+from tbsim.tb_lshtm import TBSL
 
 __all__ = ['HealthSeekingBehavior']
-
-_DISEASE_ENUM = {
-    TB_LSHTM_Acute: TBSL,
-    TB_LSHTM:       TBSL,
-    TB:             TBS,
-}
 
 class HealthSeekingBehavior(ss.Intervention):
     """
@@ -39,15 +32,18 @@ class HealthSeekingBehavior(ss.Intervention):
 
     def init_post(self):
         super().init_post()
-        tb = getattr(self.sim.diseases, 'tb', None) or getattr(self.sim.diseases, 'tb_lshtm', None) or self.sim.diseases[0]
-        if self.pars.custom_states is not None:
-            self._states = np.asarray(self.pars.custom_states)
-        else:
-            enum = next((_DISEASE_ENUM[cls] for cls in type(tb).__mro__ if cls in _DISEASE_ENUM), None)
-            if enum is None:
-                raise ValueError("Could not infer care-seeking states. Provide `custom_states`.")
-            self._states = enum.care_seeking_eligible()
+        tb = getattr(self.sim.diseases, 'tb_lshtm', None)
+        if tb is None:
+            raise ValueError("HealthSeekingBehavior requires a TB_LSHTM disease module named 'tb_lshtm'.")
         self._tb = tb
+        
+        if self.pars.custom_states is not None:
+            self._states = np.asarray(self.pars.custom_states) 
+            if not np.isin(self._states, TBSL.care_seeking_eligible()).all():
+                raise ValueError("Custom states must be a subset of the eligible states.")
+        else:
+            self._states = TBSL.care_seeking_eligible()
+        
         self._new_seekers_count = 0
         if self.pars.start is None: self.pars.start = self.sim.t.start
         if self.pars.stop  is None: self.pars.stop  = self.sim.t.stop
