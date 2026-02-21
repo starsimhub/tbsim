@@ -548,7 +548,7 @@ def test_on_treatment_consistent_with_state():
         err_msg="on_treatment should equal (state == TREATMENT)",
     )
 
-def test_dt_change():
+def test_dt_change(do_plot=False):
     """ Check how changing dt affects the results """
     kw = dict(
         n_agents=10_000,
@@ -566,9 +566,10 @@ def test_dt_change():
 
     msim = ss.MultiSim(sims=sims.values())
     msim.run()
-    msim.plot()
+    if do_plot:
+        msim.plot()
     return msim
 
 
 if __name__ == '__main__':
-    msim = test_dt_change()
+    msim = test_dt_change(do_plot=True)
