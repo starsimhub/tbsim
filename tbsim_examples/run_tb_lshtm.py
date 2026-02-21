@@ -5,7 +5,7 @@ comparing with and without acute compartment
 
 import matplotlib.pyplot as plt
 import numpy as np
-import tbsim as mtb
+import tbsim
 import starsim as ss
 
 n_agents = 5_000
@@ -41,9 +41,9 @@ def build_lshtm_sim(tb_params, n_agents, interventions=None):
         skip |= {"rate_acute_latent", "trans_acute"}  # base model doesn't use these
     infection_pars = {k: v for k, v in tb_params.items() if k not in skip}
     if use_acute:
-        infection = mtb.TB_LSHTM_Acute(pars=infection_pars)
+        infection = tbsim.TB_LSHTM_Acute(pars=infection_pars)
     else:
-        infection = mtb.TB_LSHTM(pars=infection_pars)
+        infection = tbsim.TB_LSHTM(pars=infection_pars)
 
     pop = ss.People(n_agents=n_agents)
     net = ss.RandomNet(pars={"n_contacts": ss.poisson(lam=5), "dur": 0})
@@ -79,5 +79,5 @@ if __name__ == "__main__":
     }
     # making the keys similar to plot them combined
     results['TB Acute'] = {k.replace("_acute", ""): v for k, v in results['TB Acute'].items()}
-    mtb.plot_combined(results, title="TB LSHTM: with acute vs without acute")
+    tbsim.plot_combined(results, title="TB LSHTM: with acute vs without acute")
     plt.show()

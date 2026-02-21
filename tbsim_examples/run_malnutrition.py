@@ -4,14 +4,14 @@ Illustrate malnutrition, and TB-malnutrition with connector.
 
 import numpy as np
 import starsim as ss
-import tbsim as mtb
+import tbsim
 import matplotlib.pyplot as plt
 
 
 def make_malnutrition():
     # --------- Disease ----------
     nut_pars = dict()
-    nut = mtb.Malnutrition(nut_pars)
+    nut = tbsim.Malnutrition(nut_pars)
     
     # --------- People ----------
     n_agents = 200
@@ -48,11 +48,11 @@ def make_tb_nut():
         beta = 0.01, 
         init_prev = 0.25,
         )
-    tb = mtb.TB(tb_pars)
+    tb = tbsim.TB(tb_pars)
 
     # ---------- Malnutrition --------
     nut_pars = dict()
-    nut = mtb.Malnutrition(nut_pars)
+    nut = tbsim.Malnutrition(nut_pars)
 
     # -------- Network ---------
     net_pars = dict(
@@ -69,7 +69,7 @@ def make_tb_nut():
     
     # --------- Connector ---------
     cn_pars = dict()
-    cn = mtb.TB_Nutrition_Connector(cn_pars)
+    cn = tbsim.TB_Nutrition_Connector(cn_pars)
 
     # --------- Interventions ------
     
@@ -77,7 +77,7 @@ def make_tb_nut():
     # Create a TB vaccine product   
     tb_vaccine = None # ss.Product(name="TB Vaccine")
     # Create a routine TB vaccination intervention
-    routine_vx = None # mtb.TBVaccinationCampaign(year=1997, target_state=1.0, product=tb_vaccine, prob=0.9)
+    routine_vx = None # tbsim.TBVaccinationCampaign(year=1997, target_state=1.0, product=tb_vaccine, prob=0.9)
     
     # TODO: Add a set of common nutrition interventions - we may need to remove dependencies from Harlem scenarios. 
 
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     sim_n = make_malnutrition()
     sim_n.run()
     results = {'malnutrition': sim_n.results.flatten()}
-    mtb.plot_combined(results, n_cols=3, dark=True)
+    tbsim.plot_combined(results, n_cols=3, dark=True)
 
     # Make TB-malnutrition simulation
     sim_tbn = make_tb_nut()

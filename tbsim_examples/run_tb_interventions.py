@@ -1,4 +1,4 @@
-import tbsim as mtb
+import tbsim
 import starsim as ss
 import sciris as sc
 import matplotlib.pyplot as plt
@@ -73,43 +73,43 @@ def build_sim(scenario=None, spars=None):
     if bcg_params:
         if isinstance(bcg_params, dict):
             # Single BCG intervention
-            interventions.append(mtb.BCGRoutine(pars=bcg_params))
+            interventions.append(tbsim.BCGRoutine(pars=bcg_params))
         elif isinstance(bcg_params, list):
             # Multiple BCG interventions
             for i, params in enumerate(bcg_params):
                 params['name'] = f'BCG_{i}'  # Give unique name
-                interventions.append(mtb.BCGRoutine(pars=params))
+                interventions.append(tbsim.BCGRoutine(pars=params))
     
     # Add TPT interventions (can be single or multiple)
     tpt_params = scenario.get('tptintervention')
     if tpt_params:
         if isinstance(tpt_params, dict):
             # Single TPT intervention
-            interventions.append(mtb.TPTInitiation(pars=tpt_params))
+            interventions.append(tbsim.TPTInitiation(pars=tpt_params))
         elif isinstance(tpt_params, list):
             # Multiple TPT interventions
             for i, params in enumerate(tpt_params):
                 params['name'] = f'TPT_{i}'  # Give unique name
-                interventions.append(mtb.TPTInitiation(pars=params))
+                interventions.append(tbsim.TPTInitiation(pars=params))
     
     # Add Beta interventions (can be single or multiple)
     beta_params = scenario.get('betabyyear')
     if beta_params:
         if isinstance(beta_params, dict):
             # Single Beta intervention
-            interventions.append(mtb.BetaByYear(pars=beta_params))
+            interventions.append(tbsim.BetaByYear(pars=beta_params))
         elif isinstance(beta_params, list):
             # Multiple Beta interventions
             for i, params in enumerate(beta_params):
                 params['name'] = f'Beta_{i}'  # Give unique name
-                interventions.append(mtb.BetaByYear(pars=params))
+                interventions.append(tbsim.BetaByYear(pars=params))
     
     # Create simulation components
     pop = ss.People(n_agents=500, age_data=age_data)
-    tb = mtb.TB_LSHTM(pars=tbpars, name='tb')
+    tb = tbsim.TB_LSHTM(pars=tbpars, name='tb')
     networks = [
         ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
-        mtb.HouseholdNet()
+        tbsim.HouseholdNet()
     ]
     
     # Create and return simulation
@@ -198,7 +198,7 @@ def run_scenarios(plot=True):
         pl.plot_combined(results, 
                         heightfold=2, outdir='results/interventions')
                         
-                        # filter=mtb.FILTERS.important_metrics)
+                        # filter=tbsim.FILTERS.important_metrics)
         plt.show()
     
     return results

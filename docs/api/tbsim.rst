@@ -92,10 +92,11 @@ Analysis and visualization:
 
 .. code-block:: python
 
+   import tbsim
    from tbsim.analyzers import DwtAnalyzer
    
    # Add analyzer to simulation
-   sim = ss.Sim(diseases=mtb.TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
+   sim = ss.Sim(diseases=tbsim.TB(), analyzers=DwtAnalyzer(scenario_name="Baseline"), pars=dict(dt = ss.days(7), start = ss.date('1940'), stop = ss.date('2010')))
    
    sim.run()
    

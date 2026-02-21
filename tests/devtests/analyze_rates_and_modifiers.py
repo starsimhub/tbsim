@@ -9,7 +9,7 @@ Author: TB Simulation Team
 Date: 2024
 """
 
-import tbsim as mtb
+import tbsim
 from tbsim.interventions.bcg import BCGVx, BCGRoutine
 import starsim as ss
 import pandas as pd
@@ -39,7 +39,7 @@ def analyze_tb_rates_and_modifiers():
     pop = ss.People(n_agents=500, age_data=age_data)
 
     # Initialize TB model
-    tb = mtb.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     sim = ss.Sim(
@@ -98,7 +98,7 @@ def analyze_tb_rates_and_modifiers():
     })
 
     pop_bcg = ss.People(n_agents=500, age_data=age_data)
-    tb_bcg = mtb.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb_bcg = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net_bcg = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     sim_bcg = ss.Sim(

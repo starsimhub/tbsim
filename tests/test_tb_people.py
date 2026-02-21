@@ -2,7 +2,7 @@
 Simple test script to verify TBPeople class functionality.
 """
 
-import tbsim as mtb
+import tbsim
 import starsim as ss
 from tbsim.people import TBPeople
 
@@ -113,7 +113,7 @@ def test_compatibility_with_simulation():
         beta=ss.peryear(0.01),
         init_prev=0.1,
     )
-    tb = mtb.TB(pars=tb_pars)
+    tb = tbsim.TB(pars=tb_pars)
     
     # Create network
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=2), dur=0))
@@ -270,7 +270,7 @@ def test_tb_people_custom_states_with_simulation():
         beta=ss.peryear(0.01),
         init_prev=0.1,
     )
-    tb = mtb.TB(pars=tb_pars)
+    tb = tbsim.TB(pars=tb_pars)
     
     # Create network
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=2), dur=0))
@@ -401,7 +401,7 @@ def test_tb_people_simulation_results():
         beta=ss.peryear(0.02),
         init_prev=0.1,
     )
-    tb = mtb.TB(pars=tb_pars)
+    tb = tbsim.TB(pars=tb_pars)
     
     # Create network
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=3), dur=0))
@@ -478,7 +478,7 @@ def test_tb_people_simulation_with_state_tracking():
         beta=ss.peryear(0.01),
         init_prev=0.05,
     )
-    tb = mtb.TB(pars=tb_pars)
+    tb = tbsim.TB(pars=tb_pars)
     
     # Create network
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=2), dur=0))
@@ -543,7 +543,7 @@ def test_tb_people_simulation_results_analysis():
         beta=ss.peryear(0.015),
         init_prev=0.08,
     )
-    tb = mtb.TB(pars=tb_pars)
+    tb = tbsim.TB(pars=tb_pars)
     
     # Create network
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=4), dur=0))

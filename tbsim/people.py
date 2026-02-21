@@ -76,9 +76,9 @@ class TBPeople(ss.People):
     >>> print(f"Number symptomatic: {pop.symptomatic.sum()}")
     
     Creating a simulation:
-    >>> import tbsim as mtb
+    >>> import tbsim
     >>> pop = TBPeople(n_agents=1000)
-    >>> tb = mtb.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
+    >>> tb = tbsim.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
     >>> sim = ss.Sim(people=pop, diseases=[tb], pars={'dt': ss.days(7)})
     
     Notes

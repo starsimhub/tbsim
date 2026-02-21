@@ -3,7 +3,7 @@ import sciris as sc
 import numpy as np
 from tbsim import TBS
 import datetime as dt
-import tbsim as mtb
+import tbsim
 import pandas as pd
 
 __all__ = ['Product', 'TBVaccinationCampaign', 'get_extrastates']
@@ -109,5 +109,5 @@ class TBVaccinationCampaign(ss.Intervention):
 # Sample calling function below
 if __name__ == '__main__':
 
-    print('care_seeking_multiplier' in [s.name for s in mtb.get_extrastates()])
-    print('n_times_tested' in [s.name for s in mtb.get_extrastates()])
+    print('care_seeking_multiplier' in [s.name for s in tbsim.get_extrastates()])
+    print('n_times_tested' in [s.name for s in tbsim.get_extrastates()])
