@@ -499,6 +499,7 @@ def test_on_treatment_consistent_with_state():
         err_msg="on_treatment should equal (state == TREATMENT)",
     )
 
+
 def test_dt_change(do_plot=False):
     """ Check how changing dt affects the results """
     kw = dict(
