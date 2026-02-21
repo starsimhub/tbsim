@@ -20,7 +20,7 @@ parms = c(
   mutb_fin = 0.23,  # TB mortality (Final)
   theta_ini = 0.44, # Diagnosis (Initial)
   theta_fin = 0.9,  # Diagnosis (Final)
-  phi_ini = 0.69,   # Treatment failure (Initial) 
+  phi_ini = 0.69,   # Treatment failure (Initial)
   phi_fin = 0.09,   # Treatment failure (Final)
   rho = 3.25)       # Risk of reinfection
 
@@ -44,7 +44,7 @@ ode <- function(parms, end_time = 2020) {
   des <- function(time, state, parms) {
 
     with(as.list(c(state, parms)), {
-      
+
       dSUS = ((mu * N) + (force_func_mutb(time) * CLN)) - (((beta / N) * ((kappa * SUB) + CLN)) * SUS) - (mu * SUS)
       dINF = (((beta / N) * ((kappa * SUB) + CLN)) * (SUS + CLE + (pi * REC) + (rho * TRE))) - (infcle * INF) - (infmin * INF) - (infsub * INF) - (mu * INF)
       dCLE = (infcle * INF) - (((beta / N) * ((kappa * SUB) + CLN)) * CLE) - (mu * CLE)
@@ -55,7 +55,7 @@ ode <- function(parms, end_time = 2020) {
       dTXT = (force_func_theta(time) * CLN) - (force_func_phi(time) * TXT) - (delta * TXT) - (mu * TXT)
       dTRE = (delta * TXT) - (((beta / N) * ((kappa * SUB) + CLN)) * (rho * TRE)) - (mu * TRE)
 
-      return(list(c( 
+      return(list(c(
         dSUS, dINF, dCLE, dREC, dMIN, dSUB, dCLN, dTXT, dTRE),
         TBc   = (SUB + CLN), # TB prevalence (per 100k)
         Mor   = (force_func_mutb(time) * CLN), # TB mortality (per 100k)
@@ -63,10 +63,10 @@ ode <- function(parms, end_time = 2020) {
         Spr   = (SUB / (SUB + CLN)))) # Proportion subclinical TB (%)
     })
   }
-  
+
   yini <- c(SUS = 1e5 - 1e3, INF = 0, CLE = 0, REC = 0,
             MIN = 0, SUB = 0, CLN = 1e3, TXT = 0, TRE = 0)
-  
+
   times <- seq(1500, end_time, by = 1)
   out <- deSolve::ode(yini, times, des, parms)
   return(out)
@@ -97,7 +97,7 @@ default_pars = sc.objdict(
   mutb_fin = 0.23,  # TB mortality (Final)
   theta_ini = 0.44, # Diagnosis (Initial)
   theta_fin = 0.9,  # Diagnosis (Final)
-  phi_ini = 0.69,   # Treatment failure (Initial) 
+  phi_ini = 0.69,   # Treatment failure (Initial)
   phi_fin = 0.09,   # Treatment failure (Final)
   rho = 3.25,       # Risk of reinfection
   N = 1e5,          # Population size
@@ -108,27 +108,25 @@ default_pars = sc.objdict(
 
 # Define literal Python translation of R model
 class TB_R(sc.prettyobj):
-    
+
     def __init__(self, **kwargs):
         self.pars = default_pars
         self.pars.update(kwargs)
         return
 
-    def run(self, end_time=2020):
+    def run(self, start_time=1500, end_time=2020):
         p = self.pars
 
         # Forcing functions (piecewise linear interpolation, constant extrapolation)
         # Equivalent to R's approxfun(method="linear", rule=2)
-        mutb_times  = [1500, 1999, 2020]
+        interp_times  = [start_time, 1999, end_time]
         mutb_vals   = [p.mutb_ini,  p.mutb_ini,  p.mutb_fin]
-        theta_times = [1500, 1999, 2020]
         theta_vals  = [p.theta_ini, p.theta_ini, p.theta_fin]
-        phi_times   = [1500, 1999, 2020]
         phi_vals    = [p.phi_ini,   p.phi_ini,   p.phi_fin]
 
-        def force_mutb(t):  return np.interp(t, mutb_times, mutb_vals)
-        def force_theta(t): return np.interp(t, theta_times, theta_vals)
-        def force_phi(t):   return np.interp(t, phi_times, phi_vals)
+        def force_mutb(t):  return np.interp(t, interp_times, mutb_vals)
+        def force_theta(t): return np.interp(t, interp_times, theta_vals)
+        def force_phi(t):   return np.interp(t, interp_times, phi_vals)
 
         # ODE system
         def des(state, t):
@@ -155,7 +153,7 @@ class TB_R(sc.prettyobj):
         yini = [1e5 - 1e3, 0, 0, 0, 0, 0, 1e3, 0, 0]
 
         # Solve ODE
-        times = np.arange(1500, end_time + 1, 1)
+        times = np.arange(start_time, end_time + 1, 1)
         out = odeint(des, yini, times)
 
         # Build results
@@ -355,4 +353,18 @@ class TB_R_SS(ss.Module):
                 sc.boxoff(ax)
             sc.figlayout()
         return ss.return_fig(fig)
-  
+
+
+if __name__ == '__main__':
+    sc.options(dpi=100)
+
+    # Run pure Python version
+    tbr = TB_R()
+    tbr.run(start_time=1920, end_time=2020)
+    tbr.plot()
+
+    # Run Starsim version
+    tbrss = TB_R_SS()
+    sim = ss.Sim(modules=tbrss, start=1920, stop=2020, dt=0.1)
+    sim.run()
+    sim.plot()
