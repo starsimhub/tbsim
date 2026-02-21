@@ -44,16 +44,14 @@ def test_bcg_default_values():
     assert bcg.pars.start == ss.date('1900-01-01')
     assert bcg.pars.stop == ss.date('2100-12-31')
     assert bcg.pars.age_range == [0, 5]
-    assert bcg.min_age == 0
-    assert bcg.max_age == 5
 
     # Biological pars on the product
     assert '0.8' in str(bcg.product.pars.p_take)
     assert hasattr(bcg.product.pars, 'dur_immune')
 
     # State arrays sized to population
-    assert len(bcg.bcg_vaccinated) == nagents
-    assert len(bcg.ti_bcg_vaccinated) == nagents
+    assert len(bcg.initiated) == nagents
+    assert len(bcg.ti_initiated) == nagents
 
 
 def test_bcg_custom_values():
@@ -79,9 +77,7 @@ def test_bcg_custom_values():
     assert bcg.pars.start == ss.date('2000-01-01')
     assert bcg.pars.stop == ss.date('2015-01-01')
     assert bcg.pars.age_range == (1, 10)
-    assert bcg.min_age == 1
-    assert bcg.max_age == 10
-    assert len(bcg.bcg_vaccinated) == nagents
+    assert len(bcg.initiated) == nagents
 
 
 def test_bcg_age_range_functionality():
@@ -94,16 +90,14 @@ def test_bcg_age_range_functionality():
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']
-    assert bcg.min_age == 18
-    assert bcg.max_age == 65
+    assert bcg.pars.age_range == (18, 65)
 
     # Adolescent vaccination (10-19)
     itv2 = BCGRoutine(pars={'age_range': (10, 19)})
     sim2 = ss.Sim(people=pop, diseases=tb, interventions=itv2, networks=net, pars=pars)
     sim2.init()
     bcg2 = sim2.interventions['bcgroutine']
-    assert bcg2.min_age == 10
-    assert bcg2.max_age == 19
+    assert bcg2.pars.age_range == (10, 19)
 
 
 def test_bcg_eligibility_and_vaccination():
@@ -116,13 +110,13 @@ def test_bcg_eligibility_and_vaccination():
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']
-    assert len(bcg.bcg_vaccinated) == nagents
+    assert len(bcg.initiated) == nagents
 
     bcg.step()
 
     ages = sim.people.age
     in_age_range = ((ages >= 0) & (ages <= 5)).uids
-    assert np.any(bcg.bcg_vaccinated[in_age_range]), "Some age-eligible individuals should be vaccinated after step"
+    assert np.any(bcg.initiated[in_age_range]), "Some age-eligible individuals should be vaccinated after step"
 
 
 def test_bcg_eligibility_with_age_range():
@@ -187,9 +181,9 @@ def test_bcg_protection_duration():
 
     bcg.step()
 
-    vaccinated = bcg.bcg_vaccinated
-    if np.any(vaccinated):
-        protection_expires = bcg.product.ti_bcg_protection_expires[vaccinated]
+    initiated = bcg.initiated
+    if np.any(initiated):
+        protection_expires = bcg.product.ti_bcg_protection_expires[initiated]
         valid = ~np.isnan(protection_expires)
         if np.any(valid):
             assert np.all(protection_expires[valid] > bcg.ti), "Protection expiration should be after current time"
@@ -208,13 +202,13 @@ def test_bcg_protection_expiry_and_removal():
 
     bcg.step()
 
-    vaccinated = bcg.bcg_vaccinated
-    assert np.any(vaccinated), "Some individuals should be vaccinated"
+    initiated = bcg.initiated
+    assert np.any(initiated), "Some individuals should be vaccinated"
 
     for _ in range(10):
         bcg.step()
 
-    assert hasattr(bcg, 'bcg_vaccinated'), "BCG intervention should still be functional"
+    assert hasattr(bcg, 'initiated'), "BCG intervention should still be functional"
 
 
 def test_bcg_modifiers_reapplied_each_step():
@@ -255,7 +249,7 @@ def test_bcg_result_metrics():
     bcg.step()
     bcg.update_results()
 
-    assert 'n_newly_vaccinated' in bcg.results
-    assert isinstance(bcg.results['n_newly_vaccinated'][bcg.ti], (int, np.integer))
+    assert 'n_newly_initiated' in bcg.results
+    assert isinstance(bcg.results['n_newly_initiated'][bcg.ti], (int, np.integer))
     assert 'n_protected' in bcg.results
     assert isinstance(bcg.results['n_protected'][bcg.ti], (int, np.integer))
