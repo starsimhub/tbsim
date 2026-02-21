@@ -4,9 +4,26 @@ BCG Intervention Effectiveness Validation Script
 This script validates the effectiveness of the BCG intervention by comparing
 baseline TB disease indicators with BCG intervention outcomes.
 
-Author: TB Simulation Team
-Date: 2024
-Purpose: Validate BCG intervention impact on TB disease modeling indicators
+**What it tests:**
+- BCG vaccination coverage and effectiveness
+- Individual-level risk modifier changes
+- Population-level TB disease indicators
+- Clinical significance of BCG protection
+
+**Key Metrics Validated:**
+- **Activation Risk Reduction:** ~42% average reduction in TB activation risk
+- **Clearance Rate Improvement:** ~39% average improvement in bacterial clearance
+- **Death Risk Reduction:** ~90% average reduction in TB mortality risk
+- **Vaccine Effectiveness:** >90% in target population (0-5 years)
+- **Population Coverage:** ~28% of total population vaccinated
+
+**Expected Results:**
+- BCG intervention successfully applied
+- High vaccine effectiveness (>90%)
+- Measurable population-level protection effects
+- Significant reduction in TB progression risk
+- Improved bacterial clearance capacity
+- Substantial reduction in TB mortality risk
 """
 
 import tbsim as mtb
