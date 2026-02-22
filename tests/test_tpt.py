@@ -1,11 +1,12 @@
-"""Tests for TPTTx (product) and TPTSimple (delivery intervention)."""
+"""Tests for TPTTx (product), TPTSimple, and TPTHousehold delivery."""
 
 import numpy as np
 import pytest
 import starsim as ss
 import tbsim as mtb
 import pandas as pd
-from tbsim.interventions.tpt import TPTTx, TPTSimple
+import sciris as sc
+from tbsim.interventions.tpt import TPTTx, TPTSimple, TPTHousehold
 from tbsim.tb_lshtm import TBSL
 
 
@@ -27,8 +28,19 @@ age_data = pd.DataFrame({
 })
 
 
+def make_dhs_data(n_households=100):
+    """Create synthetic DHS data for household network tests."""
+    hh_ids = np.arange(n_households)
+    age_strings = []
+    for _ in range(n_households):
+        hh_size = np.random.randint(2, 6)
+        ages = np.random.randint(1, 70, hh_size)
+        age_strings.append(sc.strjoin(ages))
+    return sc.dataframe(hh_id=hh_ids, ages=age_strings)
+
+
 # ---------------------------------------------------------------------------
-# Tests
+# TPTSimple tests
 # ---------------------------------------------------------------------------
 
 def test_tpt_default_values():
@@ -40,11 +52,8 @@ def test_tpt_default_values():
     sim.init()
     tpt = sim.interventions['tptsimple']
 
-    # Delivery pars on the intervention
     assert '0.5' in str(tpt.pars.coverage) or '0.50' in str(tpt.pars.coverage)
     assert tpt.pars.eligible_states == [TBSL.INFECTION]
-
-    # Product pars
     assert hasattr(tpt.product.pars, 'dur_treatment')
     assert hasattr(tpt.product.pars, 'dur_protection')
     assert tpt.product.pars.disease == 'tb'
@@ -84,13 +93,8 @@ def test_tpt_targets_latent_only():
 
     tpt.step()
 
-    # Only latently infected agents should have been initiated
     initiated_uids = tpt.initiated.uids
     if len(initiated_uids) > 0:
-        tb_disease = sim.diseases.tb
-        states_of_initiated = np.asarray(tb_disease.state[initiated_uids])
-        # At administration time they were INFECTION; some may have transitioned since
-        # but at minimum they should have protection_starts set
         assert np.all(~np.isnan(tpt.product.ti_protection_starts[initiated_uids]))
 
 
@@ -100,7 +104,6 @@ def test_tpt_treatment_then_protection():
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    # Non-zero treatment duration — protection should not start immediately
     product = TPTTx(pars={
         'dur_treatment': ss.constant(v=ss.years(1)),
         'dur_protection': ss.constant(v=ss.years(5)),
@@ -110,15 +113,11 @@ def test_tpt_treatment_then_protection():
     sim.init()
     tpt = sim.interventions['tptsimple']
 
-    # Step 1: initiate treatment — not yet protected (ti doesn't advance with manual step)
     tpt.step()
     initiated = tpt.initiated.uids
     if len(initiated) > 0:
-        # Protection hasn't started yet (treatment takes 1 year)
         assert not np.all(tpt.product.tpt_protected[initiated]), \
             "Agents should not be protected immediately (treatment phase)"
-
-        # But protection_starts should be set in the future
         starts = tpt.product.ti_protection_starts[initiated]
         assert np.all(~np.isnan(starts)), "Protection start times should be set"
         assert np.all(starts > tpt.ti), "Protection should start after treatment completes"
@@ -130,7 +129,6 @@ def test_tpt_protection_expiry():
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    # Very short treatment + very short protection (1 timestep each)
     product = TPTTx(pars={
         'dur_treatment': ss.constant(v=ss.days(1)),
         'dur_protection': ss.constant(v=ss.days(1)),
@@ -140,11 +138,9 @@ def test_tpt_protection_expiry():
     sim.init()
     tpt = sim.interventions['tptsimple']
 
-    # Step through enough times for treatment + protection to expire
     for _ in range(5):
         tpt.step()
 
-    # All protection should have expired
     assert np.count_nonzero(tpt.product.tpt_protected) == 0, \
         "All protection should have expired"
 
@@ -155,7 +151,6 @@ def test_tpt_modifies_rr():
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    # Instant treatment so protection starts immediately
     product = TPTTx(pars={
         'dur_treatment': ss.constant(v=ss.days(0)),
         'dur_protection': ss.constant(v=ss.years(10)),
@@ -168,7 +163,6 @@ def test_tpt_modifies_rr():
     initial_activation = np.array(tb_disease.rr_activation).copy()
 
     tpt = sim.interventions['tptsimple']
-    # Two steps: first to initiate + start protection (dur_treatment=0), second to apply
     tpt.step()
     tpt.step()
 
@@ -215,9 +209,163 @@ def test_tpt_with_age_range():
 
     tpt.step()
 
-    # Initiated agents should be within age range
     initiated_uids = tpt.initiated.uids
     if len(initiated_uids) > 0:
         ages = np.asarray(sim.people.age[initiated_uids])
         assert np.all(ages >= 15), "All initiated should be >= 15"
         assert np.all(ages <= 50), "All initiated should be <= 50"
+
+
+def test_tpt_product_skips_on_treatment():
+    """Test that TPTTx.administer() skips agents already on TB treatment."""
+    nagents = 100
+    pop, tb, net, pars = make_sim(agents=nagents)
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+    product = TPTTx(pars={
+        'dur_treatment': ss.constant(v=ss.days(0)),
+        'dur_protection': ss.constant(v=ss.years(5)),
+    })
+    itv = TPTSimple(product=product, pars={'coverage': 1.0})
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.init()
+
+    tb_disease = sim.diseases.tb
+    # Force some agents onto treatment
+    some_uids = ss.uids([0, 1, 2])
+    tb_disease.on_treatment[some_uids] = True
+
+    tpt = sim.interventions['tptsimple']
+    tpt.step()
+
+    # Those agents should NOT have protection_starts set
+    starts = tpt.product.ti_protection_starts[some_uids]
+    assert np.all(np.isnan(starts)), "Agents on TB treatment should not receive TPT"
+
+
+# ---------------------------------------------------------------------------
+# TPTHousehold tests
+# ---------------------------------------------------------------------------
+
+def test_tpt_household_init():
+    """Test TPTHousehold initializes with correct defaults."""
+    try:
+        import starsim_examples as sse
+    except ImportError:
+        pytest.skip("starsim_examples not installed")
+
+    dhs_data = make_dhs_data(50)
+    hh_net = sse.HouseholdDHSNet(dhs_data=dhs_data)
+
+    tb = mtb.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
+    tpt_hh = TPTHousehold()
+
+    sim = ss.Sim(
+        diseases=tb, networks=hh_net,
+        interventions=tpt_hh,
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2010-12-31')),
+    )
+    sim.init()
+
+    itv = sim.interventions['tpthousehold']
+    assert hasattr(itv, 'prev_on_treatment')
+    assert itv.product.pars.disease == 'tb'
+
+
+def test_tpt_household_traces_on_treatment_start():
+    """Test that household contacts are offered TPT when an index starts treatment."""
+    try:
+        import starsim_examples as sse
+    except ImportError:
+        pytest.skip("starsim_examples not installed")
+
+    dhs_data = make_dhs_data(50)
+    hh_net = sse.HouseholdDHSNet(dhs_data=dhs_data)
+
+    tb = mtb.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
+    tpt_hh = TPTHousehold(pars={'coverage': 1.0})
+
+    sim = ss.Sim(
+        diseases=tb, networks=hh_net,
+        interventions=tpt_hh,
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2010-12-31')),
+    )
+    sim.init()
+
+    itv = sim.interventions['tpthousehold']
+    tb_disease = sim.diseases.tb
+
+    # No one on treatment yet → no contacts should be found
+    contacts = itv.check_eligibility()
+    assert len(contacts) == 0, "No contacts should be found before any treatment starts"
+
+    # Force an agent onto treatment
+    index_uid = ss.uids([0])
+    tb_disease.on_treatment[index_uid] = True
+
+    # Now check_eligibility should detect the new treatment start
+    contacts = itv.check_eligibility()
+    # Should find household contacts of agent 0
+    if len(contacts) > 0:
+        # Contacts should NOT include the index case
+        assert 0 not in contacts, "Index case should not be in contacts"
+
+
+def test_tpt_household_no_retrigger_same_index():
+    """Test that the same index case doesn't retrigger tracing on subsequent steps."""
+    try:
+        import starsim_examples as sse
+    except ImportError:
+        pytest.skip("starsim_examples not installed")
+
+    dhs_data = make_dhs_data(50)
+    hh_net = sse.HouseholdDHSNet(dhs_data=dhs_data)
+
+    tb = mtb.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
+    tpt_hh = TPTHousehold(pars={'coverage': 1.0})
+
+    sim = ss.Sim(
+        diseases=tb, networks=hh_net,
+        interventions=tpt_hh,
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2010-12-31')),
+    )
+    sim.init()
+
+    itv = sim.interventions['tpthousehold']
+    tb_disease = sim.diseases.tb
+
+    # Force agent onto treatment
+    tb_disease.on_treatment[ss.uids([0])] = True
+
+    # First call: should find contacts
+    contacts1 = itv.check_eligibility()
+
+    # Second call (same step, on_treatment unchanged): snapshot already updated
+    contacts2 = itv.check_eligibility()
+    assert len(contacts2) == 0, "Same index should not retrigger tracing"
+
+
+def test_tpt_household_full_sim_run():
+    """Test that TPTHousehold runs without error in a full simulation."""
+    try:
+        import starsim_examples as sse
+    except ImportError:
+        pytest.skip("starsim_examples not installed")
+
+    dhs_data = make_dhs_data(30)
+    hh_net = sse.HouseholdDHSNet(dhs_data=dhs_data)
+
+    tb = mtb.TB_LSHTM(name='tb', pars={'init_prev': 0.20, 'beta': ss.peryear(0.5)})
+    tpt_hh = TPTHousehold(pars={'coverage': 0.8})
+
+    sim = ss.Sim(
+        diseases=tb,
+        networks=[hh_net, ss.RandomNet(dict(n_contacts=ss.poisson(lam=3), dur=0))],
+        interventions=tpt_hh,
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2005-12-31')),
+    )
+    sim.run()
+
+    # Should complete without error; check results exist
+    itv = sim.interventions['tpthousehold']
+    assert 'n_newly_initiated' in itv.results
+    assert 'n_protected' in itv.results

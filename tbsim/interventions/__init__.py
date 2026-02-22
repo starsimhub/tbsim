@@ -7,7 +7,7 @@ This module contains all intervention classes for the TB simulation.
 # Import all intervention classes
 from .interventions import TBProductRoutine
 from .beta import *
-from .tpt import TPTTx, TPTSimple
+from .tpt import TPTTx, TPTSimple, TPTHousehold
 from .bcg import BCGVx, BCGRoutine
 from .tb_treatment import TBTreatment, EnhancedTBTreatment, create_dots_treatment, create_dots_improved_treatment, create_first_line_treatment
 from .tb_drug_types import TBDrugType, TBDrugParameters, TBDrugTypeParameters, get_dots_parameters, get_drug_parameters, get_all_drug_parameters
@@ -20,6 +20,7 @@ __all__ = [
     'BetaByYear',
     'TPTTx',
     'TPTSimple',
+    'TPTHousehold',
     'BCGVx',
     'BCGRoutine',
     'TBTreatment',
