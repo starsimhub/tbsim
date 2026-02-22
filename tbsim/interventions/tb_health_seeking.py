@@ -1,7 +1,7 @@
 
 import numpy as np
 import starsim as ss
-from tbsim.tb_lshtm import TBSL
+import tbsim 
 
 __all__ = ['HealthSeekingBehavior']
 
@@ -29,7 +29,11 @@ class HealthSeekingBehavior(ss.Intervention):
             ss.FloatArr('ti_last_sought',    default=-np.inf),
         )
         self.care_seeking_dist = ss.bernoulli(p=self.pars.initial_care_seeking_rate.to_prob())  
-
+    
+    @property
+    def tbsl(self):
+        return tbsim.TBSL
+    
     def init_post(self):
         super().init_post()
         tb = getattr(self.sim.diseases, 'tb_lshtm', None)
@@ -39,10 +43,10 @@ class HealthSeekingBehavior(ss.Intervention):
         
         if self.pars.custom_states is not None:
             self._states = np.asarray(self.pars.custom_states) 
-            if not np.isin(self._states, TBSL.care_seeking_eligible()).all():
+            if not np.isin(self._states,    self.tbsl.care_seeking_eligible()).all():
                 raise ValueError("Custom states must be a subset of the eligible states.")
         else:
-            self._states = TBSL.care_seeking_eligible()
+            self._states = self.tbsl.care_seeking_eligible()
         
         self._new_seekers_count = 0
         if self.pars.start is None: self.pars.start = self.sim.t.start

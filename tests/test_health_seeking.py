@@ -2,9 +2,9 @@
 
 import numpy as np
 import starsim as ss
-import tbsim 
-from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
-
+import tbsim
+import pytest
+import sys
 
 def make_sim(n_agents=200, stop=ss.date("2005-12-31"), tb_pars=None, hsb_pars=None):
     tb_pars  = tb_pars  or {}
@@ -12,8 +12,8 @@ def make_sim(n_agents=200, stop=ss.date("2005-12-31"), tb_pars=None, hsb_pars=No
     return ss.Sim(
         people      = ss.People(n_agents=n_agents),
         networks    = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0)),
-        diseases    = tbsim.tb_lshtm.TB_LSHTM(pars=tb_pars),
-        interventions = HealthSeekingBehavior(pars=hsb_pars),
+        diseases    = tbsim.TB_LSHTM(pars=tb_pars),
+        interventions = tbsim.HealthSeekingBehavior(pars=hsb_pars),
         dt    = ss.days(7),
         start = ss.date("2000-01-01"),
         stop  = stop,
@@ -77,19 +77,16 @@ def test_inactive_outside_start_stop():
 
 def test_missing_tb_lshtm_raises():
     """A sim without tb_lshtm raises an explicit error on init."""
-    import pytest
     sim = ss.Sim(
         people      = ss.People(n_agents=50),
         networks    = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0)),
         diseases    = ss.SIR(),
-        interventions = HealthSeekingBehavior(),
+        interventions = tbsim.HealthSeekingBehavior(),
         dt = ss.days(7), start = ss.date("2000-01-01"), stop = ss.date("2002-12-31"),
         verbose = 0,
     )
     with pytest.raises(ValueError, match="tb_lshtm"):
         sim.init()
 
-
 if __name__ == '__main__':
-    import pytest, sys
     sys.exit(pytest.main([__file__, '-v']))
