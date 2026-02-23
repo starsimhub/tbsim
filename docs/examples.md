@@ -25,14 +25,14 @@ sim.plot()
 Adding BCG vaccination and treatment interventions:
 
 ```python
-from tbsim.interventions.bcg import BCGProtection
-from tbsim.interventions.tpt import TPTInitiation
+from tbsim.interventions.bcg import BCGVx
+from tbsim.interventions.tpt import TPTTx
 from tbsim import TB
 
 # Add TB module and interventions
 tb = TB()
-bcg = BCGProtection()
-tpt = TPTInitiation()
+bcg = BCGVx()
+tpt = TPTTx()
 
 sim = ss.Sim(
     diseases=tb,
@@ -46,7 +46,7 @@ sim.run()
 Modeling TB and HIV together:
 
 ```python
-from tbsim.comorbidities.hiv.hiv import HIV
+from tbsim.comorbidities.hiv import HIV
 from tbsim import TB
 
 # Add both modules
@@ -81,15 +81,18 @@ sim.run()
 Using the built-in analyzers:
 
 ```python
-from tbsim.analyzers import DwtAnalyzer, DwtPlotter
+from tbsim import TB
+from tbsim.analyzers import DwellTime
+import starsim as ss
 
-# Analyze simulation results
-analyzer = DwtAnalyzer()
-results = analyzer.analyze(sim)
+# Run simulation with dwell time analyzer
+sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
+sim.run()
 
-# Create plots
-plotter = DwtPlotter()
-plotter.plot(results)
+# Create plots from the analyzer
+sim.analyzers[0].plot('sankey')
+sim.analyzers[0].plot('histogram')
+sim.analyzers[0].plot('kaplan_meier')
 ```
 
 ## Parameter Sweeps
