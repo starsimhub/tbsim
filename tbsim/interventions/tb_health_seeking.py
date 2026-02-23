@@ -1,16 +1,9 @@
 
 import numpy as np
 import starsim as ss
-from tbsim import TBS, TB
-from tbsim.tb_lshtm import TB_LSHTM, TB_LSHTM_Acute, TBSL
+import tbsim 
 
 __all__ = ['HealthSeekingBehavior']
-
-_DISEASE_ENUM = {
-    TB_LSHTM_Acute: TBSL,
-    TB_LSHTM:       TBSL,
-    TB:             TBS,
-}
 
 class HealthSeekingBehavior(ss.Intervention):
     """
@@ -36,18 +29,29 @@ class HealthSeekingBehavior(ss.Intervention):
             ss.FloatArr('ti_last_sought',    default=-np.inf),
         )
         self.care_seeking_dist = ss.bernoulli(p=self.pars.initial_care_seeking_rate.to_prob())  
-
+    
+    @property
+    def tbsl(self):
+        return tbsim.TBSL
+    
     def init_post(self):
         super().init_post()
-        tb = getattr(self.sim.diseases, 'tb', None) or getattr(self.sim.diseases, 'tb_lshtm', None) or self.sim.diseases[0]
+
+        # Find and store the TB disease module
+        tb_class = 'tb_lshtm' # Currently only compatible with this TB model
+        try:
+            tb = self.sim.diseases[tb_class]
+            self._tb = tb
+        except:
+            raise KeyError(f"{self.__class__} requires the {tb_class} disease module.")
+        
         if self.pars.custom_states is not None:
-            self._states = np.asarray(self.pars.custom_states)
+            self._states = np.asarray(self.pars.custom_states) 
+            if not np.isin(self._states,    self.tbsl.care_seeking_eligible()).all():
+                raise ValueError("Custom states must be a subset of the eligible states.")
         else:
-            enum = next((_DISEASE_ENUM[cls] for cls in type(tb).__mro__ if cls in _DISEASE_ENUM), None)
-            if enum is None:
-                raise ValueError("Could not infer care-seeking states. Provide `custom_states`.")
-            self._states = enum.care_seeking_eligible()
-        self._tb = tb
+            self._states = self.tbsl.care_seeking_eligible()
+        
         self._new_seekers_count = 0
         if self.pars.start is None: self.pars.start = self.sim.t.start
         if self.pars.stop  is None: self.pars.stop  = self.sim.t.stop
