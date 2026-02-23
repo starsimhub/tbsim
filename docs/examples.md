@@ -7,7 +7,7 @@ This section provides practical examples of TBsim usage across different scenari
 The simplest way to run a TB simulation:
 
 ```python
-from tbsim import TB, TBS
+from tbsim import TB
 import starsim as ss
 
 # Create a basic TB simulation
@@ -25,18 +25,28 @@ sim.plot()
 Adding BCG vaccination and treatment interventions:
 
 ```python
-from tbsim.interventions.bcg import BCGVx
-from tbsim.interventions.tpt import TPTTx
+from tbsim.interventions.bcg import BCGRoutine
+from tbsim.interventions.tpt import TPTSimple
 from tbsim import TB
+import starsim as ss
 
 # Add TB module and interventions
 tb = TB()
-bcg = BCGVx()
-tpt = TPTTx()
+bcg = BCGRoutine(pars=dict(
+    coverage=ss.bernoulli(p=0.8),
+    start=ss.date('1980-01-01'),
+    stop=ss.date('2030-12-31'),
+    age_range=[0, 5],
+))
+tpt = TPTSimple(pars=dict(
+    start=ss.date('1990-01-01'),
+    stop=ss.date('2030-12-31'),
+))
 
 sim = ss.Sim(
     diseases=tb,
-    interventions=[bcg, tpt]
+    interventions=[bcg, tpt],
+    pars=dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
 )
 sim.run()
 ```
@@ -48,6 +58,7 @@ Modeling TB and HIV together:
 ```python
 from tbsim.comorbidities.hiv import HIV
 from tbsim import TB
+import starsim as ss
 
 # Add both modules
 tb = TB()
@@ -64,6 +75,7 @@ Using household-based social networks:
 ```python
 from tbsim.networks import HouseholdNet
 from tbsim import TB
+import starsim as ss
 
 # Create household network and TB
 households = HouseholdNet()
@@ -100,6 +112,8 @@ sim.analyzers[0].plot('kaplan_meier')
 Running multiple parameter combinations:
 
 ```python
+from tbsim import TB
+import starsim as ss
 import numpy as np
 
 # Define parameter ranges
@@ -121,5 +135,6 @@ The `tbsim_examples/` directory contains ready-to-run examples:
 - **Malnutrition**: `run_malnutrition.py` - TB and malnutrition comorbidity
 - **TB-HIV**: `run_tbhiv.py` - TB-HIV coinfection model
 - **Interventions**: `run_tb_interventions.py` - BCG, TPT, and beta scenarios
+- **Health Seeking**: `run_health_seeking.py` - Health-seeking behaviour with the LSHTM TB model
 
 For more detailed tutorials and step-by-step guides, see the [tutorials](tutorials.md) section.
