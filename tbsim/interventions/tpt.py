@@ -1,9 +1,9 @@
 """
 Tuberculosis Preventive Therapy (TPT): Product + Delivery.
 
-``TPTTx``      — treatment product  (biological effect, per-agent state)
-``TPTSimple``  — simple delivery    (targets latently infected by default)
-``TPTRegimes`` — CDC 2024 regimen duration constants
+``TPTTx``         — treatment product  (biological effect, per-agent state)
+``TPTSimple``     — simple delivery    (targets latently infected by default)
+``TPTHousehold``  — household contact tracing delivery
 """
 
 import numpy as np
@@ -12,7 +12,7 @@ import starsim as ss
 from .interventions import TBProductRoutine
 from ..tb_lshtm import TBSL
 
-__all__ = ['TPTTx', 'TPTSimple']
+__all__ = ['TPTTx', 'TPTSimple', 'TPTHousehold']
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +39,8 @@ class TPTTx(ss.Product):
         Duration of post-treatment protection (default 2 years).
     activation_modifier / clearance_modifier / death_modifier : ss.Dist
         Per-individual risk-modifier distributions.
+    exclude_on_treatment : bool
+        If True, skip agents currently on TB treatment (default True).
     """
 
     def __init__(self, pars=None, **kwargs):
@@ -50,6 +52,7 @@ class TPTTx(ss.Product):
             activation_modifier=ss.uniform(0.3, 0.5),
             clearance_modifier=ss.uniform(1.2, 1.4),
             death_modifier=ss.uniform(0.1, 0.3),
+            exclude_on_treatment=True,
         )
         self.update_pars(pars)
 
@@ -64,16 +67,28 @@ class TPTTx(ss.Product):
 
     def administer(self, people, uids):
         """
-        Start TPT for *uids* (already accepted by the delivery intervention).
+        Start TPT for *uids*.
 
-        Samples per-agent modifiers and schedules the protection window
-        (starts after treatment completes, expires after ``dur_protection``).
+        Filters out ineligible agents (already on TB treatment, already
+        protected), then samples per-agent modifiers and schedules the
+        protection window.
 
         Returns
         -------
         ss.uids
-            UIDs of agents who started treatment.
+            UIDs of agents who actually started TPT.
         """
+        if len(uids) == 0:
+            return ss.uids()
+
+        # Product-side eligibility: skip agents on TB treatment
+        if self.pars.exclude_on_treatment:
+            tb = self.sim.diseases[self.pars.disease]
+            uids = uids[~tb.on_treatment[uids]]
+
+        # Skip agents already protected (don't restart their clock)
+        uids = uids[~self.tpt_protected[uids]]
+
         if len(uids) == 0:
             return ss.uids()
 
@@ -122,7 +137,7 @@ class TPTTx(ss.Product):
 
 
 # ---------------------------------------------------------------------------
-# Delivery intervention
+# Simple delivery
 # ---------------------------------------------------------------------------
 
 class TPTSimple(TBProductRoutine):
@@ -157,3 +172,89 @@ class TPTSimple(TBProductRoutine):
         self.results['n_protected'][self.ti] = np.count_nonzero(self.product.tpt_protected)
 
 
+# ---------------------------------------------------------------------------
+# Household contact tracing delivery
+# ---------------------------------------------------------------------------
+
+class TPTHousehold(TBProductRoutine):
+    """
+    Household contact tracing TPT delivery.
+
+    Detects new TB treatment starts each step, traces household contacts
+    of followed-up index cases, and offers TPT to all contacts (product
+    handles eligibility filtering).
+
+    Requires a household network with ``household_ids`` (e.g.
+    ``HouseholdDHSNet`` or ``EvolvingHouseholdDHSNet`` from
+    ``starsim_examples``).
+
+    Parameters
+    ----------
+    product : TPTTx
+        The TPT treatment product (created automatically if not provided).
+    pars : dict
+        Overrides. ``coverage`` controls the probability that a given index
+        case's household is followed up (per-index-case Bernoulli).
+    """
+
+    def __init__(self, product=None, pars=None, **kwargs):
+        super().__init__(
+            product=product if product is not None else TPTTx(),
+            pars=pars,
+            **kwargs,
+        )
+        self.define_states(
+            ss.BoolArr('prev_on_treatment', default=False),
+        )
+
+    def find_household_net(self):
+        """Find the network that has ``household_ids``."""
+        for net in self.sim.networks.values():
+            if hasattr(net, 'household_ids'):
+                return net
+        raise ValueError("No household network with household_ids found in sim")
+
+    def check_eligibility(self):
+        """
+        Detect new treatment starts → follow up index cases → trace
+        household contacts.
+        """
+        tb = self.sim.diseases[self.product.pars.disease]
+        hh_net = self.find_household_net()
+
+        # 1. Detect NEW treatment starts (on_treatment: False → True)
+        newly_on_treatment = (tb.on_treatment & ~self.prev_on_treatment).uids
+        self.prev_on_treatment[:] = tb.on_treatment
+
+        if len(newly_on_treatment) == 0:
+            return ss.uids()
+
+        # 2. Coverage: per index case (does health system follow up?)
+        followed_up = self.pars.coverage.filter(newly_on_treatment)
+        if len(followed_up) == 0:
+            return ss.uids()
+
+        # 3. Find their household IDs
+        hhids = np.asarray(hh_net.household_ids[followed_up])
+        target_hhids = np.unique(hhids[~np.isnan(hhids)])
+
+        if len(target_hhids) == 0:
+            return ss.uids()
+
+        # 4. Find household contacts (excluding index cases)
+        all_hh = np.isin(np.asarray(hh_net.household_ids), target_hhids)
+        contacts = ss.uids(all_hh)
+        contacts = contacts.remove(followed_up)
+
+        # 5. Age filter (if set)
+        if self.pars.age_range is not None:
+            min_age, max_age = self.pars.age_range[0], self.pars.age_range[1]
+            ppl = self.sim.people
+            age_ok = (ppl.age[contacts] >= min_age) & (ppl.age[contacts] <= max_age)
+            contacts = contacts[age_ok]
+
+        return contacts
+
+    def update_results(self):
+        super().update_results()
+        self.results['n_protected'][self.ti] = np.count_nonzero(self.product.tpt_protected)
