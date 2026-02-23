@@ -59,7 +59,7 @@ class TBTreatment(ss.Intervention):
         ppl.n_times_treated[tx_uids] += 1
         success_uids, failure_uids = self.dist_treatment_success.filter(tx_uids, both=True)
 
-        # Update success: instant clearance via TB logic
+        # Successful treatment clears infection immediately
         tb.state[success_uids] = TBS.NONE
         tb.on_treatment[success_uids] = False
         tb.susceptible[success_uids] = True
@@ -264,8 +264,7 @@ class EnhancedTBTreatment(ss.Intervention):
         # Treatment outcomes based on drug-specific success probability
         success_uids, failure_uids = self.dist_treatment_success.filter(tx_uids, both=True)
         
-        # Update successful treatment outcomes
-        # Clear TB infection and restore susceptibility
+        # Successful treatment clears infection immediately
         tb.state[success_uids] = TBS.NONE
         tb.on_treatment[success_uids] = False
         tb.susceptible[success_uids] = True
