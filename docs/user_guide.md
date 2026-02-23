@@ -44,9 +44,7 @@ TBsim includes comprehensive diagnostic modeling with multiple test types:
 
 **Available Diagnostic Tests**
 
-- **Smear Microscopy**: Traditional sputum smear testing
 - **Xpert MTB/RIF**: Molecular testing for TB and rifampin resistance
-- **MDR Testing**: Multi-drug resistance detection
 - **FujiLAM**: Urine-based testing for HIV+ individuals
 - **CAD CXR**: Computer-aided chest X-ray interpretation
 - **Oral Swab**: Non-sputum based testing
@@ -89,7 +87,7 @@ TBsim includes sophisticated connectors to link TB with other diseases:
 - **HIV State Integration**: Uses HIV disease states (ACUTE, LATENT, AIDS) to modify TB progression
 - **CD4-dependent Effects**: TB progression varies with HIV disease stage
 - **ART Effects**: Antiretroviral therapy impacts on TB natural history
-- **Risk Multipliers**: HIV increases TB activation risk (ACUTE: 1.22x, LATENT: 1.90x, AIDS: 3.0x)
+- **Risk Multipliers**: HIV increases TB activation risk (ACUTE: 1.22x, LATENT: 1.90x, AIDS: 2.60x)
 
 **TB-Malnutrition Integration**
 
@@ -102,7 +100,6 @@ TBsim includes sophisticated connectors to link TB with other diseases:
 **Network Types**
 
 - **Household Networks**: Family and household connections for transmission
-- **Community Networks**: Broader social interactions
 - **Trial-based Networks**: Framework for intervention trials
 - **Contact Networks**: Detailed contact tracing capabilities
 
@@ -177,21 +174,23 @@ Basic simulation workflow:
 
 ```python
 import starsim as ss
-from tbsim import TB, DwtAnalyzer
+from tbsim import TB
+from tbsim.networks import HouseholdNet
+from tbsim.analyzers import DwellTime
 
 # Create simulation with TB model and analyzer
 sim = ss.Sim(
     diseases=[TB()],
-    networks=ss.HouseholdNet(),
-    analyzers=[DwtAnalyzer(scenario_name="Baseline")]
+    networks=HouseholdNet(),
+    analyzers=[DwellTime(scenario_name="Baseline")]
 )
 sim.run()
 
 # Generate comprehensive analysis plots
 analyzer = sim.analyzers[0]
-analyzer.sankey_agents()
-analyzer.network_graph()
-analyzer.kaplan_meier()
+analyzer.plot('sankey')
+analyzer.plot('network')
+analyzer.plot('kaplan_meier')
 ```
 
 For specific examples and tutorials, see the [examples](examples.md) and [tutorials](tutorials.md) sections.

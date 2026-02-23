@@ -24,19 +24,19 @@ For developers who want to work with the latest features:
 
 1. Install TBsim first:
 
-   ```bash
-   git clone https://github.com/starsimhub/tbsim.git
-   cd tbsim
-   pip install -e .
-   ```
+```bash
+git clone https://github.com/starsimhub/tbsim.git
+cd tbsim
+pip install -e .
+```
 
 2. Install the latest Starsim development version:
 
-   ```bash
-   git clone https://github.com/starsimhub/starsim.git
-   cd starsim
-   pip install -e .
-   ```
+```bash
+git clone https://github.com/starsimhub/starsim.git
+cd starsim
+pip install -e .
+```
 
 ## Dependencies
 

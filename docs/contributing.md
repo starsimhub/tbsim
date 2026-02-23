@@ -15,23 +15,23 @@ We welcome contributions to the TBsim project! This guide explains how you can g
 
 1. Install TBsim in development mode:
 
-   ```bash
-   git clone https://github.com/yourusername/tbsim.git
-   cd tbsim
-   pip install -e .
-   ```
+```bash
+git clone https://github.com/yourusername/tbsim.git
+cd tbsim
+pip install -e .
+```
 
 2. Install development dependencies:
 
-   ```bash
-   pip install -r tests/requirements.txt
-   ```
+```bash
+pip install -r tests/requirements.txt
+```
 
 3. Install pre-commit hooks:
 
-   ```bash
-   pre-commit install
-   ```
+```bash
+pre-commit install
+```
 
 ## Code Standards
 
