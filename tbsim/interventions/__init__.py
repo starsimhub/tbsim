@@ -5,22 +5,24 @@ This module contains all intervention classes for the TB simulation.
 """
 
 # Import all intervention classes
-from .interventions import *
+from .interventions import TBProductRoutine
 from .beta import *
-from .tpt import TPTInitiation
-from .bcg import BCGProtection
+from .tpt import TPTTx, TPTSimple, TPTHousehold
+from .bcg import BCGVx, BCGRoutine
 from .tb_treatment import TBTreatment, EnhancedTBTreatment, create_dots_treatment, create_dots_improved_treatment, create_first_line_treatment
 from .tb_drug_types import TBDrugType, TBDrugParameters, TBDrugTypeParameters, get_dots_parameters, get_drug_parameters, get_all_drug_parameters
 from .tb_health_seeking import HealthSeekingBehavior
 from .tb_diagnostic import TBDiagnostic, EnhancedTBDiagnostic
-from .interventions import TBVaccinationCampaign
 
 # Export all classes
 __all__ = [
+    'TBProductRoutine',
     'BetaByYear',
-    'Product',
-    'TPTInitiation',
-    'BCGProtection',
+    'TPTTx',
+    'TPTSimple',
+    'TPTHousehold',
+    'BCGVx',
+    'BCGRoutine',
     'TBTreatment',
     'EnhancedTBTreatment',
     'TBDrugType',
@@ -35,5 +37,4 @@ __all__ = [
     'HealthSeekingBehavior',
     'TBDiagnostic',
     'EnhancedTBDiagnostic',
-    'TBVaccinationCampaign',
 ]

@@ -47,7 +47,7 @@ import numpy as np
 import os
 import sciris as sc
 import datetime as ddtt
-import tbsim as mtb
+import tbsim
 from scipy import stats
 from enum import IntEnum
 import seaborn as sns
@@ -84,7 +84,7 @@ class DwellTime(ss.Analyzer):
     prefix : str, optional
         File prefix filter used with *directory*.
     states_ennumerator : IntEnum, optional
-        State enumeration class (default ``mtb.TBS``).
+        State enumeration class (default ``tbsim.TBS``).
     scenario_name : str, optional
         Label for the simulation scenario.
     debug : bool, optional
@@ -95,7 +95,7 @@ class DwellTime(ss.Analyzer):
                  states_ennumerator=None, scenario_name='', debug=False):
         self.debug = debug
         self.scenario_name = scenario_name
-        self.eSTATES = states_ennumerator or mtb.TBS
+        self.eSTATES = states_ennumerator or tbsim.TBS
         self.file_path = file_path
 
         if isinstance(data, pd.DataFrame):

@@ -1,4 +1,4 @@
-import tbsim as mtb
+import tbsim
 
 directory = '/Users/Mine/TEMP/results' 
 other = '-0206'
@@ -25,7 +25,7 @@ scenarios_feb06 = [
                 ]
 
 for sce in scenarios_13:
-    an = mtb.DwtPostProcessor(directory= directory, prefix=f"{sce}{other}")
+    an = tbsim.DwtPostProcessor(directory= directory, prefix=f"{sce}{other}")
     # an.sankey_agents(subtitle=sce)
     # an.graph_state_transitions_curved(subtitle=sce, graphseed=39)
     an.reinfections_percents_bars_interactive(target_states=[0.0, -1], scenario=sce)
@@ -37,7 +37,7 @@ for sce in scenarios_13:
     Sample of using plotter alone once the csv files are generated
 """
 # file = '/Users/mine/git/tb_acf/results/results/BaselineTBsim34935.csv'
-# plotter = mtb.DwtPlotter(file)
+# plotter = tbsim.DwtPlotter(file)
 # plotter.sankey_agents()
 
 # /Users/mine/TEMP/results/ALL_HighDecliningLSHTM-0206.csv
