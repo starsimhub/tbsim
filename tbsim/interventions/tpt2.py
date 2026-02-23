@@ -36,7 +36,7 @@ from collections import defaultdict
 import numpy as np
 import starsim as ss
 
-from ..tb_lshtm import TBSL
+from tbsim.tb_lshtm import TBSL
 
 __all__ = [
     'RegimenCategory',
@@ -48,21 +48,14 @@ __all__ = [
     'TPTHousehold',
 ]
 
-# ---------------------------------------------------------------------------
 # Active TB states that disqualify an agent from receiving TPT.
 # WHO (2024): providing TPT to active TB delays resolution and causes resistance.
-# ---------------------------------------------------------------------------
 _ACTIVE_TB_STATES = frozenset([
     int(TBSL.NON_INFECTIOUS),
     int(TBSL.ASYMPTOMATIC),
     int(TBSL.SYMPTOMATIC),
     int(TBSL.TREATMENT),
 ])
-
-
-# ---------------------------------------------------------------------------
-# Regimen catalog
-# ---------------------------------------------------------------------------
 
 class RegimenCategory(Enum):
     """
@@ -124,9 +117,8 @@ class TPTRegimen:
         return f'TPTRegimen({self.name}, category={self.category.value})'
 
 
-# ---------------------------------------------------------------------------
 # Pre-defined regimens
-#
+# ==================== 
 # activation_modifier defaults:
 #   All active regimens show similar efficacy in the 2023 NMA (Yothasan et al.);
 #   the reference HR=0.68 (32% reduction, modifier=0.68) comes from Ross et al.
@@ -141,7 +133,6 @@ class TPTRegimen:
 #   6H:   0.70 (Cambodia: 7× more incomplete than 3HP; CDC: "lower completion rates")
 #   9H:   0.75 (CDC alternative; no population-level estimate available)
 #   6Lfx: 0.80 (no direct data; similar programme context to 6H)
-# ---------------------------------------------------------------------------
 
 REGIMENS: dict[str, TPTRegimen] = {
     '3HP': TPTRegimen(
@@ -204,11 +195,8 @@ REGIMENS: dict[str, TPTRegimen] = {
     ),
 }
 
-
-# ---------------------------------------------------------------------------
-# Product
-# ---------------------------------------------------------------------------
-
+# TPTProduct
+# ======================== 
 class TPTProduct(ss.Product):
     """
     TPT treatment product: models treatment completion and per-agent protection.
@@ -353,10 +341,8 @@ class TPTProduct(ss.Product):
         return int(np.count_nonzero(self.tpt_protected))
 
 
-# ---------------------------------------------------------------------------
 # Delivery base class
-# ---------------------------------------------------------------------------
-
+# ======================== 
 class TPTDelivery(ss.Intervention):
     """
     Base delivery class for TPT interventions.
@@ -388,7 +374,7 @@ class TPTDelivery(ss.Intervention):
 
         if product is None:
             self.product = TPTProduct()
-        elif isinstance(product, str):
+        elif isinstance(product, (str, TPTRegimen)):
             self.product = TPTProduct(regimen=product)
         else:
             self.product = product
@@ -542,9 +528,11 @@ class TPTHousehold(TPTDelivery):
 
     Requirements
     ------------
-    A household network with a ``household_ids`` attribute (e.g.
-    ``HouseholdDHSNet`` from ``starsim_examples``) must be present in
-    ``sim.networks``.
+    A household network with a ``household_ids`` attribute must be present in
+    ``sim.networks``.  Both ``HouseholdDHSNet`` (static) and
+    ``EvolvingHouseholdDHSNet`` (dynamic) from ``starsim_examples`` are
+    supported.  For evolving networks the household index is rebuilt
+    automatically whenever births or household splits are detected.
 
     Parameters
     ----------
@@ -568,8 +556,10 @@ class TPTHousehold(TPTDelivery):
             ss.BoolArr('prev_on_treatment', default=False),
         )
 
-        self._hh_net   = None
+        self._hh_net         = None
         self._hh_index: dict | None = None
+        self._hh_n_assigned  = 0    # sentinels for detecting network mutations
+        self._hh_max_id      = -1.0
 
     # ------------------------------------------------------------------
     # Initialization
@@ -590,19 +580,37 @@ class TPTHousehold(TPTDelivery):
         )
 
     def _rebuild_hh_index(self):
-        """Build {household_id: uid_array} inverted index from the network."""
+        """Build {household_id: uid_array} inverted index and update sentinels."""
         hh_ids = np.asarray(self._hh_net.household_ids)
+        valid  = hh_ids[np.isfinite(hh_ids)]
         idx: dict[int, list] = defaultdict(list)
         for uid, hid in enumerate(hh_ids):
-            if not np.isnan(hid):
+            if np.isfinite(hid):
                 idx[int(hid)].append(uid)
-        self._hh_index = {hid: ss.uids(members) for hid, members in idx.items()}
+        self._hh_index      = {hid: ss.uids(members) for hid, members in idx.items()}
+        self._hh_n_assigned = len(valid)
+        self._hh_max_id     = float(valid.max()) if len(valid) else -1.0
+
+    def _maybe_rebuild_hh_index(self):
+        """Rebuild the index if the network has changed since the last rebuild.
+
+        Two O(1) checks cover all mutation types produced by
+        ``EvolvingHouseholdDHSNet``:
+        - births increase the count of assigned slots
+        - household splits always assign new IDs above the previous maximum
+        """
+        hh_ids = np.asarray(self._hh_net.household_ids)
+        valid  = hh_ids[np.isfinite(hh_ids)]
+        if len(valid) != self._hh_n_assigned or (len(valid) and valid.max() != self._hh_max_id):
+            self._rebuild_hh_index()
 
     # ------------------------------------------------------------------
     # Core delivery
     # ------------------------------------------------------------------
 
     def _find_candidates(self):
+        self._maybe_rebuild_hh_index()
+
         tb = self.sim.diseases[self.product.pars.disease]
 
         newly_on_treatment = (tb.on_treatment & ~self.prev_on_treatment).uids
