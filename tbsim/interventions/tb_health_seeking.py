@@ -36,10 +36,14 @@ class HealthSeekingBehavior(ss.Intervention):
     
     def init_post(self):
         super().init_post()
-        tb = getattr(self.sim.diseases, 'tb_lshtm', None)
-        if tb is None:
-            raise ValueError("HealthSeekingBehavior requires a TB_LSHTM disease module named 'tb_lshtm'.")
-        self._tb = tb
+
+        # Find and store the TB disease module
+        tb_class = 'tb_lshtm' # Currently only compatible with this TB model
+        try:
+            tb = self.sim.diseases[tb_class]
+            self._tb = tb
+        except:
+            raise KeyError(f"{self.__class__} requires the {tb_class} disease module.")
         
         if self.pars.custom_states is not None:
             self._states = np.asarray(self.pars.custom_states) 
