@@ -4,17 +4,17 @@ This guide will help you run your first TBsim simulation in minutes.
 
 ## Running Your First Simulation
 
-1. **Navigate to the scripts directory:**
+1. **Navigate to the examples directory:**
 
-   ```bash
-   cd tbsim_examples
-   ```
+```bash
+cd tbsim_examples
+```
 
 2. **Run the basic TB simulation:**
 
-   ```bash
-   python run_tb.py
-   ```
+```bash
+python run_tb.py
+```
 
 3. **View the results:** The script will display basic charts showing the simulation outcomes.
 
