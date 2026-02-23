@@ -1,15 +1,16 @@
 """Tests for HealthSeekingBehavior (TB_LSHTM model)."""
 
+import sys
+import pytest
 import numpy as np
 import starsim as ss
 import tbsim
-import pytest
-import sys
+
 
 def make_sim(n_agents=200, stop=ss.date("2005-12-31"), tb_pars=None, hsb_pars=None):
     tb_pars  = tb_pars  or {}
     hsb_pars = hsb_pars or {}
-    return ss.Sim(
+    sim = ss.Sim(
         people      = ss.People(n_agents=n_agents),
         networks    = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0)),
         diseases    = tbsim.TB_LSHTM(pars=tb_pars),
@@ -19,6 +20,7 @@ def make_sim(n_agents=200, stop=ss.date("2005-12-31"), tb_pars=None, hsb_pars=No
         stop  = stop,
         verbose = 0,
     )
+    return sim
 
 
 def hsb(sim):
