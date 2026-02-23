@@ -54,14 +54,14 @@ _TBsim_ is based on Starsim, please refer to [Starsim documentation](https://doc
 Contributions to the TBsim project are welcome! Please read [CONTRIBUTING.md](https://github.com/starsimhub/starsim/blob/main/contributing.md) for details on our code of conduct, and the process for submitting pull requests.
 
 ## Authors
-
--  **Daniel Klein** - [daniel-klein](https://github.com/daniel-klein)
 -  **Minerva Enriquez** - [menriquez-idm](https://github.com/MEnriquez-IDM)
--  **Stewart Chang** - [stchang-idm](https://github.com/stchang-idm)
--  **Deven Gokhale** - [gokhale616](https://github.com/gokhale616)
--  **Mike Famulare** - [famulare](https://github.com/famulare)
--  **Ryan Hull** - [rhull-idm](https://github.com/rhull-idm)
+-  **Daniel Klein** - [daniel-klein](https://github.com/daniel-klein)
 -  **Cliff Kerr** - [cliffckerr](https://github.com/cliffckerr)
+-  **Ryan Hull** - [rhull-idm](https://github.com/rhull-idm)
+-  **Mike Famulare** - [famulare](https://github.com/famulare)
+-  **Deven Gokhale** - [gokhale616](https://github.com/gokhale616)
+-  **Stewart Chang** - [stchang-idm](https://github.com/stchang-idm)
+
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE.md](https://github.com/amath-idm/tbsim/blob/main/LICENSE) file for details.
