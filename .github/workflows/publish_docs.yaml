@@ -1,4 +1,4 @@
-name: Publish STIsTBsimim docs
+name: Publish TBsim docs
 
 on:
   workflow_dispatch:
