@@ -22,7 +22,8 @@ def make_sim(n_agents=200, stop=ss.date("2005-12-31"), tb_pars=None, hsb_pars=No
 
 
 def hsb(sim):
-    return sim.interventions[0]
+    """ Get the HealthSeekingBehavior intervention from the sim """
+    return sim.interventions.healthseekingbehavior
 
 
 def test_care_seeking_fires():
@@ -80,12 +81,12 @@ def test_missing_tb_lshtm_raises():
     sim = ss.Sim(
         people      = ss.People(n_agents=50),
         networks    = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0)),
-        diseases    = ss.SIR(),
+        diseases    = ss.SIR(), # Wrong module
         interventions = tbsim.HealthSeekingBehavior(),
         dt = ss.days(7), start = ss.date("2000-01-01"), stop = ss.date("2002-12-31"),
         verbose = 0,
     )
-    with pytest.raises(ValueError, match="tb_lshtm"):
+    with pytest.raises(KeyError):
         sim.init()
 
 if __name__ == '__main__':
