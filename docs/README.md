@@ -1,20 +1,21 @@
-# TBsim docs
+# TBsim Documentation
 
 ## Tutorials
 
-Please see the `tutorials` subfolder.
+Tutorials are available in the `tutorials` subfolder.
 
-## Everything else
+## Building the Docs
 
-This folder includes source code for building the docs.
+This folder contains the source for the TBsim documentation site. To build it locally:
 
-To build the docs, follow these steps:
+1. Install Python dependencies:
+   ```
+   pip install -r docs/requirements.txt
+   ```
 
-1.  Make sure the Python dependencies are installed:
-    ```
-    pip install -r requirements.txt
-    ```
+2. Ensure TBsim is installed, then from the repository root, run:
+   ```
+   mkdocs serve
+   ```
 
-2.  Build the documents with `./mkdocs build` (requires TBsim to be installed as well).
-
-3.  The built documents will be in `./site`.
+3. The compiled site will be output to `./site`.
