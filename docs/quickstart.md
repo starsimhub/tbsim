@@ -7,7 +7,7 @@ This guide will help you run your first TBsim simulation in minutes.
 1. **Navigate to the scripts directory:**
 
    ```bash
-   cd scripts
+   cd tbsim_examples
    ```
 
 2. **Run the basic TB simulation:**
