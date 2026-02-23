@@ -7,6 +7,9 @@ import starsim as ss
 import tbsim
 from tbsim.interventions.immigration import Immigration
 
+ACUTE = False
+N_AGENTS = 5_000
+RAND_SEED = 1
 
 def build_sim(*, use_acute: bool, label: str, include_immigration: bool, n_agents: int, rand_seed: int):
     tb = tbsim.TB_LSHTM_Acute() if use_acute else tbsim.TB_LSHTM()
@@ -57,25 +60,19 @@ def build_sim(*, use_acute: bool, label: str, include_immigration: bool, n_agent
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--acute", action="store_true")
-    parser.add_argument("--n-agents", type=int, default=5_000)
-    parser.add_argument("--rand-seed", type=int, default=1)
-    args = parser.parse_args()
-
     baseline = build_sim(
-        use_acute=args.acute,
+        use_acute=ACUTE,
         label="Baseline",
         include_immigration=False,
-        n_agents=args.n_agents,
-        rand_seed=args.rand_seed,
+        n_agents=N_AGENTS,
+        rand_seed=RAND_SEED,
     )
     with_imm = build_sim(
-        use_acute=args.acute,
+        use_acute=ACUTE,
         label="With immigration",
         include_immigration=True,
-        n_agents=args.n_agents,
-        rand_seed=args.rand_seed,
+        n_agents=N_AGENTS,
+        rand_seed=RAND_SEED,
     )
 
     msim = ss.MultiSim([baseline, with_imm], label="lshtm_immigration")
@@ -86,7 +83,7 @@ def main():
     tb_scen = next(iter(scen.diseases.values()))
     n_imm = int(np.sum(scen.demographics[0].results["n_immigrants"]))
 
-    model = "TB_LSHTM_Acute" if args.acute else "TB_LSHTM"
+    model = "TB_LSHTM_Acute" if ACUTE else "TB_LSHTM"
     base_inf_end = int(np.count_nonzero(tb_base.infectious))
     scen_inf_end = int(np.count_nonzero(tb_scen.infectious))
     print(f"{model} | baseline infectious(end)={base_inf_end} | scenario infectious(end)={scen_inf_end} | immigrants added={n_imm}")

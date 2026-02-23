@@ -1,7 +1,9 @@
 import numpy as np
 import starsim as ss
+from tbsim import TBSL, TB_LSHTM, TB_LSHTM_Acute
 
 __all__ = ['Immigration']
+
 
 class Immigration(ss.Demographics):
     """
@@ -9,8 +11,7 @@ class Immigration(ss.Demographics):
 
     Adds new agents at an intensity (people/year) and initializes their TB state
     according to the LSHTM spectrum model (`TB_LSHTM` or `TB_LSHTM_Acute`).
-    """
-    
+    """   
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         
@@ -85,7 +86,6 @@ class Immigration(ss.Demographics):
             self._dist_agebin.pars.p = probs
 
         # Configure TB state sampler (LSHTM integer codes)
-        from tbsim.tb_lshtm import TBSL
         dist = dict(self.pars.tb_state_distribution or {})
         if not dist:
             raise ValueError('tb_state_distribution must be provided for TB_LSHTM(_Acute)')
@@ -142,7 +142,7 @@ class Immigration(ss.Demographics):
         return lam
 
     def _lam_per_timestep(self, module):
-        """Callable for ss.poisson(lam=...)."""
+        """Callable function for ss.poisson(lam=...)."""
         return module.expected_immigrants_per_timestep()
 
     def _sample_ages(self, n):
@@ -172,8 +172,6 @@ class Immigration(ss.Demographics):
         if diseases is None:
             return None
 
-        from tbsim.tb_lshtm import TB_LSHTM
-
         # Older convention: sim.diseases.tb
         mod = getattr(diseases, 'tb', None)
         if isinstance(mod, TB_LSHTM):
@@ -195,9 +193,6 @@ class Immigration(ss.Demographics):
         return None
 
     def _init_tb_lshtm(self, tb, new_uids):
-        """Initialize TB_LSHTM / TB_LSHTM_Acute state and bookkeeping for new agents."""
-        from tbsim.tb_lshtm import TBSL, TB_LSHTM, TB_LSHTM_Acute
-
         if not isinstance(tb, TB_LSHTM):
             raise RuntimeError('Expected TB_LSHTM(_Acute) disease module for immigration initialization')
 
