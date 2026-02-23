@@ -28,7 +28,7 @@ tb_params = {
     "cxr_asymp_sens": 1.0,         # CXR sensitivity for asymptomatic (0–1)
 
     # Acute variant only (ignored if use_acute is False)
-    "rate_acute_latent": ss.years(ss.expon(1 / 4.0)),  # ACUTE → INFECTION
+    "rate_acute_latent": ss.peryear(4.0),   # ACUTE → INFECTION
     "trans_acute": 0.9,            # α alpha: relative transmissibility from acute
 }
 
