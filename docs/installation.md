@@ -1,45 +1,44 @@
-Installation Guide
-=================
+# Installation Guide
 
 This guide covers different ways to install and set up TBsim for your tuberculosis modeling projects.
 
-Prerequisites
-------------
+## Prerequisites
 
 - Python 3.11 or higher
 - pip package manager
 - Git (for development installation)
 
-Local Installation
-------------------
+## Local Installation
 
 Clone and install TBsim locally:
 
-.. code-block:: bash
+```bash
+git clone https://github.com/starsimhub/tbsim.git
+cd tbsim
+pip install -e .
+```
 
-   git clone https://github.com/starsimhub/tbsim.git
-   cd tbsim
-   pip install -e .
-
-Development Installation
-------------------------
+## Development Installation
 
 For developers who want to work with the latest features:
 
 1. Install TBsim first:
-   .. code-block:: bash
-      git clone https://github.com/starsimhub/tbsim.git
-      cd tbsim
-      pip install -e .
+
+   ```bash
+   git clone https://github.com/starsimhub/tbsim.git
+   cd tbsim
+   pip install -e .
+   ```
 
 2. Install the latest Starsim development version:
-   .. code-block:: bash
-      git clone https://github.com/starsimhub/starsim.git
-      cd starsim
-      pip install -e .
 
-Dependencies
------------
+   ```bash
+   git clone https://github.com/starsimhub/starsim.git
+   cd starsim
+   pip install -e .
+   ```
+
+## Dependencies
 
 TBsim requires several key dependencies:
 
@@ -51,19 +50,17 @@ TBsim requires several key dependencies:
 
 All dependencies are automatically installed when you install TBsim.
 
-Verification
------------
+## Verification
 
 To verify your installation, run:
 
-.. code-block:: bash
-
-   python -c "import tbsim; print('TBsim installed successfully')"
+```bash
+python -c "import tbsim; print('TBsim installed successfully')"
+```
 
 If you encounter any issues, check the troubleshooting section below.
 
-Troubleshooting
---------------
+## Troubleshooting
 
 Common installation issues:
 
