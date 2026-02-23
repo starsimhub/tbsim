@@ -17,7 +17,7 @@
 
 ## API Reference
 
-- [modules](modules.md)
+- [API reference](api.md)
 
 ## Scripts
 
@@ -27,9 +27,3 @@
 
 - [contributing](contributing.md)
 - [changelog](changelog.md)
-
-## Indices and tables
-
-- [General Index](genindex)
-- [Module Index](modindex)
-- [Search](search)
