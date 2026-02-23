@@ -40,7 +40,7 @@ TBsim is not yet released on PyPI, so you need to install from source:
 1. Navigate to the folder `tbsim_examples`
 2. Run the script:
    ```bash
-   python run_tb.py
+   python run_tb_lshtm.py
    ```
 3. Running this script should result in basic charts being displayed.
 
@@ -48,7 +48,9 @@ TBsim is not yet released on PyPI, so you need to install from source:
 - Usage examples are available in the **[tbsim_examples](https://github.com/starsimhub/tbsim/tree/main/tbsim_examples)** folder.
 
 ## Documentation
-_TBsim_ is based on Starsim, please refer to [Starsim documentation](https://docs.idmod.org/projects/starsim/en/latest/) for additional information.
+TBsim documentation is available at [starsim.org/tbsim](https://starsim.org/tbsim).
+
+TBsim is based on Starsim; please refer to [Starsim documentation](https://docs.starsim.org) for additional information.
 
 ## Contributing
 Contributions to the TBsim project are welcome! Please read [CONTRIBUTING.md](https://github.com/starsimhub/starsim/blob/main/contributing.md) for details on our code of conduct, and the process for submitting pull requests.
