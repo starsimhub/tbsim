@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -12,7 +12,12 @@ license = { file = "LICENSE" }
 keywords = ["agent-based model", "simulation", "disease", "epidemiology"]
 
 authors = [
-  { name = "Minerva Enriquez, Robyn Stuart, Cliff Kerr, Romesh Abeysuriya, Paula Sanz-Leon, Jamie Cohen, and Daniel Klein on behalf of the tbsim Collective" },
+  { name = "Minerva Enriquez", email = "info@starsim.org" },
+  { name = "Daniel Klein" },
+  { name = "Cliff Kerr" },
+  { name = "Ryan Hull" },
+  { name = "Deven Gokhale" },
+  { name = "Stewart Chang" },
 ]
 
 classifiers = [
@@ -51,6 +56,10 @@ dev = [
   "mkdocs-include-markdown-plugin",
   "mkdocs-jupyter",
 ]
+
+[project.urls]
+"Website" = "https://stisim.org"
+"Source" = "https://github.com/starsimhub/tbsim/"
 
 [tool.setuptools.packages.find]
 where = ["."]
