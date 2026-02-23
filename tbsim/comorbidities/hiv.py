@@ -1,3 +1,5 @@
+"""Simplified HIV disease model and TB-HIV connector for co-infection simulations."""
+
 #!/usr/bin/env python3
 import numpy as np
 import starsim as ss

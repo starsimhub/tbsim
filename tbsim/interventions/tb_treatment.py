@@ -1,3 +1,5 @@
+"""TB treatment intervention for diagnosed individuals"""
+
 import numpy as np
 import starsim as ss
 from tbsim import TBS

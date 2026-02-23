@@ -1,3 +1,5 @@
+"""Custom contact networks"""
+
 import starsim as ss
 import numpy as np
 import networkx as nx

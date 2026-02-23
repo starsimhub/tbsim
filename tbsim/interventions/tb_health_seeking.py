@@ -1,7 +1,8 @@
+"""Health-seeking behavior intervention"""
 
 import numpy as np
 import starsim as ss
-import tbsim 
+import tbsim
 
 __all__ = ['HealthSeekingBehavior']
 

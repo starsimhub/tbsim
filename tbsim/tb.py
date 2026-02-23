@@ -1,3 +1,5 @@
+"""Original agent-based TB natural history model with state-based progression and transmission."""
+
 import numpy as np
 import starsim as ss
 import matplotlib.pyplot as plt
