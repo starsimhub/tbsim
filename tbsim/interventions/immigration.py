@@ -34,8 +34,9 @@ class Immigration(ss.Demographics):
         Relative immigration rate multiplier
     """
     
-    def __init__(self, pars=None, immigration_rate=_, rel_immigration=_, 
+    def __init__(self, pars=None, immigration_rate=_, rel_immigration=_,
                  age_distribution=_, tb_status_distribution=_, **kwargs):
+        """Initialize with immigration rate, age distribution, and TB status distribution."""
         super().__init__()
         
         self.define_pars(
@@ -264,6 +265,7 @@ class SimpleImmigration(ss.Demographics):
     """
     
     def __init__(self, pars=None, immigration_rate=20, **kwargs):
+        """Initialize with a fixed immigration rate (immigrants per year)."""
         super().__init__()
         
         self.define_pars(

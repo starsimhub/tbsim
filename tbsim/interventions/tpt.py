@@ -44,6 +44,7 @@ class TPTTx(ss.Product):
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Initialize TPT product with default treatment duration and efficacy parameters."""
         super().__init__(**kwargs)
         self.define_pars(
             disease='tb',
@@ -155,9 +156,23 @@ class TPTSimple(TBProductRoutine):
     pars : dict
         Overrides for delivery parameters (``coverage``, ``age_range``,
         ``eligible_states``, ``start``, ``stop``).
+
+    Example
+    -------
+    ::
+
+        import starsim as ss
+        import tbsim
+        from tbsim.interventions.tpt import TPTSimple
+
+        tb  = tbsim.TB_LSHTM(name='tb')
+        tpt = TPTSimple()
+        sim = ss.Sim(diseases=tb, interventions=tpt, pars=dict(start='2000', stop='2020'))
+        sim.run()
     """
 
     def __init__(self, product=None, pars=None, **kwargs):
+        """Initialize simple TPT delivery; defaults to targeting latently infected agents."""
         super().__init__(
             product=product if product is not None else TPTTx(),
             pars=pars,
@@ -168,6 +183,7 @@ class TPTSimple(TBProductRoutine):
             self.pars.eligible_states = [TBSL.INFECTION]
 
     def update_results(self):
+        """Record number of currently protected individuals."""
         super().update_results()
         self.results['n_protected'][self.ti] = np.count_nonzero(self.product.tpt_protected)
 
@@ -198,6 +214,7 @@ class TPTHousehold(TBProductRoutine):
     """
 
     def __init__(self, product=None, pars=None, **kwargs):
+        """Initialize household contact-tracing TPT delivery."""
         super().__init__(
             product=product if product is not None else TPTTx(),
             pars=pars,
@@ -256,5 +273,6 @@ class TPTHousehold(TBProductRoutine):
         return contacts
 
     def update_results(self):
+        """Record number of currently protected individuals."""
         super().update_results()
         self.results['n_protected'][self.ti] = np.count_nonzero(self.product.tpt_protected)

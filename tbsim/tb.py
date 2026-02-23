@@ -126,6 +126,15 @@ class TB(ss.Infection):
         rr_clearance: Relative risk multiplier for active-to-clearance transition
         rr_death: Relative risk multiplier for active-to-death transition
         reltrans_het: Individual-level heterogeneity in infectiousness
+
+    Example::
+
+        import starsim as ss
+        import tbsim
+
+        sim = ss.Sim(diseases=tbsim.TB())
+        sim.run()
+        sim.plot()
     """
     
     def __init__(self, pars=None, **kwargs):

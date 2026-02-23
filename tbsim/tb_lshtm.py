@@ -121,6 +121,17 @@ class TB_LSHTM(ss.Infection):
     - ``rr_clearance``   (FloatArr, default=1.0):  Multiplier on NON_INFECTIOUS → RECOVERED.
     - ``rr_death``       (FloatArr, default=1.0):  Multiplier on SYMPTOMATIC → DEAD.
 
+    Example
+    -------
+    ::
+
+        import starsim as ss
+        import tbsim
+
+        sim = ss.Sim(diseases=tbsim.TB_LSHTM(), pars=dict(start='2000', stop='2020'))
+        sim.run()
+        sim.plot()
+
     References
     ----------
     .. [1] Schwalb et al. (2025) Potential impact, costs, and benefits of population-wide
@@ -130,6 +141,7 @@ class TB_LSHTM(ss.Infection):
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Initialize with default LSHTM natural history parameters; override via ``pars``."""
         super().__init__(name=kwargs.pop('name', None), label=kwargs.pop('label', None))
 
         # --- Transmission and reinfection ---

@@ -11,9 +11,23 @@ class HealthSeekingBehavior(ss.Intervention):
     Eligible agents (symptomatic in LSHTM; smear+/smear-/EPTB in legacy TB) seek care
     at a rate per timestep. If the people object has a sought_care attribute, it is set
     to True for agents who seek care (for use by downstream interventions).
+
+    Example
+    -------
+    ::
+
+        import starsim as ss
+        import tbsim
+        from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
+
+        tb  = tbsim.TB_LSHTM()
+        hsb = HealthSeekingBehavior()
+        sim = ss.Sim(diseases=tb, interventions=hsb, pars=dict(start='2000', stop='2020'))
+        sim.run()
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Initialize with care-seeking rate, retry logic, and eligible-state configuration."""
         super().__init__(**kwargs)
         self.define_pars(
             initial_care_seeking_rate = ss.perday(0.1),
@@ -33,9 +47,11 @@ class HealthSeekingBehavior(ss.Intervention):
     
     @property
     def tbsl(self):
+        """Shortcut to the TBSL state enum."""
         return tbsim.TBSL
-    
+
     def init_post(self):
+        """Locate the TB disease module and resolve eligible states."""
         super().init_post()
 
         # Find and store the TB disease module
@@ -58,9 +74,10 @@ class HealthSeekingBehavior(ss.Intervention):
         if self.pars.stop  is None: self.pars.stop  = self.sim.t.stop
 
     def step(self):
+        """Identify eligible symptomatic agents and stochastically trigger care-seeking."""
         sim = self.sim
         ppl = sim.people
-        t = sim.now.date() 
+        t = sim.now.date()
 
         if t < self.pars.start.date() or t > self.pars.stop.date():
             self._new_seekers_count = 0
@@ -94,6 +111,7 @@ class HealthSeekingBehavior(ss.Intervention):
             ppl.sought_care[seeking_uids] = True
 
     def init_results(self):
+        """Define result channels for care-seeking counts."""
         super().init_results()
         self.define_results(
             ss.Result('new_sought_care',    dtype=int),
@@ -103,7 +121,8 @@ class HealthSeekingBehavior(ss.Intervention):
         )
 
     def update_results(self):
-        t = self.sim.now.date() 
+        """Record new, current, and cumulative care-seeking counts."""
+        t = self.sim.now.date()
         if t < self.pars.start.date() or t > self.pars.stop.date():
             return
         ppl = self.sim.people

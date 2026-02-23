@@ -12,12 +12,16 @@ class TBTreatment(ss.Intervention):
     """
     Starts TB treatment for diagnosed individuals and applies treatment success/failure logic.
 
+    Requires ``HealthSeekingBehavior`` and ``TBDiagnostic`` to run upstream in the
+    same simulation; see ``tbsim_examples/run_tb_interventions.py`` for a full example.
+
     Parameters:
         treatment_success_rate (float or Dist): Probability of cure if treated.
         reseek_multiplier (float): Care-seeking multiplier applied after failure.
         reset_flags (bool): Whether to reset tested/diagnosed flags after failure.
     """
     def __init__(self, pars=None, **kwargs):
+        """Initialize with treatment success probability and failure-handling parameters."""
         super().__init__(**kwargs)
         self.define_pars(
             treatment_success_prob=0.85,
@@ -34,6 +38,7 @@ class TBTreatment(ss.Intervention):
         self.failures = []
 
     def step(self):
+        """Treat diagnosed active-TB individuals"""
         sim = self.sim
         ppl = sim.people
         tb = sim.diseases.tb
@@ -83,6 +88,7 @@ class TBTreatment(ss.Intervention):
         self.failures = failure_uids
 
     def init_results(self):
+        """Define result channels for treatment counts and outcomes."""
         super().init_results()
         self.define_results(
             ss.Result('n_treated', dtype=int),
@@ -93,6 +99,7 @@ class TBTreatment(ss.Intervention):
         )
 
     def update_results(self):
+        """Record per-step and cumulative treatment success/failure counts."""
         n_treated = len(self.new_treated)
         n_success = len(self.successes)
         n_failure = len(self.failures)

@@ -80,6 +80,7 @@ class DwellTime(ss.Analyzer):
 
     def __init__(self, data=None, file_path=None, directory=None, prefix='',
                  states_ennumerator=None, scenario_name='', debug=False):
+        """Auto-detect mode (plotter, aggregate, or analyzer) from the supplied arguments."""
         self.debug = debug
         self.scenario_name = scenario_name
         self.eSTATES = states_ennumerator or tbsim.TBS
