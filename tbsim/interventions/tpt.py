@@ -223,6 +223,8 @@ class TPTHousehold(TBProductRoutine):
         self.define_states(
             ss.BoolArr('prev_on_treatment', default=False),
         )
+        self.hh_net = None
+        return
 
     def find_household_net(self):
         """Find the network that has ``household_ids``."""
@@ -237,7 +239,9 @@ class TPTHousehold(TBProductRoutine):
         household contacts.
         """
         tb = self.sim.diseases[self.product.pars.disease]
-        hh_net = self.find_household_net()
+        if self.hh_net is None:
+            self.hh_net = self.find_household_net()
+        hh_net = self.hh_net
 
         # 1. Detect NEW treatment starts (on_treatment: False → True)
         newly_on_treatment = (tb.on_treatment & ~self.prev_on_treatment).uids
@@ -276,3 +280,9 @@ class TPTHousehold(TBProductRoutine):
         """Record number of currently protected individuals."""
         super().update_results()
         self.results['n_protected'][self.ti] = np.count_nonzero(self.product.tpt_protected)
+        return
+
+    def shrink(self):
+        """ Delete link to household net """
+        self.hh_net = None
+        return
