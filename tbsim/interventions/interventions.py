@@ -21,22 +21,15 @@ class TBProductRoutine(ss.Intervention):
     Any product that exposes ``update_roster()``, ``administer(people, uids)``,
     and ``apply_protection()`` can be plugged into this delivery.
 
-    Parameters
-    ----------
-    product : ss.Vx
-        The vaccine/treatment product.
-    coverage : ss.bernoulli
-        Fraction of eligible individuals who accept (applied once per person).
-    start / stop : ss.date
-        Campaign window.
-    age_range : list or None
-        ``[min_age, max_age]`` filter, or ``None`` to skip.
-    eligible_states : list or None
-        List of disease-state values (e.g. ``[TBSL.INFECTION]``) to filter on,
-        or ``None`` to skip.
-    eligibility : callable or None
-        User-provided ``fn(sim) → BoolArr | uids`` for custom filtering
-        (passed through to ``ss.Intervention``).
+    Args:
+        product (ss.Vx): The vaccine/treatment product.
+        coverage (ss.bernoulli): Fraction of eligible individuals who accept (applied once per person).
+        start / stop (ss.date): Campaign window.
+        age_range (list or None): ``[min_age, max_age]`` filter, or ``None`` to skip.
+        eligible_states (list or None): List of disease-state values (e.g. ``[TBSL.INFECTION]``) to filter on,
+            or ``None`` to skip.
+        eligibility (callable or None): User-provided ``fn(sim) -> BoolArr | uids`` for custom filtering
+            (passed through to ``ss.Intervention``).
     """
 
     def __init__(self, product=None, pars=None, **kwargs):
@@ -59,6 +52,7 @@ class TBProductRoutine(ss.Intervention):
             ss.BoolArr('initiated', default=False),
             ss.FloatArr('ti_initiated'),
         )
+        return
 
     def check_eligibility(self):
         """
@@ -113,6 +107,7 @@ class TBProductRoutine(ss.Intervention):
 
         # Apply modifiers for all currently protected
         self.product.apply_protection()
+        return
 
     def init_results(self):
         """Define result channels for newly initiated and currently protected counts."""
@@ -123,8 +118,10 @@ class TBProductRoutine(ss.Intervention):
             ss.Result('n_newly_initiated', dtype=int),
             ss.Result('n_protected', dtype=int),
         )
+        return
 
     def update_results(self):
         """Record number of newly initiated individuals this timestep."""
         newly_initiated = np.sum((self.ti_initiated == self.ti) & self.initiated)
         self.results['n_newly_initiated'][self.ti] = newly_initiated
+        return

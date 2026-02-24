@@ -8,8 +8,8 @@ WARNING -- this class is not yet currently functional.
 """
 
 import numpy as np
-import starsim as ss
 import sciris as sc
+import starsim as ss
 
 __all__ = ['Immigration', 'SimpleImmigration']
 
@@ -248,7 +248,8 @@ class Immigration(ss.Demographics):
             # Create new households for immigrants
             for i, uid in enumerate(new_uids):
                 hh_net.hhid[uid] = i
-    
+        return
+
     def update_results(self):
         """Update results tracking."""
         if hasattr(self, 'results') and self.results is not None:
@@ -342,13 +343,13 @@ class SimpleImmigration(ss.Demographics):
             if hasattr(net, 'hhid'):
                 hh_net = net
                 break
-        
+
         if hh_net is None:
             return
-        
+
         # Get existing households
         existing_hhids = np.unique(hh_net.hhid[hh_net.hhid >= 0])
-        
+
         if len(existing_hhids) > 0:
             # Assign each immigrant to a random existing household
             assigned_hhids = np.random.choice(existing_hhids, size=len(new_uids))
@@ -357,3 +358,4 @@ class SimpleImmigration(ss.Demographics):
             # Create new households for immigrants
             for i, uid in enumerate(new_uids):
                 hh_net.hhid[uid] = i
+        return

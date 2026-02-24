@@ -8,7 +8,6 @@ Tuberculosis Preventive Therapy (TPT): Product + Delivery.
 
 import numpy as np
 import starsim as ss
-
 from .interventions import TBProductRoutine
 from ..tb_lshtm import TBSL
 
@@ -29,18 +28,12 @@ class TPTTx(ss.Product):
     completes, ``rr_activation``, ``rr_clearance``, and ``rr_death`` are
     modified each step until protection expires.
 
-    Parameters
-    ----------
-    disease : str
-        Key of the disease module to target (default ``'tb'``).
-    dur_treatment : ss.Dist
-        Duration of the antibiotic course (default 3 months).
-    dur_protection : ss.Dist
-        Duration of post-treatment protection (default 2 years).
-    activation_modifier / clearance_modifier / death_modifier : ss.Dist
-        Per-individual risk-modifier distributions.
-    exclude_on_treatment : bool
-        If True, skip agents currently on TB treatment (default True).
+    Args:
+        disease (str): Key of the disease module to target (default ``'tb'``).
+        dur_treatment (ss.Dist): Duration of the antibiotic course (default 3 months).
+        dur_protection (ss.Dist): Duration of post-treatment protection (default 2 years).
+        activation_modifier / clearance_modifier / death_modifier (ss.Dist): Per-individual risk-modifier distributions.
+        exclude_on_treatment (bool): If True, skip agents currently on TB treatment (default True).
     """
 
     def __init__(self, pars=None, **kwargs):
@@ -65,6 +58,7 @@ class TPTTx(ss.Product):
             ss.FloatArr('tpt_clearance_modifier_applied'),
             ss.FloatArr('tpt_death_modifier_applied'),
         )
+        return
 
     def administer(self, people, uids):
         """
@@ -74,10 +68,8 @@ class TPTTx(ss.Product):
         protected), then samples per-agent modifiers and schedules the
         protection window.
 
-        Returns
-        -------
-        ss.uids
-            UIDs of agents who actually started TPT.
+        Returns:
+            ss.uids: UIDs of agents who actually started TPT.
         """
         if len(uids) == 0:
             return ss.uids()
@@ -126,6 +118,7 @@ class TPTTx(ss.Product):
                 self.ti > self.ti_protection_expires[protected_uids]
             ]
             self.tpt_protected[expired] = False
+        return
 
     def apply_protection(self):
         """Multiply ``rr_*`` arrays for all currently protected agents."""
@@ -135,6 +128,7 @@ class TPTTx(ss.Product):
             tb.rr_activation[protected] *= self.tpt_activation_modifier_applied[protected]
             tb.rr_clearance[protected] *= self.tpt_clearance_modifier_applied[protected]
             tb.rr_death[protected] *= self.tpt_death_modifier_applied[protected]
+        return
 
 
 # ---------------------------------------------------------------------------
@@ -149,17 +143,12 @@ class TPTSimple(TBProductRoutine):
     agents in ``TBSL.INFECTION`` state (latent TB).  Creates a
     :class:`TPTTx` product automatically if none is provided.
 
-    Parameters
-    ----------
-    product : TPTTx
-        The TPT treatment product (created automatically if not provided).
-    pars : dict
-        Overrides for delivery parameters (``coverage``, ``age_range``,
-        ``eligible_states``, ``start``, ``stop``).
+    Args:
+        product (TPTTx): The TPT treatment product (created automatically if not provided).
+        pars (dict): Overrides for delivery parameters (``coverage``, ``age_range``,
+            ``eligible_states``, ``start``, ``stop``).
 
-    Example
-    -------
-    ::
+    Example::
 
         import starsim as ss
         import tbsim
@@ -181,11 +170,13 @@ class TPTSimple(TBProductRoutine):
         # Default: target latently infected agents
         if pars is None or 'eligible_states' not in (pars or {}):
             self.pars.eligible_states = [TBSL.INFECTION]
+        return
 
     def update_results(self):
         """Record number of currently protected individuals."""
         super().update_results()
         self.results['n_protected'][self.ti] = np.count_nonzero(self.product.tpt_protected)
+        return
 
 
 # ---------------------------------------------------------------------------
@@ -204,13 +195,10 @@ class TPTHousehold(TBProductRoutine):
     ``HouseholdDHSNet`` or ``EvolvingHouseholdDHSNet`` from
     ``starsim_examples``).
 
-    Parameters
-    ----------
-    product : TPTTx
-        The TPT treatment product (created automatically if not provided).
-    pars : dict
-        Overrides. ``coverage`` controls the probability that a given index
-        case's household is followed up (per-index-case Bernoulli).
+    Args:
+        product (TPTTx): The TPT treatment product (created automatically if not provided).
+        pars (dict): Overrides. ``coverage`` controls the probability that a given index
+            case's household is followed up (per-index-case Bernoulli).
     """
 
     def __init__(self, product=None, pars=None, **kwargs):

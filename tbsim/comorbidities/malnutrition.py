@@ -75,6 +75,8 @@ class Malnutrition(ss.Disease):
         )
         self.dweight = ss.normal(loc=0, scale=self.dweight_scale)
 
+        return
+
     @staticmethod
     def dweight_scale(self, sim, uids):
         """Scale parameter for weight change distribution: 0.01 * time_index."""
@@ -138,6 +140,8 @@ class Malnutrition(ss.Disease):
         self.weight_percentile[uids] += self.dweight(uids)
         self.weight_percentile[uids] = np.clip(self.weight_percentile[uids], 0.025, 0.975)
 
+        return
+
     def init_results(self):
         """Initialize results tracking."""
         super().init_results()
@@ -152,6 +156,8 @@ class Malnutrition(ss.Disease):
         alive = self.sim.people.alive
         n_agents = self.sim.pars['n_agents']
         self.results.people_alive[ti] = np.count_nonzero(alive)/n_agents
+
+        return
 
 
 class TB_Nutrition_Connector(ss.Connector):
@@ -178,6 +184,8 @@ class TB_Nutrition_Connector(ss.Connector):
             relsus_func = self.compute_relsus,
         )
         self.update_pars(pars, **kwargs)
+
+        return
 
     @staticmethod
     def supplementation_rr(tb, mn, uids, rate_ratio=0.5):
@@ -218,3 +226,5 @@ class TB_Nutrition_Connector(ss.Connector):
 
         uids = (~tb.infected).uids
         tb.rel_sus[uids] = self.pars.relsus_func(tb, mn, uids)
+
+        return

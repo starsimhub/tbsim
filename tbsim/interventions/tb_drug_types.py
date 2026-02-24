@@ -1,9 +1,8 @@
 """TB drug type definitions and regimen-specific parameters, following EMOD-Generic conventions."""
 
+from enum import IntEnum
 import numpy as np
 import starsim as ss
-from enum import IntEnum
-from typing import Dict, Any, Optional
 
 __all__ = ['TBDrugType', 'TBDrugParameters', 'TBDrugTypeParameters']
 
@@ -40,7 +39,7 @@ class TBDrugType(IntEnum):
     LATENT_TREATMENT = 7        # Treatment for latent TB
     
     @classmethod
-    def get_name(cls, value: int) -> str:
+    def get_name(cls, value):
         """
         Get the string name for a drug type value.
         
@@ -62,7 +61,7 @@ class TBDrugType(IntEnum):
             return f"UNKNOWN_{value}"
     
     @classmethod
-    def get_all_types(cls) -> list:
+    def get_all_types(cls):
         """
         Get all drug types as a list.
         
@@ -106,7 +105,7 @@ class TBDrugParameters:
         >>> print(f"Cure rate: {params.cure_prob}")
     """
     
-    def __init__(self, drug_name: str, drug_type: TBDrugType):
+    def __init__(self, drug_name, drug_type):
         """
         Initialize drug parameters.
         
@@ -136,8 +135,9 @@ class TBDrugParameters:
         self.duration = 180.0             # Treatment duration in days
         self.adherence_rate = 0.85        # Expected adherence rate
         self.cost_per_course = 100.0      # Cost per treatment course
-        
-    def configure(self, parameters: Dict[str, Any]) -> None:
+        return
+
+    def configure(self, parameters):
         """
         Configure drug parameters from a dictionary.
         
@@ -161,8 +161,9 @@ class TBDrugParameters:
         for key, value in parameters.items():
             if hasattr(self, key):
                 setattr(self, key, value)
-    
-    def get_effectiveness(self, time_on_treatment: float) -> float:
+        return
+
+    def get_effectiveness(self, time_on_treatment):
         """
         Calculate drug effectiveness based on time on treatment.
         
@@ -202,7 +203,7 @@ class TBDrugParameters:
             decay_factor = np.exp(-(time_on_treatment - 30) / self.primary_decay_time_constant)
             return max(0.1, decay_factor)  # Minimum 10% effectiveness
     
-    def __repr__(self) -> str:
+    def __repr__(self):
         """
         String representation of the drug parameters.
         
@@ -241,7 +242,7 @@ class TBDrugTypeParameters:
     """
     
     @staticmethod
-    def create_dots_parameters() -> TBDrugParameters:
+    def create_dots_parameters():
         """
         Create parameters for DOTS regimen.
         
@@ -278,7 +279,7 @@ class TBDrugTypeParameters:
         return params
     
     @staticmethod
-    def create_dots_improved_parameters() -> TBDrugParameters:
+    def create_dots_improved_parameters():
         """
         Create parameters for improved DOTS regimen.
         
@@ -315,7 +316,7 @@ class TBDrugTypeParameters:
         return params
     
     @staticmethod
-    def create_empiric_treatment_parameters() -> TBDrugParameters:
+    def create_empiric_treatment_parameters():
         """
         Create parameters for empiric treatment.
         
@@ -352,7 +353,7 @@ class TBDrugTypeParameters:
         return params
     
     @staticmethod
-    def create_first_line_combo_parameters() -> TBDrugParameters:
+    def create_first_line_combo_parameters():
         """
         Create parameters for first-line combination therapy.
         
@@ -389,7 +390,7 @@ class TBDrugTypeParameters:
         return params
     
     @staticmethod
-    def create_second_line_combo_parameters() -> TBDrugParameters:
+    def create_second_line_combo_parameters():
         """
         Create parameters for second-line combination therapy.
         
@@ -425,7 +426,7 @@ class TBDrugTypeParameters:
         return params
     
     @staticmethod
-    def create_third_line_combo_parameters() -> TBDrugParameters:
+    def create_third_line_combo_parameters():
         """
         Create parameters for third-line combination therapy.
         
@@ -461,7 +462,7 @@ class TBDrugTypeParameters:
         return params
     
     @staticmethod
-    def create_latent_treatment_parameters() -> TBDrugParameters:
+    def create_latent_treatment_parameters():
         """
         Create parameters for latent TB treatment.
         
@@ -498,7 +499,7 @@ class TBDrugTypeParameters:
         return params
     
     @staticmethod
-    def create_parameters_for_type(drug_type: TBDrugType) -> TBDrugParameters:
+    def create_parameters_for_type(drug_type):
         """
         Create parameters for a specific drug type.
         
@@ -537,7 +538,7 @@ class TBDrugTypeParameters:
             raise ValueError(f"Unknown drug type: {drug_type}")
     
     @staticmethod
-    def get_all_parameter_sets() -> Dict[TBDrugType, TBDrugParameters]:
+    def get_all_parameter_sets():
         """
         Get all predefined parameter sets.
         
@@ -563,7 +564,7 @@ class TBDrugTypeParameters:
 
 
 # Convenience functions for easy access
-def get_dots_parameters() -> TBDrugParameters:
+def get_dots_parameters():
     """
     Get DOTS parameters.
     
@@ -579,7 +580,7 @@ def get_dots_parameters() -> TBDrugParameters:
     """
     return TBDrugTypeParameters.create_dots_parameters()
 
-def get_drug_parameters(drug_type: TBDrugType) -> TBDrugParameters:
+def get_drug_parameters(drug_type):
     """
     Get parameters for a specific drug type.
     
@@ -598,7 +599,7 @@ def get_drug_parameters(drug_type: TBDrugType) -> TBDrugParameters:
     """
     return TBDrugTypeParameters.create_parameters_for_type(drug_type)
 
-def get_all_drug_parameters() -> Dict[TBDrugType, TBDrugParameters]:
+def get_all_drug_parameters():
     """
     Get all drug parameter sets.
     

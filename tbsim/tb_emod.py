@@ -1,11 +1,10 @@
 """Original agent-based TB natural history model with state-based progression and transmission."""
 
-import numpy as np
-import starsim as ss
-import matplotlib.pyplot as plt
-import pandas as pd
-
 from enum import IntEnum
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import starsim as ss
 
 __all__ = ['TB_EMOD', 'TBS']
 
@@ -224,6 +223,8 @@ class TB_EMOD(ss.Infection):
         self.dist_presym_to_active = ss.bernoulli(p=self.p_presym_to_active)
         self.dist_active_to_clear  = ss.bernoulli(p=self.p_active_to_clear)
         self.dist_active_to_death  = ss.bernoulli(p=self.p_active_to_death)
+
+        return
 
     @staticmethod
     def p_latent_to_presym(self, sim, uids):

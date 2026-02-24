@@ -84,6 +84,7 @@ class BetaByYear(ss.Intervention):
             self._x_beta_list = list(self.pars['x_beta'])
         else:
             self._x_beta_list = [self.pars['x_beta']] * len(self.pars['years'])
+        return
 
     def step(self):
         """
@@ -103,4 +104,4 @@ class BetaByYear(ss.Intervention):
                 self.pars.years.pop(0)
                 self._x_beta_list.pop(0)
                 # Do not increment idx, as lists have shifted
-                        
+        return

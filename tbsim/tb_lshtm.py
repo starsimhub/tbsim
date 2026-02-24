@@ -2,9 +2,8 @@
 
 from enum import IntEnum
 import numpy as np
-import starsim as ss
 import matplotlib.pyplot as plt
-
+import starsim as ss
 
 __all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL']
 
@@ -14,8 +13,8 @@ class TBSL(IntEnum):
     TB state labels for the LSHTM model.
 
     - Each agent is in exactly one of these states.
-    - Transitions are driven by exponential rates in :class:`TB_LSHTM`
-      (and :class:`TB_LSHTM_Acute`).
+    - Transitions are driven by exponential rates in `TB_LSHTM`
+      (and `TB_LSHTM_Acute`).
     """
     SUSCEPTIBLE     = -1    # Never infected (agents who clear/recover/treat remain in their last state, not here)
     INFECTION       = 0     # Latent infection (not yet active TB)
@@ -40,97 +39,92 @@ class TBSL(IntEnum):
 class TB_LSHTM(ss.Infection):
     """
     Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al. 2025).
-    States in :class:`TBSL` span the spectrum from susceptibility to active disease and treatment.
-    Infectious states are :class:`TBSL.ASYMPTOMATIC` and :class:`TBSL.SYMPTOMATIC`; the force
-    of infection depends on :attr:`pars.beta` and the prevalence of those states, with
-    :attr:`pars.trans_asymp` (κ kappa) giving the relative infectiousness of asymptomatic vs symptomatic TB.
-    Reinfectable states (:class:`TBSL.CLEARED`, :class:`TBSL.RECOVERED`, :class:`TBSL.TREATED`) use
-    :attr:`pars.rr_rec` (π pi) and :attr:`pars.rr_treat` (ρ rho). Per-agent modifiers ``rr_activation``, ``rr_clearance``,
-    ``rr_death`` scale selected rates. Interventions call :meth:`start_treatment`.
+    States in `TBSL` span the spectrum from susceptibility to active disease and treatment.
+    Infectious states are `TBSL.ASYMPTOMATIC` and `TBSL.SYMPTOMATIC`; the force
+    of infection depends on `pars.beta` and the prevalence of those states, with
+    `pars.trans_asymp` (kappa) giving the relative infectiousness of asymptomatic vs symptomatic TB.
+    Reinfectable states (`TBSL.CLEARED`, `TBSL.RECOVERED`, `TBSL.TREATED`) use
+    `pars.rr_rec` (pi) and `pars.rr_treat` (rho). Per-agent modifiers ``rr_activation``, ``rr_clearance``,
+    ``rr_death`` scale selected rates. Interventions call `start_treatment`.
 
-    Parameters (pars)
-    -----------------
-    *Transmission and reinfection*
+    Args (pars):
+        *Transmission and reinfection*
 
-    - ``init_prev``:   Initial seed infections (prevalence).
-    - ``beta``:        Transmission rate per year.
-    - ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (κ kappa)
-    - ``rr_rec``:      Relative risk of reinfection for RECOVERED.  (π pi)
-    - ``rr_treat``:    Relative risk of reinfection for TREATED. (ρ rho)
+        - ``init_prev``:   Initial seed infections (prevalence).
+        - ``beta``:        Transmission rate per year.
+        - ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (kappa)
+        - ``rr_rec``:      Relative risk of reinfection for RECOVERED.  (pi)
+        - ``rr_treat``:    Relative risk of reinfection for TREATED. (rho)
 
-    *From INFECTION (latent)*
+        *From INFECTION (latent)*
 
-    - ``inf_cle``:     Infection → Cleared (no active TB).
-    - ``inf_non``:     Infection → Non-infectious TB.
-    - ``inf_asy``:     Infection → Asymptomatic TB.
+        - ``inf_cle``:     Infection -> Cleared (no active TB).
+        - ``inf_non``:     Infection -> Non-infectious TB.
+        - ``inf_asy``:     Infection -> Asymptomatic TB.
 
-    *From NON_INFECTIOUS*
+        *From NON_INFECTIOUS*
 
-    - ``non_rec``:    Non-infectious → Recovered.
-    - ``non_asy``:    Non-infectious → Asymptomatic.
+        - ``non_rec``:    Non-infectious -> Recovered.
+        - ``non_asy``:    Non-infectious -> Asymptomatic.
 
-    *From ASYMPTOMATIC*
+        *From ASYMPTOMATIC*
 
-    - ``asy_non``:    Asymptomatic → Non-infectious.
-    - ``asy_sym``:    Asymptomatic → Symptomatic.
+        - ``asy_non``:    Asymptomatic -> Non-infectious.
+        - ``asy_sym``:    Asymptomatic -> Symptomatic.
 
-    *From SYMPTOMATIC*
+        *From SYMPTOMATIC*
 
-    - ``sym_asy``:     Symptomatic → Asymptomatic.
-    - ``sym_treat``:   Symptomatic → Treatment. (θ theta)
-    - ``sym_dead``:    Symptomatic → Dead (TB-specific mortality, μ_TB).
+        - ``sym_asy``:     Symptomatic -> Asymptomatic.
+        - ``sym_treat``:   Symptomatic -> Treatment. (theta)
+        - ``sym_dead``:    Symptomatic -> Dead (TB-specific mortality, mu_TB).
 
-    *From TREATMENT*
+        *From TREATMENT*
 
-    - ``fail_rate``:     Treatment → Symptomatic (failure). (φ phi)
-    - ``complete_rate``: Treatment → Treated (completion).  (δ delta)
+        - ``fail_rate``:     Treatment -> Symptomatic (failure). (phi)
+        - ``complete_rate``: Treatment -> Treated (completion).  (delta)
 
-    *Background (general mortality is handled by* ``ss.Deaths`` *demographics, not this module)*
+        *Background (general mortality is handled by* ``ss.Deaths`` *demographics, not this module)*
 
-    - ``cxr_asymp_sens``:   CXR sensitivity for screening asymptomatic (0–1).
+        - ``cxr_asymp_sens``:   CXR sensitivity for screening asymptomatic (0-1).
 
-    Agent states (array-like, one per agent)
-    ---------------------------------------
+    Attributes:
+        *Infection flags*
 
-    *Infection flags*
+        - ``susceptible``    (BoolState, default=True):   Whether the agent is susceptible to TB.
+        - ``infected``       (BoolState, default=False):  Whether the agent is currently infected.
+        - ``ever_infected``  (BoolState, default=False):  Whether the agent has ever been infected.
+        - ``on_treatment``   (BoolState, default=False):  Whether the agent is on TB treatment.
 
-    - ``susceptible``    (BoolState, default=True):   Whether the agent is susceptible to TB.
-    - ``infected``       (BoolState, default=False):  Whether the agent is currently infected.
-    - ``ever_infected``  (BoolState, default=False):  Whether the agent has ever been infected.
-    - ``on_treatment``   (BoolState, default=False):  Whether the agent is on TB treatment.
+        *TB state machine*
 
-    *TB state machine*
+        - ``state``          (FloatArr, default=TBSL.SUSCEPTIBLE):  Current TB state (`TBSL` value).
+        - ``ti_infected``    (FloatArr, default=-inf):              Time of infection (never infected = -inf).
 
-    - ``state``          (FloatArr, default=TBSL.SUSCEPTIBLE):  Current TB state (:class:`TBSL` value).
-    - ``ti_infected``    (FloatArr, default=-inf):              Time of infection (never infected = -inf).
+        *Transmission modifiers*
 
-    *Transmission modifiers*
+        - ``rel_sus``        (FloatArr, default=1.0):  Relative susceptibility to TB.
+        - ``rel_trans``      (FloatArr, default=1.0):  Relative transmissibility of TB.
 
-    - ``rel_sus``        (FloatArr, default=1.0):  Relative susceptibility to TB.
-    - ``rel_trans``      (FloatArr, default=1.0):  Relative transmissibility of TB.
+        *Per-agent risk modifiers*
 
-    *Per-agent risk modifiers*
+        - ``rr_activation``  (FloatArr, default=1.0):  Multiplier on INFECTION -> NON_INFECTIOUS / ASYMPTOMATIC.
+        - ``rr_clearance``   (FloatArr, default=1.0):  Multiplier on NON_INFECTIOUS -> RECOVERED.
+        - ``rr_death``       (FloatArr, default=1.0):  Multiplier on SYMPTOMATIC -> DEAD.
 
-    - ``rr_activation``  (FloatArr, default=1.0):  Multiplier on INFECTION → NON_INFECTIOUS / ASYMPTOMATIC.
-    - ``rr_clearance``   (FloatArr, default=1.0):  Multiplier on NON_INFECTIOUS → RECOVERED.
-    - ``rr_death``       (FloatArr, default=1.0):  Multiplier on SYMPTOMATIC → DEAD.
+    Example:
+        ::
 
-    Example
-    -------
-    ::
+            import starsim as ss
+            import tbsim
 
-        import starsim as ss
-        import tbsim
+            sim = ss.Sim(diseases=tbsim.TB_LSHTM(), pars=dict(start='2000', stop='2020'))
+            sim.run()
+            sim.plot()
 
-        sim = ss.Sim(diseases=tbsim.TB_LSHTM(), pars=dict(start='2000', stop='2020'))
-        sim.run()
-        sim.plot()
-
-    References
-    ----------
-    .. [1] Schwalb et al. (2025) Potential impact, costs, and benefits of population-wide
-       screening interventions for tuberculosis in Viet Nam. PLOS Glob Public Health.
-       https://doi.org/10.1371/journal.pgph.0005050
+    References:
+        [1] Schwalb et al. (2025) Potential impact, costs, and benefits of population-wide
+        screening interventions for tuberculosis in Viet Nam. PLOS Glob Public Health.
+        https://doi.org/10.1371/journal.pgph.0005050
 
     """
 
@@ -203,7 +197,7 @@ class TB_LSHTM(ss.Infection):
         Boolean array: True for agents who can transmit TB.
 
         In this model only ASYMPTOMATIC and SYMPTOMATIC states are infectious.
-        Used by the base :class:`starsim.Infection` for transmission.
+        Used by the base `starsim.Infection` for transmission.
         """
         return (self.state == TBSL.ASYMPTOMATIC) | (self.state == TBSL.SYMPTOMATIC)
 
@@ -211,9 +205,9 @@ class TB_LSHTM(ss.Infection):
         """
         Set prognoses for newly infected agents (called when transmission occurs).
 
-        The base :class:`starsim.Infection` calls this when a susceptible agent
+        The base `starsim.Infection` calls this when a susceptible agent
         acquires infection. We mark agents infected and set state to INFECTION
-        (latent). Transitions are evaluated per dt each timestep in :meth:`step`.
+        (latent). Transitions are evaluated per dt each timestep in `step`.
         """
         super().set_prognoses(uids, sources)
         if len(uids) == 0:
@@ -286,6 +280,8 @@ class TB_LSHTM(ss.Infection):
         newly_asymp = t_uids[dest_states == TBSL.ASYMPTOMATIC]
         if len(newly_asymp):
             self.ti_asymp[newly_asymp] = self.ti
+
+        return
 
     def step(self):
         """
@@ -364,6 +360,8 @@ class TB_LSHTM(ss.Infection):
         self.rel_sus[self.state == TBSL.TREATED] = self.pars.rr_treat
         self.rel_trans[:] = 1
         self.rel_trans[self.state == TBSL.ASYMPTOMATIC] = self.pars.trans_asymp
+
+        return
 
     def start_treatment(self, uids):
         """
@@ -494,10 +492,10 @@ class TB_LSHTM_Acute(TB_LSHTM):
     """
     LSHTM TB model with an acute infection state immediately after exposure.
 
-    Extends :class:`TB_LSHTM` by inserting an ACUTE state between infection and
+    Extends `TB_LSHTM` by inserting an ACUTE state between infection and
     the usual INFECTION (latent) state. New infections enter ACUTE first, then
-    transition to INFECTION at rate :attr:`pars.rate_acute_latent`. Acute cases are
-    infectious with relative transmissibility :attr:`pars.trans_acute` (α alpha).
+    transition to INFECTION at rate `pars.rate_acute_latent`. Acute cases are
+    infectious with relative transmissibility `pars.trans_acute` (alpha).
     """
 
     def __init__(self, pars=None, **kwargs):
@@ -535,8 +533,8 @@ class TB_LSHTM_Acute(TB_LSHTM):
         """
         Advance TB state machine one timestep (acute variant).
 
-        Same single-pass structure as :meth:`TB_LSHTM.step`, but adds
-        ACUTE → INFECTION transition and treats ACUTE as infectious.
+        Same single-pass structure as `TB_LSHTM.step`, but adds
+        ACUTE -> INFECTION transition and treats ACUTE as infectious.
         """
         super(TB_LSHTM, self).step()
 
@@ -607,8 +605,10 @@ class TB_LSHTM_Acute(TB_LSHTM):
         self.rel_trans[self.state == TBSL.ACUTE] = self.pars.trans_acute
         self.rel_trans[self.state == TBSL.ASYMPTOMATIC] = self.pars.trans_asymp
 
+        return
+
     def start_treatment(self, uids):
-        """ACUTE or INFECTION → CLEARED; active → TREATMENT."""
+        """ACUTE or INFECTION -> CLEARED; active -> TREATMENT."""
         if len(uids) == 0:
             return
 

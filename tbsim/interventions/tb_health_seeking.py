@@ -43,8 +43,9 @@ class HealthSeekingBehavior(ss.Intervention):
             ss.IntArr('n_care_sought_total', default=0),    # lifetime count; never resets
             ss.FloatArr('ti_last_sought',    default=-np.inf),
         )
-        self.care_seeking_dist = ss.bernoulli(p=self.pars.initial_care_seeking_rate.to_prob())  
-    
+        self.care_seeking_dist = ss.bernoulli(p=self.pars.initial_care_seeking_rate.to_prob())
+        return
+
     @property
     def tbsl(self):
         """Shortcut to the TBSL state enum."""
@@ -72,6 +73,7 @@ class HealthSeekingBehavior(ss.Intervention):
         self._new_seekers_count = 0
         if self.pars.start is None: self.pars.start = self.sim.t.start
         if self.pars.stop  is None: self.pars.stop  = self.sim.t.stop
+        return
 
     def step(self):
         """Identify eligible symptomatic agents and stochastically trigger care-seeking."""
@@ -109,6 +111,7 @@ class HealthSeekingBehavior(ss.Intervention):
         self.ti_last_sought[seeking_uids] = self.ti
         if hasattr(ppl, 'sought_care'):
             ppl.sought_care[seeking_uids] = True
+        return
 
     def init_results(self):
         """Define result channels for care-seeking counts."""
@@ -119,6 +122,7 @@ class HealthSeekingBehavior(ss.Intervention):
             ss.Result('n_ever_sought_care', dtype=int),
             ss.Result('n_eligible',         dtype=int),
         )
+        return
 
     def update_results(self):
         """Record new, current, and cumulative care-seeking counts."""
@@ -131,3 +135,4 @@ class HealthSeekingBehavior(ss.Intervention):
         self.results['new_sought_care'][self.ti] = self._new_seekers_count
         active = np.isin(self._tb.state, self._states) & ppl.alive
         self.results['n_eligible'][self.ti] = np.count_nonzero(active & (self.n_care_sought == 0))
+        return

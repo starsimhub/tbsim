@@ -1,22 +1,25 @@
 """TBsim custom analyzers"""
 
 
-import matplotlib.colors as mcolors
-import pandas as pd
-import starsim as ss
-import numpy as np
 import os
-import sciris as sc
 import datetime as ddtt
-import tbsim
-from scipy import stats
+import warnings
 from enum import IntEnum
-import seaborn as sns
-import matplotlib.pyplot as plt
+
+import numpy as np
+import pandas as pd
+from scipy import stats
 from lifelines import KaplanMeierFitter
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import seaborn as sns
 import networkx as nx
 import plotly.graph_objects as go
-import warnings
+
+import sciris as sc
+import starsim as ss
+import tbsim
 
 __all__ = ['DwellTime', 'DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor']
 
@@ -29,53 +32,44 @@ class DwellTime(ss.Analyzer):
 
     Constructor mode is auto-detected from the arguments supplied:
 
-    * **Plotter mode** – pass ``data`` (DataFrame) or ``file_path`` (CSV path).
-    * **Aggregate mode** – pass ``directory`` (and optional ``prefix``).
-    * **Analyzer mode** – pass none of the above; the instance will be
+    * **Plotter mode** -- pass ``data`` (DataFrame) or ``file_path`` (CSV path).
+    * **Aggregate mode** -- pass ``directory`` (and optional ``prefix``).
+    * **Analyzer mode** -- pass none of the above; the instance will be
       attached to a Starsim simulation and record dwell times at each step.
 
-    Parameters
-    ----------
-    data : pd.DataFrame, optional
-        Pre-loaded dwell-time DataFrame.
-    file_path : str, optional
-        Path to a single CSV file with dwell-time data.
-    directory : str, optional
-        Directory containing CSV result files for aggregation.
-    prefix : str, optional
-        File prefix filter used with *directory*.
-    states_ennumerator : IntEnum, optional
-        State enumeration class (default ``tbsim.TBS``).
-    scenario_name : str, optional
-        Label for the simulation scenario.
-    debug : bool, optional
-        Enable verbose output.
+    Args:
+        data (pd.DataFrame, optional):        Pre-loaded dwell-time DataFrame.
+        file_path (str, optional):             Path to a single CSV file with dwell-time data.
+        directory (str, optional):             Directory containing CSV result files for aggregation.
+        prefix (str, optional):                File prefix filter used with *directory*.
+        states_ennumerator (IntEnum, optional): State enumeration class (default ``tbsim.TBS``).
+        scenario_name (str, optional):         Label for the simulation scenario.
+        debug (bool, optional):                Enable verbose output.
 
     Visualization types (via ``plot(kind=...)``):
 
-    - ``'sankey'`` – Sankey diagram of agent state transitions
-    - ``'histogram'`` – Histograms with KDE per state
-    - ``'kaplan_meier'`` – Kaplan-Meier survival curves
-    - ``'network'`` – Directed graph of state transitions
-    - ``'validation'`` – Observed dwell-time histograms for validation
+    - ``'sankey'`` -- Sankey diagram of agent state transitions
+    - ``'histogram'`` -- Histograms with KDE per state
+    - ``'kaplan_meier'`` -- Kaplan-Meier survival curves
+    - ``'network'`` -- Directed graph of state transitions
+    - ``'validation'`` -- Observed dwell-time histograms for validation
 
-    Examples
-    --------
-    Direct data visualization::
+    Example:
+        Direct data visualization::
 
-        dt = DwellTime(file_path='results/Baseline-20240101120000.csv')
-        dt.plot('sankey')
+            dt = DwellTime(file_path='results/Baseline-20240101120000.csv')
+            dt.plot('sankey')
 
-    Aggregating multiple runs::
+        Aggregating multiple runs::
 
-        dt = DwellTime(directory='results', prefix='Baseline')
-        dt.plot('network')
+            dt = DwellTime(directory='results', prefix='Baseline')
+            dt.plot('network')
 
-    During simulation::
+        During simulation::
 
-        sim = ss.Sim(diseases=[TB_EMOD()], analyzers=DwellTime(scenario_name="Baseline"))
-        sim.run()
-        sim.analyzers[0].plot('validation')
+            sim = ss.Sim(diseases=[TB_EMOD()], analyzers=DwellTime(scenario_name="Baseline"))
+            sim.run()
+            sim.analyzers[0].plot('validation')
     """
 
     def __init__(self, data=None, file_path=None, directory=None, prefix='',
@@ -112,6 +106,8 @@ class DwellTime(ss.Analyzer):
         if self._data_error():
             print("No data provided, or data is corrupted")
 
+        return
+
     # ------------------------------------------------------------------
     # plot() dispatcher
     # ------------------------------------------------------------------
@@ -122,18 +118,13 @@ class DwellTime(ss.Analyzer):
         """
         Create a visualization of the dwell-time data.
 
-        Parameters
-        ----------
-        kind : str
-            One of ``'sankey'``, ``'histogram'``, ``'kaplan_meier'``,
-            ``'network'``, ``'validation'``.
-        **kwargs
-            Forwarded to the underlying plot method.
+        Args:
+            kind (str): One of ``'sankey'``, ``'histogram'``, ``'kaplan_meier'``,
+                ``'network'``, ``'validation'``.
+            **kwargs: Forwarded to the underlying plot method.
 
-        Raises
-        ------
-        ValueError
-            If *kind* is not recognised.
+        Raises:
+            ValueError: If *kind* is not recognised.
         """
         kinds = self._PLOT_KINDS
         if kind not in kinds:
@@ -194,6 +185,8 @@ class DwellTime(ss.Analyzer):
             font=dict(size=12, color='black'))
         fig.show()
 
+        return
+
     def _plot_histogram(self, subtitle=""):
         """Histograms with KDE for dwell-time distributions per state."""
         if self._data_error():
@@ -248,6 +241,8 @@ class DwellTime(ss.Analyzer):
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.show()
 
+        return
+
     def _plot_kaplan_meier(self, dwell_time_col='dwell_time',
                            event_observed_col=None):
         """Kaplan-Meier survival curve for dwell times."""
@@ -269,6 +264,8 @@ class DwellTime(ss.Analyzer):
         plt.ylabel("Survival Probability", fontsize=14)
         plt.grid(True)
         plt.show()
+
+        return
 
     def _plot_network(self, states=None, subtitle="", layout=None,
                       curved_ratio=0.09, colormap='Paired', onlymodel=True,
@@ -352,6 +349,8 @@ class DwellTime(ss.Analyzer):
         plt.tight_layout()
         plt.show()
 
+        return
+
     def _plot_validation(self):
         """Overlaid histograms for dwell-time validation."""
         if self._data_error():
@@ -370,6 +369,8 @@ class DwellTime(ss.Analyzer):
         ax.set_ylabel('Frequency')
         ax.legend()
         plt.show()
+
+        return
 
     # ------------------------------------------------------------------
     # Aggregate helpers (from former DwtPostProcessor)
@@ -419,6 +420,8 @@ class DwellTime(ss.Analyzer):
         except Exception as e:
             print(f"Error saving DataFrame to {output_file}: {e}")
 
+        return
+
     # ------------------------------------------------------------------
     # Analyzer methods (from former DwtAnalyzer)
     # ------------------------------------------------------------------
@@ -443,6 +446,8 @@ class DwellTime(ss.Analyzer):
         self._check_for_new_borns()
         self._update_state_change_data()
         self._record_natural_deaths()
+
+        return
 
     def _update_state_change_data(self):
         """Detect state changes and record dwell times."""
@@ -475,6 +480,8 @@ class DwellTime(ss.Analyzer):
             self._latest_sts_df['agent_id'].isin(uids),
             'last_state_time'] = ti
 
+        return
+
     def _record_natural_deaths(self):
         """Record dwell times for agents who died from natural causes."""
         ti = self.ti
@@ -498,6 +505,8 @@ class DwellTime(ss.Analyzer):
                 going_to_state_ids=np.full(len(relevant_rows), -3.0),
                 age=self.sim.people.age[
                     ss.uids(relevant_rows['agent_id'].values)])
+
+        return
 
     def _check_for_new_borns(self):
         """Add newly born agents to the state tracking system."""
@@ -527,6 +536,8 @@ class DwellTime(ss.Analyzer):
                     [self._latest_sts_df,
                      new_logs.loc[:, ~new_logs.isna().all()]],
                     ignore_index=True, copy=False)
+
+        return
 
     def finalize(self):
         """Finalize the analysis: map state names and save to file."""
@@ -568,6 +579,8 @@ class DwellTime(ss.Analyzer):
 
         self.file_path = self._save_to_file()
 
+        return
+
     def _log_dwell_time(self, agent_ids, states, entry_times, exit_times,
                         going_to_state_ids, age):
         """Record dwell time data for a batch of state transitions."""
@@ -583,6 +596,8 @@ class DwellTime(ss.Analyzer):
             'age': age
         })
         self.data = pd.concat([self.data, new_logs], ignore_index=True)
+
+        return
 
     def _save_to_file(self):
         """Save dwell time data to CSV and metadata files."""
@@ -621,6 +636,8 @@ class DwellTime(ss.Analyzer):
             if p_value < 0.05:
                 print(f"WARNING: Dwell times for state {state} deviate "
                       f"significantly from expectations.")
+
+        return
 
     # ------------------------------------------------------------------
     # Internal helpers
