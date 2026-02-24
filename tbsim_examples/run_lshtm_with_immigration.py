@@ -3,18 +3,28 @@
 import argparse
 import numpy as np
 import starsim as ss
-
 import tbsim
-from tbsim.interventions.immigration import Immigration
 
 ACUTE = False
-N_AGENTS = 5_000
+N_AGENTS = 1_000
 RAND_SEED = 1
+
+def generate_sample_households(n_agents, mean_size=4.5, seed=None):
+    rng = np.random.default_rng(seed)
+    uids = rng.permutation(n_agents)
+    hhs, i = [], 0
+    while i < len(uids):
+        size = max(1, int(rng.poisson(mean_size)))
+        hhs.append(list(uids[i:i + size]))
+        i += size
+    return hhs
 
 def build_sim(*, use_acute: bool, label: str, include_immigration: bool, n_agents: int, rand_seed: int):
     tb = tbsim.TB_LSHTM_Acute() if use_acute else tbsim.TB_LSHTM()
-    net = ss.RandomNet(pars={"n_contacts": ss.poisson(lam=5), "dur": 0})
-
+    rd = ss.RandomNet(pars={"n_contacts": ss.poisson(lam=5), "dur": 0})
+    hh = tbsim.HouseholdNet(hhs=generate_sample_households(N_AGENTS, seed=RAND_SEED))
+    net = [rd, hh]
+    
     demographics = []
     if include_immigration:
         # TB state for new arrivals (TBSL state names)
@@ -34,7 +44,7 @@ def build_sim(*, use_acute: bool, label: str, include_immigration: bool, n_agent
             tb_state_distribution["ACUTE"] = 0.0
 
         demographics = [
-            Immigration(
+            tbsim.Immigration(
                 pars=dict(
                     immigration_rate=1_000,  # people/year
                     tb_state_distribution=tb_state_distribution,

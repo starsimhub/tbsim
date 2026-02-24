@@ -33,6 +33,8 @@ class Immigration(ss.Demographics):
         )
         self.update_pars(pars, **kwargs)
 
+        self.pars.tb_state_distribution = self._validate_tb_state_distribution(self.pars.tb_state_distribution)
+        
         # Random draws (CRN-safe): keep one call per distribution per timestep
         self._dist_n = ss.poisson(name='imm_n', lam=self._lam_per_timestep)
         self._dist_agebin = ss.choice(name='imm_agebin', a=[0], p=[1.0])  # configured in init_pre()
@@ -58,6 +60,15 @@ class Immigration(ss.Demographics):
         
         return
     
+    def init_post(self):
+        super().init_post()
+        self._tb_name = next(
+            (k for k, d in self.sim.diseases.items() if isinstance(d, (TB_LSHTM, TB_LSHTM_Acute))),
+            None,
+        )
+        if self._tb_name is None:
+            raise RuntimeError('Expected TB_LSHTM(_Acute) disease module for immigration initialization')
+
     def init_pre(self, sim):
         """Initialize with simulation information."""
         super().init_pre(sim)
@@ -85,29 +96,10 @@ class Immigration(ss.Demographics):
             self._dist_agebin.pars.a = np.arange(len(keys), dtype=int)
             self._dist_agebin.pars.p = probs
 
-        # Configure TB state sampler (LSHTM integer codes)
-        dist = dict(self.pars.tb_state_distribution or {})
-        if not dist:
-            raise ValueError('tb_state_distribution must be provided for TB_LSHTM(_Acute)')
-
-        state_vals = []
-        probs = []
-        for k, v in dist.items():
-            if v is None:
-                continue
-            if not isinstance(k, str):
-                raise ValueError(f'tb_state_distribution keys must be strings (got {type(k).__name__}: {k!r})')
-            if k not in TBSL.__members__:
-                raise KeyError(f'Unknown LSHTM state "{k}" in tb_state_distribution')
-            state_vals.append(int(getattr(TBSL, k)))
-            probs.append(float(v))
-
-        probs = np.array(probs, dtype=float)
-        if probs.sum() <= 0:
-            raise ValueError('tb_state_distribution probabilities must sum to > 0')
-        probs = probs / probs.sum()
-        self._dist_tbstate.pars.a = np.array(state_vals, dtype=int)
-        self._dist_tbstate.pars.p = probs
+        # Configure TB state sampler (already validated and normalized in __init__)
+        dist = self.pars.tb_state_distribution
+        self._dist_tbstate.pars.a = np.array([int(getattr(TBSL, k)) for k in dist], dtype=int)
+        self._dist_tbstate.pars.p = np.array(list(dist.values()), dtype=float)
         
         return
     
@@ -166,36 +158,10 @@ class Immigration(ss.Demographics):
             return {}
         return {'ages': self._sample_ages(n_immigrants)}
 
-    def _get_tb_module(self):
-        """Return the TB_LSHTM(_Acute) disease module if available."""
-        diseases = getattr(self.sim, 'diseases', None)
-        if diseases is None:
-            return None
 
-        # Older convention: sim.diseases.tb
-        mod = getattr(diseases, 'tb', None)
-        if isinstance(mod, TB_LSHTM):
-            return mod
+    def _init_tb_lshtm(self, new_uids):
 
-        # Typical convention: dict-like container
-        try:
-            mods = list(diseases.values())
-        except Exception:
-            try:
-                mods = [m for _k, m in diseases.items()]
-            except Exception:
-                mods = []
-
-        for mod in mods:
-            if isinstance(mod, TB_LSHTM):
-                return mod
-
-        return None
-
-    def _init_tb_lshtm(self, tb, new_uids):
-        if not isinstance(tb, TB_LSHTM):
-            raise RuntimeError('Expected TB_LSHTM(_Acute) disease module for immigration initialization')
-
+        tb = self.sim.diseases[self._tb_name]
         # Only allow ACUTE if the TB module is the acute variant
         state_vals = np.asarray(self._dist_tbstate.pars.a).astype(int)
         has_acute = int(TBSL.ACUTE) in set(map(int, state_vals))
@@ -205,8 +171,6 @@ class Immigration(ss.Demographics):
         n = len(new_uids)
         sampled = self._dist_tbstate.rvs(n).astype(int)
         tb.state[new_uids] = sampled
-        tb.state_next[new_uids] = sampled
-        tb.ti_next[new_uids] = np.inf
 
         # Keep flags consistent with the TB state machine
         infected_states = np.array([int(TBSL.INFECTION), int(TBSL.NON_INFECTIOUS), int(TBSL.ASYMPTOMATIC),
@@ -252,13 +216,8 @@ class Immigration(ss.Demographics):
         
         self.sim.people.age[new_uids] = characteristics['ages']
         
-        tb = self._get_tb_module()
-        if tb is None:
-            raise RuntimeError(
-                'Immigration requires an LSHTM TB disease module (TB_LSHTM or TB_LSHTM_Acute) '
-                'to be present in sim.diseases.'
-            )
-        sampled_states = self._init_tb_lshtm(tb, new_uids)
+        
+        sampled_states = self._init_tb_lshtm( new_uids)
         self.immigration_tb_status[new_uids] = sampled_states
         
         self.assign_immigrants_to_households(new_uids)
@@ -305,5 +264,19 @@ class Immigration(ss.Demographics):
             self.results['n_immigrants'][self.ti] = int(self.n_immigrants)
         return
 
-
+    @staticmethod
+    def _validate_tb_state_distribution(tb_state_distribution):
+        """Validate and normalize tb_state_distribution."""
+        if not tb_state_distribution:
+            raise ValueError('tb_state_distribution must be provided')
+        dist = {k: float(v) for k, v in dict(tb_state_distribution).items() if v}
+        for k, v in dist.items():
+            if k not in TBSL.__members__:
+                raise KeyError(f'Unknown LSHTM state "{k}" in tb_state_distribution')
+            if v < 0:
+                raise ValueError(f'tb_state_distribution["{k}"] is negative ({v})')
+        total = sum(dist.values())
+        if total > 1.0 + 1e-9:
+            raise ValueError(f'tb_state_distribution sums to {total:.6g}, which exceeds 1.0')
+        return {k: v / total for k, v in dist.items()}
 
