@@ -3,6 +3,8 @@ Immigration module for Starsim TB simulations.
 
 This module adds new people to the simulation population over time,
 representing immigration or in-migration to the study population.
+
+WARNING -- this class is not yet currently functional.
 """
 
 import numpy as np
