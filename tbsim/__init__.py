@@ -5,6 +5,7 @@ from .tb import * # NB, deprecated
 from .tb_lshtm import *
 from .comorbidities import *
 from .interventions import *
+from .immigration import *
 from .networks import *
 from .analyzers import *
 from .plots import *

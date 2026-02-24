@@ -7,16 +7,14 @@ These tests are scoped to TB_LSHTM / TB_LSHTM_Acute and the current Starsim API.
 import numpy as np
 import pytest
 import starsim as ss
-
-from tbsim.tb_lshtm import TB_LSHTM, TB_LSHTM_Acute, TBSL
-from tbsim.interventions.immigration import Immigration
+import tbsim
 
 
-def _make_sim(*, acute: bool, immigration_pars: dict, dt=ss.days(1), start="2020-01-01", stop="2020-01-15"):
-    # Keep this small. We only need the module wiring to work.
-    tb = TB_LSHTM_Acute() if acute else TB_LSHTM()
+def make_sim(acute, immigration_pars, dt=ss.days(1), start="2020-01-01", stop="2020-01-15"):
+    """ Create the sim """
+    tb = tbsim.TB_LSHTM_Acute() if acute else tbsim.TB_LSHTM()
     net = ss.RandomNet(pars={"n_contacts": ss.poisson(lam=2), "dur": 0})
-    imm = Immigration(pars=immigration_pars)
+    imm = tbsim.Immigration(pars=immigration_pars)
     sim = ss.Sim(
         n_agents=200,
         diseases=tb,
@@ -32,7 +30,7 @@ def _make_sim(*, acute: bool, immigration_pars: dict, dt=ss.days(1), start="2020
 
 def test_expected_immigrants_matches_starsim_to_events():
     """expected_immigrants_per_timestep matches Starsim's Rate.to_events(dt)."""
-    sim = _make_sim(
+    sim = make_sim(
         acute=False,
         immigration_pars=dict(
             immigration_rate=ss.freqperyear(365.0),
@@ -52,7 +50,7 @@ def test_expected_immigrants_matches_starsim_to_events():
 
 def test_tb_state_distribution_rejects_acute_without_acute_model():
     """ACUTE in tb_state_distribution is only valid for TB_LSHTM_Acute."""
-    sim = _make_sim(
+    sim = make_sim(
         acute=False,
         immigration_pars=dict(
             immigration_rate=ss.freqperyear(1.0),
@@ -71,7 +69,7 @@ def test_tb_state_distribution_rejects_acute_without_acute_model():
 
 def test_sim_run_adds_immigrants_and_initializes_fields():
     """Run a short sim; immigrants get flags, TB state codes, and HHIDs."""
-    sim = _make_sim(
+    sim = make_sim(
         acute=False,
         immigration_pars=dict(
             # Make this effectively deterministic: P(no arrivals) is ~0 over this run.
@@ -99,7 +97,7 @@ def test_sim_run_adds_immigrants_and_initializes_fields():
     assert (imm.age_at_immigration[imm_uids] <= 85).all()
 
     # TB state codes: stored at arrival, and valid for LSHTM.
-    valid = set(int(s) for s in TBSL)
+    valid = set(int(s) for s in tbsim.TBSL)
     codes = imm.immigration_tb_status[imm_uids]
     assert (codes >= 0).all()
     assert all(int(c) in valid for c in codes)
