@@ -637,14 +637,14 @@ class TB_LSHTM_Acute(TB_LSHTM):
 
 def get_tb(sim, which=None): # TODO: Create tbsim.Sim and move this to sim.get_tb()
     """ Helper to get the TB_LSHTM infection module from a sim
-    
+
     Args:
         sim (Sim): the simulation to search for the TB module
         which (type, optional): the class of TB module to get (e.g. TB_LSHTM; if None, returns the first BaseTB subclass found
     """
     if which is None:
         which = BaseTB
-    for disease in sim.diseases:
+    for disease in sim.diseases.values():
         if isinstance(disease, which):
             return disease
     raise ValueError("No TB module found in sim.diseases")
