@@ -40,7 +40,6 @@ dependencies = [
   "networkx",
   "matplotlib",
   "seaborn",
-  "plotly",
   "starsim>=3.1.1",
 ]
 

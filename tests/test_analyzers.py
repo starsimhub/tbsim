@@ -23,16 +23,6 @@ def sample_data():
     return dataframes
 
 @pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-@patch('plotly.graph_objects.Figure.show')
-def test_sankey_agents(mock_show, sample_data, model_type):
-    for df in sample_data[model_type]:
-        dt = DwellTime(data=df)
-        dt.plot('sankey', subtitle="Test Sankey")
-        assert dt.data is not None
-        assert 'state_name' in dt.data.columns
-        assert 'going_to_state' in dt.data.columns
-
-@pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
 @patch('matplotlib.pyplot.show')
 def test_histogram_with_kde(mock_show, sample_data, model_type):
     for df in sample_data[model_type]:
