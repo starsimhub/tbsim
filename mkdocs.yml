@@ -72,7 +72,7 @@ plugins:
   - autorefs
   - include-markdown
   - mkdocs-jupyter:
-      execute: false
+      execute: true
       allow_errors: true
       include_source: true
   - mkdocstrings:
