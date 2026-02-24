@@ -4,42 +4,29 @@ We welcome contributions to the TBsim project! This guide explains how you can g
 
 ## Getting Started
 
-1. **Fork the repository** on GitHub
-2. **Clone your fork** locally
-3. **Create a feature branch** for your changes
-4. **Make your changes** following the coding standards
-5. **Test your changes** thoroughly
-6. **Submit a pull request** with a clear description
+1. **Clone your fork** locally
+2. **Create a feature branch** for your changes
+3. **Make your changes** following the coding standards
+4. **Test your changes** thoroughly
+5. **Submit a pull request** with a clear description
 
 ## Development Setup
 
-1. Install TBsim in development mode:
+Install TBsim in development mode:
 
 ```bash
 git clone https://github.com/yourusername/tbsim.git
 cd tbsim
-pip install -e .
-```
-
-2. Install development dependencies:
-
-```bash
-pip install -r tests/requirements.txt
-```
-
-3. Install pre-commit hooks:
-
-```bash
-pre-commit install
+pip install -e .[dev]
 ```
 
 ## Code Standards
 
+See https://github.com/starsimhub/stylegide for details. In general:
+
 **Python Code Style**
 
 - Follow PEP 8 guidelines
-- Use type hints where appropriate
-- Write docstrings for all public functions and classes
 - Keep functions focused and concise
 
 **Documentation**
@@ -53,12 +40,6 @@ pre-commit install
 - Write tests for new functionality
 - Ensure all tests pass before submitting
 - Aim for good test coverage
-
-**Git Workflow**
-
-- Use descriptive commit messages
-- Keep commits focused and atomic
-- Reference issues in commit messages when relevant
 
 ## Areas for Contribution
 
