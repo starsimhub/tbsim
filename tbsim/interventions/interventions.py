@@ -40,6 +40,7 @@ class TBProductRoutine(ss.Intervention):
     """
 
     def __init__(self, product=None, pars=None, **kwargs):
+        """Initialize with a product and delivery parameters (coverage, age range, date window)."""
         super().__init__(**kwargs)
 
         self.define_pars(
@@ -114,6 +115,7 @@ class TBProductRoutine(ss.Intervention):
         self.product.apply_protection()
 
     def init_results(self):
+        """Define result channels for newly initiated and currently protected counts."""
         super().init_results()
         if hasattr(self, 'results') and 'n_newly_initiated' in self.results:
             return
@@ -123,5 +125,6 @@ class TBProductRoutine(ss.Intervention):
         )
 
     def update_results(self):
+        """Record number of newly initiated individuals this timestep."""
         newly_initiated = np.sum((self.ti_initiated == self.ti) & self.initiated)
         self.results['n_newly_initiated'][self.ti] = newly_initiated

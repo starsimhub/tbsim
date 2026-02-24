@@ -1,3 +1,5 @@
+"""Plotting utilities for visualizing TB simulation results"""
+
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -455,21 +457,22 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
     
 
 def out_to(outdir):
-           # save figure
-        timestamp = sc.now(dateformat='%Y%m%d_%H%M%S') 
-        # Determine script directory in a cross-platform way
-        if hasattr(sys.modules['__main__'], '__file__'):
-            script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
-        else:
-            script_dir = os.getcwd()
+    """Return a timestamped output file path inside ``outdir``, creating the directory if needed."""
+    timestamp = sc.now(dateformat='%Y%m%d_%H%M%S') 
+    # Determine script directory in a cross-platform way
+    if hasattr(sys.modules['__main__'], '__file__'):
+        script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
+    else:
+        script_dir = os.getcwd()
 
-        outdir = 'results' if outdir is None else outdir
-        outdir = os.path.join(script_dir, outdir)
-        os.makedirs(outdir, exist_ok=True)   
-        out = os.path.join(outdir, f'scenarios_{timestamp}.png')
-        return out
+    outdir = 'results' if outdir is None else outdir
+    outdir = os.path.join(script_dir, outdir)
+    os.makedirs(outdir, exist_ok=True)   
+    out = os.path.join(outdir, f'scenarios_{timestamp}.png')
+    return out
     
-class FILTERS(): 
+class FILTERS():
+    """Predefined metric-name filters for use with ``plot_results``."""
     important_metrics = [
         'tb_prevalence_active',
         'tb_prevalence', 

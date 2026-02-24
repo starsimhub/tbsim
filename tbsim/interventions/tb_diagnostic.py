@@ -1,3 +1,5 @@
+"""TB diagnostic testing interventions"""
+
 import numpy as np
 import starsim as ss
 from tbsim import TBS
@@ -406,8 +408,9 @@ class EnhancedTBDiagnostic(ss.Intervention):
     """
     
     def __init__(self, pars=None, **kwargs):
+        """Initialize with age/HIV-stratified sensitivity and specificity for multiple diagnostic methods."""
         super().__init__(**kwargs)
-        
+
         # Define comprehensive parameters combining both approaches
         self.define_pars(
             # Coverage and basic parameters (from tb_diagnostic.py)
@@ -558,6 +561,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         return p
 
     def step(self):
+        """Test care-seekers using the appropriate diagnostic method and record results."""
         sim = self.sim
         ppl = sim.people
         tb = sim.diseases.tb
@@ -635,6 +639,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         self.diagnostic_method_used = diagnostic_methods
 
     def init_results(self):
+        """Define result channels for test counts by outcome and diagnostic method."""
         super().init_results()
         self.define_results(
             ss.Result('n_tested', dtype=int),
@@ -649,6 +654,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         )
 
     def update_results(self):
+        """Record per-step and cumulative test counts by outcome and method."""
         # Per-step counts
         n_tested = len(self.tested_this_step)
         n_pos = np.count_nonzero(self.test_result_this_step)

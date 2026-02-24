@@ -1,4 +1,6 @@
-import starsim as ss 
+"""Intervention that modifies the TB transmission rate (beta) at specified time points."""
+
+import starsim as ss
 
 __all__ = ['BetaByYear']
 

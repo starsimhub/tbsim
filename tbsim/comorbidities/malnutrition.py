@@ -34,12 +34,28 @@ class Malnutrition(ss.Disease):
         weight_percentile (float): Weight percentile (0-1), evolves over time
         micro (float): Micronutrient status z-score, evolves over time
 
+    Example
+    -------
+    ::
+
+        import starsim as ss
+        import tbsim
+        from tbsim.comorbidities.malnutrition import Malnutrition, TB_Nutrition_Connector
+
+        tb   = tbsim.TB_LSHTM(name='tb')
+        mn   = Malnutrition(name='malnutrition')
+        conn = TB_Nutrition_Connector()
+        sim  = ss.Sim(diseases=[tb, mn], connectors=conn,
+                      pars=dict(start='2000', stop='2020'))
+        sim.run()
+
     **References:**
         - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10876842/
         - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9971264/
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Initialize with default malnutrition parameters; override via ``pars``."""
         super().__init__(**kwargs)
         self.define_pars(
             beta = 1.0,         # Transmission rate  - TODO: Check if there is one
@@ -154,6 +170,7 @@ class TB_Nutrition_Connector(ss.Connector):
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Initialize with pluggable risk-ratio and relative-susceptibility functions."""
         super().__init__(label='TB-Malnutrition')
         self.define_pars(
             rr_activation_func = self.ones_rr,

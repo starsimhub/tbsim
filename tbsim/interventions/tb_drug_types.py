@@ -1,27 +1,4 @@
-"""
-TB Drug Types and Parameters for TBsim
-
-This module implements TB drug types and parameters similar to EMOD-Generic's approach,
-providing detailed drug-specific parameters for different TB treatment regimens.
-
-The module provides:
-- TBDrugType enum: Defines different TB drug regimens with values matching EMOD-Generic
-- TBDrugParameters class: Base class for drug-specific parameters
-- TBDrugTypeParameters factory: Creates predefined parameter sets for each drug type
-- Convenience functions: Easy access to drug parameters
-
-Example:
-    >>> from tbsim.interventions import get_dots_parameters, TBDrugType
-    >>> dots_params = get_dots_parameters()
-    >>> print(f"DOTS cure rate: {dots_params.cure_prob}")
-    >>> first_line_params = get_drug_parameters(TBDrugType.FIRST_LINE_COMBO)
-    >>> print(f"First line cost: ${first_line_params.cost_per_course}")
-
-References:
-    - EMOD-Generic TBDrugType enum and TBDrugTypeParameters class
-    - WHO guidelines for TB treatment regimens
-    - Standard TB drug efficacy and cost parameters
-"""
+"""TB drug type definitions and regimen-specific parameters, following EMOD-Generic conventions."""
 
 import numpy as np
 import starsim as ss
