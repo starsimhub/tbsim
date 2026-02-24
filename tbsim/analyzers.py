@@ -1,44 +1,5 @@
-"""
-TB Simulation Dwell Time Analysis and Visualization Module
+"""TBsim custom analyzers"""
 
-This module provides tools for analyzing and visualizing dwell time data
-from tuberculosis simulation runs through the unified DwellTime class.
-
-The DwellTime class operates in three modes depending on constructor arguments:
-- Plotter mode: data or file_path provided → visualize existing data
-- Aggregate mode: directory provided → combine multiple simulation CSVs
-- Analyzer mode: no data args → records dwell times during simulation
-
-Visualization types (via ``plot(kind=...)``):
-- ``'sankey'`` – Sankey diagram of agent state transitions
-- ``'histogram'`` – Histograms with KDE per state
-- ``'kaplan_meier'`` – Kaplan-Meier survival curves
-- ``'network'`` – Directed graph of state transitions
-- ``'validation'`` – Observed dwell-time histograms for validation
-
-Usage Examples:
-
-    Direct data visualization::
-
-        from tbsim.analyzers import DwellTime
-        dt = DwellTime(file_path='results/Baseline-20240101120000.csv')
-        dt.plot('sankey')
-        dt.plot('histogram')
-
-    Aggregating multiple runs::
-
-        dt = DwellTime(directory='results', prefix='Baseline')
-        dt.plot('network')
-
-    During simulation::
-
-        import starsim as ss
-        from tbsim import TB
-        from tbsim.analyzers import DwellTime
-        sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
-        sim.run()
-        sim.analyzers[0].plot('validation')
-"""
 
 import matplotlib.colors as mcolors
 import pandas as pd
@@ -89,10 +50,37 @@ class DwellTime(ss.Analyzer):
         Label for the simulation scenario.
     debug : bool, optional
         Enable verbose output.
+
+    Visualization types (via ``plot(kind=...)``):
+
+    - ``'sankey'`` – Sankey diagram of agent state transitions
+    - ``'histogram'`` – Histograms with KDE per state
+    - ``'kaplan_meier'`` – Kaplan-Meier survival curves
+    - ``'network'`` – Directed graph of state transitions
+    - ``'validation'`` – Observed dwell-time histograms for validation
+
+    Examples
+    --------
+    Direct data visualization::
+
+        dt = DwellTime(file_path='results/Baseline-20240101120000.csv')
+        dt.plot('sankey')
+
+    Aggregating multiple runs::
+
+        dt = DwellTime(directory='results', prefix='Baseline')
+        dt.plot('network')
+
+    During simulation::
+
+        sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
+        sim.run()
+        sim.analyzers[0].plot('validation')
     """
 
     def __init__(self, data=None, file_path=None, directory=None, prefix='',
                  states_ennumerator=None, scenario_name='', debug=False):
+        """Auto-detect mode (plotter, aggregate, or analyzer) from the supplied arguments."""
         self.debug = debug
         self.scenario_name = scenario_name
         self.eSTATES = states_ennumerator or tbsim.TBS

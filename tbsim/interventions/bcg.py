@@ -38,6 +38,7 @@ class BCGVx(ss.Vx):
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Initialize BCG product with default efficacy and duration parameters."""
         super().__init__(**kwargs)
         self.define_pars(
             disease='tb',
@@ -120,9 +121,23 @@ class BCGRoutine(TBProductRoutine):
     pars : dict
         Overrides for delivery parameters (``coverage``, ``age_range``,
         ``start``, ``stop``).
+
+    Example
+    -------
+    ::
+
+        import starsim as ss
+        import tbsim
+        from tbsim.interventions.bcg import BCGRoutine
+
+        tb  = tbsim.TB_LSHTM(name='tb')
+        bcg = BCGRoutine()
+        sim = ss.Sim(diseases=tb, interventions=bcg, pars=dict(start='2000', stop='2020'))
+        sim.run()
     """
 
     def __init__(self, product=None, pars=None, **kwargs):
+        """Initialize BCG routine delivery; defaults to age 0-5 with a standard BCGVx product."""
         super().__init__(
             product=product if product is not None else BCGVx(),
             pars=pars,
@@ -133,5 +148,6 @@ class BCGRoutine(TBProductRoutine):
             self.pars.age_range = [0, 5]
 
     def update_results(self):
+        """Record number of currently protected individuals."""
         super().update_results()
         self.results['n_protected'][self.ti] = np.count_nonzero(self.product.bcg_protected)

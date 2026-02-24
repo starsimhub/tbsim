@@ -59,7 +59,7 @@ dev = [
 ]
 
 [project.urls]
-"Website" = "https://stisim.org"
+"Website" = "https://starsim.org/tbsim"
 "Source" = "https://github.com/starsimhub/tbsim/"
 
 [tool.setuptools.packages.find]

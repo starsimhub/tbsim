@@ -16,5 +16,8 @@ TB-Malnutrition comorbidity model demonstrating how to add a co-disease to a sim
 **run_tbhiv.py**  
 TB-HIV coinfection model with the TB-HIV connector and optional HIV interventions.
 
-**run_tb_interventions.py**  
+**run_tb_interventions.py**
 Intervention framework demonstrating BCG vaccination, TPT, and time-varying beta scenarios.
+
+**run_health_seeking.py**
+Health-seeking behaviour with the LSHTM TB model, comparing baseline, low-rate, and high-rate care-seeking scenarios.

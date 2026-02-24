@@ -27,3 +27,9 @@
 
 - [contributing](contributing.md)
 - [changelog](changelog.md)
+
+## Links
+
+- [Official documentation](https://starsim.org/tbsim/)
+- [Starsim documentation](https://docs.starsim.org)
+- [GitHub repository](https://github.com/starsimhub/tbsim)
