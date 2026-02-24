@@ -174,15 +174,13 @@ Basic simulation workflow:
 
 ```python
 import starsim as ss
-from tbsim import TB
-from tbsim.networks import HouseholdNet
-from tbsim.analyzers import DwellTime
+import tbsim
 
 # Create simulation with TB model and analyzer
 sim = ss.Sim(
-    diseases=[TB()],
-    networks=HouseholdNet(),
-    analyzers=[DwellTime(scenario_name="Baseline")]
+    diseases=[tbsim.TB()],
+    networks=tbsim.HouseholdNet(),
+    analyzers=[tbsim.DwellTime(scenario_name="Baseline")]
 )
 sim.run()
 
