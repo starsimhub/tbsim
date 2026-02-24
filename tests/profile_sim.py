@@ -14,7 +14,7 @@ def make_sim():
     return sim
 
 to_run = [
-    'profile', # Run the built-in line profiler
+    'profile', # Run the built-in line profiler (grouped by function)
     'cprofile', # Run the built-in function profiler
     'time', # Simply time how long the sim takes to run
     'plot_cpu', # Plot the CPU time ()
@@ -22,7 +22,7 @@ to_run = [
 
 if 'profile' in to_run:
     sim = make_sim()
-    prf = sim.profile()
+    prf = sim.profile(plot=False) # We'll plot later if asked
 
 if 'cprofile' in to_run:
     sim = make_sim()

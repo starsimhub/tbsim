@@ -466,7 +466,7 @@ class TB_LSHTM(ss.Infection):
         # New active: agents whose ti_asymp == this step
         res['new_active'][ti] = new_asymp.count()
         res['new_active_15+'][ti] = (new_asymp & age15).count()
-        res['n_detectable_15+'][ti] = np.dot(age15, in_state[TBSL.SYMPTOMATIC] + self.pars.cxr_asymp_sens * in_state[TBSL.ASYMPTOMATIC])
+        res['n_detectable_15+'][ti] = (age15 * (in_state[TBSL.SYMPTOMATIC] + self.pars.cxr_asymp_sens*in_state[TBSL.ASYMPTOMATIC])).sum()
         return
 
     def finalize_results(self):
