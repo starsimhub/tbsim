@@ -35,6 +35,13 @@ TBsim is not yet released on PyPI, so you need to install from source:
    pip install -e .
    ```
 
+## Project structure
+
+- `tbsim/` -- Core package (disease models, interventions, analyzers, networks, comorbidities)
+- `tbsim_examples/` -- Ready-to-run example scripts
+- `tests/` -- Test suite
+- `docs/` -- Documentation source (MkDocs)
+
 ### Running a sample simulation
 
 1. Navigate to the folder `tbsim_examples`
@@ -43,6 +50,17 @@ TBsim is not yet released on PyPI, so you need to install from source:
    python run_tb_lshtm.py
    ```
 3. Running this script should result in basic charts being displayed.
+
+Or run directly in Python:
+
+```python
+import starsim as ss
+import tbsim
+
+sim = ss.Sim(diseases=tbsim.TB_LSHTM())
+sim.run()
+sim.plot()
+```
 
 ## Usage
 - Usage examples are available in the **[tbsim_examples](https://github.com/starsimhub/tbsim/tree/main/tbsim_examples)** folder.

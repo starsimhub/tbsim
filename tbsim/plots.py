@@ -1,13 +1,12 @@
 """Plotting utilities for visualizing TB simulation results"""
 
 import os
-import numpy as np
-import matplotlib.pyplot as plt
-import sciris as sc
-from typing import Dict, List, Tuple
-import starsim as ss
-import datetime
 import sys
+import datetime
+import numpy as np
+import sciris as sc
+import matplotlib.pyplot as plt
+import starsim as ss
 
 
 def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
@@ -193,6 +192,8 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
         fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
         print(f"Saved figure to {out}")
     plt.show()
+
+    return
 
 
 def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
@@ -454,7 +455,9 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
         fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
         print(f"Saved figure to {out}")
     plt.show()
-    
+
+    return
+
 
 def out_to(outdir):
     """Return a timestamped output file path inside ``outdir``, creating the directory if needed."""

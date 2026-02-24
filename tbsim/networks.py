@@ -12,41 +12,28 @@ class HouseholdNetRationsTrial(ss.Network):
     RATIONS trial network.
     A household-level contact network for agent-based simulations using Starsim.
 
-    This network constructs complete graphs among household members and supports 
-    dynamically adding newborns to the simulation and linking them to their household 
-    based on the parent-child relationship. It is especially useful in intervention 
+    This network constructs complete graphs among household members and supports
+    dynamically adding newborns to the simulation and linking them to their household
+    based on the parent-child relationship. It is especially useful in intervention
     trials where household structure and arm assignment are important (e.g., RATIONS trial).
 
-    Parameters
-    ----------
-    hhs : list of lists or arrays of int, optional
-        A list of households, where each household is represented by a list or array of agent UIDs.
-    pars : dict, optional
-        Dictionary of network parameters. Supports:
-            - `add_newborns` (bool): Whether to dynamically add newborns to households.
-    **kwargs : dict
-        Additional keyword arguments passed to the `Network` base class.
+    Args:
+        hhs (list of lists or arrays of int, optional): A list of households, where each
+            household is represented by a list or array of agent UIDs.
+        pars (dict, optional): Dictionary of network parameters. Supports:
+            - ``add_newborns`` (bool): Whether to dynamically add newborns to households.
+        **kwargs (dict): Additional keyword arguments passed to the ``Network`` base class.
 
-    Attributes
-    ----------
-    hhs : list
-        List of household UID groups.
-    pars : sc.objdict
-        Dictionary-like container of network parameters.
-    edges : Starsim EdgeStruct
-        Container for the network's edges (p1, p2, and beta arrays).
+    Attributes:
+        hhs (list): List of household UID groups.
+        pars (sc.objdict): Dictionary-like container of network parameters.
+        edges (Starsim EdgeStruct): Container for the network's edges (p1, p2, and beta arrays).
 
-    Methods
-    -------
-    add_hh(uids):
-        Add a complete graph among the given UIDs to the network.
-    
-    init_pre(sim):
-        Initialize the network prior to simulation start. Adds initial household connections.
-
-    step():
-        During simulation, adds newborns to the network by linking them to their household contacts 
-        and assigning household-level attributes (e.g., hhid, trial arm).
+    Methods:
+        add_hh(uids): Add a complete graph among the given UIDs to the network.
+        init_pre(sim): Initialize the network prior to simulation start. Adds initial household connections.
+        step(): During simulation, adds newborns to the network by linking them to their household contacts
+            and assigning household-level attributes (e.g., hhid, trial arm).
     """
     def __init__(self, hhs=None, pars=None, **kwargs):
         """Initialize with an optional list of households (each a list of agent UIDs)."""
@@ -145,48 +132,34 @@ class HouseholdNet(ss.Network):
     based on the parent-child relationship. It is especially useful in intervention
     trials where household structure and arm assignment are important.
 
-    Parameters
-    ----------
-    hhs : list of lists or arrays of int, optional
-        A list of households, where each household is represented by a list or array of agent UIDs.
-    pars : dict, optional
-        Dictionary of network parameters. Supports:
-            - `add_newborns` (bool): Whether to dynamically add newborns to households.
-    **kwargs : dict
-        Additional keyword arguments passed to the `Network` base class.
+    Args:
+        hhs (list of lists or arrays of int, optional): A list of households, where each
+            household is represented by a list or array of agent UIDs.
+        pars (dict, optional): Dictionary of network parameters. Supports:
+            - ``add_newborns`` (bool): Whether to dynamically add newborns to households.
+        **kwargs (dict): Additional keyword arguments passed to the ``Network`` base class.
 
-    Attributes
-    ----------
-    hhs : list
-        List of household UID groups.
-    pars : sc.objdict
-        Dictionary-like container of network parameters.
-    edges : Starsim EdgeStruct
-        Container for the network's edges (p1, p2, and beta arrays).
+    Attributes:
+        hhs (list): List of household UID groups.
+        pars (sc.objdict): Dictionary-like container of network parameters.
+        edges (Starsim EdgeStruct): Container for the network's edges (p1, p2, and beta arrays).
 
-    Methods
-    -------
-    add_hh(uids):
-        Add a complete graph among the given UIDs to the network.
+    Methods:
+        add_hh(uids): Add a complete graph among the given UIDs to the network.
+        init_pre(sim): Initialize the network prior to simulation start. Adds initial household connections.
+        step(): During simulation, adds newborns to the network by linking them to their household contacts
+            and assigning household-level attributes (e.g., hhid, trial arm).
 
-    init_pre(sim):
-        Initialize the network prior to simulation start. Adds initial household connections.
+    Example:
+        ::
 
-    step():
-        During simulation, adds newborns to the network by linking them to their household contacts
-        and assigning household-level attributes (e.g., hhid, trial arm).
+            import starsim as ss
+            import tbsim
 
-    Example
-    -------
-    ::
-
-        import starsim as ss
-        import tbsim
-
-        tb  = tbsim.TB_LSHTM()
-        net = tbsim.HouseholdNet()
-        sim = ss.Sim(diseases=tb, networks=net, pars=dict(start='2000', stop='2020'))
-        sim.run()
+            tb  = tbsim.TB_LSHTM()
+            net = tbsim.HouseholdNet()
+            sim = ss.Sim(diseases=tb, networks=net, pars=dict(start='2000', stop='2020'))
+            sim.run()
     """
     def __init__(self, hhs=None, pars=None, **kwargs):
         """Initialize with an optional list of households (each a list of agent UIDs)."""

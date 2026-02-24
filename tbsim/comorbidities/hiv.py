@@ -1,9 +1,8 @@
 """Simplified HIV disease model and TB-HIV connector for co-infection simulations."""
 
-#!/usr/bin/env python3
+from enum import IntEnum
 import numpy as np
 import starsim as ss
-from enum import IntEnum
 
 __all__ = ['HIVState', 'HIV', 'HivInterventions', 'TB_HIV_Connector']
 
@@ -107,6 +106,8 @@ class HIV(ss.Disease):
             initial_onart = self.pars.init_onart.filter(infected)
             self.on_ART[initial_onart] = True
 
+        return
+
     def step(self):
         """ Progress HIV states; ART reduces transition probabilities. """
         if self.sim.ti == 0:
@@ -125,6 +126,7 @@ class HIV(ss.Disease):
         latent_ids = uids[current == HIVState.LATENT]
         self.state[self.dist_latent_to_aids.filter(latent_ids)] = HIVState.AIDS
 
+        return
 
     def init_results(self):
         """Define HIV result channels (prevalence, state counts, ART coverage)."""
@@ -138,6 +140,8 @@ class HIV(ss.Disease):
             ss.Result(name='latent', dtype=float, label='% LATENT'),
             ss.Result(name='aids', dtype=float, label='% AIDS'),
         )
+
+        return
 
     def update_results(self):
         """Record HIV state distribution and ART counts for the current timestep."""
@@ -159,6 +163,8 @@ class HIV(ss.Disease):
         res.latent[ti]     = np.count_nonzero(self.state == HIVState.LATENT)/n_alive
         res.aids[ti]       = np.count_nonzero(self.state == HIVState.AIDS)/n_alive
         res.on_art[ti]     = np.count_nonzero(self.on_ART == True)
+
+        return
 
 
 class HivInterventions(ss.Intervention):
@@ -182,6 +188,8 @@ class HivInterventions(ss.Intervention):
         )
         self.update_pars(pars, **kwargs)
 
+        return
+
     def step(self):
         """Adjust HIV prevalence and ART coverage to match targets each timestep."""
         t = self.sim.now
@@ -191,6 +199,8 @@ class HivInterventions(ss.Intervention):
             self._apply_prevalence()
         if self.pars.use_art:
             self._apply_onart()
+
+        return
 
     def _apply_prevalence(self):
         """Add or remove acute infections to match the target HIV prevalence."""
@@ -237,6 +247,8 @@ class HivInterventions(ss.Intervention):
                 chosen = acute_uids[dist(n_to_remove)]
                 self.hiv.state[chosen] = HIVState.ATRISK
 
+        return
+
     def _apply_onart(self):
         """Add or remove agents from ART to match the target coverage."""
         self.hiv = self.sim.diseases.hiv
@@ -254,7 +266,7 @@ class HivInterventions(ss.Intervention):
             candidates = ((~self.hiv.on_ART)
                           & (self.hiv.state != HIVState.ATRISK)).uids
             if delta > len(candidates):
-                # raie a warning
+                # Raise a warning
                 ss.warn(msg=f"Not enough candidates for ART. Expected: {delta}, Available: {len(candidates)}")
 
 
@@ -274,6 +286,8 @@ class HivInterventions(ss.Intervention):
                 dist = ss.randint(0, len(current_on_art), strict=False).init()
                 chosen = current_on_art[dist(n_to_remove)]
                 self.hiv.on_ART[chosen] = False
+
+        return
 
 class TB_HIV_Connector(ss.Connector):
     """
@@ -314,6 +328,8 @@ class TB_HIV_Connector(ss.Connector):
 
         }
 
+        return
+
     @staticmethod
     def compute_tb_hiv_risk_rr(self, tb, hiv, uids, base_factor=1.0):
         """ Compute per-agent TB relative risk multiplier based on HIV state. """
@@ -338,3 +354,5 @@ class TB_HIV_Connector(ss.Connector):
         uids_tb = tb.infected.uids
         rr = self.pars.tb_hiv_rr_func(self, tb, hiv, uids_tb)
         tb.rr_activation[uids_tb] *= rr
+
+        return

@@ -111,14 +111,11 @@ class TBDiagnostic(ss.Intervention):
         initializes temporary storage for result tracking. The intervention is ready
         to be added to a simulation after initialization.
         
-        Parameters
-        ----------
-        pars : dict, optional
-            Dictionary of parameters to override defaults.
-            Valid keys: 'coverage', 'sensitivity', 'specificity',
-            'reset_flag', 'care_seeking_multiplier'.
-        **kwargs
-            Additional keyword arguments passed to parent class.
+        Args:
+            pars (dict, optional): Dictionary of parameters to override defaults.
+                Valid keys: 'coverage', 'sensitivity', 'specificity',
+                'reset_flag', 'care_seeking_multiplier'.
+            **kwargs: Additional keyword arguments passed to parent class.
         
         Default Parameters:
         -------------------
@@ -157,7 +154,7 @@ class TBDiagnostic(ss.Intervention):
         # Temporary state for update_results
         self.tested_this_step = []
         self.test_result_this_step = []
-
+        return
 
     def step(self):
         """
@@ -295,8 +292,7 @@ class TBDiagnostic(ss.Intervention):
         # Store for update_results
         self.tested_this_step = selected
         self.test_result_this_step = test_positive
-
-
+        return
 
     def init_results(self):
         """
@@ -334,7 +330,7 @@ class TBDiagnostic(ss.Intervention):
             ss.Result('cum_test_positive', dtype=int),
             ss.Result('cum_test_negative', dtype=int),
         )
-
+        return
 
     def update_results(self):
         """
@@ -392,6 +388,7 @@ class TBDiagnostic(ss.Intervention):
         # Reset temporary storage for next timestep
         self.tested_this_step = []
         self.test_result_this_step = []
+        return
 
 
 class EnhancedTBDiagnostic(ss.Intervention):
@@ -466,6 +463,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         self.tested_this_step = []
         self.test_result_this_step = []
         self.diagnostic_method_used = []  # Track which diagnostic was used
+        return
 
     def _get_diagnostic_parameters(self, uid, age, tb_state, hiv_state=None):
         """
@@ -637,6 +635,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         self.tested_this_step = selected
         self.test_result_this_step = test_positive
         self.diagnostic_method_used = diagnostic_methods
+        return
 
     def init_results(self):
         """Define result channels for test counts by outcome and diagnostic method."""
@@ -652,6 +651,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
             ss.Result('n_fujilam', dtype=int),
             ss.Result('n_cadcxr', dtype=int),
         )
+        return
 
     def update_results(self):
         """Record per-step and cumulative test counts by outcome and method."""
@@ -689,6 +689,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         self.tested_this_step = []
         self.test_result_this_step = []
         self.diagnostic_method_used = []
+        return
 
 
 # Example usage function
