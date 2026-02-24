@@ -1,3 +1,19 @@
+"""
+Sample script for the revised TPT intervention (tpt2).
+
+Demonstrates four scenarios:
+  1. Baseline — no TPT
+  2. Routine 3HP targeting latent TB (LTBI population)
+  3. PLHIV-style routine 6H (all alive agents, no LTBI test required)
+  4. Custom regimen with a user-defined completion rate
+
+Each scenario runs a 20-year simulation and prints a brief summary of
+incidence avoided, peak protection coverage, and total initiations.
+
+Run from project root:
+    python tbsim_examples/run_tpt2.py
+"""
+
 import sys
 from pathlib import Path
 
@@ -15,7 +31,11 @@ from tbsim.interventions.tpt import (
 )
 from tbsim.tb_lshtm import TBSL
 
-# shared constants
+
+# ---------------------------------------------------------------------------
+# Shared simulation parameters
+# ---------------------------------------------------------------------------
+
 N_AGENTS  = 2_000
 SIM_START = ss.date('2000-01-01')
 SIM_STOP  = ss.date('2020-12-31')
@@ -40,7 +60,12 @@ def make_sim(*interventions):
         verbose=0,
     )
 
-def _summarize_to_dict(label, sim, itv_key=None):
+
+# ---------------------------------------------------------------------------
+# Summary helper
+# ---------------------------------------------------------------------------
+
+def summarise(label, sim, itv_key=None):
     tb = sim.diseases.tb
 
     total_active = int(np.sum(
@@ -59,115 +84,104 @@ def _summarize_to_dict(label, sim, itv_key=None):
         total_started  = 0
         peak_protected = 0
 
-    return dict(
-        label=label,
-        total_active=total_active,
-        total_started=total_started,
-        peak_protected=peak_protected,
-    )
-
-def _print_summary(summary):
-    print(f'\n  {summary["label"]}')
-    print(f'    Active TB at end-of-sim : {summary["total_active"]}')
-    print(f'    Total TPT initiations   : {summary["total_started"]}')
-    print(f'    Peak protected (agents) : {summary["peak_protected"]}')
-
-def build_sims():
-    sims = []
-
-    # Scenario 1: Baseline (no TPT)
-    sim1 = make_sim()
-    sim1.label = 'Baseline — no TPT'
-    sims.append(sim1)
-
-    # Scenario 2 — routine 3HP targeting latent TB (INFECTION state)
-    itv2 = TPTRoutine(
-        product='3HP',
-        pars={
-            'coverage':        ss.bernoulli(p=0.60),
-            'eligible_states': [TBSL.INFECTION],
-            'start':           ss.date('2005-01-01'),   # programme starts in 2005
-            'stop':            SIM_STOP,
-        },
-    )
-    sim2 = make_sim(itv2)
-    sim2.label = 'Routine 3HP — LTBI targeting'
-    sims.append(sim2)
-
-    # Scenario 3 — PLHIV-style 6H (universal, no LTBI test)
-    itv3 = TPTRoutine(
-        product='6H',
-        pars={
-            'coverage':        ss.bernoulli(p=0.50),
-            'eligible_states': None,   # no LTBI test required
-            'start':           ss.date('2005-01-01'),
-            'stop':            SIM_STOP,
-        },
-    )
-    sim3 = make_sim(itv3)
-    sim3.label = 'PLHIV-style 6H — universal'
-    sims.append(sim3)
-
-    # Scenario 4 — custom regimen (e.g. a novel 2-month regimen under evaluation)
-    # - Shows how to define a new regimen without modifying core code.
-    # - Hypothetical: 2-month course, 95% completion, same efficacy as 3HP.
-    novel_2m = TPTRegimen(
-        name='2M-novel',
-        category=RegimenCategory.RIFAMYCIN_SHORT,
-        dur_treatment=ss.constant(v=ss.months(2)),
-        dur_protection=ss.constant(v=ss.years(1.5)),
-        p_complete=ss.bernoulli(p=0.95),
-        activation_modifier=ss.constant(v=0.65),
-    )
-    itv4 = TPTRoutine(
-        product=TPTProduct(regimen=novel_2m),
-        pars={
-            'coverage':        ss.bernoulli(p=0.90),
-            'eligible_states': [TBSL.INFECTION],
-            'age_range':       [5, 65],
-            'start':           ss.date('2005-01-01'),
-            'stop':            SIM_STOP,
-        },
-    )
-    sim4 = make_sim(itv4)
-    sim4.label = 'Custom 2M regimen — age 5–65'
-    sims.append(sim4)
-
-    return sims
+    print(f'\n  {label}')
+    print(f'    Active TB at end-of-sim : {total_active}')
+    print(f'    Total TPT initiations   : {total_started}')
+    print(f'    Peak protected (agents) : {peak_protected}')
 
 
-def main():
-    print('Running scenarios 1–4 in parallel …')
-    sims = build_sims()
-    msim = ss.MultiSim(sims=sims, label='tpt_scenarios')
-    msim.run(parallel=True, shrink=False, reseed=False)
+# ---------------------------------------------------------------------------
+# Scenario 1 — baseline
+# ---------------------------------------------------------------------------
 
-    for sim in msim.sims:
-        itv_key = 'tptroutine' if 'tptroutine' in sim.interventions else None
-        _print_summary(_summarize_to_dict(sim.label, sim, itv_key=itv_key))
+print('Running scenario 1: Baseline (no TPT) …')
+sim1 = make_sim()
+sim1.run()
+summarise('Baseline — no TPT', sim1)
 
-    plot_results = {
-        sim.label: {str(k): v for k, v in sim.results.flatten().items()}
-        for sim in msim.sims
-    }
-    tbsim.plot_combined(
-        plot_results,
-        title='TPT scenarios',
-        dark=False,
-        n_cols=4,
-        heightfold=2,
-        keywords=['tb', 'tpt'],
-    )
 
-    # Regimen catalog overview:
-    print('\n\nAvailable regimens in REGIMENS catalog:')
-    print(f'  {"Name":<8} {"Category":<20} {"Treatment":<16} {"p_complete":<12} {"modifier"}')
+# ---------------------------------------------------------------------------
+# Scenario 2 — routine 3HP targeting latent TB (INFECTION state)
+#
+# Uses the WHO-preferred short-course rifapentine+isoniazid regimen.
+# Coverage of 60% with the default active-TB exclusion and p_complete=0.93.
+# ---------------------------------------------------------------------------
 
-    for name, reg in REGIMENS.items():
-        dur_tx    = reg.dur_treatment.pars.v
-        p_comp    = reg.p_complete.pars.p
-        modifier  = reg.activation_modifier.pars.v
-        print(f'  {name:<8} {reg.category.value:<20} {str(dur_tx):<16} {p_comp:<12.2f} {modifier:.2f}')
+print('\nRunning scenario 2: Routine 3HP (LTBI targeting, 60% coverage) …')
+itv2 = TPTRoutine(
+    product='3HP',
+    pars={
+        'coverage':        ss.bernoulli(p=0.60),
+        'eligible_states': [TBSL.INFECTION],
+        'start':           ss.date('2005-01-01'),   # programme starts in 2005
+    },
+)
+sim2 = make_sim(itv2)
+sim2.run()
+summarise('Routine 3HP — LTBI targeting', sim2, itv_key='tptroutine')
 
-if __name__ == '__main__':
-    main()
+
+# ---------------------------------------------------------------------------
+# Scenario 3 — PLHIV-style 6H (universal, no LTBI test)
+#
+# WHO Recommendation 1 (2024): PLHIV receive TPT regardless of LTBI test result.
+# Set eligible_states=None to target all alive, non-active-TB agents.
+# Uses 6H (isoniazid) with lower completion rate (0.70) vs. 3HP.
+# ---------------------------------------------------------------------------
+
+print('\nRunning scenario 3: PLHIV-style 6H (universal, 50% coverage) …')
+itv3 = TPTRoutine(
+    product='6H',
+    pars={
+        'coverage':        ss.bernoulli(p=0.50),
+        'eligible_states': None,   # no LTBI test required
+        'start':           ss.date('2005-01-01'),
+    },
+)
+sim3 = make_sim(itv3)
+sim3.run()
+summarise('PLHIV-style 6H — universal', sim3, itv_key='tptroutine')
+
+
+# ---------------------------------------------------------------------------
+# Scenario 4 — custom regimen (e.g. a novel 2-month regimen under evaluation)
+#
+# Shows how to define a new regimen without modifying core code.
+# Hypothetical: 2-month course, 95% completion, same efficacy as 3HP.
+# ---------------------------------------------------------------------------
+
+print('\nRunning scenario 4: Custom 2-month regimen (90% coverage) …')
+novel_2m = TPTRegimen(
+    name='2M-novel',
+    category=RegimenCategory.RIFAMYCIN_SHORT,
+    dur_treatment=ss.constant(v=ss.months(2)),
+    dur_protection=ss.constant(v=ss.years(1.5)),
+    p_complete=ss.bernoulli(p=0.95),
+    activation_modifier=ss.constant(v=0.65),
+)
+itv4 = TPTRoutine(
+    product=TPTProduct(regimen=novel_2m),
+    pars={
+        'coverage':        ss.bernoulli(p=0.90),
+        'eligible_states': [TBSL.INFECTION],
+        'age_range':       [5, 65],
+        'start':           ss.date('2005-01-01'),
+    },
+)
+sim4 = make_sim(itv4)
+sim4.run()
+summarise('Custom 2M regimen — age 5–65', sim4, itv_key='tptroutine')
+
+
+# ---------------------------------------------------------------------------
+# Regimen catalog overview
+# ---------------------------------------------------------------------------
+
+print('\n\nAvailable regimens in REGIMENS catalog:')
+print(f'  {"Name":<8} {"Category":<20} {"Treatment":<16} {"p_complete":<12} {"modifier"}')
+print('  ' + '-' * 72)
+for name, reg in REGIMENS.items():
+    dur_tx    = reg.dur_treatment.pars.v
+    p_comp    = reg.p_complete.pars.p
+    modifier  = reg.activation_modifier.pars.v
+    print(f'  {name:<8} {reg.category.value:<20} {str(dur_tx):<16} {p_comp:<12.2f} {modifier:.2f}')
