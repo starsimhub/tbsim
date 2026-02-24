@@ -72,8 +72,8 @@ plugins:
   - autorefs
   - include-markdown
   - mkdocs-jupyter:
-      execute: false
-      allow_errors: true
+      execute: true
+      allow_errors: false
       include_source: true
   - mkdocstrings:
       handlers:

@@ -35,7 +35,7 @@ class BCGVx(ss.Vx):
         """Initialize BCG product with default efficacy and duration parameters."""
         super().__init__(**kwargs)
         self.define_pars(
-            disease='tb',
+            disease=0, # Assume the first disease is TB
             p_take=ss.bernoulli(p=0.8),
             dur_immune=ss.constant(v=ss.years(10)),
             activation_modifier=ss.uniform(0.5, 0.65),
