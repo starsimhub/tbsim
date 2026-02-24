@@ -7,11 +7,11 @@ This section provides practical examples of TBsim usage across different scenari
 The simplest way to run a TB simulation:
 
 ```python
-from tbsim import TB
+from tbsim import TB_EMOD
 import starsim as ss
 
 # Create a basic TB simulation
-sim = ss.Sim(diseases=TB())
+sim = ss.Sim(diseases=TB_EMOD())
 
 # Run the simulation
 sim.run()
@@ -27,11 +27,11 @@ Adding BCG vaccination and treatment interventions:
 ```python
 from tbsim.interventions.bcg import BCGRoutine
 from tbsim.interventions.tpt import TPTSimple
-from tbsim import TB
+from tbsim import TB_EMOD
 import starsim as ss
 
 # Add TB module and interventions
-tb = TB()
+tb = TB_EMOD()
 bcg = BCGRoutine(pars=dict(
     coverage=ss.bernoulli(p=0.8),
     start=ss.date('1980-01-01'),
@@ -57,11 +57,11 @@ Modeling TB and HIV together:
 
 ```python
 from tbsim.comorbidities.hiv import HIV
-from tbsim import TB
+from tbsim import TB_EMOD
 import starsim as ss
 
 # Add both modules
-tb = TB()
+tb = TB_EMOD()
 hiv = HIV()
 
 sim = ss.Sim(diseases=[tb, hiv])
@@ -74,12 +74,12 @@ Using household-based social networks:
 
 ```python
 from tbsim.networks import HouseholdNet
-from tbsim import TB
+from tbsim import TB_EMOD
 import starsim as ss
 
 # Create household network and TB
 households = HouseholdNet()
-tb = TB()
+tb = TB_EMOD()
 
 sim = ss.Sim(
     networks=households,
@@ -93,12 +93,12 @@ sim.run()
 Using the built-in analyzers:
 
 ```python
-from tbsim import TB
+from tbsim import TB_EMOD
 from tbsim.analyzers import DwellTime
 import starsim as ss
 
 # Run simulation with dwell time analyzer
-sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
+sim = ss.Sim(diseases=[TB_EMOD()], analyzers=DwellTime(scenario_name="Baseline"))
 sim.run()
 
 # Create plots from the analyzer
@@ -112,7 +112,7 @@ sim.analyzers[0].plot('kaplan_meier')
 Running multiple parameter combinations:
 
 ```python
-from tbsim import TB
+from tbsim import TB_EMOD
 import starsim as ss
 import numpy as np
 
@@ -121,7 +121,7 @@ transmission_rates = np.linspace(0.1, 0.5, 5)
 
 results = []
 for rate in transmission_rates:
-    sim = ss.Sim(diseases=TB(pars={'beta': ss.peryear(rate)}))
+    sim = ss.Sim(diseases=TB_EMOD(pars={'beta': ss.peryear(rate)}))
     sim.run()
     results.append(sim.results)
 ```

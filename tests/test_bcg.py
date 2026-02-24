@@ -1,11 +1,9 @@
 """Tests for BCGVx (product) and BCGRoutine (delivery intervention)."""
 
 import numpy as np
-import pytest
+import pandas as pd
 import starsim as ss
 import tbsim
-import pandas as pd
-from tbsim.interventions.bcg import BCGVx, BCGRoutine
 
 
 # ---------------------------------------------------------------------------
@@ -34,7 +32,7 @@ def test_bcg_default_values():
     """Test BCGRoutine + BCGVx with default parameters."""
     nagents = 100
     pop, tb, net, pars = make_sim(agents=nagents)
-    itv = BCGRoutine()
+    itv = tbsim.BCGRoutine()
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']
@@ -58,11 +56,11 @@ def test_bcg_custom_values():
     """Test BCGRoutine + BCGVx with custom parameters."""
     nagents = 100
     pop, tb, net, pars = make_sim(agents=nagents)
-    product = BCGVx(pars={
+    product = tbsim.BCGVx(pars={
         'p_take': ss.bernoulli(p=0.9),
         'dur_immune': ss.constant(v=ss.years(15)),
     })
-    itv = BCGRoutine(product=product, pars={
+    itv = tbsim.BCGRoutine(product=product, pars={
         'coverage': 0.75,
         'start': ss.date('2000-01-01'),
         'stop': ss.date('2015-01-01'),
@@ -86,14 +84,14 @@ def test_bcg_age_range_functionality():
     pop, tb, net, pars = make_sim(agents=nagents)
 
     # Adult vaccination (18-65)
-    itv = BCGRoutine(pars={'age_range': (18, 65)})
+    itv = tbsim.BCGRoutine(pars={'age_range': (18, 65)})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']
     assert bcg.pars.age_range == (18, 65)
 
     # Adolescent vaccination (10-19)
-    itv2 = BCGRoutine(pars={'age_range': (10, 19)})
+    itv2 = tbsim.BCGRoutine(pars={'age_range': (10, 19)})
     sim2 = ss.Sim(people=pop, diseases=tb, interventions=itv2, networks=net, pars=pars)
     sim2.init()
     bcg2 = sim2.interventions['bcgroutine']
@@ -106,7 +104,7 @@ def test_bcg_eligibility_and_vaccination():
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    itv = BCGRoutine()
+    itv = tbsim.BCGRoutine()
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']
@@ -126,7 +124,7 @@ def test_bcg_eligibility_with_age_range():
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
     # Age range 10-20
-    itv = BCGRoutine(pars={'age_range': (10, 20)})
+    itv = tbsim.BCGRoutine(pars={'age_range': (10, 20)})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']
@@ -134,7 +132,7 @@ def test_bcg_eligibility_with_age_range():
     assert len(eligible) > 0, "There should be eligible individuals in age range 10-20"
 
     # Age range 30-50
-    itv2 = BCGRoutine(pars={'age_range': (30, 50)})
+    itv2 = tbsim.BCGRoutine(pars={'age_range': (30, 50)})
     sim2 = ss.Sim(people=pop, diseases=tb, interventions=itv2, networks=net, pars=pars)
     sim2.init()
     bcg2 = sim2.interventions['bcgroutine']
@@ -147,7 +145,7 @@ def test_bcg_improves_tb_outcomes():
     nagents = 100
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = BCGRoutine()
+    itv = tbsim.BCGRoutine()
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']
@@ -173,8 +171,8 @@ def test_bcg_protection_duration():
     nagents = 100
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    product = BCGVx(pars={'dur_immune': ss.constant(v=ss.years(8))})
-    itv = BCGRoutine(product=product)
+    product = tbsim.BCGVx(pars={'dur_immune': ss.constant(v=ss.years(8))})
+    itv = tbsim.BCGRoutine(product=product)
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']
@@ -194,8 +192,8 @@ def test_bcg_protection_expiry_and_removal():
     nagents = 10
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    product = BCGVx(pars={'dur_immune': ss.constant(v=ss.years(1))})
-    itv = BCGRoutine(product=product)
+    product = tbsim.BCGVx(pars={'dur_immune': ss.constant(v=ss.years(1))})
+    itv = tbsim.BCGRoutine(product=product)
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']
@@ -216,14 +214,14 @@ def test_bcg_modifiers_reapplied_each_step():
     nagents = 100
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    product = BCGVx(pars={'p_take': ss.bernoulli(p=0.95)})
-    itv = BCGRoutine(product=product, pars={'coverage': 0.95})
+    product = tbsim.BCGVx(pars={'p_take': ss.bernoulli(p=0.95)})
+    itv = tbsim.BCGRoutine(product=product, pars={'coverage': 0.95})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']
 
     bcg.step()  # Vaccinate and apply modifiers
-    tb = sim.diseases.tb
+    tb = sim.diseases.tb # tb instead of tb_lshtm because name='tb' in make_sim()
     protected = bcg.product.bcg_protected.uids
     assert len(protected) > 0, "Some individuals should be protected"
 
@@ -241,7 +239,7 @@ def test_bcg_result_metrics():
     nagents = 10
     pop, tb, net, pars = make_sim(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = BCGRoutine()
+    itv = tbsim.BCGRoutine()
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     bcg = sim.interventions['bcgroutine']

@@ -45,7 +45,7 @@ def build_tbsim(sim_pars=None):
    pop = ss.People(n_agents=1000)
    
    # Configure TB disease module
-   tb = tbsim.TB(dict(
+   tb = tbsim.TB_EMOD(dict(
       dt = ss.days(7),           # Disease module time step
       beta = ss.peryear(0.0025)  # Transmission rate per year
    ))

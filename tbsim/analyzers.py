@@ -73,7 +73,7 @@ class DwellTime(ss.Analyzer):
 
     During simulation::
 
-        sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
+        sim = ss.Sim(diseases=[TB_EMOD()], analyzers=DwellTime(scenario_name="Baseline"))
         sim.run()
         sim.analyzers[0].plot('validation')
     """
@@ -447,7 +447,7 @@ class DwellTime(ss.Analyzer):
     def _update_state_change_data(self):
         """Detect state changes and record dwell times."""
         ti = self.ti
-        tb = self.sim.diseases.tb
+        tb = self.sim.diseases.tb_emod
         uids = self.sim.people.auids.copy()
 
         relevant_rows = self._latest_sts_df[
