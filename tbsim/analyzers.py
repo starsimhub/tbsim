@@ -73,7 +73,7 @@ class DwellTime(ss.Analyzer):
 
     During simulation::
 
-        sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
+        sim = ss.Sim(diseases=[TB_EMOD()], analyzers=DwellTime(scenario_name="Baseline"))
         sim.run()
         sim.analyzers[0].plot('validation')
     """

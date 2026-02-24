@@ -5,7 +5,7 @@ import tbsim
 
 def make_tb_simplified(agents=20, start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'), dt=ss.days(7)):
     pop = ss.People(n_agents=agents)
-    tb = tbsim.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
+    tb = tbsim.TB_EMOD(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     dems = [ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))]
     sim = ss.Sim(people=pop, networks=net, diseases=tb, pars=dict(dt=dt, start=start, stop=stop), demographics=dems)
@@ -13,7 +13,7 @@ def make_tb_simplified(agents=20, start=ss.date('2000-01-01'), stop=ss.date('202
     return sim
 
 def test_initial_states():
-    tb = tbsim.TB()
+    tb = tbsim.TB_EMOD()
     print(tb.state)
     assert isinstance(tb.susceptible, ss.BoolArr)
     assert isinstance(tb.infected, ss.BoolArr)
@@ -31,7 +31,7 @@ def test_initial_states():
     assert isinstance(tb.ti_active, ss.FloatArr)
     
 def test_tb_initialization():
-    tb = tbsim.TB()
+    tb = tbsim.TB_EMOD()
     assert tb.pars['init_prev'] is not None
     assert isinstance(tb.pars['rate_LS_to_presym'], ss.Rate)
     assert isinstance(tb.pars['rate_LF_to_presym'], ss.Rate)
@@ -47,7 +47,7 @@ def test_tb_initialization():
     assert isinstance(tb.pars['rel_trans_treatment'], float)
     
 def test_default_parameters():
-    tb = tbsim.TB()
+    tb = tbsim.TB_EMOD()
     print(tb)
     assert tb.pars['init_prev'] is not None
     assert isinstance(tb.pars['rate_LS_to_presym'], ss.Rate)
@@ -59,7 +59,7 @@ def test_default_parameters():
     assert isinstance(tb.pars['rel_trans_smpos'], float)
 
 def test_tb_infectious():
-    tb = tbsim.TB()
+    tb = tbsim.TB_EMOD()
     tb.state[:] = tbsim.TBS.ACTIVE_PRESYMP
     assert tb.infectious.all()
     tb.state[:] = tbsim.TBS.ACTIVE_SMPOS
@@ -243,8 +243,8 @@ def test_p_latent_to_presym():
     tb.state[latent_fast_uids] = tbsim.TBS.LATENT_FAST
 
     # Expected: Verify that probabilities are correctly calculated based on TB states
-    probabilities_slow = tbsim.TB.p_latent_to_presym(tb, sim, latent_slow_uids) 
-    probabilities_fast = tbsim.TB.p_latent_to_presym(tb, sim, latent_fast_uids) 
+    probabilities_slow = tbsim.TB_EMOD.p_latent_to_presym(tb, sim, latent_slow_uids) 
+    probabilities_fast = tbsim.TB_EMOD.p_latent_to_presym(tb, sim, latent_fast_uids) 
 
     # The rate should be different for slow and fast latent TB states
     assert np.all(probabilities_slow < probabilities_fast), "Fast progression should have higher transition probabilities"
@@ -272,7 +272,7 @@ def test_p_presym_to_active():
     presym_uids = ss.uids([1, 2, 3, 4, 5])
 
     # Expected: Verify that probabilities are correctly calculated based on TB state
-    probabilities = tbsim.TB.p_presym_to_active(tb, sim, presym_uids)
+    probabilities = tbsim.TB_EMOD.p_presym_to_active(tb, sim, presym_uids)
 
     # Assert that all probabilities are the same if rate is constant across all individuals
     expected_rate = np.full(len(presym_uids), fill_value=tb.pars.rate_presym_to_active.rate)
@@ -302,7 +302,7 @@ def test_p_active_to_clear():
     tb.on_treatment[ss.uids([1, 2])] = True
 
     # Calculate probabilities
-    probabilities = tbsim.TB.p_active_to_clear(tb, sim, active_uids)
+    probabilities = tbsim.TB_EMOD.p_active_to_clear(tb, sim, active_uids)
 
     # Check that probabilities are within the expected range (0 to 1)
     assert np.all(0 <= probabilities) and np.all(probabilities <= 1)
@@ -333,7 +333,7 @@ def test_p_active_to_death( ):
     tb.state[active_uids] = np.random.choice([tbsim.TBS.ACTIVE_SMPOS, tbsim.TBS.ACTIVE_SMNEG, tbsim.TBS.ACTIVE_EXPTB], size=len(active_uids))
 
     # Calculate probabilities
-    probabilities = tbsim.TB.p_active_to_death(tb, sim, active_uids)
+    probabilities = tbsim.TB_EMOD.p_active_to_death(tb, sim, active_uids)
 
     # Check that probabilities are within the expected range (0 to 1)
     assert np.all(0 <= probabilities) and np.all(probabilities <= 1)

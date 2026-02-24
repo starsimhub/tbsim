@@ -735,7 +735,7 @@ if __name__ == '__main__':
     # Example simulation with enhanced diagnostic
     sim = ss.Sim(
         people=ss.People(n_agents=1000, extra_states=tbsim.get_extrastates()),
-        diseases=tbsim.TB({'init_prev': ss.bernoulli(0.25)}),
+        diseases=tbsim.TB_EMOD({'init_prev': ss.bernoulli(0.25)}),
         interventions=[
             tbsim.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.25)}),
             EnhancedTBDiagnostic(pars={

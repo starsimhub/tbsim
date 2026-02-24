@@ -7,7 +7,7 @@ import pandas as pd
 
 from enum import IntEnum
 
-__all__ = ['TB', 'TBS']
+__all__ = ['TB_EMOD', 'TBS']
 
 
 class TBS(IntEnum):
@@ -98,7 +98,7 @@ class TBS(IntEnum):
         return np.array([TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
     
 
-class TB(ss.Infection):
+class TB_EMOD(ss.Infection):
     """
     Tuberculosis disease model for TBsim simulations.
     
@@ -132,7 +132,7 @@ class TB(ss.Infection):
         import starsim as ss
         import tbsim
 
-        sim = ss.Sim(diseases=tbsim.TB())
+        sim = ss.Sim(diseases=tbsim.TB_EMOD())
         sim.run()
         sim.plot()
     """

@@ -48,7 +48,7 @@ def make_tb_nut():
         beta = 0.01, 
         init_prev = 0.25,
         )
-    tb = tbsim.TB(tb_pars)
+    tb = tbsim.TB_EMOD(tb_pars)
 
     # ---------- Malnutrition --------
     nut_pars = dict()

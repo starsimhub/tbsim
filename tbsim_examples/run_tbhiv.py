@@ -22,7 +22,7 @@ def build_tbhiv_sim(interventions=True):
     )
 
     # TB disease
-    tb = tbsim.TB(pars=dict(
+    tb = tbsim.TB_EMOD(pars=dict(
         beta=ss.peryear(0.025),
         init_prev=ss.bernoulli(p=0.25),
         rel_sus_latentslow=0.1,
