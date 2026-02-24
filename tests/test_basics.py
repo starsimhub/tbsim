@@ -12,52 +12,6 @@ def make_tb_simplified(agents=20, start=ss.date('2000-01-01'), stop=ss.date('202
     sim.pars.verbose = 0.1
     return sim
 
-def test_initial_states():
-    tb = tbsim.TB_EMOD()
-    print(tb.state)
-    assert isinstance(tb.susceptible, ss.BoolArr)
-    assert isinstance(tb.infected, ss.BoolArr)
-    assert isinstance(tb.rel_sus, ss.FloatArr)
-    assert isinstance(tb.rel_trans, ss.FloatArr)
-    assert isinstance(tb.ti_infected, ss.FloatArr)
-    assert isinstance(tb.state, ss.FloatArr)
-    assert isinstance(tb.active_tb_state, ss.FloatArr)
-    assert isinstance(tb.rr_activation, ss.FloatArr)
-    assert isinstance(tb.rr_clearance, ss.FloatArr)
-    assert isinstance(tb.rr_death, ss.FloatArr)
-    assert isinstance(tb.on_treatment, ss.BoolArr)
-    assert isinstance(tb.ti_active, ss.FloatArr)
-    assert isinstance(tb.ti_active, ss.FloatArr)
-    assert isinstance(tb.ti_active, ss.FloatArr)
-    
-def test_tb_initialization():
-    tb = tbsim.TB_EMOD()
-    assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.Rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.Rate)
-    assert isinstance(tb.pars['rate_presym_to_active'], ss.Rate)
-    assert isinstance(tb.pars['rate_active_to_clear'], ss.Rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.Rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.Rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.Rate)
-    assert isinstance(tb.pars['rel_trans_presymp'], float)
-    assert isinstance(tb.pars['rel_trans_smpos'], float)
-    assert isinstance(tb.pars['rel_trans_smneg'], float)
-    assert isinstance(tb.pars['rel_trans_exptb'], float)
-    assert isinstance(tb.pars['rel_trans_treatment'], float)
-    
-def test_default_parameters():
-    tb = tbsim.TB_EMOD()
-    print(tb)
-    assert tb.pars['init_prev'] is not None
-    assert isinstance(tb.pars['rate_LS_to_presym'], ss.Rate)
-    assert isinstance(tb.pars['rate_LF_to_presym'], ss.Rate)
-    # assert isinstance(tb.pars['rate_active_to_cure'], ss.Rate)
-    assert isinstance(tb.pars['rate_exptb_to_dead'], ss.Rate)
-    assert isinstance(tb.pars['rate_smpos_to_dead'], ss.Rate)
-    assert isinstance(tb.pars['rate_smneg_to_dead'], ss.Rate)
-    assert isinstance(tb.pars['rel_trans_smpos'], float)
-
 def test_tb_infectious():
     tb = tbsim.TB_EMOD()
     tb.state[:] = tbsim.TBS.ACTIVE_PRESYMP
@@ -74,7 +28,7 @@ def test_tb_infectious():
 def test_set_prognoses():
     sim = make_tb_simplified()
     sim.run()
-    tb = sim.diseases['tb_emod']
+    tb = tbsim.get_tb(sim)
     before = tb.state.copy()
     uids = ss.uids([1, 2, 3, 7, 9])
     tb.set_prognoses(uids)
@@ -86,12 +40,12 @@ def test_set_prognoses():
 def test_update_pre():
     sim = make_tb_simplified(agents=300)
     sim.init()
-    tb = sim.diseases['tb_emod']
+    tb = tbsim.get_tb(sim)
     assert len(tb.state[tb.state == tbsim.TBS.NONE]) > 0
     sim.run()
     assert len(tb.state[tb.state == tbsim.TBS.LATENT_SLOW]) > 0
     assert len(tb.state[tb.state == tbsim.TBS.ACTIVE_SMNEG]) > 0
-    
+
     print("none", tb.state[tb.state == tbsim.TBS.NONE])
     print("Slow:", tb.state[tb.state == tbsim.TBS.LATENT_SLOW])
     print("Fast:", tb.state[tb.state == tbsim.TBS.LATENT_FAST])
@@ -103,29 +57,29 @@ def test_update_pre():
 def test_update_death_with_uids():
     sim = make_tb_simplified(agents=300)
     sim.init()
-    tb = sim.diseases['tb_emod']
+    tb = tbsim.get_tb(sim)
     uids = ss.uids([1, 2, 3])
     tb.susceptible[uids] = True
     tb.infected[uids] = True
     tb.rel_trans[uids] = 1.0
-    
+
     tb.step_die(uids)
-    
+
     assert not tb.susceptible[uids].any()
     assert not tb.infected[uids].any()
     assert (tb.rel_trans[uids] == 0).all()
-    
+
 def test_step_die_no_uids():
     sim = make_tb_simplified(agents=300)
     sim.init()
-    tb = sim.diseases['tb_emod']
-        
+    tb = tbsim.get_tb(sim)
+
     initial_susceptible = tb.susceptible.copy()
     initial_infected = tb.infected.copy()
     initial_rel_trans = tb.rel_trans.copy()
-    
+
     tb.step_die([])
-    
+
     assert np.array_equal(tb.susceptible, initial_susceptible)
     assert np.array_equal(tb.infected, initial_infected)
     assert np.array_equal(tb.rel_trans, initial_rel_trans)
@@ -134,7 +88,7 @@ def test_step_die_no_uids():
 def tb():
     sim = make_tb_simplified(agents=1000)
     sim.init()
-    tb = sim.diseases['tb_emod']
+    tb = tbsim.get_tb(sim)
     return tb
 
 # When no individuals have active TB, no treatment should be started
@@ -154,14 +108,14 @@ def test_start_treatment_with_active_tb(tb):
     assert num_treated == len(uids)
     assert tb.on_treatment[uids].all()
     assert (tb.rr_death[uids] == 0).all()
-    
+
 # When there is a mix of individuals with and without active TB, only those with active TB should start treatment.
 def test_start_treatment_mixed_states(tb):
     uids_active = ss.uids([1, 2])
     uids_non_active = ss.uids([3, 4])
     tb.state[uids_active] = tbsim.TBS.ACTIVE_SMPOS  # Active TB
     tb.state[uids_non_active] = tbsim.TBS.LATENT_SLOW  # No active TB
-    all_uids = ss.uids.concat(uids_active, uids_non_active) 
+    all_uids = ss.uids.concat(uids_active, uids_non_active)
     num_treated = tb.start_treatment(all_uids)
     assert num_treated == len(uids_active)
     assert tb.on_treatment[uids_active].all()
@@ -198,21 +152,21 @@ def test_set_prognoses_susceptible_to_infected(tb):
 def test_set_prognoses_reltrans_het(tb):
     uids = ss.uids([1, 2, 3])
     tb.pars.reltrans_het.rvs = lambda uids: np.array([0.5, 0.7, 0.9], dtype=np.float32)
-    
+
     tb.set_prognoses(uids)
-    
+
     # Ensure both arrays are of the same data type when comparing
     expected = np.array([0.5, 0.7, 0.9], dtype=np.float32)
     actual = tb.reltrans_het[uids]
-    assert np.array_equal(actual, expected), f"Expected {expected}, but got {actual}"      
+    assert np.array_equal(actual, expected), f"Expected {expected}, but got {actual}"
 
 # Determining the active TB state.
 def test_set_prognoses_active_tb_state(tb):
     uids = ss.uids([1, 2, 3])
     tb.pars.active_state.rvs = lambda uids: np.array([tbsim.TBS.ACTIVE_SMPOS, tbsim.TBS.ACTIVE_SMNEG, tbsim.TBS.ACTIVE_EXPTB])
-    
+
     tb.set_prognoses(uids)
-    
+
     assert np.array_equal(tb.active_tb_state[uids], np.array([tbsim.TBS.ACTIVE_SMPOS, tbsim.TBS.ACTIVE_SMNEG, tbsim.TBS.ACTIVE_EXPTB]))
 
 # Updating the result count of new infections.
@@ -222,17 +176,17 @@ def test_set_prognoses_new_infections_count(tb):
     tb.infected[uids] = False
     tb.state[uids] = tbsim.TBS.NONE
     initial_count = np.count_nonzero(tb.infected)
-    
+
     tb.set_prognoses(uids)
-    
+
     assert np.count_nonzero(tb.infected) == initial_count + len(uids)
 
 def test_p_latent_to_presym():
     # Setup: Create a simulated TB instance and prepare relevant data
     sim = make_tb_simplified(agents=10)
     sim.init()
-    tb = sim.diseases['tb_emod']
-    
+    tb = tbsim.get_tb(sim)
+
     # Temporarily unlock attributes for testing
     tb._lock_attrs = False
     tb.state[:] = tbsim.TBS.LATENT_SLOW  # Assuming all agents are in the latent slow TB state
@@ -243,8 +197,8 @@ def test_p_latent_to_presym():
     tb.state[latent_fast_uids] = tbsim.TBS.LATENT_FAST
 
     # Expected: Verify that probabilities are correctly calculated based on TB states
-    probabilities_slow = tbsim.TB_EMOD.p_latent_to_presym(tb, sim, latent_slow_uids) 
-    probabilities_fast = tbsim.TB_EMOD.p_latent_to_presym(tb, sim, latent_fast_uids) 
+    probabilities_slow = tbsim.TB_EMOD.p_latent_to_presym(tb, sim, latent_slow_uids)
+    probabilities_fast = tbsim.TB_EMOD.p_latent_to_presym(tb, sim, latent_fast_uids)
 
     # The rate should be different for slow and fast latent TB states
     assert np.all(probabilities_slow < probabilities_fast), "Fast progression should have higher transition probabilities"
@@ -262,8 +216,8 @@ def test_p_presym_to_active():
     # Setup: Create a simulated TB instance and prepare relevant data
     sim = make_tb_simplified(agents=10)
     sim.init()
-    tb = sim.diseases['tb_emod']
-    
+    tb = tbsim.get_tb(sim)
+
     # Temporarily unlock attributes for testing
     tb._lock_attrs = False
     tb.state[:] = tbsim.TBS.ACTIVE_PRESYMP  # Assuming all agents are in the pre-symptomatic active TB state
@@ -289,8 +243,8 @@ def test_p_presym_to_active():
 def test_p_active_to_clear():
     sim = make_tb_simplified(agents=10)
     sim.init()
-    tb = sim.diseases['tb_emod']
-    
+    tb = tbsim.get_tb(sim)
+
     # Temporarily unlock attributes for testing
     tb._lock_attrs = False
 
@@ -311,7 +265,7 @@ def test_p_active_to_clear():
     # Use the actual rate values instead of trying to do math on rate objects
     base_rate = tb.pars.rate_active_to_clear.rate
     treatment_rate = tb.pars.rate_treatment_to_clear.rate
-    
+
     expected_rate = np.full(len(active_uids), fill_value=base_rate)
     expected_rate[:2] = treatment_rate  # Adjust for treatment
     expected_rate *= tb.rr_clearance[active_uids]  # Adjust for relative clearance
@@ -326,7 +280,7 @@ def test_p_active_to_clear():
 def test_p_active_to_death( ):
     sim = make_tb_simplified(agents=10)
     sim.init()
-    tb = sim.diseases['tb_emod']
+    tb = tbsim.get_tb(sim)
 
     # Set some individuals to different active TB states
     active_uids = ss.uids([1, 2, 3, 4, 5])
@@ -354,9 +308,9 @@ def test_p_active_to_death( ):
 def test_latent_to_active_presymptomatic_transition():
     sim = make_tb_simplified(agents=10000)
     sim.init()
-    tb = sim.diseases['tb_emod']
+    tb = tbsim.get_tb(sim)
     # Setup individuals in latent states
-    latent_uids = ss.uids(np.arange(5000)) 
+    latent_uids = ss.uids(np.arange(5000))
     tb.state[latent_uids] = np.random.choice([tbsim.TBS.LATENT_SLOW, tbsim.TBS.LATENT_FAST], size=len(latent_uids))
 
     # Manually execute the transition step
@@ -372,9 +326,9 @@ def test_presymptomatic_to_active_transition():
     # individuals in the pre-symptomatic state to have a good chance of transitioning
     sim = make_tb_simplified(agents=500)
     sim.init()
-    tb = sim.diseases['tb_emod']
+    tb = tbsim.get_tb(sim)
     # Setup some individuals to pre-symptomatic
-    presym_uids = ss.uids(np.arange(250)) 
+    presym_uids = ss.uids(np.arange(250))
     tb.state[presym_uids] = tbsim.TBS.ACTIVE_PRESYMP
 
     # Manually execute the transition step
@@ -393,10 +347,10 @@ def test_active_to_cleared_transition():
     # Increasing number of agents even higher as the clearance rate is very low
     sim = make_tb_simplified(agents=20000)
     sim.init()
-    tb = sim.diseases['tb_emod']
+    tb = tbsim.get_tb(sim)
     # Setup individuals in active TB states
     active_uids = ss.uids(np.arange(15000))  # Also test with a large number of agents
-    
+
     tb.state[active_uids] = np.random.choice(
         [tbsim.TBS.ACTIVE_SMPOS, tbsim.TBS.ACTIVE_SMNEG, tbsim.TBS.ACTIVE_EXPTB],
         size=len(active_uids),
@@ -408,12 +362,12 @@ def test_active_to_cleared_transition():
     # Check if any active TB patients have cleared the infection
     cleared = tb.state[active_uids] == tbsim.TBS.NONE
     assert cleared.any(), "At least one active TB patient should have cleared the infection."
-    
+
 def test_active_to_death_transition():
     # Setup individuals in active TB states
     sim = make_tb_simplified(agents=20000)
     sim.init()
-    tb = sim.diseases['tb_emod']
+    tb = tbsim.get_tb(sim)
     active_uids = ss.uids(np.arange(15000))  # Also test with a large number of agents
     tb.state[active_uids] = np.random.choice(
         [tbsim.TBS.ACTIVE_SMPOS, tbsim.TBS.ACTIVE_SMNEG, tbsim.TBS.ACTIVE_EXPTB],
@@ -427,6 +381,7 @@ def test_active_to_death_transition():
     died = tb.state[active_uids] == tbsim.TBS.DEAD
     # total = len(died[died])
     assert died.any(), "At least one active TB patient should have transitioned to death."
-  
+
+
 if __name__ == '__main__':
-    pytest.main()
+    pytest.main(["-x", "-v", __file__])

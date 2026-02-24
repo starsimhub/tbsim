@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import starsim as ss
 
-__all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL']
+__all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL', 'get_tb']
 
 
 class TBSL(IntEnum):
@@ -36,7 +36,12 @@ class TBSL(IntEnum):
         return np.array([TBSL.SYMPTOMATIC])
 
 
-class TB_LSHTM(ss.Infection):
+class BaseTB(ss.Infection):
+    """Base class for TB natural history models."""
+    pass
+
+
+class TB_LSHTM(BaseTB):
     """
     Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al. 2025).
     States in `TBSL` span the spectrum from susceptibility to active disease and treatment.
@@ -135,7 +140,7 @@ class TB_LSHTM(ss.Infection):
         # --- Transmission and reinfection ---
         self.define_pars(
             init_prev=ss.bernoulli(0.05),       # Initial seed infections (prevalence)
-            beta=ss.peryear(0.25),              # Transmission rate per year
+            beta=ss.permonth(0.2),              # Transmission rate per year
             trans_asymp=0.82,                   # κ kappa: rel. transmissibility asymptomatic vs symptomatic
             rr_rec=0.21,                        # π pi: RR reinfection after recovery
             rr_treat=3.15,                      # ρ rho: RR reinfection after treatment
@@ -443,28 +448,30 @@ class TB_LSHTM(ss.Infection):
         super().update_results()
         res = self.results
         ti = self.ti
-        ti_infctd = self.ti_infected
         dty = self.sim.t.dt_year
 
-        for state in TBSL:
-            res[f'n_{state.name}'][ti] = np.count_nonzero(self.state == state)
-            res[f'n_{state.name}_15+'][ti] = np.count_nonzero((self.sim.people.age >= 15) & (self.state == state))
+        # Cache commonly reused arrays
+        age15 = self.sim.people.age >= 15
+        infectious = self.infectious
+        n_alive = self.sim.people.alive.count()
+        new_asymp = self.ti_asymp == ti
 
-        res.n_infectious[ti] = np.count_nonzero(self.infectious)
-        res['n_infectious_15+'][ti] = np.count_nonzero(self.infectious & (self.sim.people.age >= 15))
-        res.prevalence_active[ti] = res.n_infectious[ti] / np.count_nonzero(self.sim.people.alive)
-        res.incidence_kpy[ti] = 1_000 * np.count_nonzero(ti_infctd == ti) / (np.count_nonzero(self.sim.people.alive) * dty)
-        res.deaths_ppy[ti] = res.new_deaths[ti] / (np.count_nonzero(self.sim.people.alive) * dty)
+        in_state = {}
+        for state in TBSL:
+            in_state[state] = self.state == state
+            res[f'n_{state.name}'][ti] = in_state[state].count()
+            res[f'n_{state.name}_15+'][ti] = (age15 & in_state[state]).count()
+
+        res.n_infectious[ti] = infectious.count()
+        res['n_infectious_15+'][ti] = (infectious & age15).count()
+        res.prevalence_active[ti] = res.n_infectious[ti] / n_alive
+        res.incidence_kpy[ti] = 1_000 * (self.ti_infected == ti).count() / (n_alive * dty)
+        res.deaths_ppy[ti] = res.new_deaths[ti] / (n_alive * dty)
 
         # New active: agents whose ti_asymp == this step
-        res['new_active'][ti] = np.count_nonzero(self.ti_asymp == ti)
-        res['new_active_15+'][ti] = np.count_nonzero((self.ti_asymp == ti) & (self.sim.people.age >= 15))
-
-        res['n_detectable_15+'][ti] = np.dot(
-            self.sim.people.age >= 15,
-            (self.state == TBSL.SYMPTOMATIC) + self.pars.cxr_asymp_sens * (self.state == TBSL.ASYMPTOMATIC)
-        )
-
+        res['new_active'][ti] = new_asymp.count()
+        res['new_active_15+'][ti] = (new_asymp & age15).count()
+        res['n_detectable_15+'][ti] = (age15 * (in_state[TBSL.SYMPTOMATIC] + self.pars.cxr_asymp_sens*in_state[TBSL.ASYMPTOMATIC])).sum()
         return
 
     def finalize_results(self):
@@ -626,3 +633,18 @@ class TB_LSHTM_Acute(TB_LSHTM):
         self.results['new_notifications_15+'][self.ti] += np.count_nonzero(self.sim.people.age[active] >= 15)
 
         return
+
+
+def get_tb(sim, which=None): # TODO: Create tbsim.Sim and move this to sim.get_tb()
+    """ Helper to get the TB_LSHTM infection module from a sim
+
+    Args:
+        sim (Sim): the simulation to search for the TB module
+        which (type, optional): the class of TB module to get (e.g. TB_LSHTM; if None, returns the first BaseTB subclass found
+    """
+    if which is None:
+        which = BaseTB
+    for disease in sim.diseases.values():
+        if isinstance(disease, which):
+            return disease
+    raise ValueError("No TB module found in sim.diseases")

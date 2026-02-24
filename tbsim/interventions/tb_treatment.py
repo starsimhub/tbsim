@@ -2,6 +2,7 @@
 
 import numpy as np
 import starsim as ss
+import tbsim
 from tbsim import TBS
 from .tb_drug_types import TBDrugType, TBDrugParameters, TBDrugTypeParameters
 
@@ -42,7 +43,7 @@ class TBTreatment(ss.Intervention):
         """Treat diagnosed active-TB individuals"""
         sim = self.sim
         ppl = sim.people
-        tb = sim.diseases.tb_emod
+        tb = tbsim.get_tb(sim)
 
         # Select individuals diagnosed with TB and alive
         diagnosed = ppl.diagnosed & ppl.alive
@@ -226,7 +227,7 @@ class EnhancedTBTreatment(ss.Intervention):
         """
         sim = self.sim
         ppl = sim.people
-        tb = sim.diseases.tb_emod
+        tb = tbsim.get_tb(sim)
         
         # Select individuals diagnosed with TB and alive
         diagnosed_uids = (ppl.diagnosed & ppl.alive).uids

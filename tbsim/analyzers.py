@@ -15,7 +15,6 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import seaborn as sns
 import networkx as nx
-import plotly.graph_objects as go
 
 import sciris as sc
 import starsim as ss
@@ -48,17 +47,12 @@ class DwellTime(ss.Analyzer):
 
     Visualization types (via ``plot(kind=...)``):
 
-    - ``'sankey'`` -- Sankey diagram of agent state transitions
     - ``'histogram'`` -- Histograms with KDE per state
     - ``'kaplan_meier'`` -- Kaplan-Meier survival curves
     - ``'network'`` -- Directed graph of state transitions
     - ``'validation'`` -- Observed dwell-time histograms for validation
 
     Example:
-        Direct data visualization::
-
-            dt = DwellTime(file_path='results/Baseline-20240101120000.csv')
-            dt.plot('sankey')
 
         Aggregating multiple runs::
 
@@ -114,12 +108,12 @@ class DwellTime(ss.Analyzer):
 
     _PLOT_KINDS = None  # populated after method definitions
 
-    def plot(self, kind='sankey', **kwargs):
+    def plot(self, kind='histogram', **kwargs):
         """
         Create a visualization of the dwell-time data.
 
         Args:
-            kind (str): One of ``'sankey'``, ``'histogram'``, ``'kaplan_meier'``,
+            kind (str): One of ``'histogram'``, ``'kaplan_meier'``,
                 ``'network'``, ``'validation'``.
             **kwargs: Forwarded to the underlying plot method.
 
@@ -136,56 +130,6 @@ class DwellTime(ss.Analyzer):
     # ------------------------------------------------------------------
     # Kept plotting methods (private)
     # ------------------------------------------------------------------
-
-    def _plot_sankey(self, subtitle=""):
-        """Sankey diagram of agent state transitions."""
-        if self._data_error():
-            return
-
-        df = self.data
-        source = df['state_name']
-        target = df['going_to_state']
-
-        transition_counts = df.groupby(
-            ['state_name', 'going_to_state']).size().reset_index(name='count')
-
-        labels = list(set(source) | set(target))
-        label_to_index = {label: i for i, label in enumerate(labels)}
-
-        source_indices = transition_counts['state_name'].map(label_to_index)
-        target_indices = transition_counts['going_to_state'].map(label_to_index)
-        values = transition_counts['count']
-
-        colors = plt.cm.tab20(np.linspace(0, 1, len(labels)))
-        node_colors = [
-            f'rgba({c[0]*255}, {c[1]*255}, {c[2]*255}, 1.0)' for c in colors]
-        link_colors_base = [
-            f'rgba({c[0]*255}, {c[1]*255}, {c[2]*255}, 0.5)' for c in colors]
-        link_color_map = {i: link_colors_base[i] for i in range(len(labels))}
-        link_colors = [link_color_map[idx] for idx in source_indices]
-
-        fig = go.Figure(go.Sankey(
-            arrangement="snap",
-            node=dict(
-                pad=15, thickness=20,
-                line=dict(color="black", width=0.2),
-                label=labels, color=node_colors),
-            link=dict(
-                source=source_indices, target=target_indices,
-                value=values, color=link_colors,
-                hovertemplate='%{source.label} → %{target.label}: %{value} agents<br>',
-                line=dict(color="lightgray", width=0.1),
-                label=values)))
-
-        fig.update_layout(
-            hovermode='x',
-            title=dict(
-                text=f"State Transitions  - Agents Count<br>{subtitle}",
-                font=dict(size=12)),
-            font=dict(size=12, color='black'))
-        fig.show()
-
-        return
 
     def _plot_histogram(self, subtitle=""):
         """Histograms with KDE for dwell-time distributions per state."""
@@ -452,7 +396,7 @@ class DwellTime(ss.Analyzer):
     def _update_state_change_data(self):
         """Detect state changes and record dwell times."""
         ti = self.ti
-        tb = self.sim.diseases.tb_emod
+        tb = tbsim.get_tb(self.sim)
         uids = self.sim.people.auids.copy()
 
         relevant_rows = self._latest_sts_df[
@@ -556,10 +500,9 @@ class DwellTime(ss.Analyzer):
                 age=self.sim.people.age[
                     ss.uids(relevant_rows['agent_id'].values)].copy())
 
-        if 'LSHTM' in str(self.sim.diseases[0].__class__):
-            print("====> Using model: str(self.sim.diseases[0].__class__)")
-            import tb_acf as tbacf
-            self.eSTATES = tbacf.TBSL
+        tb = tbsim.get_tb(self.sim)
+        if isinstance(tb, tbsim.TB_LSHTM):
+            self.eSTATES = tbsim.TBSL
 
         state_dict = {
             state.value: state.name.replace('_', ' ').title()
@@ -667,31 +610,17 @@ class DwellTime(ss.Analyzer):
         return df_cleaned
 
     @staticmethod
-    def _select_graph_pos(G, layout=4, seed=42):
+    def _select_graph_pos(G, layout='shell_layout', seed=42):
         """Select a NetworkX layout algorithm for graph visualizations."""
-        if layout == 1:
-            return nx.circular_layout(G)
-        elif layout == 2:
-            return nx.spiral_layout(G)
-        elif layout == 3:
-            return nx.spectral_layout(G)
-        elif layout == 4:
-            return nx.shell_layout(G)
-        elif layout == 5:
-            return nx.kamada_kawai_layout(G)
-        elif layout == 6:
-            return nx.planar_layout(G)
-        elif layout == 7:
-            return nx.random_layout(G)
-        elif layout == 9:
-            return nx.fruchterman_reingold_layout(G)
+        func = getattr(x, layout)
+        if layout == 'spring_layout':
+            return func(G, seed=seed)
         else:
-            return nx.spring_layout(G, seed=seed)
+            return func(G)
 
 
 # Wire up the plot dispatcher after the methods are defined
 DwellTime._PLOT_KINDS = {
-    'sankey': DwellTime._plot_sankey,
     'histogram': DwellTime._plot_histogram,
     'kaplan_meier': DwellTime._plot_kaplan_meier,
     'network': DwellTime._plot_network,

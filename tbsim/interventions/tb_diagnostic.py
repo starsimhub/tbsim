@@ -2,6 +2,7 @@
 
 import numpy as np
 import starsim as ss
+import tbsim
 from tbsim import TBS
 
 __all__ = ['TBDiagnostic', 'EnhancedTBDiagnostic']
@@ -31,7 +32,7 @@ class TBDiagnostic(ss.Intervention):
     Inputs/Requirements:
     --------------------
     The intervention requires the following to be present in the simulation:
-    - TB disease module (sim.diseases.tb_emod) with active TB states
+    - TB disease module (accessed via tbsim.get_tb(sim)) with active TB states
     - Health seeking behavior intervention that sets the 'sought_care' flag
     - Person states: 'sought_care', 'tested', 'diagnosed', 'n_times_tested', 
       'test_result', 'care_seeking_multiplier', 'multiplier_applied'
@@ -208,7 +209,7 @@ class TBDiagnostic(ss.Intervention):
         """
         sim = self.sim
         ppl = sim.people
-        tb = sim.diseases.tb_emod
+        tb = tbsim.get_tb(sim)
 
         # Find people who sought care but haven't been tested
         # eligible = ppl.sought_care & (~ppl.tested) & ppl.alive
@@ -536,7 +537,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
     @staticmethod
     def p_test_positive(self, sim, uids):
         """ Calculate per-individual probability of a positive test result. """
-        tb = sim.diseases.tb_emod
+        tb = tbsim.get_tb(sim)
         ppl = sim.people
         tb_states = tb.state[uids]
         ages = ppl.age[uids]
@@ -562,7 +563,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         """Test care-seekers using the appropriate diagnostic method and record results."""
         sim = self.sim
         ppl = sim.people
-        tb = sim.diseases.tb_emod
+        tb = tbsim.get_tb(sim)
 
         # Find people who sought care but haven't been diagnosed
         eligible = ppl.sought_care & (~ppl.diagnosed) & ppl.alive

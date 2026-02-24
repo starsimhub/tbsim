@@ -3,6 +3,7 @@
 from enum import IntEnum
 import numpy as np
 import starsim as ss
+import tbsim
 
 __all__ = ['HIVState', 'HIV', 'HivInterventions', 'TB_HIV_Connector']
 
@@ -349,7 +350,7 @@ class TB_HIV_Connector(ss.Connector):
 
     def step(self):
         """ Apply HIV-based risk multipliers to TB activation rates. """
-        tb = self.sim.diseases['tb_emod']
+        tb = tbsim.get_tb(self.sim)
         hiv = self.sim.diseases['hiv']
         uids_tb = tb.infected.uids
         rr = self.pars.tb_hiv_rr_func(self, tb, hiv, uids_tb)

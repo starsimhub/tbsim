@@ -1,6 +1,7 @@
 """Intervention that modifies the TB transmission rate (beta) at specified time points."""
 
 import starsim as ss
+import tbsim
 
 __all__ = ['BetaByYear']
 
@@ -98,7 +99,7 @@ class BetaByYear(ss.Intervention):
             # Apply intervention only when we first reach the target year
             # This ensures it's applied only once, not repeatedly
             if year == target_year:
-                self.sim.diseases.tb_emod.pars['beta'] *= x_beta
+                tbsim.get_tb(self.sim).pars['beta'] *= x_beta
                 print(f"At year:{year}, Modified BetaValue:{x_beta}")
                 # Always remove the year and x_beta after application
                 self.pars.years.pop(0)

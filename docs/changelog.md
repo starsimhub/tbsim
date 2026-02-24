@@ -2,23 +2,9 @@
 
 All notable changes to TBsim will be documented in this file.
 
-## Unreleased
-
-**Added**
-
-- Comprehensive documentation restructuring
-- Enhanced user guides and tutorials
-- Improved API documentation
-
-**Changed**
-
-- Documentation organization and navigation
-- Tutorial categorization and descriptions
-
-**Fixed**
-
-- Documentation build issues
-- Missing API references
+## Version 0.6.0 (2026-02-024)
+- TB natural history model based on London School of Hygiene & Tropical Medicine (LSHTM)
+- Many, many other changes
 
 ## Version 0.1.0
 
