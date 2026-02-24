@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import starsim as ss
 from tbsim import TBSL, TB_LSHTM, TB_LSHTM_Acute
@@ -7,11 +8,66 @@ __all__ = ['Immigration']
 
 class Immigration(ss.Demographics):
     """
-    Add new people over time (LSHTM-only).
+    Demographic module that adds new immigrants to the population each timestep.
 
-    Adds new agents at an intensity (people/year) and initializes their TB state
-    according to the LSHTM spectrum model (`TB_LSHTM` or `TB_LSHTM_Acute`).
-    """   
+    Arrivals are Poisson-distributed at the specified rate, assigned ages drawn
+    from a configurable age distribution, and seeded into the TB state machine
+    according to a user-supplied prevalence distribution. Requires either
+    ``TB_LSHTM`` or ``TB_LSHTM_Acute`` to be present in the simulation.
+
+    Parameters
+    ----------
+    pars : dict, optional
+        Parameter overrides. Supported keys:
+
+        immigration_rate : ss.freq
+            Mean number of arrivals per year (default: 10). Must be an event-rate
+            type (``ss.freqperyear``, etc.).
+        rel_immigration : float
+            Scalar multiplier applied to ``immigration_rate`` (default: 1.0).
+            Useful for scenario scaling without changing the base rate.
+        age_distribution : dict or None
+            Mapping of ``{lower_age_bound: probability}`` defining the age-bin
+            sampling distribution. Probabilities are normalized automatically.
+            If ``None``, a default distribution spanning 0–85 years is used.
+        tb_state_distribution : dict
+            Mapping of ``{TBSL state name: probability}`` for the TB state
+            assigned to each new arrival. Keys must be valid ``TBSL`` member
+            names. Values are normalized automatically; a warning is raised if
+            they sum to more than 1.
+
+    States
+    ------
+    hhid : int
+        Household ID assigned to the agent (-1 if unassigned).
+    is_immigrant : bool
+        ``True`` for agents that arrived via this module.
+    immigration_time : float
+        Timestep index at which the agent immigrated (NaN for non-immigrants).
+    age_at_immigration : float
+        Age in years at time of immigration (NaN for non-immigrants).
+    immigration_tb_status : int
+        TBSL state integer sampled at immigration (-1 for non-immigrants).
+
+    Results
+    -------
+    n_immigrants : int
+        Number of new arrivals recorded each timestep.
+
+    Example
+    -------
+    ::
+
+        import starsim as ss
+        import tbsim
+
+        sim = ss.Sim(
+            diseases=tbsim.TB_LSHTM(),
+            networks=tbsim.HouseholdNet(),
+            demographics=tbsim.Immigration(pars=dict(immigration_rate=500)),
+        )
+        sim.run()
+    """
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         
@@ -61,6 +117,7 @@ class Immigration(ss.Demographics):
         return
     
     def init_post(self):
+        """Resolve the TB disease module name after the simulation is assembled."""
         super().init_post()
         self._tb_name = next(
             (k for k, d in self.sim.diseases.items() if isinstance(d, (TB_LSHTM, TB_LSHTM_Acute))),
@@ -160,7 +217,24 @@ class Immigration(ss.Demographics):
 
 
     def _init_tb_lshtm(self, new_uids):
+        """
+        Seed TB states for newly arrived agents.
 
+        Samples a TB state for each UID from ``tb_state_distribution`` and
+        sets all derived flags (``infected``, ``susceptible``, ``ever_infected``,
+        ``on_treatment``, ``rel_sus``, ``rel_trans``) to be consistent with the
+        sampled state.
+
+        Parameters
+        ----------
+        new_uids : array-like
+            UIDs of the agents just added to the population.
+
+        Returns
+        -------
+        sampled : np.ndarray of int
+            TBSL integer states assigned to each UID.
+        """
         tb = self.sim.diseases[self._tb_name]
         # Only allow ACUTE if the TB module is the acute variant
         state_vals = np.asarray(self._dist_tbstate.pars.a).astype(int)
@@ -230,7 +304,19 @@ class Immigration(ss.Demographics):
         return new_uids
     
     def assign_immigrants_to_households(self, new_uids):
-        """Assign new immigrants to households."""
+        """
+        Assign new arrivals to existing households.
+
+        Searches the simulation's networks for the first one that exposes an
+        ``hhid`` array, then randomly assigns each immigrant to one of the
+        existing household IDs. If no households exist yet, each immigrant is
+        placed in its own singleton household.
+
+        Parameters
+        ----------
+        new_uids : array-like
+            UIDs of the agents to assign.
+        """
         # Find the first network with an hhid array
         hh_net = None
         for net in self.sim.networks.values():
@@ -276,7 +362,7 @@ class Immigration(ss.Demographics):
             if v < 0:
                 raise ValueError(f'tb_state_distribution["{k}"] is negative ({v})')
         total = sum(dist.values())
-        if total > 1.0 + 1e-9:
-            raise ValueError(f'tb_state_distribution sums to {total:.6g}, which exceeds 1.0')
+        if total > 1.0:
+            warnings.warn(f'tb_state_distribution sums to {total:.6g} (>1); normalizing automatically')
         return {k: v / total for k, v in dist.items()}
 
