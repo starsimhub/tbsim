@@ -396,7 +396,7 @@ class DwellTime(ss.Analyzer):
     def _update_state_change_data(self):
         """Detect state changes and record dwell times."""
         ti = self.ti
-        tb = self.sim.diseases.tb_emod
+        tb = tbsim.get_tb(self.sim)
         uids = self.sim.people.auids.copy()
 
         relevant_rows = self._latest_sts_df[
@@ -500,10 +500,9 @@ class DwellTime(ss.Analyzer):
                 age=self.sim.people.age[
                     ss.uids(relevant_rows['agent_id'].values)].copy())
 
-        if 'LSHTM' in str(self.sim.diseases[0].__class__):
-            print("====> Using model: str(self.sim.diseases[0].__class__)")
-            import tb_acf as tbacf
-            self.eSTATES = tbacf.TBSL
+        tb = tbsim.get_tb(self.sim)
+        if isinstance(tb, tbsim.TB_LSHTM):
+            self.eSTATES = tbsim.TBSL
 
         state_dict = {
             state.value: state.name.replace('_', ' ').title()

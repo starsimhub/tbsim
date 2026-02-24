@@ -10,6 +10,7 @@ WARNING -- this class is not yet currently functional.
 import numpy as np
 import sciris as sc
 import starsim as ss
+import tbsim
 
 __all__ = ['Immigration', 'SimpleImmigration']
 
@@ -205,7 +206,7 @@ class Immigration(ss.Demographics):
         self.sim.people.age[new_uids] = characteristics['ages']
         
         # Set TB status for new immigrants
-        tb = self.sim.diseases.tb_emod
+        tb = tbsim.get_tb(self.sim)
         for i, uid in enumerate(new_uids):
             tb_status = characteristics['tb_statuses'][i]
             if tb_status == 'susceptible':
@@ -315,8 +316,7 @@ class SimpleImmigration(ss.Demographics):
         # when people.grow() is called, so we don't need to manually grow TB arrays
         
         # Set TB status for new immigrants (mostly susceptible)
-        tb = self.sim.diseases.tb_emod
-        import tbsim
+        tb = tbsim.get_tb(self.sim)
         for uid in new_uids:
             # 90% susceptible, 5% latent slow, 3% latent fast, 2% active
             rand = np.random.random()

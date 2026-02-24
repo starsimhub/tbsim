@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import starsim as ss
 from scipy.stats import norm
+import tbsim
 from tbsim import DATADIR
 
 __all__ = ["Malnutrition", "TB_Nutrition_Connector"]
@@ -217,7 +218,7 @@ class TB_Nutrition_Connector(ss.Connector):
 
     def step(self):
         """Apply nutritional effects to TB transition rates each time step."""
-        tb = self.sim.diseases['tb_emod']
+        tb = tbsim.get_tb(self.sim)
         mn = self.sim.diseases['malnutrition']
 
         uids = tb.infected.uids
