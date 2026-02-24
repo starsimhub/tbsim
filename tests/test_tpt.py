@@ -158,7 +158,7 @@ def test_tpt_modifies_rr():
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
 
-    tb_disease = sim.diseases.tb_emod
+    tb_disease = sim.diseases.tb
     initial_activation = np.array(tb_disease.rr_activation).copy()
 
     tpt = sim.interventions['tptsimple']
@@ -228,7 +228,7 @@ def test_tpt_product_skips_on_treatment():
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
 
-    tb_disease = sim.diseases.tb_emod
+    tb_disease = sim.diseases.tb
     # Force some agents onto treatment
     some_uids = ss.uids([0, 1, 2])
     tb_disease.on_treatment[some_uids] = True
@@ -291,7 +291,7 @@ def test_tpt_household_traces_on_treatment_start():
     sim.init()
 
     itv = sim.interventions['tpthousehold']
-    tb_disease = sim.diseases.tb_emod
+    tb_disease = sim.diseases.tb
 
     # No one on treatment yet → no contacts should be found
     contacts = itv.check_eligibility()
@@ -330,7 +330,7 @@ def test_tpt_household_no_retrigger_same_index():
     sim.init()
 
     itv = sim.interventions['tpthousehold']
-    tb_disease = sim.diseases.tb_emod
+    tb_disease = sim.diseases.tb
 
     # Force agent onto treatment
     tb_disease.on_treatment[ss.uids([0])] = True
