@@ -21,6 +21,7 @@ This section contains step-by-step tutorials and examples for using TBsim. These
 ### Advanced Features
 
 - [tutorials/tbhiv_comorbidity.ipynb](tutorials/tbhiv_comorbidity.ipynb)
+- [tutorials/malnutrition_tutorial.ipynb](tutorials/malnutrition_tutorial.ipynb)
 - [tutorials/comprehensive_analyzer_plots_example.ipynb](tutorials/comprehensive_analyzer_plots_example.ipynb)
 
 ## Tutorial Descriptions
@@ -37,10 +38,13 @@ Detailed guide to implementing and analyzing TB interventions
 **run_tbhiv_scens.ipynb**  
 TB-HIV co-infection modeling scenarios and analysis
 
-**tbhiv_comorbidity.ipynb**  
+**tbhiv_comorbidity.ipynb**
 Advanced comorbidity modeling between TB and HIV
 
-**comprehensive_analyzer_plots_example.ipynb**  
+**malnutrition_tutorial.ipynb**
+TB-malnutrition comorbidity modeling and nutritional status effects
+
+**comprehensive_analyzer_plots_example.ipynb**
 Using TBsim's built-in analyzers and plotting tools
 
 ## Running Tutorials

@@ -1,6 +1,6 @@
 site_name: TBsim
 site_description: Agent-based TB model implemented using the Starsim framework
-site_url: https://docs.idmod.org/projects/tbsim
+site_url: https://starsim.org/tbsim/
 
 repo_name: starsimhub/tbsim
 repo_url: https://github.com/starsimhub/tbsim
