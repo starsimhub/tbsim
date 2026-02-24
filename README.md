@@ -57,7 +57,7 @@ Or run directly in Python:
 import starsim as ss
 import tbsim
 
-sim = ss.Sim(diseases=tbsim.TB_LSHTM())
+sim = ss.Sim(diseases=tbsim.TB_LSHTM(), networks='random', demographics=True, start=2000, stop=2010, dt='month')
 sim.run()
 sim.plot()
 ```

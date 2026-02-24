@@ -134,7 +134,7 @@ class TB_LSHTM(ss.Infection):
 
         # --- Transmission and reinfection ---
         self.define_pars(
-            init_prev=ss.bernoulli(0.01),       # Initial seed infections (prevalence)
+            init_prev=ss.bernoulli(0.05),       # Initial seed infections (prevalence)
             beta=ss.peryear(0.25),              # Transmission rate per year
             trans_asymp=0.82,                   # κ kappa: rel. transmissibility asymptomatic vs symptomatic
             rr_rec=0.21,                        # π pi: RR reinfection after recovery
