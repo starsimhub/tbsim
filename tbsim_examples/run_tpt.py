@@ -24,9 +24,7 @@ import starsim as ss
 import tbsim
 from tbsim.interventions.tpt import (
     TPTRoutine,
-    TPTRegimen,
     TPTProduct,
-    RegimenCategory,
     REGIMENS,
 )
 from tbsim.tb_lshtm import TBSL
@@ -151,16 +149,15 @@ summarise('PLHIV-style 6H — universal', sim3, itv_key='tptroutine')
 # ---------------------------------------------------------------------------
 
 print('\nRunning scenario 4: Custom 2-month regimen (90% coverage) …')
-novel_2m = TPTRegimen(
-    name='2M-novel',
-    category=RegimenCategory.RIFAMYCIN_SHORT,
-    dur_treatment=ss.constant(v=ss.months(2)),
-    dur_protection=ss.constant(v=ss.years(1.5)),
-    p_complete=ss.bernoulli(p=0.95),
-    activation_modifier=ss.constant(v=0.65),
-)
 itv4 = TPTRoutine(
-    product=TPTProduct(regimen=novel_2m),
+    product=TPTProduct(
+        pars=dict(
+            dur_treatment=ss.constant(v=ss.months(2)),
+            dur_protection=ss.constant(v=ss.years(1.5)),
+            p_complete=ss.bernoulli(p=0.95),
+        ),
+        effects={'rr_activation': ss.constant(v=0.65)},
+    ),
     pars={
         'coverage':        ss.bernoulli(p=0.90),
         'eligible_states': [TBSL.INFECTION],
@@ -178,10 +175,11 @@ summarise('Custom 2M regimen — age 5–65', sim4, itv_key='tptroutine')
 # ---------------------------------------------------------------------------
 
 print('\n\nAvailable regimens in REGIMENS catalog:')
-print(f'  {"Name":<8} {"Category":<20} {"Treatment":<16} {"p_complete":<12} {"modifier"}')
-print('  ' + '-' * 72)
-for name, reg in REGIMENS.items():
-    dur_tx    = reg.dur_treatment.pars.v
-    p_comp    = reg.p_complete.pars.p
-    modifier  = reg.activation_modifier.pars.v
-    print(f'  {name:<8} {reg.category.value:<20} {str(dur_tx):<16} {p_comp:<12.2f} {modifier:.2f}')
+print(f'  {"Name":<8} {"Treatment":<16} {"p_complete":<12} {"effects"}')
+print('  ' + '-' * 60)
+for name, spec in REGIMENS.items():
+    p        = spec['pars']
+    dur_tx   = p['dur_treatment'].pars.v
+    p_comp   = p['p_complete'].pars.p
+    effects  = ', '.join(f'{k}={v.pars.v:.2f}' for k, v in spec['effects'].items())
+    print(f'  {name:<8} {str(dur_tx):<16} {p_comp:<12.2f} {effects}')

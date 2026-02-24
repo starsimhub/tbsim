@@ -29,11 +29,27 @@ class TBSL(IntEnum):
     ACUTE           = 9     # Acute infection immediately after exposure (TB_LSHTM_Acute only)
 
     @staticmethod
+    def active_tb_states():
+        """States that constitute active TB disease, disqualifying an agent from TPT.
+
+        WHO (2024): active TB must be ruled out before initiating TPT — providing
+        TPT to active TB cases delays resolution and promotes resistance.
+        NON_INFECTIOUS is included because it represents pre-symptomatic active disease.
+        """
+        return frozenset([
+            int(TBSL.NON_INFECTIOUS),
+            int(TBSL.ASYMPTOMATIC),
+            int(TBSL.SYMPTOMATIC),
+            int(TBSL.TREATMENT),
+        ])
+
+    @staticmethod
     def care_seeking_eligible():
         """States eligible for care-seeking: only SYMPTOMATIC.
         Only individuals with clinical symptoms (cough, fever, night sweats, etc.)
         recognise their illness and seek healthcare."""
         return np.array([TBSL.SYMPTOMATIC])
+
 
 
 class TB_LSHTM(ss.Infection):
