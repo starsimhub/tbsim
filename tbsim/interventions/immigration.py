@@ -40,6 +40,7 @@ class Immigration(ss.Demographics):
                  age_distribution=_, tb_status_distribution=_, **kwargs):
         """Initialize with immigration rate, age distribution, and TB status distribution."""
         super().__init__()
+        print('Warning: this class is not fully functional')
         
         self.define_pars(
             immigration_rate=ss.peryear(10),  # 10 immigrants per year by default
@@ -269,6 +270,7 @@ class SimpleImmigration(ss.Demographics):
     def __init__(self, pars=None, immigration_rate=20, **kwargs):
         """Initialize with a fixed immigration rate (immigrants per year)."""
         super().__init__()
+        print('Warning: this class is not fully functional')
         
         self.define_pars(
             immigration_rate=immigration_rate,
