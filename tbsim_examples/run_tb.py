@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 def build_tbsim(sim_pars=None):
 
-    sim = ss.Sim(diseases=tbsim.TB(),pars=dict(dt = ss.days(7), start = ss.date('1940-01-01'), stop = ss.date('2010')))
+    sim = ss.Sim(diseases=tbsim.TB_EMOD(),pars=dict(dt = ss.days(7), start = ss.date('1940-01-01'), stop = ss.date('2010')))
     return sim
 
 if __name__ == '__main__':

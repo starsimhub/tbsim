@@ -1,3 +1,5 @@
+"""TB diagnostic testing interventions"""
+
 import numpy as np
 import starsim as ss
 from tbsim import TBS
@@ -29,7 +31,7 @@ class TBDiagnostic(ss.Intervention):
     Inputs/Requirements:
     --------------------
     The intervention requires the following to be present in the simulation:
-    - TB disease module (sim.diseases.tb) with active TB states
+    - TB disease module (sim.diseases.tb_emod) with active TB states
     - Health seeking behavior intervention that sets the 'sought_care' flag
     - Person states: 'sought_care', 'tested', 'diagnosed', 'n_times_tested', 
       'test_result', 'care_seeking_multiplier', 'multiplier_applied'
@@ -109,14 +111,11 @@ class TBDiagnostic(ss.Intervention):
         initializes temporary storage for result tracking. The intervention is ready
         to be added to a simulation after initialization.
         
-        Parameters
-        ----------
-        pars : dict, optional
-            Dictionary of parameters to override defaults.
-            Valid keys: 'coverage', 'sensitivity', 'specificity',
-            'reset_flag', 'care_seeking_multiplier'.
-        **kwargs
-            Additional keyword arguments passed to parent class.
+        Args:
+            pars (dict, optional): Dictionary of parameters to override defaults.
+                Valid keys: 'coverage', 'sensitivity', 'specificity',
+                'reset_flag', 'care_seeking_multiplier'.
+            **kwargs: Additional keyword arguments passed to parent class.
         
         Default Parameters:
         -------------------
@@ -155,7 +154,7 @@ class TBDiagnostic(ss.Intervention):
         # Temporary state for update_results
         self.tested_this_step = []
         self.test_result_this_step = []
-
+        return
 
     def step(self):
         """
@@ -209,7 +208,7 @@ class TBDiagnostic(ss.Intervention):
         """
         sim = self.sim
         ppl = sim.people
-        tb = sim.diseases.tb
+        tb = sim.diseases.tb_emod
 
         # Find people who sought care but haven't been tested
         # eligible = ppl.sought_care & (~ppl.tested) & ppl.alive
@@ -293,8 +292,7 @@ class TBDiagnostic(ss.Intervention):
         # Store for update_results
         self.tested_this_step = selected
         self.test_result_this_step = test_positive
-
-
+        return
 
     def init_results(self):
         """
@@ -332,7 +330,7 @@ class TBDiagnostic(ss.Intervention):
             ss.Result('cum_test_positive', dtype=int),
             ss.Result('cum_test_negative', dtype=int),
         )
-
+        return
 
     def update_results(self):
         """
@@ -390,6 +388,7 @@ class TBDiagnostic(ss.Intervention):
         # Reset temporary storage for next timestep
         self.tested_this_step = []
         self.test_result_this_step = []
+        return
 
 
 class EnhancedTBDiagnostic(ss.Intervention):
@@ -406,8 +405,9 @@ class EnhancedTBDiagnostic(ss.Intervention):
     """
     
     def __init__(self, pars=None, **kwargs):
+        """Initialize with age/HIV-stratified sensitivity and specificity for multiple diagnostic methods."""
         super().__init__(**kwargs)
-        
+
         # Define comprehensive parameters combining both approaches
         self.define_pars(
             # Coverage and basic parameters (from tb_diagnostic.py)
@@ -463,6 +463,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         self.tested_this_step = []
         self.test_result_this_step = []
         self.diagnostic_method_used = []  # Track which diagnostic was used
+        return
 
     def _get_diagnostic_parameters(self, uid, age, tb_state, hiv_state=None):
         """
@@ -535,7 +536,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
     @staticmethod
     def p_test_positive(self, sim, uids):
         """ Calculate per-individual probability of a positive test result. """
-        tb = sim.diseases.tb
+        tb = sim.diseases.tb_emod
         ppl = sim.people
         tb_states = tb.state[uids]
         ages = ppl.age[uids]
@@ -558,9 +559,10 @@ class EnhancedTBDiagnostic(ss.Intervention):
         return p
 
     def step(self):
+        """Test care-seekers using the appropriate diagnostic method and record results."""
         sim = self.sim
         ppl = sim.people
-        tb = sim.diseases.tb
+        tb = sim.diseases.tb_emod
 
         # Find people who sought care but haven't been diagnosed
         eligible = ppl.sought_care & (~ppl.diagnosed) & ppl.alive
@@ -633,8 +635,10 @@ class EnhancedTBDiagnostic(ss.Intervention):
         self.tested_this_step = selected
         self.test_result_this_step = test_positive
         self.diagnostic_method_used = diagnostic_methods
+        return
 
     def init_results(self):
+        """Define result channels for test counts by outcome and diagnostic method."""
         super().init_results()
         self.define_results(
             ss.Result('n_tested', dtype=int),
@@ -647,8 +651,10 @@ class EnhancedTBDiagnostic(ss.Intervention):
             ss.Result('n_fujilam', dtype=int),
             ss.Result('n_cadcxr', dtype=int),
         )
+        return
 
     def update_results(self):
+        """Record per-step and cumulative test counts by outcome and method."""
         # Per-step counts
         n_tested = len(self.tested_this_step)
         n_pos = np.count_nonzero(self.test_result_this_step)
@@ -683,6 +689,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         self.tested_this_step = []
         self.test_result_this_step = []
         self.diagnostic_method_used = []
+        return
 
 
 # Example usage function
@@ -729,7 +736,7 @@ if __name__ == '__main__':
     # Example simulation with enhanced diagnostic
     sim = ss.Sim(
         people=ss.People(n_agents=1000, extra_states=tbsim.get_extrastates()),
-        diseases=tbsim.TB({'init_prev': ss.bernoulli(0.25)}),
+        diseases=tbsim.TB_EMOD({'init_prev': ss.bernoulli(0.25)}),
         interventions=[
             tbsim.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.25)}),
             EnhancedTBDiagnostic(pars={

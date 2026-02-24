@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tbsim"
+dynamic = ["version"]
+description = "TBsim, an agent-based TB model implemented using the Starsim framework"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+keywords = ["agent-based model", "simulation", "disease", "epidemiology"]
+
+authors = [
+  { name = "Minerva Enriquez", email = "info@starsim.org" },
+  { name = "Daniel Klein" },
+  { name = "Cliff Kerr" },
+  { name = "Ryan Hull" },
+  { name = "Mike Famulare" },
+  { name = "Deven Gokhale" },
+  { name = "Stewart Chang" },
+]
+
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Development Status :: 3 - Alpha",
+]
+
+dependencies = [
+  "numpy",
+  "scipy",
+  "pandas>=2.0.0",
+  "sciris>=3.1.0",
+  "lifelines",
+  "networkx",
+  "matplotlib",
+  "seaborn",
+  "plotly",
+  "starsim>=3.1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "pytest-cov",
+  "pytest-env",
+  "pytest-xdist",
+  "jupyter",
+  "mkdocs",
+  "mkdocs-material",
+  "mkdocstrings[python]",
+  "mkdocs-include-markdown-plugin",
+  "mkdocs-jupyter",
+]
+
+[project.urls]
+"Website" = "https://starsim.org/tbsim"
+"Source" = "https://github.com/starsimhub/tbsim/"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tbsim*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "tbsim.version.__version__" }

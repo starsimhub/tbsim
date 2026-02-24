@@ -14,7 +14,7 @@ def make_tb(pars = None):
             beta = ss.per(0.1),
             init_prev = ss.bernoulli(p=0.25),
             )
-    return tbsim.TB(pars=pars)
+    return tbsim.TB_EMOD(pars=pars)
 
 
 def make_pop(pars = None, n_agents=500):

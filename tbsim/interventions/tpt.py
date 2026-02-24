@@ -224,6 +224,7 @@ class TPTProduct(ss.Product):
             ss.FloatArr('ti_protection_expires'),
             ss.FloatArr('tpt_activation_modifier_applied'),
         )
+        return
 
     def _active_tb_mask(self, uids):
         """Return boolean mask for *uids* currently in an active TB state."""
@@ -308,6 +309,9 @@ class TPTProduct(ss.Product):
         if len(protected):
             tb = self.sim.diseases[self.pars.disease]
             tb.rr_activation[protected] *= self.tpt_activation_modifier_applied[protected]
+            tb.rr_clearance[protected] *= self.tpt_clearance_modifier_applied[protected]
+            tb.rr_death[protected] *= self.tpt_death_modifier_applied[protected]
+        return
 
     @property
     def n_protected(self):
@@ -521,6 +525,8 @@ class TPTHousehold(TPTDelivery):
         self.define_states(
             ss.BoolArr('prev_on_treatment', default=False),
         )
+        self.hh_net = None
+        return
 
         self._hh_net         = None
         self._hh_index: dict | None = None
@@ -571,6 +577,9 @@ class TPTHousehold(TPTDelivery):
         self._maybe_rebuild_hh_index()
 
         tb = self.sim.diseases[self.product.pars.disease]
+        if self.hh_net is None:
+            self.hh_net = self.find_household_net()
+        hh_net = self.hh_net
 
         newly_on_treatment = (tb.on_treatment & ~self.prev_on_treatment).uids
         self.prev_on_treatment[:] = tb.on_treatment
@@ -615,3 +624,13 @@ class TPTHousehold(TPTDelivery):
         if len(started):
             self.tpt_initiated[started] = True
             self.ti_initiated[started]  = self.ti
+    def update_results(self):
+        """Record number of currently protected individuals."""
+        super().update_results()
+        self.results['n_protected'][self.ti] = np.count_nonzero(self.product.tpt_protected)
+        return
+
+    def shrink(self):
+        """ Delete link to household net """
+        self.hh_net = None
+        return

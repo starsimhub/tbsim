@@ -34,12 +34,28 @@ class Malnutrition(ss.Disease):
         weight_percentile (float): Weight percentile (0-1), evolves over time
         micro (float): Micronutrient status z-score, evolves over time
 
+    Example
+    -------
+    ::
+
+        import starsim as ss
+        import tbsim
+        from tbsim.comorbidities.malnutrition import Malnutrition, TB_Nutrition_Connector
+
+        tb   = tbsim.TB_LSHTM(name='tb')
+        mn   = Malnutrition(name='malnutrition')
+        conn = TB_Nutrition_Connector()
+        sim  = ss.Sim(diseases=[tb, mn], connectors=conn,
+                      pars=dict(start='2000', stop='2020'))
+        sim.run()
+
     **References:**
         - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10876842/
         - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9971264/
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Initialize with default malnutrition parameters; override via ``pars``."""
         super().__init__(**kwargs)
         self.define_pars(
             beta = 1.0,         # Transmission rate  - TODO: Check if there is one
@@ -58,6 +74,8 @@ class Malnutrition(ss.Disease):
             ss.FloatArr('micro', default=ss.uniform(0.0, 1.0)),
         )
         self.dweight = ss.normal(loc=0, scale=self.dweight_scale)
+
+        return
 
     @staticmethod
     def dweight_scale(self, sim, uids):
@@ -122,6 +140,8 @@ class Malnutrition(ss.Disease):
         self.weight_percentile[uids] += self.dweight(uids)
         self.weight_percentile[uids] = np.clip(self.weight_percentile[uids], 0.025, 0.975)
 
+        return
+
     def init_results(self):
         """Initialize results tracking."""
         super().init_results()
@@ -136,6 +156,8 @@ class Malnutrition(ss.Disease):
         alive = self.sim.people.alive
         n_agents = self.sim.pars['n_agents']
         self.results.people_alive[ti] = np.count_nonzero(alive)/n_agents
+
+        return
 
 
 class TB_Nutrition_Connector(ss.Connector):
@@ -154,6 +176,7 @@ class TB_Nutrition_Connector(ss.Connector):
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Initialize with pluggable risk-ratio and relative-susceptibility functions."""
         super().__init__(label='TB-Malnutrition')
         self.define_pars(
             rr_activation_func = self.ones_rr,
@@ -161,6 +184,8 @@ class TB_Nutrition_Connector(ss.Connector):
             relsus_func = self.compute_relsus,
         )
         self.update_pars(pars, **kwargs)
+
+        return
 
     @staticmethod
     def supplementation_rr(tb, mn, uids, rate_ratio=0.5):
@@ -192,7 +217,7 @@ class TB_Nutrition_Connector(ss.Connector):
 
     def step(self):
         """Apply nutritional effects to TB transition rates each time step."""
-        tb = self.sim.diseases['tb']
+        tb = self.sim.diseases['tb_emod']
         mn = self.sim.diseases['malnutrition']
 
         uids = tb.infected.uids
@@ -201,3 +226,5 @@ class TB_Nutrition_Connector(ss.Connector):
 
         uids = (~tb.infected).uids
         tb.rel_sus[uids] = self.pars.relsus_func(tb, mn, uids)
+
+        return

@@ -1,11 +1,12 @@
+"""Plotting utilities for visualizing TB simulation results"""
+
 import os
-import numpy as np
-import matplotlib.pyplot as plt
-import sciris as sc
-from typing import Dict, List, Tuple
-import starsim as ss
-import datetime
 import sys
+import datetime
+import numpy as np
+import sciris as sc
+import matplotlib.pyplot as plt
+import starsim as ss
 
 
 def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
@@ -192,10 +193,12 @@ def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
         print(f"Saved figure to {out}")
     plt.show()
 
+    return
+
 
 def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
                  dark=True, cmap='plasma', heightfold=2, 
-                 style='default', savefig=True, outdir=None, plot_type='line',
+                 style='default', savefig=False, outdir=None, plot_type='line',
                  marker_styles=None, alpha=0.85, grid_alpha=0.4, title_fontsize=10, legend_fontsize=7, 
                  line_width=0.3, marker_size=2, markeredgewidth=0.2, grid_linewidth=0.5, 
                  spine_linewidth=0.5, label_fontsize=6, tick_fontsize=6, filter=None, title='',
@@ -220,7 +223,7 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
         cmap (str, optional): Name of a matplotlib colormap (e.g., 'viridis', 'tab10', 'plasma'). Default is 'plasma'.
         heightfold (int, optional): Height multiplier per row of subplots. Default is 3.
         style (str, optional): Matplotlib style to apply. Defaults to 'default'. Falls back to 'default' if not found.
-        savefig (bool, optional): If True (default), saves the figure as a PNG file with a timestamped filename.
+        savefig (bool, optional): If True, saves the figure as a PNG file with a timestamped filename.
         outdir (str, optional): Directory to save the figure. If None, saves in the current script's directory under 'results'.
         plot_type (str, optional): Type of plot to use for each metric ('line' or 'scatter'). Default is 'line'.
         marker_styles (list[str], optional): List of marker styles for scatter plots. Defaults to a preset list.
@@ -282,30 +285,6 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
         'TPT': <results>,
         ...
     }
-    
-    cmap:
-    ---------------
-    'Accent', 'Accent_r', 'Blues', 'Blues_r', 'BrBG', 'BrBG_r', 'BuGn', 'BuGn_r', 'BuPu', 'BuPu_r',
-    'CMRmap', 'CMRmap_r', 'Dark2', 'Dark2_r', 'GnBu', 'GnBu_r', 'Grays', 'Grays_r', 'Greens', 'Greens_r',
-    'Greys', 'Greys_r', 'OrRd', 'OrRd_r', 'Oranges', 'Oranges_r', 'PRGn', 'PRGn_r', 'Paired', 'Paired_r',
-    'Pastel1', 'Pastel1_r', 'Pastel2', 'Pastel2_r', 'PiYG', 'PiYG_r', 'PuBu', 'PuBuGn', 'PuBuGn_r', 'PuBu_r',
-    'PuOr', 'PuOr_r', 'PuRd', 'PuRd_r', 'Purples', 'Purples_r', 'RdBu', 'RdBu_r', 'RdGy', 'RdGy_r',
-    'RdPu', 'RdPu_r', 'RdYlBu', 'RdYlBu_r', 'RdYlGn', 'RdYlGn_r', 'Reds', 'Reds_r', 'Set1', 'Set1_r',
-    'Set2', 'Set2_r', 'Set3', 'Set3_r', 'Spectral', 'Spectral_r', 'Wistia', 'Wistia_r', 'YlGn', 'YlGnBu',
-    'YlGnBu_r', 'YlGn_r', 'YlOrBr', 'YlOrBr_r', 'YlOrRd', 'YlOrRd_r', 'afmhot', 'afmhot_r', 'alpine', 'autumn',
-    'autumn_r', 'banded', 'berlin', 'berlin_r', 'bi', 'binary', 'binary_r', 'bone', 'bone_r', 'brg',
-    'brg_r', 'bwr', 'bwr_r', 'cividis', 'cividis_r', 'cool', 'cool_r', 'coolwarm', 'coolwarm_r', 'copper',
-    'copper_r', 'crest', 'crest_r', 'cubehelix', 'cubehelix_r', 'flag', 'flag_r', 'flare', 'flare_r', 'gist_earth',
-    'gist_earth_r', 'gist_gray', 'gist_gray_r', 'gist_grey', 'gist_grey_r', 'gist_heat', 'gist_heat_r', 'gist_ncar', 'gist_ncar_r', 'gist_rainbow',
-    'gist_rainbow_r', 'gist_stern', 'gist_stern_r', 'gist_yarg', 'gist_yarg_r', 'gist_yerg', 'gist_yerg_r', 'gnuplot', 'gnuplot2', 'gnuplot2_r',
-    'gnuplot_r', 'gray', 'gray_r', 'grey', 'grey_r', 'hot', 'hot_r', 'hsv', 'hsv_r', 'icefire',
-    'icefire_r', 'inferno', 'inferno_r', 'jet', 'jet_r', 'magma', 'magma_r', 'mako', 'mako_r', 'managua',
-    'managua_r', 'nipy_spectral', 'nipy_spectral_r', 'ocean', 'ocean_r', 'orangeblue', 'parula', 'pink', 'pink_r', 'plasma',
-    'plasma_r', 'prism', 'prism_r', 'rainbow', 'rainbow_r', 'rocket', 'rocket_r', 'sciris-alpine', 'sciris-banded', 'sciris-bi',
-    'sciris-orangeblue', 'sciris-parula', 'sciris-turbo', 'seismic', 'seismic_r', 'spring', 'spring_r', 'summer', 'summer_r', 'tab10',
-    'tab10_r', 'tab20', 'tab20_r', 'tab20b', 'tab20b_r', 'tab20c', 'tab20c_r', 'terrain', 'terrain_r', 'turbo',
-    'turbo_r', 'twilight', 'twilight_r', 'twilight_shifted', 'twilight_shifted_r', 'vanimo', 'vanimo_r', 'viridis', 'viridis_r', 'vlag',
-    'vlag_r', 'winter', 'winter_r'
 
     """
 
@@ -452,24 +431,27 @@ def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
         fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
         print(f"Saved figure to {out}")
     plt.show()
-    
+
+    return
+
 
 def out_to(outdir):
-           # save figure
-        timestamp = sc.now(dateformat='%Y%m%d_%H%M%S') 
-        # Determine script directory in a cross-platform way
-        if hasattr(sys.modules['__main__'], '__file__'):
-            script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
-        else:
-            script_dir = os.getcwd()
+    """Return a timestamped output file path inside ``outdir``, creating the directory if needed."""
+    timestamp = sc.now(dateformat='%Y%m%d_%H%M%S') 
+    # Determine script directory in a cross-platform way
+    if hasattr(sys.modules['__main__'], '__file__'):
+        script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
+    else:
+        script_dir = os.getcwd()
 
-        outdir = 'results' if outdir is None else outdir
-        outdir = os.path.join(script_dir, outdir)
-        os.makedirs(outdir, exist_ok=True)   
-        out = os.path.join(outdir, f'scenarios_{timestamp}.png')
-        return out
+    outdir = 'results' if outdir is None else outdir
+    outdir = os.path.join(script_dir, outdir)
+    os.makedirs(outdir, exist_ok=True)   
+    out = os.path.join(outdir, f'scenarios_{timestamp}.png')
+    return out
     
-class FILTERS(): 
+class FILTERS():
+    """Predefined metric-name filters for use with ``plot_results``."""
     important_metrics = [
         'tb_prevalence_active',
         'tb_prevalence', 

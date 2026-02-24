@@ -5,48 +5,11 @@ This module contains all intervention classes for the TB simulation.
 """
 
 # Import all intervention classes
-from .interventions import TBProductRoutine
+from .interventions import *
 from .beta import *
-from .tpt import (
-    RegimenCategory,
-    TPTRegimen,
-    REGIMENS,
-    TPTProduct,
-    TPTDelivery,
-    TPTRoutine,
-    TPTHousehold,
-)
-from .bcg import BCGVx, BCGRoutine
-from .tb_treatment import TBTreatment, EnhancedTBTreatment, create_dots_treatment, create_dots_improved_treatment, create_first_line_treatment
-from .tb_drug_types import TBDrugType, TBDrugParameters, TBDrugTypeParameters, get_dots_parameters, get_drug_parameters, get_all_drug_parameters
-from .tb_health_seeking import HealthSeekingBehavior
-from .tb_diagnostic import TBDiagnostic, EnhancedTBDiagnostic
-
-# Export all classes
-__all__ = [
-    'TBProductRoutine',
-    'BetaByYear',
-    'RegimenCategory',
-    'TPTRegimen',
-    'REGIMENS',
-    'TPTProduct',
-    'TPTDelivery',
-    'TPTRoutine',
-    'TPTHousehold',
-    'BCGVx',
-    'BCGRoutine',
-    'TBTreatment',
-    'EnhancedTBTreatment',
-    'TBDrugType',
-    'TBDrugParameters',
-    'TBDrugTypeParameters',
-    'create_dots_treatment',
-    'create_dots_improved_treatment',
-    'create_first_line_treatment',
-    'get_dots_parameters',
-    'get_drug_parameters',
-    'get_all_drug_parameters',
-    'HealthSeekingBehavior',
-    'TBDiagnostic',
-    'EnhancedTBDiagnostic',
-]
+from .tpt import *
+from .bcg import *
+from .tb_treatment import *
+from .tb_drug_types import *
+from .tb_health_seeking import *
+from .tb_diagnostic import *

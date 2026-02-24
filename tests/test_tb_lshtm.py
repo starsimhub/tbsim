@@ -46,23 +46,21 @@ def test_transition_empty_uids():
 
 
 def test_transition_sets_valid_states():
-    """transition sets state_next to one of the destination keys for transitioning agents."""
+    """transition applies valid destination states immediately."""
     sim = make_lshtm_sim(n_agents=500)
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids(np.arange(500))
-    tb.state[uids] = TBSL.INFECTION  # put them in INFECTION so transition makes sense
-    tb.ti_next[uids] = np.inf  # not yet scheduled
+    tb.state[uids] = TBSL.INFECTION
     keys = [TBSL.CLEARED, TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC]
     tb.transition(uids, to={
         TBSL.CLEARED: tb.pars.inf_cle,
         TBSL.NON_INFECTIOUS: tb.pars.inf_non,
         TBSL.ASYMPTOMATIC: tb.pars.inf_asy,
     }, rng=tb._rng_inf)
-    # Some agents should have transitioned (with 500 agents, very likely)
-    transitioned = uids[tb.ti_next[uids] == tb.ti]
+    # Some agents should have changed state
+    transitioned = uids[np.isin(tb.state[uids], keys)]
     assert len(transitioned) > 0, "With 500 agents and typical rates, some should transition"
-    assert np.all(np.isin(tb.state_next[transitioned], keys))
 
 
 # --- set_prognoses ---
@@ -81,8 +79,6 @@ def test_set_prognoses_sets_state_and_susceptible():
     assert tb.infected[uids].all()
     assert tb.ever_infected[uids].all()
     assert np.all(tb.ti_infected[uids] == tb.ti)
-    # No transition scheduling — step() evaluates per dt
-    assert np.all(tb.ti_next[uids] == np.inf)
 
 
 def test_set_prognoses_empty_uids():
@@ -110,7 +106,6 @@ def test_step_die():
     assert not tb.infected[uids].any()
     assert (tb.rel_trans[uids] == 0).all()
     assert np.all(tb.state[uids] == TBSL.DEAD)
-    assert np.all(tb.ti_next[uids] == np.inf)
 
 
 def test_step_die_empty_uids():
@@ -124,21 +119,20 @@ def test_step_die_empty_uids():
 # --- start_treatment ---
 
 def test_start_treatment_latent_cleared():
-    """start_treatment on INFECTION (latent) schedules CLEARED."""
+    """start_treatment on INFECTION (latent) sets state to CLEARED immediately."""
     sim = make_lshtm_sim(n_agents=50)
     sim.init()
     tb = sim.diseases[0]
     uids = ss.uids([1, 2, 3])
     tb.state[uids] = TBSL.INFECTION
-    tb.state_next[uids] = TBSL.NON_INFECTIOUS  # would have transitioned later
-    tb.ti_next[uids] = tb.ti + 10
     tb.start_treatment(uids)
-    assert np.all(tb.state_next[uids] == TBSL.CLEARED)
-    assert np.all(tb.ti_next[uids] == tb.ti)
+    assert np.all(tb.state[uids] == TBSL.CLEARED)
+    assert not tb.infected[uids].any()
+    assert tb.susceptible[uids].all()
 
 
 def test_start_treatment_active_to_treatment():
-    """start_treatment on NON_INFECTIOUS/ASYMPTOMATIC/SYMPTOMATIC schedules TREATMENT."""
+    """start_treatment on NON_INFECTIOUS/ASYMPTOMATIC/SYMPTOMATIC sets state to TREATMENT."""
     sim = make_lshtm_sim(n_agents=50)
     sim.init()
     tb = sim.diseases[0]
@@ -146,8 +140,8 @@ def test_start_treatment_active_to_treatment():
         uids = ss.uids([0])
         tb.state[uids] = state
         tb.start_treatment(uids)
-        assert np.all(tb.state_next[uids] == TBSL.TREATMENT)
-        assert np.all(tb.ti_next[uids] == tb.ti)
+        assert np.all(tb.state[uids] == TBSL.TREATMENT)
+        assert tb.on_treatment[uids].all()
 
 
 def test_start_treatment_empty_uids():
@@ -159,17 +153,15 @@ def test_start_treatment_empty_uids():
 
 
 def test_start_treatment_acute_latent_cleared():
-    """TB_LSHTM_Acute: start_treatment on ACUTE or INFECTION schedules CLEARED."""
+    """TB_LSHTM_Acute: start_treatment on ACUTE or INFECTION sets state to CLEARED."""
     sim = make_lshtm_sim(n_agents=20, use_acute=True)
     sim.init()
     tb = sim.diseases[0]
-    uids_acute = ss.uids([0])
-    uids_inf = ss.uids([1])
-    tb.state[uids_acute] = TBSL.ACUTE
-    tb.state[uids_inf] = TBSL.INFECTION
+    tb.state[ss.uids([0])] = TBSL.ACUTE
+    tb.state[ss.uids([1])] = TBSL.INFECTION
     tb.start_treatment(ss.uids([0, 1]))
-    assert tb.state_next[0] == TBSL.CLEARED
-    assert tb.state_next[1] == TBSL.CLEARED
+    assert tb.state[0] == TBSL.CLEARED
+    assert tb.state[1] == TBSL.CLEARED
 
 
 # --- Sim run and results ---
@@ -191,7 +183,6 @@ def test_sim_run_tb_lshtm():
     assert "new_deaths" in tb.results
     assert "cum_active" in tb.results
     assert len(tb.results["timevec"]) > 0
-    # At least one time point should have some infectious or some prevalence
     assert np.any(tb.results["n_infectious"][:] >= 0)
     assert np.any(np.isfinite(tb.results["prevalence_active"][:]))
 
@@ -262,11 +253,9 @@ def test_state_counts_sum_to_population():
     sim = make_lshtm_sim(n_agents=150, start=ss.date("2000-01-01"), stop=ss.date("2003-12-31"))
     sim.run()
     tb = sim.diseases[0]
-    # At final ti, sum of n_* must equal current population (deaths may have removed agents)
     n_now = len(tb.sim.people)
     total_final = sum(tb.results[f"n_{state.name}"][-1] for state in TBSL)
     assert total_final == n_now, f"At final ti state counts sum to {total_final}, expected {n_now}"
-    # At first ti, sum should equal initial population
     total_first = sum(tb.results[f"n_{state.name}"][0] for state in TBSL)
     assert total_first == 150, f"At ti=0 state counts sum to {total_first}, expected 150"
 
@@ -277,9 +266,7 @@ def test_n_infectious_matches_infectious_states():
     sim.run()
     tb = sim.diseases[0]
     for ti in range(len(tb.results["timevec"])):
-        # We can't replay state at ti, but we can check the last step
         pass
-    # After run, do one update_results at final ti and check
     ti = tb.ti
     expected = np.count_nonzero(
         (tb.state == TBSL.ASYMPTOMATIC) | (tb.state == TBSL.SYMPTOMATIC)
@@ -289,7 +276,7 @@ def test_n_infectious_matches_infectious_states():
 
 
 def test_prevalence_active_in_valid_range():
-    """prevalence_active is in [0, 1] when finite (implementation divides by alive count)."""
+    """prevalence_active is in [0, 1] when finite."""
     sim = make_lshtm_sim(n_agents=200, start=ss.date("2000-01-01"), stop=ss.date("2005-12-31"))
     sim.run()
     tb = sim.diseases[0]
@@ -338,7 +325,7 @@ def test_susceptible_only_cleared_recovered_treated_or_never_infected():
 
 
 def test_rel_sus_rel_trans_after_step():
-    """After step, RECOVERED have rel_sus=rr_rec (π pi), TREATED rel_sus=rr_treat (ρ rho), ASYMPTOMATIC rel_trans=trans_asymp (κ kappa)."""
+    """After step, RECOVERED have rel_sus=rr_rec, TREATED rel_sus=rr_treat, ASYMPTOMATIC rel_trans=trans_asymp."""
     sim = make_lshtm_sim(n_agents=60)
     sim.init()
     tb = sim.diseases[0]
@@ -361,25 +348,13 @@ def test_start_treatment_mixed_latent_active_ignores_cleared():
     sim = make_lshtm_sim(n_agents=50)
     sim.init()
     tb = sim.diseases[0]
-    u_inf = ss.uids([0])
-    u_sym = ss.uids([1])
-    u_clr = ss.uids([2])
-    tb.state[u_inf] = TBSL.INFECTION
-    tb.state[u_sym] = TBSL.SYMPTOMATIC
-    tb.state[u_clr] = TBSL.CLEARED
-    tb.state_next[u_inf] = TBSL.NON_INFECTIOUS
-    tb.state_next[u_sym] = TBSL.DEAD
-    tb.ti_next[u_inf] = tb.ti + 5
-    tb.ti_next[u_sym] = tb.ti + 5
-    tb.state_next[u_clr] = TBSL.CLEARED
-    tb.ti_next[u_clr] = np.inf
-    all_u = ss.uids([0, 1, 2])
-    tb.start_treatment(all_u)
-    assert tb.state_next[0] == TBSL.CLEARED and tb.ti_next[0] == tb.ti
-    assert tb.state_next[1] == TBSL.TREATMENT and tb.ti_next[1] == tb.ti
-    # CLEARED stays CLEARED, ti_next unchanged (still inf)
-    assert tb.state_next[2] == TBSL.CLEARED
-    assert tb.ti_next[2] == np.inf
+    tb.state[ss.uids([0])] = TBSL.INFECTION
+    tb.state[ss.uids([1])] = TBSL.SYMPTOMATIC
+    tb.state[ss.uids([2])] = TBSL.CLEARED
+    tb.start_treatment(ss.uids([0, 1, 2]))
+    assert tb.state[0] == TBSL.CLEARED  # INFECTION → CLEARED
+    assert tb.state[1] == TBSL.TREATMENT  # SYMPTOMATIC → TREATMENT
+    assert tb.state[2] == TBSL.CLEARED  # CLEARED stays CLEARED (not affected)
 
 
 def test_transition_single_destination():
@@ -389,11 +364,9 @@ def test_transition_single_destination():
     tb = sim.diseases[0]
     uids = ss.uids(np.arange(200))
     tb.state[uids] = TBSL.INFECTION
-    tb.ti_next[uids] = np.inf
     tb.transition(uids, to={TBSL.CLEARED: tb.pars.inf_cle}, rng=tb._rng_inf)
-    transitioned = uids[tb.ti_next[uids] == tb.ti]
+    transitioned = uids[tb.state[uids] == TBSL.CLEARED]
     assert len(transitioned) > 0, "With 200 agents, some should transition"
-    assert np.all(tb.state_next[transitioned] == TBSL.CLEARED)
 
 
 def test_step_all_susceptible_no_infection_leaves_state_unchanged():
@@ -417,8 +390,6 @@ def test_set_prognoses_acute_enters_acute_not_infection():
     tb.infected[uids] = False
     tb.set_prognoses(uids)
     assert np.all(tb.state[uids] == TBSL.ACUTE)
-    # No transition scheduling — step() evaluates per dt
-    assert np.all(tb.ti_next[uids] == np.inf)
 
 
 def test_rr_activation_zero_prevents_progression_to_active():
@@ -428,19 +399,16 @@ def test_rr_activation_zero_prevents_progression_to_active():
     tb = sim.diseases[0]
     uids = ss.uids(np.arange(200))
     tb.state[uids] = TBSL.INFECTION
-    tb.ti_next[uids] = np.inf
     tb.rr_activation[uids] = 0
-    # Call transition directly with rr_activation=0 rates
     tb.transition(uids, to={
         TBSL.CLEARED:        tb.pars.inf_cle,
         TBSL.NON_INFECTIOUS: tb.pars.inf_non * tb.rr_activation[uids],
         TBSL.ASYMPTOMATIC:   tb.pars.inf_asy * tb.rr_activation[uids],
     }, rng=tb._rng_inf)
-    # Some agents should have transitioned
-    transitioned = uids[tb.ti_next[uids] == tb.ti]
+    transitioned = uids[tb.state[uids] != TBSL.INFECTION]
     assert len(transitioned) > 0, "With 200 agents, some should transition"
     # All transitioners should go to CLEARED (not NON_INFECTIOUS or ASYMPTOMATIC)
-    assert np.all(tb.state_next[transitioned] == TBSL.CLEARED)
+    assert np.all(tb.state[transitioned] == TBSL.CLEARED)
 
 
 def test_zero_beta_no_initial_infection_no_transmission():
@@ -450,7 +418,7 @@ def test_zero_beta_no_initial_infection_no_transmission():
         start=ss.date("2000-01-01"),
         stop=ss.date("2001-12-31"),
         pars={
-            "init_prev": ss.bernoulli(0.0),  # no initial cases
+            "init_prev": ss.bernoulli(0.0),
             "beta": ss.peryear(0.0),
         },
     )
@@ -471,21 +439,9 @@ def test_detectable_15_plus_bounds():
         n_sym_15 = tb.results["n_SYMPTOMATIC_15+"][ti]
         n_asy_15 = tb.results["n_ASYMPTOMATIC_15+"][ti]
         detectable = tb.results["n_detectable_15+"][ti]
-        # With cxr_asymp_sens=1: detectable = sym_15 + asy_15 (integer). With sens<1 it could be less.
         assert 0 <= detectable <= n_sym_15 + n_asy_15 + 1e-6, (
             f"n_detectable_15+ at ti={ti} should be between 0 and sym+asy 15+"
         )
-
-
-def test_ti_next_inf_for_cleared_recovered_treated():
-    """After step, CLEARED, RECOVERED, TREATED have ti_next=inf (no scheduled transition)."""
-    sim = make_lshtm_sim(n_agents=100, start=ss.date("2000-01-01"), stop=ss.date("2003-12-31"))
-    sim.run()
-    tb = sim.diseases[0]
-    for state in [TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED]:
-        u = ss.uids(tb.state == state)
-        if len(u) > 0:
-            assert np.all(tb.ti_next[u] == np.inf), f"Agents in {state.name} should have ti_next=inf"
 
 
 def test_on_treatment_consistent_with_state():
@@ -506,8 +462,8 @@ def test_dt_change(do_plot=False):
         n_agents=10_000,
         start=ss.date("2000-01-01"),
         stop=ss.date("2002-01-01"),
-        pars=dict( # TB parameters
-            init_prev=0.5, # Much higher to get better statistics
+        pars=dict(
+            init_prev=0.5,
         ),
     )
     sims = sc.objdict()

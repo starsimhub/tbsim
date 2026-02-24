@@ -1,7 +1,9 @@
+"""TB treatment intervention for diagnosed individuals"""
+
 import numpy as np
 import starsim as ss
 from tbsim import TBS
-import matplotlib.ticker as mticker
+from .tb_drug_types import TBDrugType, TBDrugParameters, TBDrugTypeParameters
 
 __all__ = ['TBTreatment']
 
@@ -10,12 +12,16 @@ class TBTreatment(ss.Intervention):
     """
     Starts TB treatment for diagnosed individuals and applies treatment success/failure logic.
 
+    Requires ``HealthSeekingBehavior`` and ``TBDiagnostic`` to run upstream in the
+    same simulation; see ``tbsim_examples/run_tb_interventions.py`` for a full example.
+
     Parameters:
         treatment_success_rate (float or Dist): Probability of cure if treated.
         reseek_multiplier (float): Care-seeking multiplier applied after failure.
         reset_flags (bool): Whether to reset tested/diagnosed flags after failure.
     """
     def __init__(self, pars=None, **kwargs):
+        """Initialize with treatment success probability and failure-handling parameters."""
         super().__init__(**kwargs)
         self.define_pars(
             treatment_success_prob=0.85,
@@ -30,11 +36,13 @@ class TBTreatment(ss.Intervention):
         self.new_treated = []
         self.successes = []
         self.failures = []
+        return
 
     def step(self):
+        """Treat diagnosed active-TB individuals"""
         sim = self.sim
         ppl = sim.people
-        tb = sim.diseases.tb
+        tb = sim.diseases.tb_emod
 
         # Select individuals diagnosed with TB and alive
         diagnosed = ppl.diagnosed & ppl.alive
@@ -52,7 +60,7 @@ class TBTreatment(ss.Intervention):
         ppl.n_times_treated[tx_uids] += 1
         success_uids, failure_uids = self.dist_treatment_success.filter(tx_uids, both=True)
 
-        # Update success: instant clearance via TB logic
+        # Successful treatment clears infection immediately
         tb.state[success_uids] = TBS.NONE
         tb.on_treatment[success_uids] = False
         tb.susceptible[success_uids] = True
@@ -79,8 +87,10 @@ class TBTreatment(ss.Intervention):
         self.new_treated = tx_uids
         self.successes = success_uids
         self.failures = failure_uids
+        return
 
     def init_results(self):
+        """Define result channels for treatment counts and outcomes."""
         super().init_results()
         self.define_results(
             ss.Result('n_treated', dtype=int),
@@ -89,8 +99,10 @@ class TBTreatment(ss.Intervention):
             ss.Result('cum_treatment_success', dtype=int),
             ss.Result('cum_treatment_failure', dtype=int),
         )
+        return
 
     def update_results(self):
+        """Record per-step and cumulative treatment success/failure counts."""
         n_treated = len(self.new_treated)
         n_success = len(self.successes)
         n_failure = len(self.failures)
@@ -110,15 +122,10 @@ class TBTreatment(ss.Intervention):
         self.new_treated = []
         self.successes = []
         self.failures = []
+        return
 
 
-import numpy as np
-import starsim as ss
-from tbsim import TBS
-from .tb_drug_types import TBDrugType, TBDrugParameters, TBDrugTypeParameters
-from typing import Dict, Optional
-
-__all__ = ['EnhancedTBTreatment']
+__all__ += ['EnhancedTBTreatment']
 
 
 class EnhancedTBTreatment(ss.Intervention):
@@ -132,35 +139,23 @@ class EnhancedTBTreatment(ss.Intervention):
     - Managing post-treatment care-seeking behavior
     - Recording comprehensive treatment statistics
     
-    Parameters
-    ----------
-    drug_type : TBDrugType
-        The type of drug regimen to use for treatment. Options include:
-        - DOTS: Standard DOTS protocol
-        - DOTS_IMPROVED: Enhanced DOTS with better adherence
-        - FIRST_LINE_COMBO: First-line combination therapy
-    treatment_success_rate : float, default 0.85
-        Base treatment success rate (can be overridden by drug-specific parameters)
-    reseek_multiplier : float, default 2.0
-        Multiplier applied to care-seeking probability after treatment failure
-    reset_flags : bool, default True
-        Whether to reset diagnosis and testing flags after treatment failure
-        
-    Attributes
-    ----------
-    drug_parameters : TBDrugTypeParameters
-        Drug-specific parameters including cure rates and side effects
-    new_treated : list
-        List of UIDs of individuals who started treatment in the current timestep
-    successes : list
-        List of UIDs of individuals who successfully completed treatment
-    failures : list
-        List of UIDs of individuals who failed treatment
-    drug_type_assignments : dict
-        Mapping of individual UIDs to assigned drug types
-        
-    Examples
-    --------
+    Args:
+        drug_type (TBDrugType): The type of drug regimen to use for treatment. Options include:
+            - DOTS: Standard DOTS protocol
+            - DOTS_IMPROVED: Enhanced DOTS with better adherence
+            - FIRST_LINE_COMBO: First-line combination therapy
+        treatment_success_rate (float, default 0.85): Base treatment success rate (can be overridden by drug-specific parameters)
+        reseek_multiplier (float, default 2.0): Multiplier applied to care-seeking probability after treatment failure
+        reset_flags (bool, default True): Whether to reset diagnosis and testing flags after treatment failure
+
+    Attributes:
+        drug_parameters (TBDrugTypeParameters): Drug-specific parameters including cure rates and side effects
+        new_treated (list): List of UIDs of individuals who started treatment in the current timestep
+        successes (list): List of UIDs of individuals who successfully completed treatment
+        failures (list): List of UIDs of individuals who failed treatment
+        drug_type_assignments (dict): Mapping of individual UIDs to assigned drug types
+
+    Examples:
     Create a standard DOTS treatment intervention:
     
     >>> treatment = EnhancedTBTreatment(drug_type=TBDrugType.DOTS)
@@ -184,13 +179,10 @@ class EnhancedTBTreatment(ss.Intervention):
     def __init__(self, pars=None, **kwargs):
         """
         Initialize the enhanced TB treatment intervention.
-        
-        Parameters
-        ----------
-        pars : dict, optional
-            Dictionary of parameters to override defaults
-        **kwargs
-            Additional keyword arguments passed to parent class
+
+        Args:
+            pars (dict, optional): Dictionary of parameters to override defaults
+            **kwargs: Additional keyword arguments passed to parent class
         """
         super().__init__(**kwargs)
         
@@ -213,7 +205,8 @@ class EnhancedTBTreatment(ss.Intervention):
         self.successes = []
         self.failures = []
         self.drug_type_assignments = {}
-    
+        return
+
     def step(self):
         """
         Execute one timestep of enhanced TB treatment.
@@ -233,7 +226,7 @@ class EnhancedTBTreatment(ss.Intervention):
         """
         sim = self.sim
         ppl = sim.people
-        tb = sim.diseases.tb
+        tb = sim.diseases.tb_emod
         
         # Select individuals diagnosed with TB and alive
         diagnosed_uids = (ppl.diagnosed & ppl.alive).uids
@@ -255,8 +248,7 @@ class EnhancedTBTreatment(ss.Intervention):
         # Treatment outcomes based on drug-specific success probability
         success_uids, failure_uids = self.dist_treatment_success.filter(tx_uids, both=True)
         
-        # Update successful treatment outcomes
-        # Clear TB infection and restore susceptibility
+        # Successful treatment clears infection immediately
         tb.state[success_uids] = TBS.NONE
         tb.on_treatment[success_uids] = False
         tb.susceptible[success_uids] = True
@@ -285,7 +277,8 @@ class EnhancedTBTreatment(ss.Intervention):
         self.new_treated = tx_uids
         self.successes = success_uids
         self.failures = failure_uids
-    
+        return
+
     def init_results(self):
         """
         Initialize results tracking for the intervention.
@@ -308,7 +301,8 @@ class EnhancedTBTreatment(ss.Intervention):
             ss.Result('cum_treatment_failure', dtype=int),
             ss.Result('drug_type_used', dtype=str, scale=False),  # Don't scale string results
         )
-    
+        return
+
     def update_results(self):
         """
         Update results for the current timestep.
@@ -345,93 +339,76 @@ class EnhancedTBTreatment(ss.Intervention):
         self.new_treated = []
         self.successes = []
         self.failures = []
+        return
 
 
 # Convenience functions for common treatment configurations
 
-def create_dots_treatment(pars=None, **kwargs) -> EnhancedTBTreatment:
+def create_dots_treatment(pars=None, **kwargs):
     """
     Create a standard DOTS treatment intervention.
-    
+
     This function provides a convenient way to create a DOTS treatment
     intervention with standard parameters. DOTS (Directly Observed Treatment,
     Short-course) is the WHO-recommended strategy for TB control.
-    
-    Parameters
-    ----------
-    pars : dict, optional
-        Additional parameters to override defaults
-    **kwargs
-        Additional keyword arguments passed to EnhancedTBTreatment
-        
-    Returns
-    -------
-    EnhancedTBTreatment
-        Configured DOTS treatment intervention
-        
-    Examples
-    --------
-    >>> dots_treatment = create_dots_treatment()
-    >>> dots_treatment.pars.drug_type
-    TBDrugType.DOTS
+
+    Args:
+        pars (dict, optional): Additional parameters to override defaults
+        **kwargs: Additional keyword arguments passed to EnhancedTBTreatment
+
+    Returns:
+        EnhancedTBTreatment: Configured DOTS treatment intervention
+
+    Examples:
+        >>> dots_treatment = create_dots_treatment()
+        >>> dots_treatment.pars.drug_type
+        TBDrugType.DOTS
     """
     return EnhancedTBTreatment(pars={'drug_type': TBDrugType.DOTS, **(pars or {})}, **kwargs)
 
-def create_dots_improved_treatment(pars=None, **kwargs) -> EnhancedTBTreatment:
+def create_dots_improved_treatment(pars=None, **kwargs):
     """
     Create an improved DOTS treatment intervention.
-    
+
     This function creates a DOTS treatment intervention with enhanced
     parameters that may include better adherence monitoring, improved
     drug formulations, or enhanced patient support systems.
-    
-    Parameters
-    ----------
-    pars : dict, optional
-        Additional parameters to override defaults
-    **kwargs
-        Additional keyword arguments passed to EnhancedTBTreatment
-        
-    Returns
-    -------
-    EnhancedTBTreatment
-        Configured improved DOTS treatment intervention
-        
-    Examples
-    --------
-    >>> improved_dots = create_dots_improved_treatment(
-    ...     reseek_multiplier=2.5,
-    ...     reset_flags=False
-    ... )
+
+    Args:
+        pars (dict, optional): Additional parameters to override defaults
+        **kwargs: Additional keyword arguments passed to EnhancedTBTreatment
+
+    Returns:
+        EnhancedTBTreatment: Configured improved DOTS treatment intervention
+
+    Examples:
+        >>> improved_dots = create_dots_improved_treatment(
+        ...     reseek_multiplier=2.5,
+        ...     reset_flags=False
+        ... )
     """
     return EnhancedTBTreatment(pars={'drug_type': TBDrugType.DOTS_IMPROVED, **(pars or {})}, **kwargs)
 
-def create_first_line_treatment(pars=None, **kwargs) -> EnhancedTBTreatment:
+def create_first_line_treatment(pars=None, **kwargs):
     """
     Create a first-line combination treatment intervention.
-    
+
     This function creates a treatment intervention using first-line
     combination therapy, which typically includes multiple drugs
     to prevent resistance development and improve treatment outcomes.
-    
-    Parameters
-    ----------
-    pars : dict, optional
-        Additional parameters to override defaults
-    **kwargs
-        Additional keyword arguments passed to EnhancedTBTreatment
-        
-    Returns
-    -------
-    EnhancedTBTreatment
-        Configured first-line combination treatment intervention
-        
-    Examples
-    --------
-    >>> first_line = create_first_line_treatment(
-    ...     treatment_success_rate=0.90,
-    ...     reseek_multiplier=1.5
-    ... )
+
+    Args:
+        pars (dict, optional): Additional parameters to override defaults
+        **kwargs: Additional keyword arguments passed to EnhancedTBTreatment
+
+    Returns:
+        EnhancedTBTreatment: Configured first-line combination treatment intervention
+
+    Examples:
+        >>> first_line = create_first_line_treatment(
+        ...     treatment_success_rate=0.90,
+        ...     reseek_multiplier=1.5
+        ... )
     """
     return EnhancedTBTreatment(pars={'drug_type': TBDrugType.FIRST_LINE_COMBO, **(pars or {})}, **kwargs)
 

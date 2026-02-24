@@ -7,7 +7,6 @@ BCG vaccination: Product + Delivery following the Starsim Vx pattern.
 
 import numpy as np
 import starsim as ss
-
 from .interventions import TBProductRoutine
 
 __all__ = ['BCGVx', 'BCGRoutine']
@@ -25,22 +24,18 @@ class BCGVx(ss.Vx):
     duration tracking, and per-step modifier application to disease
     ``rr_activation``, ``rr_clearance``, and ``rr_death`` arrays.
 
-    Parameters
-    ----------
-    disease : str
-        Key of the disease module to target (default ``'tb'``).
-    p_take : ss.bernoulli
-        Probability of immunological response post-vaccination.
-    dur_immune : ss.Dist
-        Duration of protection (sampled per individual).
-    activation_modifier / clearance_modifier / death_modifier : ss.Dist
-        Per-individual risk-modifier distributions.
+    Args:
+        disease (str): Key of the disease module to target (default ``'tb'``).
+        p_take (ss.bernoulli): Probability of immunological response post-vaccination.
+        dur_immune (ss.Dist): Duration of protection (sampled per individual).
+        activation_modifier / clearance_modifier / death_modifier (ss.Dist): Per-individual risk-modifier distributions.
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Initialize BCG product with default efficacy and duration parameters."""
         super().__init__(**kwargs)
         self.define_pars(
-            disease='tb',
+            disease=0, # Assume the first disease is TB
             p_take=ss.bernoulli(p=0.8),
             dur_immune=ss.constant(v=ss.years(10)),
             activation_modifier=ss.uniform(0.5, 0.65),
@@ -56,6 +51,7 @@ class BCGVx(ss.Vx):
             ss.FloatArr('bcg_clearance_modifier_applied'),
             ss.FloatArr('bcg_death_modifier_applied'),
         )
+        return
 
     def administer(self, people, uids):
         """
@@ -65,10 +61,8 @@ class BCGVx(ss.Vx):
         protection expiry.  Does **not** touch ``rr_*`` arrays — that happens
         in :meth:`apply_protection` each step.
 
-        Returns
-        -------
-        ss.uids
-            UIDs of agents who responded immunologically.
+        Returns:
+            ss.uids: UIDs of agents who responded immunologically.
         """
         if len(uids) == 0:
             return ss.uids()
@@ -90,6 +84,7 @@ class BCGVx(ss.Vx):
         if len(protected_uids) > 0:
             expired = protected_uids[self.ti > self.ti_bcg_protection_expires[protected_uids]]
             self.bcg_protected[expired] = False
+        return
 
     def apply_protection(self):
         """Multiply ``rr_*`` arrays for all currently protected agents."""
@@ -99,6 +94,7 @@ class BCGVx(ss.Vx):
             tb.rr_activation[protected] *= self.bcg_activation_modifier_applied[protected]
             tb.rr_clearance[protected] *= self.bcg_clearance_modifier_applied[protected]
             tb.rr_death[protected] *= self.bcg_death_modifier_applied[protected]
+        return
 
 
 # ---------------------------------------------------------------------------
@@ -113,16 +109,25 @@ class BCGRoutine(TBProductRoutine):
     (age 0–5, 50 % coverage).  Creates a :class:`BCGVx` product
     automatically if none is provided.
 
-    Parameters
-    ----------
-    product : BCGVx
-        The BCG vaccine product (created automatically if not provided).
-    pars : dict
-        Overrides for delivery parameters (``coverage``, ``age_range``,
-        ``start``, ``stop``).
+    Args:
+        product (BCGVx): The BCG vaccine product (created automatically if not provided).
+        pars (dict): Overrides for delivery parameters (``coverage``, ``age_range``,
+            ``start``, ``stop``).
+
+    Example::
+
+        import starsim as ss
+        import tbsim
+        from tbsim.interventions.bcg import BCGRoutine
+
+        tb  = tbsim.TB_LSHTM(name='tb')
+        bcg = BCGRoutine()
+        sim = ss.Sim(diseases=tb, interventions=bcg, pars=dict(start='2000', stop='2020'))
+        sim.run()
     """
 
     def __init__(self, product=None, pars=None, **kwargs):
+        """Initialize BCG routine delivery; defaults to age 0-5 with a standard BCGVx product."""
         super().__init__(
             product=product if product is not None else BCGVx(),
             pars=pars,
@@ -131,7 +136,10 @@ class BCGRoutine(TBProductRoutine):
         # BCG-specific defaults (age 0-5)
         if pars is None or 'age_range' not in (pars or {}):
             self.pars.age_range = [0, 5]
+        return
 
     def update_results(self):
+        """Record number of currently protected individuals."""
         super().update_results()
         self.results['n_protected'][self.ti] = np.count_nonzero(self.product.bcg_protected)
+        return

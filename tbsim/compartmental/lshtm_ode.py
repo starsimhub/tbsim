@@ -46,13 +46,25 @@ class TB_ODE(sc.prettyobj):
     Exact translation of the R model (lshtm_ode.R) into Python. No Starsim.
 
     See default_pars for parameter definitions.
+
+    Example
+    -------
+    ::
+
+        from tbsim.compartmental.lshtm_ode import TB_ODE
+
+        tb = TB_ODE()
+        tb.run()
+        tb.plot()
     """
     def __init__(self, **kwargs):
+        """Initialize with ``default_pars``; keyword arguments override individual parameters."""
         self.pars = default_pars
         self.pars.update(kwargs)
         return
 
     def run(self, start_time=1500, end_time=2020):
+        """Integrate the ODE system from ``start_time`` to ``end_time`` and store results."""
         p = self.pars
 
         # Forcing functions (piecewise linear interpolation, constant extrapolation)
@@ -153,6 +165,7 @@ class TB_SS(ss.Module):
         sim.plot()
     """
     def __init__(self, **kwargs):
+        """Initialize compartmental states and parameters; keyword arguments override defaults."""
         super().__init__()
         self.define_pars(
             **default_pars,

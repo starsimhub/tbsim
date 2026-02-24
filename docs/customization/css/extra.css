@@ -1,0 +1,17 @@
+/* Custom styles for TBsim documentation */
+
+/* Improve admonition styling */
+.admonition {
+    border-radius: 0.5rem;
+}
+
+/* Better table styling */
+.md-typeset table:not([class]) {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+/* Improve code block styling */
+.highlight {
+    border-radius: 0.5rem;
+}

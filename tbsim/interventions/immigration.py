@@ -3,11 +3,13 @@ Immigration module for Starsim TB simulations.
 
 This module adds new people to the simulation population over time,
 representing immigration or in-migration to the study population.
+
+WARNING -- this class is not yet currently functional.
 """
 
 import numpy as np
-import starsim as ss
 import sciris as sc
+import starsim as ss
 
 __all__ = ['Immigration', 'SimpleImmigration']
 
@@ -34,9 +36,11 @@ class Immigration(ss.Demographics):
         Relative immigration rate multiplier
     """
     
-    def __init__(self, pars=None, immigration_rate=_, rel_immigration=_, 
+    def __init__(self, pars=None, immigration_rate=_, rel_immigration=_,
                  age_distribution=_, tb_status_distribution=_, **kwargs):
+        """Initialize with immigration rate, age distribution, and TB status distribution."""
         super().__init__()
+        print('Warning: this class is not fully functional')
         
         self.define_pars(
             immigration_rate=ss.peryear(10),  # 10 immigrants per year by default
@@ -201,7 +205,7 @@ class Immigration(ss.Demographics):
         self.sim.people.age[new_uids] = characteristics['ages']
         
         # Set TB status for new immigrants
-        tb = self.sim.diseases.tb
+        tb = self.sim.diseases.tb_emod
         for i, uid in enumerate(new_uids):
             tb_status = characteristics['tb_statuses'][i]
             if tb_status == 'susceptible':
@@ -244,7 +248,8 @@ class Immigration(ss.Demographics):
             # Create new households for immigrants
             for i, uid in enumerate(new_uids):
                 hh_net.hhid[uid] = i
-    
+        return
+
     def update_results(self):
         """Update results tracking."""
         if hasattr(self, 'results') and self.results is not None:
@@ -264,7 +269,9 @@ class SimpleImmigration(ss.Demographics):
     """
     
     def __init__(self, pars=None, immigration_rate=20, **kwargs):
+        """Initialize with a fixed immigration rate (immigrants per year)."""
         super().__init__()
+        print('Warning: this class is not fully functional')
         
         self.define_pars(
             immigration_rate=immigration_rate,
@@ -308,7 +315,7 @@ class SimpleImmigration(ss.Demographics):
         # when people.grow() is called, so we don't need to manually grow TB arrays
         
         # Set TB status for new immigrants (mostly susceptible)
-        tb = self.sim.diseases.tb
+        tb = self.sim.diseases.tb_emod
         import tbsim
         for uid in new_uids:
             # 90% susceptible, 5% latent slow, 3% latent fast, 2% active
@@ -336,13 +343,13 @@ class SimpleImmigration(ss.Demographics):
             if hasattr(net, 'hhid'):
                 hh_net = net
                 break
-        
+
         if hh_net is None:
             return
-        
+
         # Get existing households
         existing_hhids = np.unique(hh_net.hhid[hh_net.hhid >= 0])
-        
+
         if len(existing_hhids) > 0:
             # Assign each immigrant to a random existing household
             assigned_hhids = np.random.choice(existing_hhids, size=len(new_uids))
@@ -351,3 +358,4 @@ class SimpleImmigration(ss.Demographics):
             # Create new households for immigrants
             for i, uid in enumerate(new_uids):
                 hh_net.hhid[uid] = i
+        return

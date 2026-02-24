@@ -1,7 +1,8 @@
+"""Health-seeking behavior intervention"""
 
 import numpy as np
 import starsim as ss
-import tbsim 
+import tbsim
 
 __all__ = ['HealthSeekingBehavior']
 
@@ -10,9 +11,23 @@ class HealthSeekingBehavior(ss.Intervention):
     Eligible agents (symptomatic in LSHTM; smear+/smear-/EPTB in legacy TB) seek care
     at a rate per timestep. If the people object has a sought_care attribute, it is set
     to True for agents who seek care (for use by downstream interventions).
+
+    Example
+    -------
+    ::
+
+        import starsim as ss
+        import tbsim
+        from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
+
+        tb  = tbsim.TB_LSHTM()
+        hsb = HealthSeekingBehavior()
+        sim = ss.Sim(diseases=tb, interventions=hsb, pars=dict(start='2000', stop='2020'))
+        sim.run()
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Initialize with care-seeking rate, retry logic, and eligible-state configuration."""
         super().__init__(**kwargs)
         self.define_pars(
             initial_care_seeking_rate = ss.perday(0.1),
@@ -28,13 +43,16 @@ class HealthSeekingBehavior(ss.Intervention):
             ss.IntArr('n_care_sought_total', default=0),    # lifetime count; never resets
             ss.FloatArr('ti_last_sought',    default=-np.inf),
         )
-        self.care_seeking_dist = ss.bernoulli(p=self.pars.initial_care_seeking_rate.to_prob())  
-    
+        self.care_seeking_dist = ss.bernoulli(p=self.pars.initial_care_seeking_rate.to_prob())
+        return
+
     @property
     def tbsl(self):
+        """Shortcut to the TBSL state enum."""
         return tbsim.TBSL
-    
+
     def init_post(self):
+        """Locate the TB disease module and resolve eligible states."""
         super().init_post()
 
         # Find and store the TB disease module
@@ -55,11 +73,13 @@ class HealthSeekingBehavior(ss.Intervention):
         self._new_seekers_count = 0
         if self.pars.start is None: self.pars.start = self.sim.t.start
         if self.pars.stop  is None: self.pars.stop  = self.sim.t.stop
+        return
 
     def step(self):
+        """Identify eligible symptomatic agents and stochastically trigger care-seeking."""
         sim = self.sim
         ppl = sim.people
-        t = sim.now.date() 
+        t = sim.now.date()
 
         if t < self.pars.start.date() or t > self.pars.stop.date():
             self._new_seekers_count = 0
@@ -91,8 +111,10 @@ class HealthSeekingBehavior(ss.Intervention):
         self.ti_last_sought[seeking_uids] = self.ti
         if hasattr(ppl, 'sought_care'):
             ppl.sought_care[seeking_uids] = True
+        return
 
     def init_results(self):
+        """Define result channels for care-seeking counts."""
         super().init_results()
         self.define_results(
             ss.Result('new_sought_care',    dtype=int),
@@ -100,9 +122,11 @@ class HealthSeekingBehavior(ss.Intervention):
             ss.Result('n_ever_sought_care', dtype=int),
             ss.Result('n_eligible',         dtype=int),
         )
+        return
 
     def update_results(self):
-        t = self.sim.now.date() 
+        """Record new, current, and cumulative care-seeking counts."""
+        t = self.sim.now.date()
         if t < self.pars.start.date() or t > self.pars.stop.date():
             return
         ppl = self.sim.people
@@ -111,3 +135,4 @@ class HealthSeekingBehavior(ss.Intervention):
         self.results['new_sought_care'][self.ti] = self._new_seekers_count
         active = np.isin(self._tb.state, self._states) & ppl.alive
         self.results['n_eligible'][self.ti] = np.count_nonzero(active & (self.n_care_sought == 0))
+        return

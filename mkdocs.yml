@@ -1,0 +1,97 @@
+site_name: TBsim
+site_description: Agent-based TB model implemented using the Starsim framework
+site_url: https://starsim.org/tbsim/
+
+repo_name: starsimhub/tbsim
+repo_url: https://github.com/starsimhub/tbsim
+edit_uri: edit/main/docs/
+
+copyright: "2024, IDM, Burnet Institute, and Collaborators"
+
+# Theme Configuration
+theme:
+  name: material
+  font:
+    text: Raleway
+    code: Roboto Mono
+  logo: _static/logo-light.png
+  favicon: _static/logo-light.png
+  features:
+    - navigation.footer
+    - content.code.copy
+    - navigation.indexes
+  palette:
+    # Light Mode
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Light mode
+      primary: white
+      accent: cyan
+    # Dark Mode
+    - scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Dark mode
+      primary: black
+      accent: cyan
+
+# Navigation Structure
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Quick start: quickstart.md
+  - User guide: user_guide.md
+  - Tutorials: tutorials.md
+  - Examples: examples.md
+  - Scripts: scripts.md
+  - API reference: api.md
+  - Contributing: contributing.md
+  - What's new: changelog.md
+
+# Markdown Extensions
+markdown_extensions:
+  - toc:
+      toc_depth: 3
+  - attr_list
+  - md_in_html
+  - admonition
+  - def_list
+  - footnotes
+
+# JavaScript & CSS
+extra_javascript:
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+  - customization/css/extra.css
+
+# Plugins
+plugins:
+  - search
+  - autorefs
+  - include-markdown
+  - mkdocs-jupyter:
+      execute: true
+      allow_errors: false
+      include_source: true
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["."]
+          options:
+            docstring_style: google
+            show_source: false
+            merge_init_into_class: true
+            heading_level: 2
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_root_toc_entry: true
+            show_object_full_path: true
+
+# Extra Configuration
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/starsimhub/tbsim
