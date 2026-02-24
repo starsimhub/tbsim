@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import starsim as ss
+from . import tb_lshtm
 
 __all__ = ['TB_EMOD', 'TBS']
 
@@ -97,7 +98,7 @@ class TBS(IntEnum):
         return np.array([TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
     
 
-class TB_EMOD(ss.Infection):
+class TB_EMOD(tb_lshtm.BaseTB):
     """
     Tuberculosis disease model for TBsim simulations.
     

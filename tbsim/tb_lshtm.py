@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import starsim as ss
 
-__all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL']
+__all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL', 'get_tb']
 
 
 class TBSL(IntEnum):
@@ -36,7 +36,12 @@ class TBSL(IntEnum):
         return np.array([TBSL.SYMPTOMATIC])
 
 
-class TB_LSHTM(ss.Infection):
+class BaseTB(ss.Infection):
+    """Base class for TB natural history models."""
+    pass
+
+
+class TB_LSHTM(BaseTB):
     """
     Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al. 2025).
     States in `TBSL` span the spectrum from susceptibility to active disease and treatment.
@@ -628,3 +633,18 @@ class TB_LSHTM_Acute(TB_LSHTM):
         self.results['new_notifications_15+'][self.ti] += np.count_nonzero(self.sim.people.age[active] >= 15)
 
         return
+
+
+def get_tb(sim, which=None): # TODO: Create tbsim.Sim and move this to sim.get_tb()
+    """ Helper to get the TB_LSHTM infection module from a sim
+    
+    Args:
+        sim (Sim): the simulation to search for the TB module
+        which (type, optional): the class of TB module to get (e.g. TB_LSHTM; if None, returns the first BaseTB subclass found
+    """
+    if which is None:
+        which = BaseTB
+    for disease in sim.diseases:
+        if isinstance(disease, which):
+            return disease
+    raise ValueError("No TB module found in sim.diseases")
