@@ -23,7 +23,7 @@ sim_pars = {
 # TB parameters
 tb_pars = {
     "init_prev": ss.bernoulli(0.01), # seed prevalence
-    "beta": ss.peryear(0.20),       # transmission rate
+    "beta": ss.permonth(0.20),       # transmission rate
     "trans_asymp": 0.82,           # κ kappa: asymp vs symp relative transmissibility
     "rr_rec": 0.21,                # π pi: reinfection risk after recovery
     "rr_treat": 3.15,              # ρ rho: reinfection risk after treatment
@@ -32,7 +32,7 @@ tb_pars = {
 
 tb_pars_acute = {
     # Acute variant only (ignored if use_acute is False)
-    "rate_acute_latent": ss.peryear(4.0),   # ACUTE → INFECTION
+    "rate_acute_latent": ss.permonth(0.4),   # ACUTE → INFECTION
     "trans_acute": 0.9,            # α alpha: relative transmissibility from acute
 }
 
