@@ -152,7 +152,7 @@ def test_bcg_improves_tb_outcomes():
     sim.init()
     bcg = sim.interventions['bcgroutine']
 
-    tb = sim.diseases.tb
+    tb = sim.diseases.tb_emod
     initial_rr_activation = np.array(tb.rr_activation).copy()
     initial_rr_clearance = np.array(tb.rr_clearance).copy()
     initial_rr_death = np.array(tb.rr_death).copy()
@@ -223,7 +223,7 @@ def test_bcg_modifiers_reapplied_each_step():
     bcg = sim.interventions['bcgroutine']
 
     bcg.step()  # Vaccinate and apply modifiers
-    tb = sim.diseases.tb
+    tb = sim.diseases.tb_emod
     protected = bcg.product.bcg_protected.uids
     assert len(protected) > 0, "Some individuals should be protected"
 

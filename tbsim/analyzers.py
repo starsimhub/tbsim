@@ -447,7 +447,7 @@ class DwellTime(ss.Analyzer):
     def _update_state_change_data(self):
         """Detect state changes and record dwell times."""
         ti = self.ti
-        tb = self.sim.diseases.tb
+        tb = self.sim.diseases.tb_emod
         uids = self.sim.people.auids.copy()
 
         relevant_rows = self._latest_sts_df[

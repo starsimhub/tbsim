@@ -209,7 +209,7 @@ class TB_Nutrition_Connector(ss.Connector):
 
     def step(self):
         """Apply nutritional effects to TB transition rates each time step."""
-        tb = self.sim.diseases['tb']
+        tb = self.sim.diseases['tb_emod']
         mn = self.sim.diseases['malnutrition']
 
         uids = tb.infected.uids

@@ -64,20 +64,20 @@ def test_beta_intervention_changes_beta():
     
     sim.init()
     # Check beta before intervention
-    assert np.isclose(sim.diseases.tb.pars['beta'].value, initial_beta)
+    assert np.isclose(sim.diseases.tb_emod.pars['beta'].value, initial_beta)
     # Run up to just before the intervention year
     while sim.t.now('year') < intervention_year:
         sim.run_one_step()
     # Should still be unchanged
-    assert np.isclose(sim.diseases.tb.pars['beta'].value, initial_beta)
+    assert np.isclose(sim.diseases.tb_emod.pars['beta'].value, initial_beta)
     # Step into the intervention year
     sim.run_one_step()
     # Beta should now be changed
     expected_beta = initial_beta * x_beta
-    assert np.isclose(sim.diseases.tb.pars['beta'].value, expected_beta)
+    assert np.isclose(sim.diseases.tb_emod.pars['beta'].value, expected_beta)
     # Step again, beta should not change further
     sim.run_one_step()
-    assert np.isclose(sim.diseases.tb.pars['beta'].value, expected_beta)
+    assert np.isclose(sim.diseases.tb_emod.pars['beta'].value, expected_beta)
 
 
 if __name__ == '__main__':

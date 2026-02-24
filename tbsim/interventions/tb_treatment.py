@@ -41,7 +41,7 @@ class TBTreatment(ss.Intervention):
         """Treat diagnosed active-TB individuals"""
         sim = self.sim
         ppl = sim.people
-        tb = sim.diseases.tb
+        tb = sim.diseases.tb_emod
 
         # Select individuals diagnosed with TB and alive
         diagnosed = ppl.diagnosed & ppl.alive
@@ -242,7 +242,7 @@ class EnhancedTBTreatment(ss.Intervention):
         """
         sim = self.sim
         ppl = sim.people
-        tb = sim.diseases.tb
+        tb = sim.diseases.tb_emod
         
         # Select individuals diagnosed with TB and alive
         diagnosed_uids = (ppl.diagnosed & ppl.alive).uids

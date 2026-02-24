@@ -74,7 +74,7 @@ def test_tb_infectious():
 def test_set_prognoses():
     sim = make_tb_simplified()
     sim.run()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     before = tb.state.copy()
     uids = ss.uids([1, 2, 3, 7, 9])
     tb.set_prognoses(uids)
@@ -86,7 +86,7 @@ def test_set_prognoses():
 def test_update_pre():
     sim = make_tb_simplified(agents=300)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     assert len(tb.state[tb.state == tbsim.TBS.NONE]) > 0
     sim.run()
     assert len(tb.state[tb.state == tbsim.TBS.LATENT_SLOW]) > 0
@@ -103,7 +103,7 @@ def test_update_pre():
 def test_update_death_with_uids():
     sim = make_tb_simplified(agents=300)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     uids = ss.uids([1, 2, 3])
     tb.susceptible[uids] = True
     tb.infected[uids] = True
@@ -118,7 +118,7 @@ def test_update_death_with_uids():
 def test_step_die_no_uids():
     sim = make_tb_simplified(agents=300)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
         
     initial_susceptible = tb.susceptible.copy()
     initial_infected = tb.infected.copy()
@@ -134,7 +134,7 @@ def test_step_die_no_uids():
 def tb():
     sim = make_tb_simplified(agents=1000)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     return tb
 
 # When no individuals have active TB, no treatment should be started
@@ -231,7 +231,7 @@ def test_p_latent_to_presym():
     # Setup: Create a simulated TB instance and prepare relevant data
     sim = make_tb_simplified(agents=10)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     
     # Temporarily unlock attributes for testing
     tb._lock_attrs = False
@@ -262,7 +262,7 @@ def test_p_presym_to_active():
     # Setup: Create a simulated TB instance and prepare relevant data
     sim = make_tb_simplified(agents=10)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     
     # Temporarily unlock attributes for testing
     tb._lock_attrs = False
@@ -289,7 +289,7 @@ def test_p_presym_to_active():
 def test_p_active_to_clear():
     sim = make_tb_simplified(agents=10)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     
     # Temporarily unlock attributes for testing
     tb._lock_attrs = False
@@ -326,7 +326,7 @@ def test_p_active_to_clear():
 def test_p_active_to_death( ):
     sim = make_tb_simplified(agents=10)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
 
     # Set some individuals to different active TB states
     active_uids = ss.uids([1, 2, 3, 4, 5])
@@ -354,7 +354,7 @@ def test_p_active_to_death( ):
 def test_latent_to_active_presymptomatic_transition():
     sim = make_tb_simplified(agents=10000)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     # Setup individuals in latent states
     latent_uids = ss.uids(np.arange(5000)) 
     tb.state[latent_uids] = np.random.choice([tbsim.TBS.LATENT_SLOW, tbsim.TBS.LATENT_FAST], size=len(latent_uids))
@@ -372,7 +372,7 @@ def test_presymptomatic_to_active_transition():
     # individuals in the pre-symptomatic state to have a good chance of transitioning
     sim = make_tb_simplified(agents=500)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     # Setup some individuals to pre-symptomatic
     presym_uids = ss.uids(np.arange(250)) 
     tb.state[presym_uids] = tbsim.TBS.ACTIVE_PRESYMP
@@ -393,7 +393,7 @@ def test_active_to_cleared_transition():
     # Increasing number of agents even higher as the clearance rate is very low
     sim = make_tb_simplified(agents=20000)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     # Setup individuals in active TB states
     active_uids = ss.uids(np.arange(15000))  # Also test with a large number of agents
     
@@ -413,7 +413,7 @@ def test_active_to_death_transition():
     # Setup individuals in active TB states
     sim = make_tb_simplified(agents=20000)
     sim.init()
-    tb = sim.diseases['tb']
+    tb = sim.diseases['tb_emod']
     active_uids = ss.uids(np.arange(15000))  # Also test with a large number of agents
     tb.state[active_uids] = np.random.choice(
         [tbsim.TBS.ACTIVE_SMPOS, tbsim.TBS.ACTIVE_SMNEG, tbsim.TBS.ACTIVE_EXPTB],
