@@ -1,11 +1,18 @@
-"""Plotting utilities for visualizing TB simulation results"""
+"""Plotting utilities for visualizing TB simulation results."""
 
+# Standard library
 import os
 import re
 import sys
+
+# External packages - data/numerical
 import numpy as np
-import sciris as sc
+
+# External packages - plotting
 import matplotlib.pyplot as plt
+
+# External packages - project dependencies
+import sciris as sc
 import starsim as ss
 
 __all__ = ['plot']
@@ -62,7 +69,12 @@ def plot(
     row_height : float, optional
         Subplot row height (inches). Default 1.5.
     style : dict, optional
-        Override plot style (e.g. cmap, line_width, marker_size, mpl_style).
+        Override plot style. Keys (all optional) include: mpl_style, cmap, alpha (opacity of lines/markers),
+        plot_type ('line' or 'scatter'), line_width, line_style, use_markers,
+        marker_size, marker_styles, marker_edge_width, grid_color, grid_alpha,
+        grid_linewidth, spine_linewidth, title_fontsize, legend_fontsize,
+        axis_label_fontsize, tick_fontsize, shared_legend, legend_position.
+        Example: ``style=dict(cmap='plasma', use_markers=True)``.
 
     Notes
     -----
@@ -71,11 +83,15 @@ def plot(
     """
     opts = {**_DEFAULT_STYLE, **(style or {})}
 
-    flat_results = _normalize_results(results)
-    if not flat_results:
-        print("No scenarios to plot.")
+    try:
+        flat_results = _normalize_results(results)
+        if not flat_results:
+            print("No scenarios to plot.")
+            return
+        flat_results = _validate_flat_results(flat_results)
+    except (TypeError, ValueError) as e:
+        print(f"Cannot plot: {e}")
         return
-    flat_results = _validate_flat_results(flat_results)
 
     dark = str(theme).lower() == 'dark'
     fg = '#eaeaea' if dark else '#111'
@@ -117,8 +133,7 @@ def plot(
         ax.set_axisbelow(True)
         ax.tick_params(colors=fg, which='both', width=opts['spine_linewidth'])
         for spine in ax.spines.values():
-            spine.set_color(grid_color)
-            spine.set_linewidth(opts['spine_linewidth'])
+            spine.set_visible(False)
 
     try:
         _cm = plt.colormaps.get_cmap(opts['cmap']).resampled(len(flat_results))
@@ -130,6 +145,7 @@ def plot(
         return _cm(j / max(1, n_scen - 1)) if n_scen > 1 else _cm(0)
 
     mstyles = opts['marker_styles'] or ['o', 's', 'D', '^', 'v', 'P', 'X', '*', 'h', '8', 'p', '<', '>', 'H', 'd']
+    use_markers = bool(opts.get('use_markers', False))
 
     for i, metric in enumerate(metrics):
         ax = axs[i]
@@ -137,10 +153,10 @@ def plot(
             x, y = _as_1d_xy(flat.get(metric))
             if x is None:
                 continue
-            # color = (0.35, 0.35, 0.35, 1) if j == 0 else palette(j)
             color = palette(j)
-            ls = '--' if j == 0 else '-'
-            marker = mstyles[j % len(mstyles)]
+            # ls = '--' if j == 0 else '-'
+            ls = '-'
+            marker = mstyles[j % len(mstyles)] if use_markers else None
             if opts['plot_type'] == 'scatter':
                 ax.scatter(x, y, label=scen, color=color, s=max(1, float(opts['marker_size'])) ** 2,
                            marker=marker, alpha=opts['alpha'], edgecolor=grid_color, linewidths=opts['marker_edge_width'])
@@ -152,7 +168,7 @@ def plot(
         ax.set_title(metric, fontsize=opts['title_fontsize'], fontweight='light', color=fg)
         ax.set_xlabel('Time', fontsize=opts['axis_label_fontsize'], color=fg)
         ax.tick_params(axis='both', labelsize=opts['tick_fontsize'], colors=fg)
-        ax.grid(True, color=grid_color, alpha=opts['grid_alpha'], linestyle='--', linewidth=opts['grid_linewidth'])
+        ax.grid(True, color=opts['grid_color'], alpha=opts['grid_alpha'], linestyle='--', linewidth=opts['grid_linewidth'])
         if all_x_min is not None and all_x_max is not None:
             ax.set_xlim(all_x_min, all_x_max)
         if not opts['shared_legend']:
@@ -188,33 +204,42 @@ def plot(
 
     plt.tight_layout(pad=2.0)
     if savefig:
-        out = out_to(output_dir)
-        fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
-        print(f"Saved figure to {out}")
+        try:
+            out = out_to(output_dir)
+            fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
+            print(f"Saved figure to {out}")
+        except OSError as e:
+            print(f"Warning: could not save figure: {e}")
     plt.show()
-    
+
+    return
+
+
 _DEFAULT_STYLE = dict(
-    mpl_style='default',
-    cmap='tab20',
-    alpha=0.85,
-    plot_type='line',
-    line_width=1.2,
-    marker_size=.5,
-    marker_styles=None,
-    marker_edge_width=0.2,
-    grid_alpha=0.4,
-    grid_linewidth=0.2,
-    grid_color='lightgrey',
-    spine_linewidth=0.5,
-    title_fontsize=10,
-    legend_fontsize=7,
-    axis_label_fontsize=6,
-    tick_fontsize=6,
-    shared_legend=True,
-    legend_position='upper left',
+    mpl_style   = 'default',
+    cmap        = 'plasma',
+    alpha       = 0.85,
+    plot_type   = 'line',
+    line_width  = 1.2,
+    marker_size = 0.5,
+    use_markers = False,
+    marker_styles      = None,
+    marker_edge_width  = 0.2,
+    grid_color         = 'white',
+    grid_alpha         = 0.25,
+    grid_linewidth     = 0.2,
+    spine_linewidth    = 0.5,
+    title_fontsize     = 10,
+    legend_fontsize    = 7,
+    axis_label_fontsize = 6,
+    tick_fontsize      = 6,
+    shared_legend      = True,
+    legend_position    = 'upper left',
+    line_style         = '-',
 )
 
 def _normalize_results(results):
+    """Convert MultiSim, Sim, or dict into a dict of label -> flat result dict."""
     if hasattr(results, 'sims') and results.sims is not None:
         # MultiSim: unpack sims and flatten each
         return {sim.label: sim.results.flatten() for sim in results.sims}
@@ -229,6 +254,7 @@ def _normalize_results(results):
 
 
 def _validate_flat_results(flat_results):
+    """Ensure each value is a dict of metric name -> result with timevec and values."""
     if not flat_results:
         raise ValueError("flat_results is empty")
     out = {}
@@ -248,7 +274,7 @@ def _validate_flat_results(flat_results):
 
 
 def _parse_exclude_patterns(items):
-    """'~Something' or ['~None','~temp'] → list of patterns (strip leading ~)."""
+    """Return list of patterns from '~Something' or list like ['~None','~temp'] (strip leading ~)."""
     if not items:
         return []
     it = (items,) if isinstance(items, str) else items
@@ -256,6 +282,7 @@ def _parse_exclude_patterns(items):
 
 
 def _select_metrics(all_metrics, select_spec, flat_results):
+    """Filter all_metrics by select_spec (None/list/dict with items, like, regex, exclude)."""
     available = {m for m in all_metrics if any(m in flat for flat in flat_results.values())}
 
     if select_spec is None:
@@ -291,6 +318,7 @@ def _select_metrics(all_metrics, select_spec, flat_results):
 
 
 def _fill_missing_metrics(flat_results, metrics):
+    """Fill missing metrics in each scenario with zero series using a reference timevec."""
     ref_timevec = {}
     for flat in flat_results.values():
         for m in metrics:
@@ -312,6 +340,7 @@ def _fill_missing_metrics(flat_results, metrics):
 
 
 def _as_1d_xy(result):
+    """Return (x, y) 1D arrays from a result with timevec and values; (None, None) if invalid."""
     if result is None or not hasattr(result, 'timevec') or not hasattr(result, 'values'):
         return None, None
 
@@ -332,34 +361,31 @@ def _as_1d_xy(result):
 
 
 def _safe_min_max(x):
-    """Return (min,max) for x, or (None,None) if unavailable."""
+    """Return (min, max) for array x, or (None, None) if empty or invalid."""
     if x is None:
         return None, None
     try:
-        if len(x) == 0:
+        a = np.asarray(x)
+        if a.size == 0:
             return None, None
-    except Exception:
+        return np.nanmin(a), np.nanmax(a)
+    except (TypeError, ValueError):
         return None, None
-    try:
-        return np.nanmin(x), np.nanmax(x)
-    except Exception:
-        try:
-            return min(x), max(x)
-        except Exception:
-            return None, None
+
 
 def out_to(outdir):
-    """Return a timestamped output file path inside ``outdir``, creating the directory if needed."""
-    timestamp = sc.now(dateformat='%Y%m%d_%H%M%S') 
-    # Determine script directory in a cross-platform way
-    if hasattr(sys.modules['__main__'], '__file__'):
-        script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
-    else:
-        script_dir = os.getcwd()
-
-    outdir = 'results' if outdir is None else outdir
-    outdir = os.path.join(script_dir, outdir)
-    os.makedirs(outdir, exist_ok=True)   
-    out = os.path.join(outdir, f'scenarios_{timestamp}.png')
-    return out
+    """Return a timestamped output file path inside outdir, creating the directory if needed."""
+    try:
+        timestamp = sc.now(dateformat='%Y%m%d_%H%M%S')
+        if hasattr(sys.modules.get('__main__'), '__file__'):
+            script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
+        else:
+            script_dir = os.getcwd()
+        outdir = 'results' if outdir is None else outdir
+        outdir = os.path.join(script_dir, outdir)
+        os.makedirs(outdir, exist_ok=True)
+        out = os.path.join(outdir, f'scenarios_{timestamp}.png')
+        return out
+    except OSError as e:
+        raise OSError(f"Cannot create output path for figure: {e}") from e
     
