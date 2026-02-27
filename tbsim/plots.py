@@ -1,458 +1,418 @@
-"""Plotting utilities for visualizing TB simulation results"""
+"""Plotting utilities for visualizing TB simulation results."""
 
+# Standard library
 import os
+import re
 import sys
-import datetime
+
+# External packages - data/numerical
 import numpy as np
-import sciris as sc
+
+# External packages - plotting
 import matplotlib.pyplot as plt
-import starsim as ss
 
+# External packages - project dependencies
+import sciris as sc
 
-def plot_results(flat_results, keywords=None, exclude=('None',), n_cols=5,
-                 dark=True, cmap='tab20', heightfold=2, 
-                 style='default', savefig=True, outdir=None, metric_filter=None, title='',
-                 shared_legend=True, legend_position='upper right'):
-    """
-    Visualize simulation outputs from multiple scenarios in a structured grid layout.
+__all__ = ['plot']
 
-    Args:
-        flat_results (dict): Nested dictionary of the form:
-            {
-                'Scenario A': {'metric1': Result, 'metric2': Result, ...},
-                'Scenario B': {'metric1': Result, 'metric2': Result, ...},
-                ...
-            }
-            Each Result must have `timevec` and `values` attributes representing
-            time series data for a given metric.
+def plot(
+    results,
+    select=None,
+    title='',
+    savefig=False,
+    output_dir=None,
+    theme='light',
+    n_cols=6,
+    row_height=1.5,
+    style=None,
+    show=True,
+):
+    """Plot simulation results (MultiSim, Sim, or flat results dict).
 
-        keywords (list[str], optional): If provided, only plot metrics containing at least one of these substrings.
-        exclude (tuple[str], optional): Substrings of metric names to skip. Default is ('15',).
-        n_cols (int, optional): Number of columns in the plot grid. Default is 5.
-        dark (bool, optional): If True (default), uses a gray-on-dark theme for improved contrast.
-        cmap (str, optional): Name of a matplotlib colormap (e.g., 'viridis', 'tab10'). Default is 'tab20'.
-        heightfold (int, optional): Height multiplier per row of subplots. Default is 3.
-        style (str, optional): Matplotlib style to apply. Defaults to 'default'. Falls back to 'default' if not found.
-        savefig (bool, optional): If True (default), saves the figure as a PNG file with a timestamped filename.
-        outdir (str, optional): Directory to save the figure. If None, saves in the current script's directory under 'results'.
-        metric_filter (list[str], optional): List of metric names to plot. If provided, only these metrics will be plotted.
-        shared_legend (bool, optional): If True, creates a single shared legend for all subplots. Default is True.
-        legend_position (str, optional): Position for the shared legend. Options: 'upper right', 'upper left', 'lower right', 'lower left', 'center', etc. Default is 'upper right'.
-    
-    Returns:
-        None: The figure is displayed and also saved as a PNG with a timestamped filename.
+    Parameters
+    ----------
+    results
+        MultiSim, single Sim, or dict of flat results per scenario.
+    select : None, list, or dict, optional
+        Which metrics to plot. Interpreted like pandas column selection
+        (e.g. ``DataFrame.filter()``):
 
-    Workflow:
-        1. Collects all metric names across scenarios.
-        2. Filters metrics based on `keywords` and `exclude`.
-        3. Lays out subplots based on the number of metrics and specified `n_cols`.
-        4. Iterates over each metric and plots it across all scenarios.
-        5. Adjusts appearance (background, style, gridlines, labels).
-        6. Saves the figure as 'scenarios_<timestamp>.png'.
+        - **None** : all metrics (except names containing 'None').
+        - **list** : same as ``dict(items=list)``; use ``'~pattern'`` in the
+          list to exclude metric names containing that pattern.
+        - **dict** :
+          - ``items`` : list of exact metric names (like pandas ``filter(items=...)``).
+          - ``like`` : str or list of str; keep names containing any (``filter(like=...)``).
+          - ``regex`` : str; keep names matching the regex (``filter(regex=...)``).
+          - ``exclude`` : list of patterns (or ``'~pattern'``); drop names containing any.
 
-    Example:
-        >>> results = {
-        ...     'BCG': {
-        ...         'incidence': Result(timevec=[0, 1, 2], values=[0.1, 0.2, 0.3]),
-        ...         'mortality': Result(timevec=[0, 1, 2], values=[0.05, 0.07, 0.1])
-        ...     },
-        ...     'TPT': {
-        ...         'incidence': Result(timevec=[0, 1, 2], values=[0.08, 0.15, 0.25]),
-        ...         'mortality': Result(timevec=[0, 1, 2], values=[0.03, 0.05, 0.08])
-        ...     }
-        ... }
-        >>> plot_results(results, keywords=['incidence'], n_cols=2, dark=False, cmap='viridis')
+        Examples::
 
-    NOTE:
+            plot(msim)                                    # all metrics
+            plot(msim, select=['incidence', 'prevalence']) # items=['incidence','prevalence']
+            plot(msim, select=['incidence', '~None'])      # items + exclude 'None'
+            plot(msim, select=dict(like='prev'))          # names containing 'prev'
+            plot(msim, select=dict(like=['prev', 'death']))
+            plot(msim, select=dict(regex=r'^tb_.*'))      # names matching regex
+            plot(msim, select=dict(items=['a'], exclude=['internal']))
+    title : str, optional
+        Figure suptitle. Default ''.
+    savefig : bool, optional
+        If True, save PNG to output_dir. Default False.
+    output_dir : str, optional
+        Directory for saved figure. Default 'results'.
+    theme : {'light', 'dark'}, optional
+        Color theme. Default 'light'.
+    n_cols : int, optional
+        Number of subplot columns. Default 6.
+    row_height : float, optional
+        Subplot row height (inches). Default 1.5.
+    style : dict, optional
+        Override plot style. Keys (all optional) include: mpl_style, cmap, alpha (opacity of lines/markers),
+        plot_type ('line' or 'scatter'), line_width, line_style, use_markers,
+        marker_size, marker_styles, marker_edge_width, grid_color, grid_alpha,
+        grid_linewidth, spine_linewidth, title_fontsize, legend_fontsize,
+        axis_label_fontsize, tick_fontsize, shared_legend, legend_position.
+        Example: ``style=dict(cmap='plasma', use_markers=True)``.
+
+    Notes
     -----
-    This plotting utility assumes results have already been flattened, such that
-    each scenario maps to a dictionary of named time series outputs. This structure
-    enables clean side-by-side comparisons of metrics like incidence or mortality
-    across scenarios in a single visual layout.
-    
-    FLATTENING RESULTS:
-    ---------------
-    This line:
-        >>> results['Any_Name'] = sim.results.flatten()       <-- The name will be used for the series name
-         
-    Converts the simulation's time series outputs into a flat dictionary or DataFrame.
-    Makes results easier to compare across scenarios (e.g., plotting incidence over time).
-    The results dictionary now maps scenario names to their flattened outputs:
-    {
-        'BCG': <results>,
-        'TPT': <results>,
-        ...
-    }
-    
+    Missing metrics in a scenario are filled with zeros.
+    Non-1D result values are reduced with nanmean.
     """
-
+    opts = {**_DEFAULT_STYLE, **(style or {})}
 
     try:
-        plt.style.use(style)
+        flat_results = _normalize_results(results)
+        if not flat_results:
+            print("No scenarios to plot.")
+            return
+        flat_results = _validate_flat_results(flat_results)
+    except (TypeError, ValueError) as e:
+        print(f"Cannot plot: {e}")
+        return
+
+    dark = str(theme).lower() == 'dark'
+    fg = '#eaeaea' if dark else '#111'
+    ax_bg = '#2b2b2b' if dark else '#f0f0f0'
+    fig_bg = '#1e1e1e' if dark else '#f7f7f7'
+    try:
+        plt.style.use(opts['mpl_style'])
     except Exception:
-        print(f"Warning: {style} style not found. Using default style.")
+        print(f"Warning: {opts['mpl_style']} style not found. Using default style.")
         plt.style.use('default')
 
-    # collect & filter metric names
     all_metrics = {m for flat in flat_results.values() for m in flat}
-    if keywords is not None:
-        all_metrics = {m for m in all_metrics if any(kw in m for kw in keywords)}
-    if metric_filter is not None:
-        metrics = metric_filter
-    else:
-        metrics = sorted(m for m in all_metrics if not any(ex in m for ex in exclude))
+    metrics = _select_metrics(all_metrics, select, flat_results)
     if not metrics:
         print("No metrics to plot.")
         return
 
-    # plot layout and colors
+    flat_results, _ = _fill_missing_metrics(flat_results, metrics)
+
+    n_cols = max(1, int(n_cols))
     n_rows = int(np.ceil(len(metrics) / n_cols))
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, heightfold*n_rows))
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(4.0 * n_cols, row_height * n_rows + 1))
     axs = np.array(axs).flatten()
 
-    # Calculate global X-axis range across all metrics
-    all_x_min = None
-    all_x_max = None
+    all_x_min = all_x_max = None
     for flat in flat_results.values():
-        for metric in metrics:
-            if metric in flat:
-                r = flat[metric]
-                if all_x_min is None:
-                    all_x_min = min(r.timevec)
-                    all_x_max = max(r.timevec)
-                else:
-                    all_x_min = min(all_x_min, min(r.timevec))
-                    all_x_max = max(all_x_max, max(r.timevec))
+        for m in metrics:
+            x, _ = _as_1d_xy(flat.get(m))
+            tmin, tmax = _safe_min_max(x)
+            if tmin is not None:
+                all_x_min = tmin if all_x_min is None else min(all_x_min, tmin)
+                all_x_max = tmax if all_x_max is None else max(all_x_max, tmax)
 
-    if dark:
-        fig.patch.set_facecolor('#606060')  # medium dark gray background
-        for ax in axs:
-            ax.set_facecolor('#404040')  # dark gray for axes
-    palette = plt.cm.get_cmap(cmap, len(flat_results))
+    fig.patch.set_facecolor(fig_bg)
+    for ax in axs:
+        ax.set_facecolor(ax_bg)
+        ax.set_axisbelow(True)
+        ax.tick_params(colors=fg, which='both', width=opts['spine_linewidth'])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
 
-    # plot each metric
+    n_scen = len(flat_results)
+    try:
+        _cm = plt.colormaps.get_cmap(opts['cmap'])
+    except Exception:
+        _cm = plt.cm.get_cmap(opts['cmap'])
+
+    def palette(j):
+        # Just get the next color from the colormap
+        return _cm(j)
+
+    mstyles = opts['marker_styles'] or ['o', 's', 'D', '^', 'v', 'P', 'X', '*', 'h', '8', 'p', '<', '>', 'H', 'd']
+    use_markers = bool(opts.get('use_markers', False))
+
     for i, metric in enumerate(metrics):
         ax = axs[i]
-        for j, (scen, flat) in enumerate(flat_results.items()):
-            if metric in flat:
-                r = flat[metric]
-                ax.plot(r.timevec, r.values, lw=0.8, label=scen, color=palette(j))
-        ax.set_title(metric, fontsize=10, color='white' if dark else 'black')
-        vmax = max(flat.get(metric, r).values)
-        if vmax < 1.010:
-            ax.set_ylim(0, max(0.5, vmax))
-            ax.set_ylabel('%', color='white' if dark else 'black')
-        else:
-            ax.set_ylabel('Value', color='white' if dark else 'black')
-        ax.set_xlabel('Time', color='white' if dark else 'black')
-        ax.tick_params(axis='both', colors='white' if dark else 'black', labelsize=6)
-        # Set consistent X-axis range for all plots
-        ax.set_xlim(all_x_min, all_x_max)
-
-        # grid lines
-        ax.grid(True, color='white' if dark else 'gray', alpha=0.3)
-        
-        # Only add individual legends if shared_legend is False
-        if not shared_legend:
-            leg = ax.legend(fontsize=6 if len(flat_results)>5 else 7)
-            if leg: leg.get_frame().set_alpha(0.3)
-
-    # remove unused axes
-    for ax in axs[len(metrics):]:
-        fig.delaxes(ax)
-
-    # Create shared legend if requested
-    if shared_legend:
-        # Get handles and labels from the first subplot that has data
-        handles, labels = None, None
-        for ax in axs[:len(metrics)]:
-            if ax.get_legend_handles_labels()[0]:  # Check if there are handles
-                handles, labels = ax.get_legend_handles_labels()
+        # Get the label from the first available result object
+        metric_label = metric
+        for flat in flat_results.values():
+            result = flat.get(metric)
+            if result is not None:
+                if hasattr(result, 'full_label'):
+                    metric_label = result.full_label
+                elif hasattr(result, 'label') and result.label:
+                    metric_label = result.label
                 break
         
-        if handles and labels:
-            # Create shared legend
-            fig.legend(handles, labels, loc=legend_position, fontsize=6 if len(flat_results)>5 else 7, 
-                      frameon=True, fancybox=True, shadow=True)
-            # Style the shared legend
-            legend = fig.legends[-1]
-            legend.get_frame().set_alpha(0.9)
-            legend.get_frame().set_facecolor('#f0f0f0')
-            legend.get_frame().set_edgecolor('#888')
-            for text in legend.get_texts():
-                text.set_color('#222')
-
-    if title:
-        fig.suptitle(title, fontsize=12, color='white' if dark else 'black')
-
-    plt.tight_layout(pad=2.0)
-
-    if savefig:
-        out = out_to(outdir)
-        fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
-        print(f"Saved figure to {out}")
-    plt.show()
-
-    return
-
-
-def plot_combined(flat_results, keywords=None, exclude=('None',), n_cols=7,
-                 dark=True, cmap='plasma', heightfold=2, 
-                 style='default', savefig=False, outdir=None, plot_type='line',
-                 marker_styles=None, alpha=0.85, grid_alpha=0.4, title_fontsize=10, legend_fontsize=7, 
-                 line_width=0.3, marker_size=2, markeredgewidth=0.2, grid_linewidth=0.5, 
-                 spine_linewidth=0.5, label_fontsize=6, tick_fontsize=6, filter=None, title='',
-                 shared_legend=True, legend_position='upper left'):
-    """
-    Visualize simulation outputs from multiple scenarios in a structured grid layout.
-
-    Args:
-        flat_results (dict): Nested dictionary of the form:
-            {
-                'Scenario A': {'metric1': Result, 'metric2': Result, ...},
-                'Scenario B': {'metric1': Result, 'metric2': Result, ...},
-                ...
-            }
-            Each Result must have `timevec` and `values` attributes representing
-            time series data for a given metric.
-
-        keywords (list[str], optional): If provided, only plot metrics containing at least one of these substrings.
-        exclude (tuple[str], optional): Substrings of metric names to skip. Default is ('15',).
-        n_cols (int, optional): Number of columns in the plot grid. Default is 5.
-        dark (bool, optional): If True (default), uses a gray-on-dark theme for improved contrast.
-        cmap (str, optional): Name of a matplotlib colormap (e.g., 'viridis', 'tab10', 'plasma'). Default is 'plasma'.
-        heightfold (int, optional): Height multiplier per row of subplots. Default is 3.
-        style (str, optional): Matplotlib style to apply. Defaults to 'default'. Falls back to 'default' if not found.
-        savefig (bool, optional): If True, saves the figure as a PNG file with a timestamped filename.
-        outdir (str, optional): Directory to save the figure. If None, saves in the current script's directory under 'results'.
-        plot_type (str, optional): Type of plot to use for each metric ('line' or 'scatter'). Default is 'line'.
-        marker_styles (list[str], optional): List of marker styles for scatter plots. Defaults to a preset list.
-        alpha (float, optional): Transparency for lines/markers. Default is 0.85.
-        grid_alpha (float, optional): Transparency for grid lines. Default is 0.4.
-        title_fontsize (int, optional): Font size for subplot titles. Default is 10.
-        legend_fontsize (int, optional): Font size for legends. Default is 6.
-        line_width (float, optional): Line width for line plots. Default is 0.2.
-        marker_size (int, optional): Marker size for scatter and line plots. Default is 3.
-        markeredgewidth (float, optional): Marker edge width. Default is 0.5.
-        grid_linewidth (float, optional): Grid line width. Default is 0.5.
-        spine_linewidth (float, optional): Axis spine line width. Default is 0.5.
-        label_fontsize (int, optional): Font size for axis labels. Default is 9.
-        tick_fontsize (int, optional): Font size for axis tick labels. Default is 5.
-        shared_legend (bool, optional): If True, creates a single shared legend for all subplots. Default is True.
-        legend_position (str, optional): Position for the shared legend. Options: 'upper right', 'upper left', 'lower right', 'lower left', 'center', etc. Default is 'upper right'.
-    
-    Returns:
-        None: The figure is displayed and also saved as a PNG with a timestamped filename.
-
-    Workflow:
-        1. Collects all metric names across scenarios.
-        2. Filters metrics based on `keywords` and `exclude`.
-        3. Lays out subplots based on the number of metrics and specified `n_cols`.
-        4. Iterates over each metric and plots it across all scenarios.
-        5. Adjusts appearance (background, style, gridlines, labels).
-        6. Saves the figure as 'scenarios_<timestamp>.png'.
-
-    Example:
-        >>> results = {
-        ...     'BCG': {
-        ...         'incidence': Result(timevec=[0, 1, 2], values=[0.1, 0.2, 0.3]),
-        ...         'mortality': Result(timevec=[0, 1, 2], values=[0.05, 0.07, 0.1])
-        ...     },
-        ...     'TPT': {
-        ...         'incidence': Result(timevec=[0, 1, 2], values=[0.08, 0.15, 0.25]),
-        ...         'mortality': Result(timevec=[0, 1, 2], values=[0.03, 0.05, 0.08])
-        ...     }
-        ... }
-        >>> plot_results(results, keywords=['incidence'], n_cols=2, dark=False, cmap='viridis', plot_type='scatter')
-
-    NOTE:
-    -----
-    This plotting utility assumes results have already been flattened, such that
-    each scenario maps to a dictionary of named time series outputs. This structure
-    enables clean side-by-side comparisons of metrics like incidence or mortality
-    across scenarios in a single visual layout.
-    
-    FLATTENING RESULTS:
-    ---------------
-    This line:
-        >>> results['Any_Name'] = sim.results.flatten()       <-- The name will be used for the series name
-         
-    Converts the simulation's time series outputs into a flat dictionary or DataFrame.
-    Makes results easier to compare across scenarios (e.g., plotting incidence over time).
-    The results dictionary now maps scenario names to their flattened outputs:
-    {
-        'BCG': <results>,
-        'TPT': <results>,
-        ...
-    }
-
-    """
-
-
-    try:
-        plt.style.use(style)
-    except Exception:
-        print(f"Warning: {style} style not found. Using default style.")
-        plt.style.use('default')
-
-    # normalize all keys to strings so numeric/other types from flatten() become string column names
-    flat_results = {
-        label: {str(k): v for k, v in flat.items()}
-        for label, flat in flat_results.items()
-    }
-    # collect & filter metric names
-    all_metrics = {m for flat in flat_results.values() for m in flat}
-    if keywords is not None:
-        all_metrics = {m for m in all_metrics if any(kw in m for kw in keywords)}
-    metrics = sorted(m for m in all_metrics if not any(ex in m for ex in exclude))
-    if not metrics:
-        print("No metrics to plot.")
-        return
-    if filter is not None:
-        metrics = filter
-        n_cols = len(metrics)
-        
-    # plot layout and colors
-    n_rows = int(np.ceil(len(metrics) / n_cols))
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(4.5*n_cols, heightfold*n_rows+1))
-    axs = np.array(axs).flatten()
-
-    # Calculate global X-axis range across all metrics
-    all_x_min = None
-    all_x_max = None
-    for flat in flat_results.values():
-        for metric in metrics:
-            if metric in flat:
-                r = flat[metric]
-                if all_x_min is None:
-                    all_x_min = min(r.timevec)
-                    all_x_max = max(r.timevec)
-                else:
-                    all_x_min = min(all_x_min, min(r.timevec))
-                    all_x_max = max(all_x_max, max(r.timevec))
-
-    # Fancy background gradient
-    if dark:
-        # fig.patch.set_facecolor("#606060")  # medium dark gray background
-        fig.patch.set_facecolor('lightgray') 
-        for ax in axs:
-            #ax.set_facecolor('#404040')  # dark gray for axes
-            ax.set_facecolor('darkgray')
-            ax.set_axisbelow(True)
-            ax.tick_params(colors='#222', which='both', width=spine_linewidth)
-            for spine in ax.spines.values():
-                spine.set_color('#888')
-                spine.set_linewidth(spine_linewidth)
-    else:
-        fig.patch.set_facecolor("#f7f7f7")
-        for ax in axs:
-            ax.set_facecolor('#f0f0f0')
-            ax.set_axisbelow(True)
-            ax.tick_params(colors='#222', which='both', width=spine_linewidth)
-            for spine in ax.spines.values():
-                spine.set_color('#888')
-                spine.set_linewidth(spine_linewidth)
-    
-    palette = plt.cm.get_cmap(cmap, len(flat_results))
-    if marker_styles is None:
-        marker_styles = ['o', 's', 'D', '^', 'v', 'P', 'X', '*', 'h', '8', 'p', '<', '>', 'H', 'd']
-
-    # plot each metric
-    for i, metric in enumerate(metrics):
-        ax = axs[i]
         for j, (scen, flat) in enumerate(flat_results.items()):
-            if metric in flat:
-                r = flat[metric]
-                color = palette(j)
-                marker = marker_styles[j % len(marker_styles)]
-                if plot_type == 'scatter':
-                    ax.scatter(r.timevec, r.values, label=scen, color=color, 
-                               s=marker_size, marker=marker, alpha=alpha, 
-                               edgecolor='darkgray', linewidths=markeredgewidth)
-                else:
-                    ax.plot(r.timevec, r.values, lw=line_width, label=scen, color=color, 
-                            alpha=alpha, marker=marker, markersize=marker_size, 
-                            markeredgewidth=markeredgewidth, markeredgecolor='darkgrey')
-                    
-        ax.set_title(metric, fontsize=title_fontsize, fontweight='light', color='navy' if dark else 'black')
-        ax.set_xlabel('Time', fontsize=label_fontsize, color='black' if dark else 'black', fontweight='light')
-        ax.tick_params(axis='both', labelsize=tick_fontsize, colors='black')
-        ax.grid(True, color='white' if dark else 'gray', alpha=grid_alpha, linestyle='--', linewidth=grid_linewidth)
-        # Set consistent X-axis range for all plots
-        ax.set_xlim(all_x_min, all_x_max)
-        
-        # Only add individual legends if shared_legend is False
-        if not shared_legend:
-            leg = ax.legend(fontsize=legend_fontsize, frameon=True, loc='best')
-            if leg: 
-                leg.get_frame().set_alpha(0.7)
-                leg.get_frame().set_facecolor('#eee')
-                for text in leg.get_texts():
-                    text.set_color('#222')
+            x, y = _as_1d_xy(flat.get(metric))
+            if x is None:
+                continue
+            color = palette(j)
+            # ls = '--' if j == 0 else '-'
+            ls = opts['line_style']
+            marker = mstyles[j % len(mstyles)] if use_markers else None
+            if opts['plot_type'] == 'scatter':
+                ax.scatter(x, y, label=scen, color=color, s=max(1, float(opts['marker_size'])) ** 2,
+                           marker=marker, alpha=opts['alpha'], edgecolor=opts['grid_color'], linewidths=opts['marker_edge_width'])
+            else:
+                ax.plot(x, y, lw=opts['line_width'], label=scen, color=color, linestyle=ls,
+                        alpha=opts['alpha'], marker=marker, markersize=opts['marker_size'],
+                        markeredgewidth=opts['marker_edge_width'], markeredgecolor=opts['grid_color'],
+                        zorder=10 if j == 0 else 5)
+        ax.set_title(metric_label, fontsize=opts['title_fontsize'], fontweight='light', color=fg)
+        ax.set_xlabel('Time', fontsize=opts['axis_label_fontsize'], color=fg)
+        ax.tick_params(axis='both', labelsize=opts['tick_fontsize'], colors=fg)
+        ax.grid(True, color=opts['grid_color'], alpha=opts['grid_alpha'], linestyle='--', linewidth=opts['grid_linewidth'])
+        if all_x_min is not None and all_x_max is not None:
+            ax.set_xlim(all_x_min, all_x_max)
+        if not opts['shared_legend']:
+            leg = ax.legend(fontsize=opts['legend_fontsize'], frameon=True, loc='best')
+            if leg:
+                leg.get_frame().set_alpha(0.8)
+                leg.get_frame().set_facecolor(fig_bg)
+                for t in leg.get_texts():
+                    t.set_color(fg)
 
-    # remove unused axes
     for ax in axs[len(metrics):]:
         fig.delaxes(ax)
 
-    # Create shared legend if requested
-    if shared_legend:
-        # Collect all unique handles and labels from all subplots to get maximum coverage
-        all_handles = []
-        all_labels = []
-        seen_labels = set()
-        
+    if opts['shared_legend']:
+        all_handles, all_labels, seen = [], [], set()
         for ax in axs[:len(metrics)]:
-            handles, labels = ax.get_legend_handles_labels()
-            for handle, label in zip(handles, labels):
-                if label not in seen_labels:
-                    all_handles.append(handle)
-                    all_labels.append(label)
-                    seen_labels.add(label)
-        
+            for h, lbl in zip(*ax.get_legend_handles_labels()):
+                if lbl and lbl not in seen:
+                    all_handles.append(h)
+                    all_labels.append(lbl)
+                    seen.add(lbl)
         if all_handles and all_labels:
-            # Create shared legend with all unique entries
-            fig.legend(all_handles, all_labels, loc=legend_position, fontsize=legend_fontsize, 
-                      frameon=True, fancybox=True, shadow=True)
-            # Style the shared legend
-            legend = fig.legends[-1]
-            legend.get_frame().set_alpha(0.9)
-            legend.get_frame().set_facecolor('#f0f0f0')
-            legend.get_frame().set_edgecolor('#888')
-            for text in legend.get_texts():
-                text.set_color('#222')
+            leg = fig.legend(all_handles, all_labels, loc=opts['legend_position'], fontsize=opts['legend_fontsize'],
+                             frameon=True, fancybox=True)
+            leg.get_frame().set_alpha(0.9)
+            leg.get_frame().set_facecolor(fig_bg)
+            leg.get_frame().set_edgecolor(opts['grid_color'])
+            for t in leg.get_texts():
+                t.set_color(fg)
 
     if title:
-        fig.suptitle(title, fontsize=12, color='white' if dark else 'black')
+        fig.suptitle(title, fontsize=12, color=fg)
 
     plt.tight_layout(pad=2.0)
-
     if savefig:
-        out = out_to(outdir)
-        fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
-        print(f"Saved figure to {out}")
-    plt.show()
+        try:
+            out = out_to(output_dir)
+            fig.savefig(out, dpi=300, facecolor=fig.get_facecolor())
+            print(f"Saved figure to {out}")
+        except OSError as e:
+            print(f"Warning: could not save figure: {e}")
+    if show:
+        plt.show()
 
-    return
+    return fig
+
+
+_DEFAULT_STYLE = dict(
+    mpl_style   = 'default',
+    cmap        = 'tab10',
+    alpha       = 0.85,
+    plot_type   = 'line',
+    line_width  = 1.2,
+    marker_size = 0.5,
+    use_markers = False,
+    marker_styles      = None,
+    marker_edge_width  = 0.2,
+    grid_color         = 'white',
+    grid_alpha         = 0.25,
+    grid_linewidth     = 0.2,
+    spine_linewidth    = 0.5,
+    title_fontsize     = 10,
+    legend_fontsize    = 7,
+    axis_label_fontsize = 6,
+    tick_fontsize      = 6,
+    shared_legend      = True,
+    legend_position    = 'upper left',
+    line_style         = '-',
+)
+
+def _normalize_results(results):
+    """Convert MultiSim, Sim, or dict into a dict of label -> flat result dict."""
+    if hasattr(results, 'sims') and results.sims is not None:
+        # MultiSim: unpack sims and flatten each
+        return {sim.label: sim.results.flatten() for sim in results.sims}
+    if hasattr(results, 'results') and hasattr(results, 'label'):
+        # Single Sim
+        return {results.label: results.results.flatten()}
+    if isinstance(results, dict):
+        return results
+    raise TypeError(
+        f"results must be MultiSim, Sim, or dict of flat results; got {type(results).__name__}"
+    )
+
+
+def _validate_flat_results(flat_results):
+    """Ensure each value is a dict of metric name -> result with timevec and values."""
+    if not flat_results:
+        raise ValueError("flat_results is empty")
+    out = {}
+    for label, flat in flat_results.items():
+        if not isinstance(flat, dict):
+            raise TypeError(f"flat_results[{label!r}] must be dict; got {type(flat).__name__}")
+        normalized = {}
+        for k, v in flat.items():
+            sk = str(k)
+            if not hasattr(v, 'timevec') or not hasattr(v, 'values'):
+                raise TypeError(
+                    f"flat_results[{label!r}][{sk}] must have timevec and values; got {type(v).__name__}"
+                )
+            normalized[sk] = v
+        out[str(label)] = normalized
+    return out
+
+
+def _parse_exclude_patterns(items):
+    """Return list of patterns from '~Something' or list like ['~None','~temp'] (strip leading ~)."""
+    if not items:
+        return []
+    it = (items,) if isinstance(items, str) else items
+    return [p[1:] if isinstance(p, str) and p.startswith('~') else str(p) for p in it if p]
+
+
+def _as_list(values):
+    """Return a list from scalar/list-like input."""
+    if values is None:
+        return []
+    if isinstance(values, (list, tuple, set)):
+        return list(values)
+    return [values]
+
+
+def _select_metrics(all_metrics, select_spec, flat_results):
+    """Filter all_metrics by select_spec (None/list/dict with items, like, regex, exclude)."""
+    available = {m for m in all_metrics if any(m in flat for flat in flat_results.values())}
+
+    if select_spec is None:
+        exclude = _parse_exclude_patterns(['~None'])
+        return sorted(m for m in available if not any(pat in m for pat in exclude))
+
+    exclude_patterns = []
+    resolved = set()
+
+    if isinstance(select_spec, str):
+        resolved = {select_spec} if select_spec in available else set()
+    elif isinstance(select_spec, (list, tuple, set)):
+        include_items = [x for x in select_spec if not (isinstance(x, str) and x.startswith('~'))]
+        exclude_patterns = _parse_exclude_patterns([x for x in select_spec if isinstance(x, str) and x.startswith('~')])
+        if include_items:
+            resolved = {m for m in include_items if m in available}
+        else:
+            resolved = available
+    elif isinstance(select_spec, dict):
+        exclude_patterns = _parse_exclude_patterns(select_spec.get('exclude', []))
+        if 'items' in select_spec:
+            resolved |= {m for m in _as_list(select_spec['items']) if m in available}
+        if 'like' in select_spec:
+            pats = _as_list(select_spec['like'])
+            for p in pats:
+                resolved |= {m for m in available if str(p) in m}
+        if 'regex' in select_spec:
+            pat = re.compile(str(select_spec['regex']))
+            resolved |= {m for m in available if pat.search(m)}
+        if not any(k in select_spec for k in ('items', 'like', 'regex')):
+            resolved = available
+    else:
+        resolved = available
+
+    exclude_fn = lambda m: any(pat in m for pat in exclude_patterns)
+    return sorted(m for m in resolved if not exclude_fn(m))
+
+
+def _fill_missing_metrics(flat_results, metrics):
+    """Fill missing metrics in each scenario with zero series using a reference timevec."""
+    ref_timevec = {}
+    for flat in flat_results.values():
+        for m in metrics:
+            if m in flat and m not in ref_timevec:
+                ref_timevec[m] = flat[m].timevec
+    # Fill missing
+    for label, flat in flat_results.items():
+        for m in metrics:
+            if m not in flat and m in ref_timevec:
+                tv = ref_timevec[m]
+                n = len(tv)
+                flat[m] = _ZeroResult(tv, np.zeros(n))
+    return flat_results, ref_timevec
+
+
+class _ZeroResult:
+    """Simple result-like object used for missing metric padding."""
+
+    def __init__(self, timevec, values):
+        self.timevec = timevec
+        self.values = np.asarray(values, dtype=float)
+
+
+def _as_1d_xy(result):
+    """Return (x, y) 1D arrays from a result with timevec and values; (None, None) if invalid."""
+    if result is None or not hasattr(result, 'timevec') or not hasattr(result, 'values'):
+        return None, None
+
+    x = np.asarray(result.timevec)
+    if x.size == 0:
+        return None, None
+    x = np.ravel(x)
+
+    y = np.asarray(result.values)
+    if y.size == 0:
+        return x, np.asarray([])
+    if y.ndim > 1:
+        y = np.nanmean(y, axis=tuple(range(1, y.ndim)))
+    y = np.ravel(y)
+
+    n = min(len(x), len(y))
+    return x[:n], y[:n]
+
+
+def _safe_min_max(x):
+    """Return (min, max) for array x, or (None, None) if empty or invalid."""
+    if x is None:
+        return None, None
+    try:
+        a = np.asarray(x)
+        if a.size == 0:
+            return None, None
+        return np.nanmin(a), np.nanmax(a)
+    except (TypeError, ValueError):
+        return None, None
 
 
 def out_to(outdir):
-    """Return a timestamped output file path inside ``outdir``, creating the directory if needed."""
-    timestamp = sc.now(dateformat='%Y%m%d_%H%M%S') 
-    # Determine script directory in a cross-platform way
-    if hasattr(sys.modules['__main__'], '__file__'):
-        script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
-    else:
-        script_dir = os.getcwd()
-
-    outdir = 'results' if outdir is None else outdir
-    outdir = os.path.join(script_dir, outdir)
-    os.makedirs(outdir, exist_ok=True)   
-    out = os.path.join(outdir, f'scenarios_{timestamp}.png')
-    return out
+    """Return a timestamped output file path inside outdir, creating the directory if needed."""
+    try:
+        timestamp = sc.now(dateformat='%Y%m%d_%H%M%S')
+        if hasattr(sys.modules.get('__main__'), '__file__'):
+            script_dir = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
+        else:
+            script_dir = os.getcwd()
+        outdir = 'results' if outdir is None else outdir
+        outdir = os.path.join(script_dir, outdir)
+        os.makedirs(outdir, exist_ok=True)
+        out = os.path.join(outdir, f'scenarios_{timestamp}.png')
+        return out
+    except OSError as e:
+        raise OSError(f"Cannot create output path for figure: {e}") from e
     
-class FILTERS():
-    """Predefined metric-name filters for use with ``plot_results``."""
-    important_metrics = [
-        'tb_prevalence_active',
-        'tb_prevalence', 
-        'cum_deaths' ]

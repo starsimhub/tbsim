@@ -82,5 +82,7 @@ if __name__ == "__main__":
     }
     # making the keys similar to plot them combined
     results['TB Acute'] = {k.replace("_acute", ""): v for k, v in results['TB Acute'].items()}
-    tbsim.plot_combined(results, title="TB LSHTM: with acute vs without acute")
+    tbsim.plot(results, title="TB LSHTM: with acute vs without acute")
+    
+    msim.plot()
     plt.show()

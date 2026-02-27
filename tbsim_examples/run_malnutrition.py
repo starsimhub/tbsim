@@ -101,7 +101,7 @@ if __name__ == '__main__':
     sim_n = make_malnutrition()
     sim_n.run()
     results = {'malnutrition': sim_n.results.flatten()}
-    tbsim.plot_combined(results, n_cols=3, dark=True)
+    tbsim.plot(results, n_cols=3)
 
     # Make TB-malnutrition simulation
     sim_tbn = make_tb_nut()
