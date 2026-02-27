@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 
 # External packages - project dependencies
 import sciris as sc
-import starsim as ss
 
 __all__ = ['plot']
 
@@ -27,6 +26,7 @@ def plot(
     n_cols=6,
     row_height=1.5,
     style=None,
+    show=True,
 ):
     """Plot simulation results (MultiSim, Sim, or flat results dict).
 
@@ -97,8 +97,6 @@ def plot(
     fg = '#eaeaea' if dark else '#111'
     ax_bg = '#2b2b2b' if dark else '#f0f0f0'
     fig_bg = '#1e1e1e' if dark else '#f7f7f7'
-    grid_color = '#9a9a9a' if dark else '#777'
-
     try:
         plt.style.use(opts['mpl_style'])
     except Exception:
@@ -167,15 +165,15 @@ def plot(
                 continue
             color = palette(j)
             # ls = '--' if j == 0 else '-'
-            ls = '-'
+            ls = opts['line_style']
             marker = mstyles[j % len(mstyles)] if use_markers else None
             if opts['plot_type'] == 'scatter':
                 ax.scatter(x, y, label=scen, color=color, s=max(1, float(opts['marker_size'])) ** 2,
-                           marker=marker, alpha=opts['alpha'], edgecolor=grid_color, linewidths=opts['marker_edge_width'])
+                           marker=marker, alpha=opts['alpha'], edgecolor=opts['grid_color'], linewidths=opts['marker_edge_width'])
             else:
                 ax.plot(x, y, lw=opts['line_width'], label=scen, color=color, linestyle=ls,
                         alpha=opts['alpha'], marker=marker, markersize=opts['marker_size'],
-                        markeredgewidth=opts['marker_edge_width'], markeredgecolor=grid_color,
+                        markeredgewidth=opts['marker_edge_width'], markeredgecolor=opts['grid_color'],
                         zorder=10 if j == 0 else 5)
         ax.set_title(metric_label, fontsize=opts['title_fontsize'], fontweight='light', color=fg)
         ax.set_xlabel('Time', fontsize=opts['axis_label_fontsize'], color=fg)
@@ -207,7 +205,7 @@ def plot(
                              frameon=True, fancybox=True)
             leg.get_frame().set_alpha(0.9)
             leg.get_frame().set_facecolor(fig_bg)
-            leg.get_frame().set_edgecolor(grid_color)
+            leg.get_frame().set_edgecolor(opts['grid_color'])
             for t in leg.get_texts():
                 t.set_color(fg)
 
@@ -222,9 +220,10 @@ def plot(
             print(f"Saved figure to {out}")
         except OSError as e:
             print(f"Warning: could not save figure: {e}")
-    plt.show()
+    if show:
+        plt.show()
 
-    return
+    return fig
 
 
 _DEFAULT_STYLE = dict(
@@ -293,6 +292,15 @@ def _parse_exclude_patterns(items):
     return [p[1:] if isinstance(p, str) and p.startswith('~') else str(p) for p in it if p]
 
 
+def _as_list(values):
+    """Return a list from scalar/list-like input."""
+    if values is None:
+        return []
+    if isinstance(values, (list, tuple, set)):
+        return list(values)
+    return [values]
+
+
 def _select_metrics(all_metrics, select_spec, flat_results):
     """Filter all_metrics by select_spec (None/list/dict with items, like, regex, exclude)."""
     available = {m for m in all_metrics if any(m in flat for flat in flat_results.values())}
@@ -304,7 +312,9 @@ def _select_metrics(all_metrics, select_spec, flat_results):
     exclude_patterns = []
     resolved = set()
 
-    if isinstance(select_spec, (list, tuple)):
+    if isinstance(select_spec, str):
+        resolved = {select_spec} if select_spec in available else set()
+    elif isinstance(select_spec, (list, tuple, set)):
         include_items = [x for x in select_spec if not (isinstance(x, str) and x.startswith('~'))]
         exclude_patterns = _parse_exclude_patterns([x for x in select_spec if isinstance(x, str) and x.startswith('~')])
         if include_items:
@@ -314,14 +324,16 @@ def _select_metrics(all_metrics, select_spec, flat_results):
     elif isinstance(select_spec, dict):
         exclude_patterns = _parse_exclude_patterns(select_spec.get('exclude', []))
         if 'items' in select_spec:
-            resolved |= {m for m in select_spec['items'] if m in available}
+            resolved |= {m for m in _as_list(select_spec['items']) if m in available}
         if 'like' in select_spec:
-            pats = select_spec['like'] if isinstance(select_spec['like'], (list, tuple)) else [select_spec['like']]
+            pats = _as_list(select_spec['like'])
             for p in pats:
-                resolved |= {m for m in available if p in m}
+                resolved |= {m for m in available if str(p) in m}
         if 'regex' in select_spec:
-            pat = re.compile(select_spec['regex'])
+            pat = re.compile(str(select_spec['regex']))
             resolved |= {m for m in available if pat.search(m)}
+        if not any(k in select_spec for k in ('items', 'like', 'regex')):
+            resolved = available
     else:
         resolved = available
 
@@ -342,13 +354,16 @@ def _fill_missing_metrics(flat_results, metrics):
             if m not in flat and m in ref_timevec:
                 tv = ref_timevec[m]
                 n = len(tv)
-                # Create a Result-like object with zeros
-                class _ZeroResult:
-                    def __init__(self, timevec, values):
-                        self.timevec = timevec
-                        self.values = np.asarray(values, dtype=float)
                 flat[m] = _ZeroResult(tv, np.zeros(n))
     return flat_results, ref_timevec
+
+
+class _ZeroResult:
+    """Simple result-like object used for missing metric padding."""
+
+    def __init__(self, timevec, values):
+        self.timevec = timevec
+        self.values = np.asarray(values, dtype=float)
 
 
 def _as_1d_xy(result):
