@@ -77,13 +77,13 @@ if __name__ == "__main__":
         for label, sim in zip(scenarios.keys(), msim.sims)
     }
 
-    mtb.plot_combined(
+    mtb.plot(
         results,
-        keywords = ["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"],
+        select = dict(like=["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"]),
         title    = "Health-seeking behaviour – LSHTM TB model",
         n_cols   = 3,
-        outdir   = "results",
-        dark     = False,
+        output_dir   = "results",
+        theme     = 'light',
     )
     plt.show()
     

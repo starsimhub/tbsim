@@ -89,11 +89,10 @@ if __name__ == '__main__':
    # Process and visualize results
    results = sim.results.flatten()
    results = {'basic': results}
-   tbsim.plot_combined(
+   tbsim.plot(
       results, 
-      dark=True, 
-      n_cols=3, 
-      filter=tbsim.FILTERS.important_metrics
+      theme='light', 
+      n_cols=3
    )
    
    plt.show()
