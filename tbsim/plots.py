@@ -135,20 +135,32 @@ def plot(
         for spine in ax.spines.values():
             spine.set_visible(False)
 
-    try:
-        _cm = plt.colormaps.get_cmap(opts['cmap']).resampled(len(flat_results))
-    except Exception:
-        _cm = plt.cm.get_cmap(opts['cmap'], len(flat_results))
     n_scen = len(flat_results)
+    try:
+        _cm = plt.colormaps.get_cmap(opts['cmap'])
+    except Exception:
+        _cm = plt.cm.get_cmap(opts['cmap'])
 
     def palette(j):
-        return _cm(j / max(1, n_scen - 1)) if n_scen > 1 else _cm(0)
+        # Just get the next color from the colormap
+        return _cm(j)
 
     mstyles = opts['marker_styles'] or ['o', 's', 'D', '^', 'v', 'P', 'X', '*', 'h', '8', 'p', '<', '>', 'H', 'd']
     use_markers = bool(opts.get('use_markers', False))
 
     for i, metric in enumerate(metrics):
         ax = axs[i]
+        # Get the label from the first available result object
+        metric_label = metric
+        for flat in flat_results.values():
+            result = flat.get(metric)
+            if result is not None:
+                if hasattr(result, 'full_label'):
+                    metric_label = result.full_label
+                elif hasattr(result, 'label') and result.label:
+                    metric_label = result.label
+                break
+        
         for j, (scen, flat) in enumerate(flat_results.items()):
             x, y = _as_1d_xy(flat.get(metric))
             if x is None:
@@ -165,7 +177,7 @@ def plot(
                         alpha=opts['alpha'], marker=marker, markersize=opts['marker_size'],
                         markeredgewidth=opts['marker_edge_width'], markeredgecolor=grid_color,
                         zorder=10 if j == 0 else 5)
-        ax.set_title(metric, fontsize=opts['title_fontsize'], fontweight='light', color=fg)
+        ax.set_title(metric_label, fontsize=opts['title_fontsize'], fontweight='light', color=fg)
         ax.set_xlabel('Time', fontsize=opts['axis_label_fontsize'], color=fg)
         ax.tick_params(axis='both', labelsize=opts['tick_fontsize'], colors=fg)
         ax.grid(True, color=opts['grid_color'], alpha=opts['grid_alpha'], linestyle='--', linewidth=opts['grid_linewidth'])
@@ -217,7 +229,7 @@ def plot(
 
 _DEFAULT_STYLE = dict(
     mpl_style   = 'default',
-    cmap        = 'plasma',
+    cmap        = 'tab10',
     alpha       = 0.85,
     plot_type   = 'line',
     line_width  = 1.2,
