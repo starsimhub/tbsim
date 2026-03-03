@@ -20,7 +20,7 @@ import sciris as sc
 import starsim as ss
 import tbsim
 
-__all__ = ['DwellTime', 'DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor']
+__all__ = ['DwellTime', 'DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor', 'HouseholdStats']
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -631,3 +631,152 @@ DwellTime._PLOT_KINDS = {
 DwtPlotter = DwellTime
 DwtPostProcessor = DwellTime
 DwtAnalyzer = DwellTime
+
+
+class HouseholdStats(ss.Analyzer):
+    """
+    Track household size and age distribution statistics over time.
+
+    Works with any network that exposes a ``household_ids`` state (e.g.
+    ``starsim_examples.EvolvingHouseholdDHSNet``).  At each timestep the
+    analyzer counts alive agents per household and records summary statistics.
+
+    Args:
+        network_name (str): Name of the household network on ``sim.networks``
+            (default ``'evolvinghouseholddhsnet'``).
+        age_bins (tuple): Bin edges for the age distribution histogram
+            (default ``(0, 5, 15, 50, 100)``).
+
+    Results (per timestep):
+        mean_hh_size, median_hh_size, max_hh_size, n_households,
+        mean_age, and one count per age bin.
+
+    Example::
+
+        import starsim as ss
+        import starsim_examples as sse
+        import tbsim
+
+        dhs_data = ...  # pandas DataFrame with hh_id and ages columns
+        net = sse.EvolvingHouseholdDHSNet(dhs_data=dhs_data)
+        analyzer = tbsim.HouseholdStats(network_name='evolvinghouseholddhsnet')
+        sim = ss.Sim(
+            diseases='sis', networks=net,
+            demographics=[ss.Pregnancy(fertility_rate=20), ss.Deaths(death_rate=10)],
+            analyzers=analyzer,
+        )
+        sim.run()
+        analyzer.plot()
+    """
+
+    def __init__(self, network_name='evolvinghouseholddhsnet', age_bins=(0, 5, 15, 50, 100), **kwargs):
+        super().__init__(**kwargs)
+        self.network_name = network_name
+        self.age_bins = list(age_bins)
+        self.hh_size_hists = []  # per-timestep lists of household sizes
+        return
+
+    def init_results(self):
+        super().init_results()
+        results = [
+            ss.Result('mean_hh_size'),
+            ss.Result('median_hh_size'),
+            ss.Result('max_hh_size'),
+            ss.Result('n_households'),
+            ss.Result('mean_age'),
+        ]
+        for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:]):
+            results.append(ss.Result(f'age_{lo}_{hi}'))
+        self.define_results(*results)
+        return
+
+    def step(self):
+        sim = self.sim
+        ti = sim.ti
+        net = sim.networks[self.network_name]
+        ppl = sim.people
+        alive = ppl.alive
+
+        # --- Household sizes (alive agents only) ---
+        hh_ids = net.household_ids[alive.uids]
+        unique_ids, counts = np.unique(hh_ids, return_counts=True)
+
+        self.results['mean_hh_size'][ti] = np.mean(counts) if len(counts) else 0
+        self.results['median_hh_size'][ti] = np.median(counts) if len(counts) else 0
+        self.results['max_hh_size'][ti] = np.max(counts) if len(counts) else 0
+        self.results['n_households'][ti] = len(unique_ids)
+        self.hh_size_hists.append(counts.copy())
+
+        # --- Age distribution (alive agents only) ---
+        ages = ppl.age[alive.uids]
+        self.results['mean_age'][ti] = np.mean(ages) if len(ages) else 0
+        for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:]):
+            n = np.sum((ages >= lo) & (ages < hi))
+            self.results[f'age_{lo}_{hi}'][ti] = n
+        return
+
+    def finalize_results(self):
+        super().finalize_results()
+        self.hh_size_hists = [np.array(h) for h in self.hh_size_hists]
+        return
+
+    def plot(self, **kwargs):
+        """Plot household size and age distribution trends."""
+        kw = ss.plot_args(kwargs)
+        timevec = self.sim.t.timevec
+
+        with ss.style(**kw.style):
+            fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+            # -- Household size over time --
+            ax = axes[0, 0]
+            ax.plot(timevec, self.results['mean_hh_size'], label='Mean')
+            ax.plot(timevec, self.results['median_hh_size'], label='Median', linestyle='--')
+            ax.set_ylabel('Household size')
+            ax.set_xlabel('Year')
+            ax.set_title('Household size over time')
+            ax.legend()
+            ax.set_ylim(bottom=0)
+
+            # -- Number of households --
+            ax = axes[0, 1]
+            ax.plot(timevec, self.results['n_households'])
+            ax.set_ylabel('Count')
+            ax.set_xlabel('Year')
+            ax.set_title('Number of households')
+            ax.set_ylim(bottom=0)
+
+            # -- Age distribution over time (stacked area) --
+            ax = axes[1, 0]
+            bin_labels = []
+            bin_data = []
+            for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:]):
+                bin_labels.append(f'{lo}-{hi}')
+                bin_data.append(np.array(self.results[f'age_{lo}_{hi}']))
+            ax.stackplot(timevec, *bin_data, labels=bin_labels, alpha=0.8)
+            ax.set_ylabel('Number of agents')
+            ax.set_xlabel('Year')
+            ax.set_title('Age distribution over time')
+            ax.legend(loc='upper left', fontsize=8)
+
+            # -- Initial vs final household size distribution --
+            ax = axes[1, 1]
+            if len(self.hh_size_hists) >= 2:
+                initial_sizes = self.hh_size_hists[0]
+                final_sizes = self.hh_size_hists[-1]
+                max_size = int(max(np.max(initial_sizes), np.max(final_sizes)))
+                size_range = np.arange(1, max_size + 1)
+                initial_counts = np.array([np.sum(initial_sizes == s) for s in size_range])
+                final_counts = np.array([np.sum(final_sizes == s) for s in size_range])
+                width = 0.35
+                ax.bar(size_range - width/2, initial_counts, width, edgecolor='black', label=f'Initial (t={float(timevec[0]):.0f})')
+                ax.bar(size_range + width/2, final_counts, width, edgecolor='black', label=f'Final (t={float(timevec[-1]):.0f})')
+                ax.set_xlabel('Household size')
+                ax.set_ylabel('Number of households')
+                ax.set_title('Household size distribution')
+                ax.set_xticks(size_range)
+                ax.legend()
+
+            plt.tight_layout()
+
+        return ss.return_fig(fig, **kw.return_fig)
