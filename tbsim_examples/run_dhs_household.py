@@ -35,7 +35,7 @@ disease = ss.SIS(beta=0.1, dur_inf=10)
 
 analyzer = tbsim.HouseholdStats(
     network_name='evolvinghouseholddhsnet',
-    age_bins=(0, 5, 15, 30, 50, 100),
+    age_bins=(0, 5, 15, 20, 30, 40, 50, 75, 100),
 )
 
 # -- 3. Create and run sim ----------------------------------------------------
