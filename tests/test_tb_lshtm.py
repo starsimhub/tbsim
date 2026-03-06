@@ -307,12 +307,12 @@ def test_new_events_non_negative():
     assert np.all(tb.results["new_notifications_15+"][:] >= 0)
 
 
-def test_susceptible_only_cleared_recovered_treated_or_never_infected():
-    """susceptible is True only for state in SUSCEPTIBLE, CLEARED, RECOVERED, TREATED."""
+def test_susceptible_only_cleared_or_never_infected():
+    """susceptible is True only for state in SUSCEPTIBLE or CLEARED."""
     sim = make_lshtm_sim(n_agents=80, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
     sim.run()
     tb = tbsim.get_tb(sim)
-    susceptible_states = {TBSL.SUSCEPTIBLE, TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED}
+    susceptible_states = {TBSL.SUSCEPTIBLE, TBSL.CLEARED}
     for i in range(len(tb.state)):
         if tb.susceptible[i]:
             assert tb.state[i] in susceptible_states, (
@@ -325,22 +325,16 @@ def test_susceptible_only_cleared_recovered_treated_or_never_infected():
 
 
 def test_rel_sus_rel_trans_after_step():
-    """After step, RECOVERED have rel_sus=rr_rec, TREATED rel_sus=rr_treat, ASYMPTOMATIC rel_trans=trans_asymp."""
+    """After step, CLEARED agents have rel_sus == rr_reinfection; ASYMPTOMATIC have rel_trans == trans_asymp."""
     sim = make_lshtm_sim(n_agents=60)
-    sim.init()
-    tb = tbsim.get_tb(sim)
     sim.run()
     tb = tbsim.get_tb(sim)
-    rr_rec, rr_treat, trans_asymp = tb.pars.rr_rec, tb.pars.rr_treat, tb.pars.trans_asymp
-    recovered_uids = ss.uids(tb.state == TBSL.RECOVERED)
-    treated_uids = ss.uids(tb.state == TBSL.TREATED)
+    cleared_uids = ss.uids(tb.state == TBSL.CLEARED)
     asymp_uids = ss.uids(tb.state == TBSL.ASYMPTOMATIC)
-    if len(recovered_uids) > 0:
-        assert np.allclose(tb.rel_sus[recovered_uids], rr_rec)
-    if len(treated_uids) > 0:
-        assert np.allclose(tb.rel_sus[treated_uids], rr_treat)
+    if len(cleared_uids) > 0:
+        assert np.allclose(tb.rel_sus[cleared_uids], tb.rr_reinfection[cleared_uids])
     if len(asymp_uids) > 0:
-        assert np.allclose(tb.rel_trans[asymp_uids], trans_asymp)
+        assert np.allclose(tb.rel_trans[asymp_uids], tb.pars.trans_asymp)
 
 
 def test_start_treatment_mixed_latent_active_ignores_cleared():
