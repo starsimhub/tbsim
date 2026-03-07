@@ -638,12 +638,12 @@ class HouseholdStats(ss.Analyzer):
     Track household size, age, and contact-mixing statistics over time.
 
     Works with any network that exposes a ``household_ids`` state (e.g.
-    ``starsim_examples.EvolvingHouseholdDHSNet``).  At each timestep the
+    ``starsim.HouseholdNet``).  At each timestep the
     analyzer counts alive agents per household and records summary statistics.
 
     Args:
         network_name (str): Name of the household network on ``sim.networks``
-            (default ``'evolvinghouseholddhsnet'``).
+            (default ``'householdnet'``).
         age_bins (tuple): Bin edges for the age distribution histogram
             (default ``(0, 5, 15, 50, 100)``).
 
@@ -666,8 +666,8 @@ class HouseholdStats(ss.Analyzer):
         import tbsim
 
         dhs_data = ...  # pandas DataFrame with hh_id and ages columns
-        net = sse.EvolvingHouseholdDHSNet(dhs_data=dhs_data)
-        analyzer = tbsim.HouseholdStats(network_name='evolvinghouseholddhsnet')
+        net = ss.HouseholdNet(dhs_data=dhs_data)
+        analyzer = tbsim.HouseholdStats(network_name='householdnet')
         sim = ss.Sim(
             diseases='sis', networks=net,
             demographics=[ss.Pregnancy(fertility_rate=20), ss.Deaths(death_rate=10)],
@@ -677,7 +677,7 @@ class HouseholdStats(ss.Analyzer):
         analyzer.plot()
     """
 
-    def __init__(self, network_name='evolvinghouseholddhsnet', age_bins=(0, 5, 15, 50, 100), **kwargs):
+    def __init__(self, network_name='householdnet', age_bins=(0, 5, 15, 50, 100), **kwargs):
         super().__init__(**kwargs)
         self.network_name = network_name
         self.age_bins = list(age_bins)

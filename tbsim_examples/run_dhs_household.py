@@ -10,7 +10,6 @@ time using tbsim.HouseholdStats.
 import numpy as np
 import sciris as sc
 import starsim as ss
-import starsim_examples as sse
 import tbsim
 
 
@@ -27,14 +26,14 @@ for _ in range(n_households):
 dhs_data = sc.dataframe(hh_id=hh_ids, ages=age_strings)
 
 # -- 2. Build simulation components -------------------------------------------
-net = sse.EvolvingHouseholdDHSNet(dhs_data=dhs_data, prob_move_out=0.7)
+net = ss.HouseholdNet(dhs_data=dhs_data, prob_move_out=0.7)
 
 pregnancy = ss.Pregnancy(fertility_rate=20)
 deaths = ss.Deaths(death_rate=10)
 disease = ss.SIS(beta=0.1, dur_inf=10)
 
 analyzer = tbsim.HouseholdStats(
-    network_name='evolvinghouseholddhsnet',
+    network_name='householdnet',
     age_bins=(0, 5, 15, 20, 30, 40, 50, 75, 100),
 )
 
