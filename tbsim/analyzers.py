@@ -20,7 +20,7 @@ import sciris as sc
 import starsim as ss
 import tbsim
 
-__all__ = ['DwellTime', 'DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor']
+__all__ = ['DwellTime', 'DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor', 'HouseholdStats']
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -631,3 +631,247 @@ DwellTime._PLOT_KINDS = {
 DwtPlotter = DwellTime
 DwtPostProcessor = DwellTime
 DwtAnalyzer = DwellTime
+
+
+class HouseholdStats(ss.Analyzer):
+    """
+    Track household size, age, and contact-mixing statistics over time.
+
+    Works with any network that exposes a ``household_ids`` state (e.g.
+    ``starsim.HouseholdNet``).  At each timestep the
+    analyzer counts alive agents per household and records summary statistics.
+
+    Args:
+        network_name (str): Name of the household network on ``sim.networks``
+            (default ``'householdnet'``).
+        age_bins (tuple): Bin edges for the age distribution histogram
+            (default ``(0, 5, 15, 50, 100)``).
+
+    Results (per timestep):
+        mean_hh_size, median_hh_size, max_hh_size, n_households,
+        mean_hh_age, median_hh_age, mean_age, and one count per age bin.
+
+    Plots:
+        ``plot_stats()`` -- four-panel figure: household size over time,
+            number of households, average household age over time, and
+            initial vs. final household size distribution.
+        ``plot_matrix()`` -- three-panel figure: age distribution over time,
+            age-mixing matrix at simulation start, age-mixing matrix at end.
+        ``plot()`` -- calls both of the above.
+
+    Example::
+
+        import starsim as ss
+        import starsim_examples as sse
+        import tbsim
+
+        dhs_data = ...  # pandas DataFrame with hh_id and ages columns
+        net = ss.HouseholdNet(dhs_data=dhs_data)
+        analyzer = tbsim.HouseholdStats(network_name='householdnet')
+        sim = ss.Sim(
+            diseases='sis', networks=net,
+            demographics=[ss.Pregnancy(fertility_rate=20), ss.Deaths(death_rate=10)],
+            analyzers=analyzer,
+        )
+        sim.run()
+        analyzer.plot()
+    """
+
+    def __init__(self, network_name='householdnet', age_bins=(0, 5, 15, 50, 100), **kwargs):
+        super().__init__(**kwargs)
+        self.network_name = network_name
+        self.age_bins = list(age_bins)
+        self.hh_size_hists = []       # per-timestep arrays of per-household sizes
+        self.age_mixing_initial = None  # age-mixing matrix at t=0
+        self.age_mixing_final = None    # age-mixing matrix at last step
+        return
+
+    def init_results(self):
+        super().init_results()
+        results = [
+            ss.Result('mean_hh_size'),
+            ss.Result('median_hh_size'),
+            ss.Result('max_hh_size'),
+            ss.Result('n_households'),
+            ss.Result('mean_hh_age'),
+            ss.Result('median_hh_age'),
+            ss.Result('mean_age'),
+        ]
+        for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:]):
+            results.append(ss.Result(f'age_{lo}_{hi}'))
+        self.define_results(*results)
+        return
+
+    def step(self):
+        sim = self.sim
+        ti = sim.ti
+        net = sim.networks[self.network_name]
+        ppl = sim.people
+        alive = ppl.alive
+
+        # --- Gather per-agent data and sort by household for efficient grouping ---
+        hh_ids = net.household_ids[alive.uids]
+        ages = ppl.age[alive.uids]
+
+        sort_idx = np.argsort(hh_ids)
+        hh_ids_sorted = hh_ids[sort_idx]
+        ages_sorted = ages[sort_idx]
+
+        unique_ids, counts = np.unique(hh_ids_sorted, return_counts=True)
+        split_pts = np.cumsum(counts)[:-1]
+        hh_age_groups = np.split(ages_sorted, split_pts)
+
+        # --- Household sizes ---
+        self.results['mean_hh_size'][ti] = np.mean(counts) if len(counts) else 0
+        self.results['median_hh_size'][ti] = np.median(counts) if len(counts) else 0
+        self.results['max_hh_size'][ti] = np.max(counts) if len(counts) else 0
+        self.results['n_households'][ti] = len(unique_ids)
+        self.hh_size_hists.append(counts.copy())
+
+        # --- Per-household mean age ---
+        hh_mean_ages = np.array([np.mean(g) for g in hh_age_groups])
+        self.results['mean_hh_age'][ti] = np.mean(hh_mean_ages) if len(hh_mean_ages) else 0
+        self.results['median_hh_age'][ti] = np.median(hh_mean_ages) if len(hh_mean_ages) else 0
+
+        # --- Population age distribution ---
+        self.results['mean_age'][ti] = np.mean(ages) if len(ages) else 0
+        for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:]):
+            self.results[f'age_{lo}_{hi}'][ti] = np.sum((ages >= lo) & (ages < hi))
+
+        # --- Age-mixing matrix (household pairwise contacts) ---
+        n_bins = len(self.age_bins) - 1
+        age_bin_idx = np.clip(np.digitize(ages_sorted, self.age_bins) - 1, 0, n_bins - 1)
+        hh_bin_groups = np.split(age_bin_idx, split_pts)
+        mix = np.zeros((n_bins, n_bins), dtype=float)
+        for hh_bins in hh_bin_groups:
+            if len(hh_bins) < 2:
+                continue
+            bc = np.bincount(hh_bins, minlength=n_bins)
+            pm = np.outer(bc, bc)
+            pm[np.diag_indices(n_bins)] = bc * (bc - 1)  # ordered within-group pairs
+            mix += pm
+
+        if ti == 0:
+            self.age_mixing_initial = mix.copy()
+        self.age_mixing_final = mix  # updated every step; final value persists
+
+        return
+
+    def finalize_results(self):
+        super().finalize_results()
+        self.hh_size_hists = [np.array(h) for h in self.hh_size_hists]
+        return
+
+    def plot(self, **kwargs):
+        """Plot all household statistics (calls plot_stats and plot_matrix)."""
+        fig1 = self.plot_stats(**kwargs)
+        fig2 = self.plot_matrix(**kwargs)
+        return fig1, fig2
+
+    def plot_stats(self, **kwargs):
+        """Four-panel figure: household size, n_households, average household age, size distribution."""
+        kw = ss.plot_args(kwargs)
+        timevec = self.sim.t.timevec
+
+        with ss.style(**kw.style):
+            fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+            # -- Household size over time --
+            ax = axes[0, 0]
+            ax.plot(timevec, self.results['mean_hh_size'], label='Mean')
+            ax.plot(timevec, self.results['median_hh_size'], label='Median', linestyle='--')
+            ax.set_ylabel('Household size')
+            ax.set_xlabel('Year')
+            ax.set_title('Household size over time')
+            ax.legend()
+            ax.set_ylim(bottom=0)
+
+            # -- Number of households --
+            ax = axes[0, 1]
+            ax.plot(timevec, self.results['n_households'])
+            ax.set_ylabel('Count')
+            ax.set_xlabel('Year')
+            ax.set_title('Number of households')
+            ax.set_ylim(bottom=0)
+
+            # -- Average household age over time --
+            ax = axes[1, 0]
+            ax.plot(timevec, self.results['mean_hh_age'], label='Mean')
+            ax.plot(timevec, self.results['median_hh_age'], label='Median', linestyle='--')
+            ax.set_ylabel('Mean age (years)')
+            ax.set_xlabel('Year')
+            ax.set_title('Average household age over time')
+            ax.legend()
+            ax.set_ylim(bottom=0)
+
+            # -- Initial vs final household size distribution --
+            ax = axes[1, 1]
+            if len(self.hh_size_hists) >= 2:
+                initial_sizes = self.hh_size_hists[0]
+                final_sizes = self.hh_size_hists[-1]
+                max_size = int(max(np.max(initial_sizes), np.max(final_sizes)))
+                size_range = np.arange(1, max_size + 1)
+                initial_counts = np.array([np.sum(initial_sizes == s) for s in size_range]) / len(initial_sizes)
+                final_counts = np.array([np.sum(final_sizes == s) for s in size_range]) / len(final_sizes)
+                width = 0.35
+                ax.bar(size_range - width/2, initial_counts, width, edgecolor='black', label=f'Initial (t={float(timevec[0]):.0f})')
+                ax.bar(size_range + width/2, final_counts, width, edgecolor='black', label=f'Final (t={float(timevec[-1]):.0f})')
+                ax.set_xlabel('Household size')
+                ax.set_ylabel('Proportion of households')
+                ax.set_title('Household size distribution')
+                ax.set_xticks(size_range)
+                ax.legend()
+
+            plt.tight_layout()
+
+        return ss.return_fig(fig, **kw.return_fig)
+
+    def plot_matrix(self, **kwargs):
+        """Three-panel figure: age distribution over time, initial and final age-mixing matrices."""
+        kw = ss.plot_args(kwargs)
+        timevec = self.sim.t.timevec
+        bin_labels = [f'{lo}-{hi}' for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:])]
+
+        with ss.style(**kw.style):
+            fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+            # -- Age distribution over time (stacked area) --
+            ax = axes[0]
+            bin_data = [np.array(self.results[f'age_{lo}_{hi}']) for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:])]
+            ax.stackplot(timevec, *bin_data, labels=bin_labels, alpha=0.8)
+            ax.set_ylabel('Number of agents')
+            ax.set_xlabel('Year')
+            ax.set_title('Age distribution over time')
+            ax.legend(loc='upper left', fontsize=8)
+
+            # -- Age-mixing matrix: initial --
+            ax = axes[1]
+            if self.age_mixing_initial is not None:
+                sns.heatmap(
+                    self.age_mixing_initial, ax=ax,
+                    xticklabels=bin_labels, yticklabels=bin_labels,
+                    cmap='YlOrRd', annot=True, fmt='.0f',
+                    cbar_kws={'label': 'Contact pairs'},
+                )
+                ax.set_title(f'Age-mixing matrix (t={float(timevec[0]):.0f})')
+                ax.set_xlabel('Age group')
+                ax.set_ylabel('Age group')
+                ax.invert_yaxis()
+
+            # -- Age-mixing matrix: final --
+            ax = axes[2]
+            if self.age_mixing_final is not None:
+                sns.heatmap(
+                    self.age_mixing_final, ax=ax,
+                    xticklabels=bin_labels, yticklabels=bin_labels,
+                    cmap='YlOrRd', annot=True, fmt='.0f',
+                    cbar_kws={'label': 'Contact pairs'},
+                )
+                ax.set_title(f'Age-mixing matrix (t={float(timevec[-1]):.0f})')
+                ax.set_xlabel('Age group')
+                ax.set_ylabel('Age group')
+                ax.invert_yaxis()
+
+            plt.tight_layout()
+
+        return ss.return_fig(fig, **kw.return_fig)

@@ -247,13 +247,8 @@ def test_tpt_product_skips_on_treatment():
 
 def test_tpt_household_init():
     """Test TPTHousehold initializes with correct defaults."""
-    try:
-        import starsim_examples as sse
-    except ImportError:
-        pytest.skip("starsim_examples not installed")
-
     dhs_data = make_dhs_data(50)
-    hh_net = sse.HouseholdDHSNet(dhs_data=dhs_data)
+    hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
     tpt_hh = TPTHousehold()
@@ -272,13 +267,8 @@ def test_tpt_household_init():
 
 def test_tpt_household_traces_on_treatment_start():
     """Test that household contacts are offered TPT when an index starts treatment."""
-    try:
-        import starsim_examples as sse
-    except ImportError:
-        pytest.skip("starsim_examples not installed")
-
     dhs_data = make_dhs_data(50)
-    hh_net = sse.HouseholdDHSNet(dhs_data=dhs_data)
+    hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
     tpt_hh = TPTHousehold(pars={'coverage': 1.0})
@@ -311,13 +301,8 @@ def test_tpt_household_traces_on_treatment_start():
 
 def test_tpt_household_no_retrigger_same_index():
     """Test that the same index case doesn't retrigger tracing on subsequent steps."""
-    try:
-        import starsim_examples as sse
-    except ImportError:
-        pytest.skip("starsim_examples not installed")
-
     dhs_data = make_dhs_data(50)
-    hh_net = sse.HouseholdDHSNet(dhs_data=dhs_data)
+    hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
     tpt_hh = TPTHousehold(pars={'coverage': 1.0})
@@ -345,13 +330,8 @@ def test_tpt_household_no_retrigger_same_index():
 
 def test_tpt_household_full_sim_run():
     """Test that TPTHousehold runs without error in a full simulation."""
-    try:
-        import starsim_examples as sse
-    except ImportError:
-        pytest.skip("starsim_examples not installed")
-
     dhs_data = make_dhs_data(30)
-    hh_net = sse.HouseholdDHSNet(dhs_data=dhs_data)
+    hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20, 'beta': ss.peryear(0.5)})
     tpt_hh = TPTHousehold(pars={'coverage': 0.8})
