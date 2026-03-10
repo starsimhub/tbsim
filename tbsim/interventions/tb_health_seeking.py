@@ -31,7 +31,6 @@ class HealthSeekingBehavior(ss.Intervention):
         super().__init__(**kwargs)
         self.define_pars(
             initial_care_seeking_rate = ss.perday(0.1),
-            care_seeking_dist         = ss.bernoulli(p=0),
             care_retry_steps          = None, 
             start                     = None,  # if not provided will take the same value as the simulation start date
             stop                      = None,  # if not provided will take the same value as the simulation stop date
@@ -100,8 +99,8 @@ class HealthSeekingBehavior(ss.Intervention):
             return
 
         rate = self.pars.initial_care_seeking_rate
-        self.pars.care_seeking_dist.set(p=rate.to_prob())
-        seeking_uids = self.pars.care_seeking_dist.filter(ss.uids(not_yet_sought))
+        self.care_seeking_dist.set(p=rate.to_prob())
+        seeking_uids = self.care_seeking_dist.filter(ss.uids(not_yet_sought))
 
         if len(seeking_uids) == 0:
             return
