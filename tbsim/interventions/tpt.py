@@ -192,8 +192,7 @@ class TPTHousehold(TBProductRoutine):
     handles eligibility filtering).
 
     Requires a household network with ``household_ids`` (e.g.
-    ``HouseholdDHSNet`` or ``EvolvingHouseholdDHSNet`` from
-    ``starsim_examples``).
+    ``ss.HouseholdNet``).
 
     Args:
         product (TPTTx): The TPT treatment product (created automatically if not provided).
