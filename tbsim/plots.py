@@ -1,18 +1,13 @@
 """Plotting utilities for visualizing TB simulation results."""
 
-# Standard library
 import os
 import re
 import sys
 
-# External packages - data/numerical
-import numpy as np
-
-# External packages - plotting
 import matplotlib.pyplot as plt
-
-# External packages - project dependencies
+import numpy as np
 import sciris as sc
+import starsim as ss
 
 __all__ = ['plot']
 
@@ -164,7 +159,6 @@ def plot(
             if x is None:
                 continue
             color = palette(j)
-            # ls = '--' if j == 0 else '-'
             ls = opts['line_style']
             marker = mstyles[j % len(mstyles)] if use_markers else None
             if opts['plot_type'] == 'scatter':
@@ -175,6 +169,7 @@ def plot(
                         alpha=opts['alpha'], marker=marker, markersize=opts['marker_size'],
                         markeredgewidth=opts['marker_edge_width'], markeredgecolor=opts['grid_color'],
                         zorder=10 if j == 0 else 5)
+
         ax.set_title(metric_label, fontsize=opts['title_fontsize'], fontweight='light', color=fg)
         ax.set_xlabel('Time', fontsize=opts['axis_label_fontsize'], color=fg)
         ax.tick_params(axis='both', labelsize=opts['tick_fontsize'], colors=fg)
@@ -249,14 +244,23 @@ _DEFAULT_STYLE = dict(
     line_style         = '-',
 )
 
+def _flatten_by_result_name(flat):
+    out = {}
+    for prefixed_key, result in flat.items():
+        key = result.name.lower() if getattr(result, 'name', None) else prefixed_key
+        out[key] = result
+    return out
+
+
 def _normalize_results(results):
-    """Convert MultiSim, Sim, or dict into a dict of label -> flat result dict."""
+    """Convert MultiSim, Sim, or dict into a dict of label -> flat result dict.
+    Uses ``ss.utils.match_result_keys`` (with ``key=None``) to get the results.
+    """
     if hasattr(results, 'sims') and results.sims is not None:
-        # MultiSim: unpack sims and flatten each
-        return {sim.label: sim.results.flatten() for sim in results.sims}
+        return {sim.label: _flatten_by_result_name(ss.utils.match_result_keys(sim.results, key=None))
+                for sim in results.sims}
     if hasattr(results, 'results') and hasattr(results, 'label'):
-        # Single Sim
-        return {results.label: results.results.flatten()}
+        return {results.label: _flatten_by_result_name(ss.utils.match_result_keys(results.results, key=None))}
     if isinstance(results, dict):
         return results
     raise TypeError(

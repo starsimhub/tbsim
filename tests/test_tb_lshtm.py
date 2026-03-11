@@ -235,12 +235,11 @@ def test_finalize_results_cumulative():
 
 def test_plot_returns_figure():
     """plot() returns a matplotlib Figure."""
+    import matplotlib.pyplot as plt
     sim = make_lshtm_sim(n_agents=50, start=ss.date("2000-01-01"), stop=ss.date("2001-12-31"))
     sim.run()
-    tb = tbsim.get_tb(sim)
-    fig = tb.plot()
+    fig = tbsim.get_tb(sim).plot(show=False)
     assert fig is not None
-    import matplotlib.pyplot as plt
     assert isinstance(fig, plt.Figure)
 
 

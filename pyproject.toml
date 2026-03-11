@@ -61,6 +61,9 @@ dev = [
 "Website" = "https://starsim.org/tbsim"
 "Source" = "https://github.com/starsimhub/tbsim/"
 
+[tool.pytest.ini_options]
+env = ["MPLBACKEND=Agg"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["tbsim*"]

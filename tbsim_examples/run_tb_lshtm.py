@@ -23,7 +23,7 @@ sim_pars = {
 # TB parameters
 tb_pars = {
     "init_prev": ss.bernoulli(0.01), # seed prevalence
-    "beta": ss.permonth(0.20),       # transmission rate
+    "beta": ss.peryear(0.20),       # transmission rate
     "trans_asymp": 0.82,           # κ kappa: asymp vs symp relative transmissibility
     "rr_rec": 0.21,                # π pi: reinfection risk after recovery
     "rr_treat": 3.15,              # ρ rho: reinfection risk after treatment
@@ -32,7 +32,7 @@ tb_pars = {
 
 tb_pars_acute = {
     # Acute variant only (ignored if use_acute is False)
-    "rate_acute_latent": ss.permonth(0.4),   # ACUTE → INFECTION
+    "rate_acute_latent": ss.peryear(4.0),   # ACUTE → INFECTION
     "trans_acute": 0.9,            # α alpha: relative transmissibility from acute
 }
 
@@ -74,15 +74,16 @@ if __name__ == "__main__":
     sims = build_sims_acute_vs_no_acute()
     msim = ss.MultiSim(sims=sims)
     msim.run(parallel=True)
-
-    # Custom plotting
-    results = {
-        s.label: {str(k): v for k, v in s.results.flatten().items()}
-        for s in msim.sims
-    }
-    # making the keys similar to plot them combined
-    results['TB Acute'] = {k.replace("_acute", ""): v for k, v in results['TB Acute'].items()}
-    tbsim.plot(results, title="TB LSHTM: with acute vs without acute")
     
-    msim.plot()
+    # plot all the sims together (tbsim plotting function as static method)
+    tbsim.plot(msim, select=dict(like='in'), n_cols=3, title="BOTH SIMS, USING pandas-like FILTERED METRICS", savefig=True) # using pandas-like syntax to select the metrics to plot
+    tbsim.plot(msim, yscale=True, title="BOTH SIMS, USING Y AXIS AUTO-SCALING", savefig=True) # plot all info in the multi-sim object
+    
+    # Using tbsim plotting function as a method on the Sim object
+    sim1 = msim.sims[0]
+    sim1.diseases.tb_lshtm_acute.plot(n_cols=6, title="TB LSHTM ACUTE VARIANT SIM ONLY, 6 SUBPLOTS", savefig=True) # this plots the acute sim only
+    
+    sim2 = msim.sims[1]
+    sim2.diseases.tb_lshtm.plot(n_cols=6, title="TB LSHTM **NON-ACUTE** VARIANT SIM ONLY, 6 SUBPLOTS", savefig=True) # this plots the non-acute sim only
+    
     plt.show()
