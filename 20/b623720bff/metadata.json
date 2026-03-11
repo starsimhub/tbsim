@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "20b623720bff",
+  "strategy": "manual-commit",
+  "branch": "fix-interventions",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "tbsim/interventions/tb_diagnostic.py",
+    "tbsim/interventions/tb_health_seeking.py",
+    "tbsim/interventions/tb_treatment.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/20/b623720bff/0/metadata.json",
+      "transcript": "/20/b623720bff/0/full.jsonl",
+      "content_hash": "/20/b623720bff/0/content_hash.txt",
+      "prompt": "/20/b623720bff/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 48053,
+    "cache_read_tokens": 3277805,
+    "output_tokens": 19742,
+    "api_call_count": 26
+  }
+}
