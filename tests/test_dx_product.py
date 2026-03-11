@@ -103,3 +103,51 @@ def test_dx_default_hierarchy():
     ])
     dx = Dx(df=df)
     assert list(dx.hierarchy) == ['positive', 'negative']
+
+
+def test_xpert_factory():
+    """xpert() returns a Dx with age-stratified, state-stratified DataFrame."""
+    from tbsim.interventions.dx_products import xpert
+    dx = xpert()
+    assert isinstance(dx, Dx)
+    assert 'age_min' in dx.df.columns
+    assert 'age_max' in dx.df.columns
+    assert 'hiv' not in dx.df.columns
+    assert set(dx.hierarchy) == {'positive', 'negative'}
+    # Check adult symptomatic sensitivity
+    adult_symp = dx.df[(dx.df.state == TBSL.SYMPTOMATIC) & (dx.df.age_min == 15) & (dx.df.result == 'positive')]
+    assert np.isclose(adult_symp.probability.values[0], 0.909)
+
+
+def test_oral_swab_factory():
+    """oral_swab() returns a Dx with age and state stratification."""
+    from tbsim.interventions.dx_products import oral_swab
+    dx = oral_swab()
+    assert isinstance(dx, Dx)
+    assert 'hiv' not in dx.df.columns
+
+
+def test_fujilam_factory():
+    """fujilam() returns a Dx with HIV stratification."""
+    from tbsim.interventions.dx_products import fujilam
+    dx = fujilam()
+    assert isinstance(dx, Dx)
+    assert 'hiv' in dx.df.columns
+
+
+def test_cad_cxr_factory():
+    """cad_cxr() returns a Dx product."""
+    from tbsim.interventions.dx_products import cad_cxr
+    dx = cad_cxr()
+    assert isinstance(dx, Dx)
+
+
+def test_xpert_runs_in_sim():
+    """xpert() product can be administered in a running sim."""
+    from tbsim.interventions.dx_products import xpert
+    dx = xpert()
+    sim = make_dx_sim(n_agents=200)
+    for _ in range(20):
+        sim.run_one_step()
+    results = dx.administer(sim, sim.people.alive.uids)
+    assert len(results['positive']) + len(results['negative']) == len(sim.people.alive.uids)

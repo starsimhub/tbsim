@@ -113,3 +113,93 @@ class Dx(ss.Product):
         for i, label in enumerate(self.hierarchy):
             output[label] = ss.uids(uids[results == i])
         return output
+
+
+def xpert():
+    """Xpert MTB/RIF -- age-stratified (child/adult), TB-state-stratified."""
+    df = pd.DataFrame([
+        # Adults (age >= 15)
+        dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.909, age_min=15, age_max=np.inf),
+        dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.091, age_min=15, age_max=np.inf),
+        dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.775, age_min=15, age_max=np.inf),
+        dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.225, age_min=15, age_max=np.inf),
+        dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.775, age_min=15, age_max=np.inf),
+        dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.225, age_min=15, age_max=np.inf),
+        # Children (age < 15)
+        dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.73, age_min=0, age_max=15),
+        dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.27, age_min=0, age_max=15),
+        dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.73, age_min=0, age_max=15),
+        dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.27, age_min=0, age_max=15),
+        dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.73, age_min=0, age_max=15),
+        dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.27, age_min=0, age_max=15),
+    ])
+    return Dx(df=df, hierarchy=['positive', 'negative'])
+
+
+def oral_swab():
+    """Oral swab -- age-stratified, TB-state-stratified."""
+    df = pd.DataFrame([
+        # Adults
+        dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.80, age_min=15, age_max=np.inf),
+        dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.20, age_min=15, age_max=np.inf),
+        dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.30, age_min=15, age_max=np.inf),
+        dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.70, age_min=15, age_max=np.inf),
+        dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.30, age_min=15, age_max=np.inf),
+        dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.70, age_min=15, age_max=np.inf),
+        # Children
+        dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.25, age_min=0, age_max=15),
+        dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.75, age_min=0, age_max=15),
+        dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.25, age_min=0, age_max=15),
+        dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.75, age_min=0, age_max=15),
+        dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.25, age_min=0, age_max=15),
+        dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.75, age_min=0, age_max=15),
+    ])
+    return Dx(df=df, hierarchy=['positive', 'negative'])
+
+
+def fujilam():
+    """FujiLAM -- HIV-stratified, age-stratified."""
+    df = pd.DataFrame([
+        # HIV+, adults
+        dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.75,  age_min=15, age_max=np.inf, hiv=True),
+        dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.25,  age_min=15, age_max=np.inf, hiv=True),
+        dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.75,  age_min=15, age_max=np.inf, hiv=True),
+        dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.25,  age_min=15, age_max=np.inf, hiv=True),
+        dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.75,  age_min=15, age_max=np.inf, hiv=True),
+        dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.25,  age_min=15, age_max=np.inf, hiv=True),
+        # HIV-, adults
+        dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.58,  age_min=15, age_max=np.inf, hiv=False),
+        dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.42,  age_min=15, age_max=np.inf, hiv=False),
+        dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.58,  age_min=15, age_max=np.inf, hiv=False),
+        dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.42,  age_min=15, age_max=np.inf, hiv=False),
+        dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.58,  age_min=15, age_max=np.inf, hiv=False),
+        dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.42,  age_min=15, age_max=np.inf, hiv=False),
+        # HIV+, children
+        dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.579, age_min=0, age_max=15, hiv=True),
+        dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.421, age_min=0, age_max=15, hiv=True),
+        dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.579, age_min=0, age_max=15, hiv=True),
+        dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.421, age_min=0, age_max=15, hiv=True),
+        dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.579, age_min=0, age_max=15, hiv=True),
+        dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.421, age_min=0, age_max=15, hiv=True),
+        # HIV-, children
+        dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.51,  age_min=0, age_max=15, hiv=False),
+        dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.49,  age_min=0, age_max=15, hiv=False),
+        dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.51,  age_min=0, age_max=15, hiv=False),
+        dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.49,  age_min=0, age_max=15, hiv=False),
+        dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.51,  age_min=0, age_max=15, hiv=False),
+        dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.49,  age_min=0, age_max=15, hiv=False),
+    ])
+    return Dx(df=df, hierarchy=['positive', 'negative'])
+
+
+def cad_cxr():
+    """CAD chest X-ray -- simple, no age/HIV stratification."""
+    df = pd.DataFrame([
+        dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.66),
+        dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.34),
+        dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.66),
+        dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.34),
+        dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.66),
+        dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.34),
+    ])
+    return Dx(df=df, hierarchy=['positive', 'negative'])
