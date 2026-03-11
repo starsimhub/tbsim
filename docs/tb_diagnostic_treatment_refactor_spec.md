@@ -46,7 +46,7 @@ ss.Product (starsim)
 
 ### File
 
-New file: `tbsim/interventions/tb_dx_products.py`
+New file: `tbsim/interventions/dx_products.py`
 
 ### Inheritance
 
@@ -162,7 +162,7 @@ df = pd.DataFrame([
 
 ### File
 
-New file: `tbsim/interventions/tb_tx_products.py`
+New file: `tbsim/interventions/tx_products.py`
 
 ### Inheritance
 
@@ -196,7 +196,7 @@ tbsim.second_line()    # Second-line for MDR-TB
 
 ### File
 
-Replaces contents of `tbsim/interventions/tb_diagnostic.py`
+Replaces contents of `tbsim/interventions/tb_diagnostic.py` as `tbsim/interventions/diagnostics.py`
 
 ### Inheritance
 
@@ -250,7 +250,7 @@ During `init_pre`, if `result_state` is not `'diagnosed'` and the named state do
 
 ### File
 
-Replaces contents of `tbsim/interventions/tb_treatment.py`
+Replaces contents of `tbsim/interventions/tb_treatment.py` as `tbsim/interventions/treatments.py`
 
 ### Inheritance
 
@@ -297,7 +297,6 @@ lambda sim: diagnosed & active_tb_state & alive
 
 ```python
 import tbsim
-import starsim as ss
 
 # Screen -> confirm -> treat
 screen = tbsim.DxDelivery(
@@ -317,7 +316,7 @@ treat = tbsim.TxDelivery(
     product = tbsim.dots(),
 )
 
-sim = ss.Sim(
+sim = tbsim.Sim(
     diseases     = tbsim.TB(),
     interventions = [
         tbsim.HealthSeekingBehavior(),
@@ -332,7 +331,7 @@ sim.run()
 ### Single-step usage (no cascade)
 
 ```python
-sim = ss.Sim(
+sim = tbsim.Sim(
     diseases     = tbsim.TB(),
     interventions = [
         tbsim.HealthSeekingBehavior(),
@@ -348,16 +347,16 @@ sim = ss.Sim(
 
 | file | change |
 |------|--------|
-| `tbsim/interventions/tb_dx_products.py` | **new** -- `Dx` class and factory functions |
-| `tbsim/interventions/tb_tx_products.py` | **new** -- `Tx` class and factory functions |
-| `tbsim/interventions/tb_diagnostic.py` | **replace** -- delete old classes, write `DxDelivery` |
-| `tbsim/interventions/tb_treatment.py` | **replace** -- delete old classes, write `TxDelivery` |
+| `tbsim/interventions/dx_products.py` | **new** -- `Dx` class and factory functions |
+| `tbsim/interventions/tx_products.py` | **new** -- `Tx` class and factory functions |
+| `tbsim/interventions/diagnostics.py` | **replace** -- delete old classes, write `DxDelivery` |
+| `tbsim/interventions/treatments.py` | **replace** -- delete old classes, write `TxDelivery` |
 | `tbsim/interventions/__init__.py` | update exports |
 | `tbsim/__init__.py` | update exports |
-| `tests/test_tbinterventions.py` | update to use new classes |
-| `tbsim_examples/run_tb_interventions.py` | update examples |
+| `tests/test_interventions.py` | update to use new classes |
+| `tbsim_examples/run_interventions.py` | update examples |
 
-**Unchanged:** `HealthSeekingBehavior`, `TBProductRoutine`, BCG, TPT, `BetaByYear`, `tb_drug_types.py`
+**Unchanged:** `HealthSeekingBehavior`, `TBProductRoutine`, BCG, TPT, `BetaByYear`, `drug_types.py` (except for rename)
 
 ---
 
