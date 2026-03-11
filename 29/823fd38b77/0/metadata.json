@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "29823fd38b77",
+  "session_id": "a802b9ea-919d-4857-aafe-7bdfab75b5ef",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-11T22:14:43.598223537Z",
+  "branch": "add-sim",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "tbsim/sim.py",
+    "tests/test_sim.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "607421eb1e5b",
+  "checkpoint_transcript_start": 198,
+  "transcript_lines_at_start": 198,
+  "token_usage": {
+    "input_tokens": 23,
+    "cache_creation_tokens": 116574,
+    "cache_read_tokens": 1639014,
+    "output_tokens": 3556,
+    "api_call_count": 17
+  },
+  "session_metrics": {
+    "turn_count": 6
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-11T22:14:43.452887316Z",
+    "agent_lines": 0,
+    "human_added": 130,
+    "human_modified": 1,
+    "human_removed": 0,
+    "total_committed": 130,
+    "agent_percentage": 0
+  }
+}

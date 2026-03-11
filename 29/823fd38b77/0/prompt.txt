@@ -1,0 +1,9 @@
+this is WAY too complicated. write 2 simple tests: one for tbsim.Sim(), one for demo()
+
+---
+
+please remove examples from sim.py
+
+---
+
+use sciris interactive rather than matplotlib
