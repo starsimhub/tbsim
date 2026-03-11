@@ -1,0 +1,49 @@
+<ide_opened_file>The user opened the file /home/cliffk/.claude/settings.json in the IDE. This may or may not be related to the current task.</ide_opened_file>
+read the plan provided here:
+/home/cliffk/idm/tbsim/docs/tb_diagnostic_refactor_plan.md
+1. review it and see if it makes sense
+2. revise it with respect to the current codebase (interventions have changed)
+3. revise it with the aim of splitting all diagnostic and treatment interventions into this approach (separate product and delivery steps)
+4. check with me, and then we can start making changes.
+
+use the superpower and starsim-ai skills.
+
+---
+
+yes, drop TB_EMOD entirely, just focus on TB_LSHTM, which you can just call TB (don't add suffixes to everything)
+
+---
+
+option A
+
+---
+
+option C
+
+---
+
+yes, i agree with your approach
+
+---
+
+yes, delete them
+
+---
+
+that sounds good, but only add as many columns to the dataframe as it needs for that intervention -- don't e.g. include hiv status if the given diagnostic isn't sensitive to it
+
+---
+
+yes
+
+---
+
+yes that looks good
+
+---
+
+yes, this looks good. one small thing to amend -- you don't need to prefix everything with 'TB', e.g. just `tbsim.DxDelivery` instead of `tbsim.TBDxDelivery`
+
+---
+
+yes
