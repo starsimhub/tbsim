@@ -54,13 +54,11 @@ class HealthSeekingBehavior(ss.Intervention):
         """Locate the TB disease module and resolve eligible states."""
         super().init_post()
 
-        # Find and store the TB disease module
-        tb_class = 'tb_lshtm' # Currently only compatible with this TB model
+        # Find and store the TB disease module (works with TB_LSHTM and TB_LSHTM_Acute)
         try:
-            tb = self.sim.diseases[tb_class]
-            self._tb = tb
-        except:
-            raise KeyError(f"{self.__class__} requires the {tb_class} disease module.")
+            self._tb = tbsim.get_tb(self.sim)
+        except ValueError:
+            raise KeyError(f"{self.__class__} requires a TB_LSHTM or TB_LSHTM_Acute disease module.")
         
         if self.pars.custom_states is not None:
             self._states = np.asarray(self.pars.custom_states) 
