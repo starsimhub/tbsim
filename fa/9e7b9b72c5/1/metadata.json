@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "fa9e7b9b72c5",
+  "session_id": "7372f684-f3d9-4378-977c-849a4e72b47c",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-11T23:37:11.154111578Z",
+  "branch": "refactor-interventions",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "tbsim/interventions/dx_products.py",
+    "tests/test_dx_product.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "e5ca67eb99d3",
+  "token_usage": {
+    "input_tokens": 3,
+    "cache_creation_tokens": 21828,
+    "cache_read_tokens": 0,
+    "output_tokens": 78,
+    "api_call_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-11T23:37:11.152097812Z",
+    "agent_lines": 220,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 220,
+    "agent_percentage": 100
+  }
+}
