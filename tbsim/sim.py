@@ -36,7 +36,7 @@ class Sim(ss.Sim):
         sim.plot()
 
         # Override TB and sim parameters via flat dict
-        sim = tbsim.Sim(n_agents=2000, beta=ss.peryear(0.3), start='1990', stop='2020')
+        sim = tbsim.Sim(n_agents=2000, beta=ss.peryear(0.3), start=1990, stop=2020)
 
         # Use a different TB model
         sim = tbsim.Sim(tb_model='lshtm_acute')
