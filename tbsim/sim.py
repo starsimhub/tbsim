@@ -187,12 +187,11 @@ class Sim(ss.Sim):
         return super().plot(key=key, **kwargs)
 
 
-def demo(example=None, run=True, plot=True, **kwargs):
+def demo(run=True, plot=True, **kwargs):
     """
     Create a demo TB simulation.
 
     Args:
-        example (str): Example name. Default: 'simple'.
         run (bool): Whether to run the sim.
         plot (bool): Whether to plot results (only if run=True).
         **kwargs: Passed to Sim().
@@ -206,14 +205,7 @@ def demo(example=None, run=True, plot=True, **kwargs):
         tbsim.demo()                                  # Run simple default demo
         sim = tbsim.demo(run=False, n_agents=500)     # Just create it
     """
-    if example is None:
-        example = 'simple'
-    if example not in EXAMPLES:
-        available = ', '.join(EXAMPLES.keys())
-        raise ValueError(f"Example '{example}' not found. Available: {available}")
-
-    if example == 'simple':
-        sim = Sim(**kwargs)
+    sim = Sim(**kwargs)
 
     if run:
         sim.run()
