@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "b55f97921d92",
+  "strategy": "manual-commit",
+  "branch": "fix-interventions",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitignore",
+    "tests/common_functions.py",
+    "tests/test_tbinterventions.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b5/5f97921d92/0/metadata.json",
+      "transcript": "/b5/5f97921d92/0/full.jsonl",
+      "content_hash": "/b5/5f97921d92/0/content_hash.txt",
+      "prompt": "/b5/5f97921d92/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 39,
+    "cache_creation_tokens": 99399,
+    "cache_read_tokens": 2413008,
+    "output_tokens": 19374,
+    "api_call_count": 33
+  }
+}

@@ -1,0 +1,2 @@
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/tbsim/sim.py in the IDE. This may or may not be related to the current task.</ide_opened_file>
+change all the tests of interventions to exclusively use tb_lshtm or tb_lshtm_acute (not tb_emod). ensure that all interventions are tested. make a list of ant interventions that fail, and make a plan for fixing them. use superpowers and starsim-ai skills.
