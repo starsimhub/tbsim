@@ -1,0 +1,16 @@
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/tbsim/compartmental/lshtm_ode.R in the IDE. This may or may not be related to the current task.</ide_opened_file>
+create a sim.py file using this as a template:
+/home/cliffk/idm/stisim/hivsim/sim.py
+
+this should add `tbsim.Sim()` as a class, addressing this issue:
+https://github.com/starsimhub/tbsim/issues/362
+
+look at the code in ./tbsim_examples and ./tests for ideas for what to include as default settings. make a plan for what to include and what defaults to use before implementing it. use superpowers and starsim-ai skills.
+
+---
+
+yes, option A. stisim was an example. tbsim should be *parallel* to stisim, not inherited from it.
+
+---
+
+yes that sounds great!
