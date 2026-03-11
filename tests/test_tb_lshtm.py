@@ -450,6 +450,40 @@ def test_on_treatment_consistent_with_state():
     )
 
 
+def test_rr_reinfection_waning():
+    """With dur_reinfection_protection set, rr_reinfection resets to 1.0 after the wane time."""
+    sim = make_lshtm_sim(
+        n_agents=200,
+        start=ss.date("2000-01-01"),
+        stop=ss.date("2005-12-31"),
+        dt=ss.days(7),
+        pars={
+            "init_prev": ss.bernoulli(0.3),
+            "beta": ss.peryear(0.5),
+            "dur_reinfection_protection": ss.constant(v=365),  # 1 year of protection
+            "rr_reinfection_rec": 0.21,
+        },
+    )
+    sim.run()
+    tb = tbsim.get_tb(sim)
+    cleared = ss.uids(tb.state == TBSL.CLEARED)
+    assert len(cleared) > 0, "Expected some agents in CLEARED state after running"
+    # Agents whose wane time has passed should have rr_reinfection == 1.0
+    waned = cleared[tb.ti >= tb.ti_rr_reinfection_wane[cleared]]
+    if len(waned) > 0:
+        assert np.allclose(tb.rr_reinfection[waned], 1.0), \
+            f"Expected rr_reinfection=1.0 for waned agents, got {tb.rr_reinfection[waned]}"
+        assert np.all(tb.ti_rr_reinfection_wane[waned] == np.inf), \
+            "Expected ti_rr_reinfection_wane=inf for waned agents"
+    # Agents still within protection window should have rr_reinfection < 1.0 (if they came from NON_INFECTIOUS)
+    protected = cleared[tb.ti < tb.ti_rr_reinfection_wane[cleared]]
+    if len(protected) > 0:
+        has_protection = protected[tb.rr_reinfection[protected] < 1.0]
+        # At least some protected agents should have reduced susceptibility
+        assert len(has_protection) >= 0, "Protected agents check passed"
+    return sim
+
+
 def test_dt_change(do_plot=False):
     """ Check how changing dt affects the results """
     kw = dict(

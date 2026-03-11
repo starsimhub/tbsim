@@ -141,7 +141,7 @@ class TB_LSHTM(BaseTB):
         # --- Transmission and reinfection ---
         self.define_pars(
             init_prev=ss.bernoulli(0.05),       # Initial seed infections (prevalence)
-            beta=ss.permonth(0.2),              # Transmission rate per year
+            beta=ss.permonth(0.2),              # Transmission rate per month
             trans_asymp=0.82,                   # κ kappa: rel. transmissibility asymptomatic vs symptomatic
             rr_reinfection_rec=0.21,            # π pi: RR reinfection after NON_INFECTIOUS → CLEARED
             rr_reinfection_treat=3.15,          # ρ rho: RR reinfection after TREATMENT → CLEARED
@@ -158,7 +158,7 @@ class TB_LSHTM(BaseTB):
             asy_non=ss.peryear(1.66),            # Revert to non-infectious
             asy_sym=ss.peryear(0.88),            # Progress to symptomatic
             # --- From SYMPTOMATIC ---
-            sym_asy=ss.peryear(0.54),            # Regress to asymptomatic (still active, not recovered)
+            sym_asy=ss.peryear(0.54),            # Regress to asymptomatic (still active TB; does not enter CLEARED)
             sym_dead=ss.peryear(0.34),           # μ_TB: symptomatic → dead (TB mortality)
             # --- From TREATMENT ---
             fail_rate=ss.peryear(0.63),          # φ phi: treatment failure (→ symptomatic)
@@ -313,7 +313,7 @@ class TB_LSHTM(BaseTB):
 
         u = ss.uids(self.state == TBSL.INFECTION)
         if len(u):
-            pre = (self.state == TBSL.CLEARED)   # agents already in CLEARED before this transition
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
                 TBSL.CLEARED:        self.pars.inf_cle,
                 TBSL.NON_INFECTIOUS: self.pars.inf_non * self.rr_activation[u],
@@ -326,7 +326,7 @@ class TB_LSHTM(BaseTB):
 
         u = ss.uids(self.state == TBSL.NON_INFECTIOUS)
         if len(u):
-            pre = (self.state == TBSL.CLEARED)   # agents already in CLEARED before this transition
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
                 TBSL.CLEARED:      self.pars.non_rec * self.rr_clearance[u],
                 TBSL.ASYMPTOMATIC: self.pars.non_asy,
@@ -352,7 +352,7 @@ class TB_LSHTM(BaseTB):
 
         u = ss.uids(self.state == TBSL.TREATMENT)
         if len(u):
-            pre = (self.state == TBSL.CLEARED)   # agents already in CLEARED before this transition
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
                 TBSL.SYMPTOMATIC: self.pars.fail_rate,
                 TBSL.CLEARED:     self.pars.complete_rate,
@@ -587,7 +587,7 @@ class TB_LSHTM_Acute(TB_LSHTM):
 
         u = ss.uids(self.state == TBSL.INFECTION)
         if len(u):
-            pre = (self.state == TBSL.CLEARED)   # agents already in CLEARED before this transition
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
                 TBSL.CLEARED:        self.pars.inf_cle,
                 TBSL.NON_INFECTIOUS: self.pars.inf_non * self.rr_activation[u],
@@ -600,7 +600,7 @@ class TB_LSHTM_Acute(TB_LSHTM):
 
         u = ss.uids(self.state == TBSL.NON_INFECTIOUS)
         if len(u):
-            pre = (self.state == TBSL.CLEARED)   # agents already in CLEARED before this transition
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
                 TBSL.CLEARED:      self.pars.non_rec * self.rr_clearance[u],
                 TBSL.ASYMPTOMATIC: self.pars.non_asy,
@@ -626,7 +626,7 @@ class TB_LSHTM_Acute(TB_LSHTM):
 
         u = ss.uids(self.state == TBSL.TREATMENT)
         if len(u):
-            pre = (self.state == TBSL.CLEARED)   # agents already in CLEARED before this transition
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
                 TBSL.SYMPTOMATIC: self.pars.fail_rate,
                 TBSL.CLEARED:     self.pars.complete_rate,
