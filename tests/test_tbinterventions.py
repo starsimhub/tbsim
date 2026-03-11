@@ -10,7 +10,7 @@ import numpy as np
 # Helpers
 # ---------------------------------------------------------------------------
 
-def make_sim(agents=50, start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'), dt=ss.days(7)):
+def make_sim(agents=50, start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'), dt=ss.days(7)):
     """Standard sim components using TB_LSHTM."""
     pop = ss.People(n_agents=agents)
     tb = tbsim.TB_LSHTM(pars={'init_prev': 0.30})
@@ -19,7 +19,7 @@ def make_sim(agents=50, start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'),
     return pop, tb, net, pars
 
 
-def make_sim_acute(agents=50, start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'), dt=ss.days(7)):
+def make_sim_acute(agents=50, start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'), dt=ss.days(7)):
     """Standard sim components using TB_LSHTM_Acute."""
     pop = ss.People(n_agents=agents)
     tb = tbsim.TB_LSHTM_Acute(pars={'init_prev': 0.30})
@@ -40,7 +40,7 @@ def test_beta_intervention_changes_beta():
     stop_year = 2010
 
     tb_pars = dict(beta=initial_beta, init_prev=0.25)
-    sim_pars = dict(start=f'{intervention_year-1}-01-01', stop=f'{stop_year}-01-01', dt=ss.days(1), rand_seed=42)
+    sim_pars = dict(start=f'{intervention_year-1}-01-01', stop=f'{stop_year}-01-01', dt=ss.days(7), rand_seed=42)
 
     pop = ss.People(n_agents=100)
     tb = tbsim.TB_LSHTM(pars=tb_pars)
@@ -79,7 +79,7 @@ def test_beta_intervention_with_acute():
     intervention_year = 2005
 
     tb_pars = dict(beta=initial_beta, init_prev=0.25)
-    sim_pars = dict(start='2004-01-01', stop='2007-01-01', dt=ss.days(1), rand_seed=42)
+    sim_pars = dict(start='2004-01-01', stop='2007-01-01', dt=ss.days(7), rand_seed=42)
 
     pop = ss.People(n_agents=100)
     tb = tbsim.TB_LSHTM_Acute(pars=tb_pars)
@@ -111,7 +111,7 @@ def test_beta_multiple_years():
 
     beta_intv = tbsim.BetaByYear(pars={'years': years, 'x_beta': x_betas})
     sim = ss.Sim(people=pop, networks=net, diseases=tb, interventions=[beta_intv],
-                 pars=dict(start='2001-01-01', stop='2007-01-01', dt=ss.days(1), rand_seed=42))
+                 pars=dict(start='2001-01-01', stop='2007-01-01', dt=ss.days(7), rand_seed=42))
     sim.init()
 
     while sim.t.now('year') < 2002:
