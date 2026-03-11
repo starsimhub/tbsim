@@ -657,7 +657,10 @@ class HouseholdStats(ss.Analyzer):
             initial vs. final household size distribution.
         ``plot_matrix()`` -- three-panel figure: age distribution over time,
             age-mixing matrix at simulation start, age-mixing matrix at end.
-        ``plot()`` -- calls both of the above.
+        ``plot_normalized_matrix()`` -- four-panel figure: contacts per person
+            (C_ij / n_j) and proportionate mixing ratio (C_ij / E_ij) at
+            simulation start and end.
+        ``plot()`` -- calls all three of the above.
 
     Example::
 
@@ -681,9 +684,11 @@ class HouseholdStats(ss.Analyzer):
         super().__init__(**kwargs)
         self.network_name = network_name
         self.age_bins = list(age_bins)
-        self.hh_size_hists = []       # per-timestep arrays of per-household sizes
+        self.hh_size_hists = []         # per-timestep arrays of per-household sizes
         self.age_mixing_initial = None  # age-mixing matrix at t=0
         self.age_mixing_final = None    # age-mixing matrix at last step
+        self.age_counts_initial = None  # per-bin population counts at t=0
+        self.age_counts_final = None    # per-bin population counts at last step
         return
 
     def init_results(self):
@@ -738,22 +743,26 @@ class HouseholdStats(ss.Analyzer):
         for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:]):
             self.results[f'age_{lo}_{hi}'][ti] = np.sum((ages >= lo) & (ages < hi))
 
-        # --- Age-mixing matrix (household pairwise contacts) ---
+        # --- Age-mixing matrix (pairwise network contacts) ---
         n_bins = len(self.age_bins) - 1
-        age_bin_idx = np.clip(np.digitize(ages_sorted, self.age_bins) - 1, 0, n_bins - 1)
-        hh_bin_groups = np.split(age_bin_idx, split_pts)
         mix = np.zeros((n_bins, n_bins), dtype=float)
-        for hh_bins in hh_bin_groups:
-            if len(hh_bins) < 2:
-                continue
-            bc = np.bincount(hh_bins, minlength=n_bins)
-            pm = np.outer(bc, bc)
-            pm[np.diag_indices(n_bins)] = bc * (bc - 1)  # ordered within-group pairs
-            mix += pm
+        p1, p2 = net.edges.p1, net.edges.p2
+        if len(p1) > 0:
+            bins_p1 = np.clip(np.digitize(ppl.age[p1], self.age_bins) - 1, 0, n_bins - 1)
+            bins_p2 = np.clip(np.digitize(ppl.age[p2], self.age_bins) - 1, 0, n_bins - 1)
+            np.add.at(mix, (bins_p1, bins_p2), 1)
+            mix = (mix + mix.T) / 2
+
+        age_counts = np.array([
+            np.sum((ages >= lo) & (ages < hi))
+            for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:])
+        ], dtype=float)
 
         if ti == 0:
             self.age_mixing_initial = mix.copy()
-        self.age_mixing_final = mix  # updated every step; final value persists
+            self.age_counts_initial = age_counts.copy()
+        self.age_mixing_final = mix          # updated every step; final value persists
+        self.age_counts_final = age_counts   # updated every step; final value persists
 
         return
 
@@ -763,10 +772,11 @@ class HouseholdStats(ss.Analyzer):
         return
 
     def plot(self, **kwargs):
-        """Plot all household statistics (calls plot_stats and plot_matrix)."""
+        """Plot all household statistics (calls plot_stats, plot_matrix, and plot_normalized_matrix)."""
         fig1 = self.plot_stats(**kwargs)
         fig2 = self.plot_matrix(**kwargs)
-        return fig1, fig2
+        fig3 = self.plot_normalized_matrix(**kwargs)
+        return fig1, fig2, fig3
 
     def plot_stats(self, **kwargs):
         """Four-panel figure: household size, n_households, average household age, size distribution."""
@@ -821,6 +831,87 @@ class HouseholdStats(ss.Analyzer):
                 ax.set_title('Household size distribution')
                 ax.set_xticks(size_range)
                 ax.legend()
+
+            plt.tight_layout()
+
+        return ss.return_fig(fig, **kw.return_fig)
+
+    def plot_normalized_matrix(self, **kwargs):
+        """Four-panel figure: contacts-per-person and proportionate-mixing ratio at start and end.
+
+        Top row: contacts per person in the x-axis age group (C_ij / n_j).
+        Bottom row: departure from proportionate mixing (C_ij / E_ij), where
+        E_ij = C_total * p_i * p_j and p_k = n_k / N.
+        Left column: simulation start; right column: simulation end.
+        """
+        kw = ss.plot_args(kwargs)
+        timevec = self.sim.t.timevec
+        bin_labels = [f'{lo}-{hi}' for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:])]
+
+        def _contacts_per_person(mix, counts):
+            """C_ij / n_j — average contacts with age-i individuals per person of age j."""
+            n_j = counts.copy()
+            n_j[n_j == 0] = np.nan
+            return mix / n_j[np.newaxis, :]
+
+        def _prop_mixing_ratio(mix, counts):
+            """C_ij / E_ij where E_ij = C_total * p_i * p_j."""
+            C_total = mix.sum()
+            if C_total == 0:
+                return np.full_like(mix, np.nan)
+            N = counts.sum()
+            if N == 0:
+                return np.full_like(mix, np.nan)
+            p = counts / N
+            expected = C_total * np.outer(p, p)
+            with np.errstate(invalid='ignore', divide='ignore'):
+                ratio = np.where(expected > 0, mix / expected, np.nan)
+            return ratio
+
+        panels = [
+            (self.age_mixing_initial, self.age_counts_initial,
+             f't={float(timevec[0]):.0f}'),
+            (self.age_mixing_final, self.age_counts_final,
+             f't={float(timevec[-1]):.0f}'),
+        ]
+
+        with ss.style(**kw.style):
+            fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+            for col, (mix, counts, t_label) in enumerate(panels):
+                if mix is None or counts is None:
+                    continue
+
+                # -- Contacts per person --
+                ax = axes[0, col]
+                cpp = _contacts_per_person(mix, counts)
+                sns.heatmap(
+                    cpp, ax=ax,
+                    xticklabels=bin_labels, yticklabels=bin_labels,
+                    cmap='YlOrRd', annot=True, fmt='.2f',
+                    cbar_kws={'label': 'Contacts per person'},
+                )
+                ax.set_title(f'Contacts per person ({t_label})')
+                ax.set_xlabel('Age group (contact)')
+                ax.set_ylabel('Age group')
+                ax.invert_yaxis()
+
+                # -- Proportionate mixing ratio --
+                ax = axes[1, col]
+                ratio = _prop_mixing_ratio(mix, counts)
+                # Centre the diverging colormap on 1 (proportionate mixing)
+                vmax = np.nanmax(np.abs(ratio - 1)) + 1 if not np.all(np.isnan(ratio)) else 2
+                sns.heatmap(
+                    ratio, ax=ax,
+                    xticklabels=bin_labels, yticklabels=bin_labels,
+                    cmap='RdBu_r', center=1, vmin=max(0, 2 - vmax), vmax=vmax,
+                    annot=True, fmt='.2f',
+                    cbar_kws={'label': 'Observed / expected contacts'},
+                )
+                ax.set_title(f'Proportionate mixing ratio ({t_label})')
+                ax.set_xlabel('Age group (contact)')
+                ax.set_ylabel('Age group')
+                ax.invert_yaxis()
 
             plt.tight_layout()
 
