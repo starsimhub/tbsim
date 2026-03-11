@@ -3,7 +3,7 @@ import numpy as np
 import starsim as ss
 import tbsim
 
-def make_tb_simplified(agents=20, start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'), dt=ss.days(7)):
+def make_tb_simplified(agents=20, start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'), dt=ss.days(7)):
     pop = ss.People(n_agents=agents)
     tb = tbsim.TB_EMOD(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))

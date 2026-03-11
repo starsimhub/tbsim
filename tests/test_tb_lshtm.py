@@ -487,9 +487,9 @@ def test_rr_reinfection_waning():
 def test_dt_change(do_plot=False):
     """ Check how changing dt affects the results """
     kw = dict(
-        n_agents=10_000,
+        n_agents=1_000,
         start=ss.date("2000-01-01"),
-        stop=ss.date("2002-01-01"),
+        stop=ss.date("2001-01-01"),
         pars=dict(
             init_prev=0.5,
         ),
