@@ -3,9 +3,12 @@
 import numpy as np
 import starsim as ss
 import tbsim
-from tbsim import TBS
+from tbsim import TBSL
 
 __all__ = ['TBDiagnostic', 'EnhancedTBDiagnostic']
+
+# Active TB states in the LSHTM model (used for diagnostic eligibility)
+_ACTIVE_TB_STATES = [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC]
 
 
 class TBDiagnostic(ss.Intervention):
@@ -36,7 +39,7 @@ class TBDiagnostic(ss.Intervention):
     - Health seeking behavior intervention that sets the 'sought_care' flag
     - Person states: 'sought_care', 'tested', 'diagnosed', 'n_times_tested', 
       'test_result', 'care_seeking_multiplier', 'multiplier_applied'
-    - TB states: ACTIVE_SMPOS, ACTIVE_SMNEG, ACTIVE_EXPTB for active TB cases
+    - TB states: SYMPTOMATIC, ASYMPTOMATIC, NON_INFECTIOUS for active TB cases
     
     Parameters:
     -----------
@@ -146,6 +149,17 @@ class TBDiagnostic(ss.Intervention):
         )
         self.update_pars(pars=pars, **kwargs)
 
+        # Define person-level states needed by this intervention
+        self.define_states(
+            ss.BoolState('sought_care',            default=False),
+            ss.BoolState('diagnosed',              default=False),
+            ss.BoolArr('tested',                     default=False),
+            ss.IntArr('n_times_tested',            default=0),
+            ss.BoolState('test_result',            default=False),
+            ss.FloatArr('care_seeking_multiplier', default=1.0),
+            ss.BoolState('multiplier_applied',     default=False),
+        )
+
         # Create distributions once (avoid recreating every step)
         if not isinstance(self.pars.coverage, ss.Dist):
             self.dist_coverage = ss.bernoulli(p=self.pars.coverage)
@@ -158,62 +172,13 @@ class TBDiagnostic(ss.Intervention):
         return
 
     def step(self):
-        """
-        Execute one timestep of TB diagnostic testing.
-        
-        This method performs the core diagnostic testing logic for each simulation timestep.
-        It identifies eligible individuals, applies diagnostic tests with specified sensitivity
-        and specificity, and handles the consequences of test results including false negatives.
-        
-        Process Flow:
-        ------------
-        1. Identify eligible individuals (sought care, not diagnosed, alive)
-        2. Apply coverage filter to select who gets tested
-        3. Determine TB status and apply test sensitivity/specificity
-        4. Update person states based on test results
-        5. Handle false negatives by allowing retesting with increased care-seeking probability
-        
-        Eligibility Criteria:
-        --------------------
-        - Individual must have sought care (sought_care = True)
-        - Individual must not be already diagnosed (diagnosed = False)
-        - Individual must be alive (alive = True)
-        
-        Test Logic:
-        ----------
-        - True TB cases: test positive with probability = sensitivity
-        - Non-TB cases: test positive with probability = (1 - specificity)
-        
-        False Negative Handling:
-        ------------------------
-        - Individuals with TB who test negative are identified as false negatives
-        - Their care-seeking probability is increased by the care_seeking_multiplier
-        - Their care-seeking and testing flags are reset to allow retesting
-        - The multiplier is only applied once per individual to prevent infinite boosting
-        
-        Side Effects:
-        -------------
-        - Updates person states: tested, n_times_tested, test_result, diagnosed
-        - Modifies care_seeking_multiplier and multiplier_applied for false negatives
-        - Resets sought_care and tested flags for false negatives
-        - Stores results for update_results method
-        
-        Returns:
-        --------
-        None
-        
-        Note:
-        -----
-        This method is called automatically by the simulation framework at each timestep.
-        The intervention must be added to the simulation's interventions list to be executed.
-        """
+        """Execute one timestep of TB diagnostic testing."""
         sim = self.sim
         ppl = sim.people
         tb = tbsim.get_tb(sim)
 
-        # Find people who sought care but haven't been tested
-        # eligible = ppl.sought_care & (~ppl.tested) & ppl.alive
-        eligible = ppl.sought_care & (~ppl.diagnosed) & ppl.alive  # Avoids excluding once-tested people
+        # Find people who sought care but haven't been diagnosed
+        eligible = self.sought_care & (~self.diagnosed) & ppl.alive
         uids = eligible.uids
         if len(uids) == 0:
             return
@@ -228,9 +193,7 @@ class TBDiagnostic(ss.Intervention):
 
         # Determine TB status for selected individuals
         tb_states = tb.state[selected]
-        has_tb = np.isin(tb_states, [TBS.ACTIVE_SMPOS,
-                                     TBS.ACTIVE_SMNEG,
-                                     TBS.ACTIVE_EXPTB])
+        has_tb = np.isin(tb_states, _ACTIVE_TB_STATES)
 
         # Apply test sensitivity and specificity
         test_positive = np.zeros(len(selected), dtype=bool)
@@ -246,49 +209,31 @@ class TBDiagnostic(ss.Intervention):
         if len(non_tb_cases) > 0:
             non_tb_test_positive = self.dist_false_positive.filter(non_tb_cases)
             test_positive[~has_tb] = np.isin(selected[~has_tb], non_tb_test_positive)
-        
-        # Error handling: Check test result validity
-        assert len(test_positive) == len(selected), TBDiagnosticErrors.test_result_length_mismatch(len(selected), len(test_positive))
-        assert test_positive.dtype == bool, TBDiagnosticErrors.test_result_wrong_type(test_positive.dtype)
 
         # Update person state
-        ppl.tested[selected] = True
-        ppl.n_times_tested[selected] += 1
-        ppl.test_result[selected] = test_positive
-        ppl.diagnosed[selected[test_positive]] = True
+        self.tested[selected] = True
+        self.n_times_tested[selected] += 1
+        self.test_result[selected] = test_positive
+        self.diagnosed[selected[test_positive]] = True
 
         # Optional: reset the health-seeking flag after testing
         if self.pars.reset_flag:
-            ppl.sought_care[selected] = False
+            self.sought_care[selected] = False
 
         # Handle false negatives: individuals with TB who tested negative
         false_negative_uids = selected[~test_positive & has_tb]
 
-        if len(false_negative_uids):
-            # print(f"[t={self.sim.ti}] {len(false_negative_uids)} false negatives → retry scheduled")
-            pass
-
-        # # Enable retry: reset care flag and allow re-test
-        # ppl.sought_care[false_negative_uids] = False
-        # ppl.tested[false_negative_uids] = False
-        # mult = self.pars.care_seeking_multiplier
-        # ppl.care_seeking_multiplier[false_negative_uids] *= mult
-
         # Filter only those who haven't had multiplier applied yet
-        unboosted = false_negative_uids[~ppl.multiplier_applied[false_negative_uids]]
+        unboosted = false_negative_uids[~self.multiplier_applied[false_negative_uids]]
 
         if len(unboosted):
             # Increase care-seeking probability for future attempts
-            ppl.care_seeking_multiplier[unboosted] *= self.pars.care_seeking_multiplier
-            ppl.multiplier_applied[unboosted] = True  # mark as boosted 
-
-        if len(unboosted):
-            # print(f"[t={self.sim.ti}] Multiplier applied to {len(unboosted)} people")
-            pass
+            self.care_seeking_multiplier[unboosted] *= self.pars.care_seeking_multiplier
+            self.multiplier_applied[unboosted] = True
 
         # Reset flags to allow re-care-seeking
-        ppl.sought_care[false_negative_uids] = False
-        ppl.tested[false_negative_uids] = False
+        self.sought_care[false_negative_uids] = False
+        self.tested[false_negative_uids] = False
 
         # Store for update_results
         self.tested_this_step = selected
@@ -410,50 +355,62 @@ class EnhancedTBDiagnostic(ss.Intervention):
         super().__init__(**kwargs)
 
         # Define comprehensive parameters combining both approaches
+        # Note: LSHTM state mapping: SYMPTOMATIC≈smear+, ASYMPTOMATIC≈smear-, NON_INFECTIOUS≈EPTB
         self.define_pars(
-            # Coverage and basic parameters (from tb_diagnostic.py)
+            # Coverage and basic parameters
             coverage=1.0,
             reset_flag=False,
             care_seeking_multiplier=1.0,
-            
-            # Xpert baseline parameters (from interventions_updated.py)
-            sensitivity_adult_smearpos=0.909,
-            specificity_adult_smearpos=0.966,
-            sensitivity_adult_smearneg=0.775,
-            specificity_adult_smearneg=0.958,
-            sensitivity_adult_eptb=0.775,
-            specificity_adult_eptb=0.958,
+
+            # Xpert baseline parameters (stratified by LSHTM active-TB category)
+            sensitivity_adult_symptomatic=0.909,       # was smearpos
+            specificity_adult_symptomatic=0.966,
+            sensitivity_adult_asymptomatic=0.775,      # was smearneg
+            specificity_adult_asymptomatic=0.958,
+            sensitivity_adult_noninfectious=0.775,     # was eptb
+            specificity_adult_noninfectious=0.958,
             sensitivity_child=0.73,
             specificity_child=0.95,
-            
+
             # Oral swab parameters (optional)
             use_oral_swab=False,
-            sens_adult_smearpos_oral=0.80,
-            spec_adult_smearpos_oral=0.90,
-            sens_adult_smearneg_oral=0.30,
-            spec_adult_smearneg_oral=0.98,
+            sens_adult_symptomatic_oral=0.80,
+            spec_adult_symptomatic_oral=0.90,
+            sens_adult_asymptomatic_oral=0.30,
+            spec_adult_asymptomatic_oral=0.98,
             sens_child_oral=0.25,
             spec_child_oral=0.95,
-            
+
             # FujiLAM parameters (optional)
             use_fujilam=False,
             sens_hivpos_adult_tb=0.75,
             spec_hivpos_adult_tb=0.90,
-            sens_hivpos_adult_eptb=0.75,
-            spec_hivpos_adult_eptb=0.739,
+            sens_hivpos_adult_noninfectious=0.75,
+            spec_hivpos_adult_noninfectious=0.739,
             sens_hivneg_adult=0.58,
             spec_hivneg_adult=0.98,
             sens_hivpos_child=0.579,
             spec_hivpos_child=0.877,
             sens_hivneg_child=0.51,
             spec_hivneg_child=0.895,
-            
+
             # CAD CXR parameters (optional)
             use_cadcxr=False,
             cad_cxr_sensitivity=0.66,
             cad_cxr_specificity=0.79,
         )
         self.update_pars(pars=pars, **kwargs)
+
+        # Define person-level states needed by this intervention
+        self.define_states(
+            ss.BoolState('sought_care',            default=False),
+            ss.BoolState('diagnosed',              default=False),
+            ss.BoolArr('tested',                     default=False),
+            ss.IntArr('n_times_tested',            default=0),
+            ss.BoolState('test_result',            default=False),
+            ss.FloatArr('care_seeking_multiplier', default=1.0),
+            ss.BoolState('multiplier_applied',     default=False),
+        )
 
         # Create distributions once
         if not isinstance(self.pars.coverage, ss.Dist):
@@ -463,19 +420,15 @@ class EnhancedTBDiagnostic(ss.Intervention):
         # Temporary state for update_results
         self.tested_this_step = []
         self.test_result_this_step = []
-        self.diagnostic_method_used = []  # Track which diagnostic was used
+        self.diagnostic_method_used = []
         return
 
     def _get_diagnostic_parameters(self, uid, age, tb_state, hiv_state=None):
-        """
-        Get sensitivity and specificity based on individual characteristics.
-        """
+        """Get sensitivity and specificity based on individual characteristics."""
         is_child = age < 15
-        hiv_positive = hiv_state is not None and hiv_state in [1, 2, 3]  # ACUTE, LATENT, AIDS
-        
-        # Determine which diagnostic method to use
+        hiv_positive = hiv_state is not None and hiv_state in [1, 2, 3]
+
         if self.pars.use_fujilam and hiv_state is not None:
-            # FujiLAM for HIV-positive individuals
             if is_child:
                 if hiv_positive:
                     return self.pars.sens_hivpos_child, self.pars.spec_hivpos_child
@@ -483,51 +436,42 @@ class EnhancedTBDiagnostic(ss.Intervention):
                     return self.pars.sens_hivneg_child, self.pars.spec_hivneg_child
             else:
                 if hiv_positive:
-                    if tb_state == TBS.ACTIVE_EXPTB:
-                        return self.pars.sens_hivpos_adult_eptb, self.pars.spec_hivpos_adult_eptb
+                    if tb_state == TBSL.NON_INFECTIOUS:
+                        return self.pars.sens_hivpos_adult_noninfectious, self.pars.spec_hivpos_adult_noninfectious
                     else:
                         return self.pars.sens_hivpos_adult_tb, self.pars.spec_hivpos_adult_tb
                 else:
                     return self.pars.sens_hivneg_adult, self.pars.spec_hivneg_adult
-        
-        elif self.pars.use_cadcxr and is_child and tb_state != TBS.ACTIVE_EXPTB:
-            # CAD CXR for children (not EPTB)
+
+        elif self.pars.use_cadcxr and is_child and tb_state != TBSL.NON_INFECTIOUS:
             return self.pars.cad_cxr_sensitivity, self.pars.cad_cxr_specificity
-        
+
         elif self.pars.use_oral_swab:
-            # Oral swab parameters
             if is_child:
                 return self.pars.sens_child_oral, self.pars.spec_child_oral
-            elif tb_state == TBS.ACTIVE_SMPOS:
-                return self.pars.sens_adult_smearpos_oral, self.pars.spec_adult_smearpos_oral
-            elif tb_state == TBS.ACTIVE_SMNEG:
-                return self.pars.sens_adult_smearneg_oral, self.pars.spec_adult_smearneg_oral
+            elif tb_state == TBSL.SYMPTOMATIC:
+                return self.pars.sens_adult_symptomatic_oral, self.pars.spec_adult_symptomatic_oral
             else:
-                return self.pars.sens_adult_smearneg_oral, self.pars.spec_adult_smearneg_oral
-        
+                return self.pars.sens_adult_asymptomatic_oral, self.pars.spec_adult_asymptomatic_oral
+
         else:
-            # Default Xpert baseline parameters
             if is_child:
                 return self.pars.sensitivity_child, self.pars.specificity_child
-            elif tb_state == TBS.ACTIVE_SMPOS:
-                return self.pars.sensitivity_adult_smearpos, self.pars.specificity_adult_smearpos
-            elif tb_state == TBS.ACTIVE_SMNEG:
-                return self.pars.sensitivity_adult_smearneg, self.pars.specificity_adult_smearneg
-            elif tb_state == TBS.ACTIVE_EXPTB:
-                return self.pars.sensitivity_adult_eptb, self.pars.specificity_adult_eptb
+            elif tb_state == TBSL.SYMPTOMATIC:
+                return self.pars.sensitivity_adult_symptomatic, self.pars.specificity_adult_symptomatic
+            elif tb_state == TBSL.ASYMPTOMATIC:
+                return self.pars.sensitivity_adult_asymptomatic, self.pars.specificity_adult_asymptomatic
+            elif tb_state == TBSL.NON_INFECTIOUS:
+                return self.pars.sensitivity_adult_noninfectious, self.pars.specificity_adult_noninfectious
             else:
-                return 0.0, 1.0  # Default for unknown states
+                return 0.0, 1.0
 
     def _determine_diagnostic_method(self, uid, age, tb_state, hiv_state=None):
-        """
-        Determine which diagnostic method to use and return method name.
-        """
+        """Determine which diagnostic method to use and return method name."""
         is_child = age < 15
-        hiv_positive = hiv_state is not None and hiv_state in [1, 2, 3]
-        
         if self.pars.use_fujilam and hiv_state is not None:
             return "FujiLAM"
-        elif self.pars.use_cadcxr and is_child and tb_state != TBS.ACTIVE_EXPTB:
+        elif self.pars.use_cadcxr and is_child and tb_state != TBSL.NON_INFECTIOUS:
             return "CAD_CXR"
         elif self.pars.use_oral_swab:
             return "Oral_Swab"
@@ -536,12 +480,12 @@ class EnhancedTBDiagnostic(ss.Intervention):
 
     @staticmethod
     def p_test_positive(self, sim, uids):
-        """ Calculate per-individual probability of a positive test result. """
+        """Calculate per-individual probability of a positive test result."""
         tb = tbsim.get_tb(sim)
         ppl = sim.people
         tb_states = tb.state[uids]
         ages = ppl.age[uids]
-        has_tb = np.isin(tb_states, [TBS.ACTIVE_SMPOS, TBS.ACTIVE_SMNEG, TBS.ACTIVE_EXPTB])
+        has_tb = np.isin(tb_states, _ACTIVE_TB_STATES)
 
         hiv_states = None
         if hasattr(sim.diseases, 'hiv'):
@@ -566,7 +510,7 @@ class EnhancedTBDiagnostic(ss.Intervention):
         tb = tbsim.get_tb(sim)
 
         # Find people who sought care but haven't been diagnosed
-        eligible = ppl.sought_care & (~ppl.diagnosed) & ppl.alive
+        eligible = self.sought_care & (~self.diagnosed) & ppl.alive
         uids = eligible.uids
         if len(uids) == 0:
             return
@@ -583,15 +527,11 @@ class EnhancedTBDiagnostic(ss.Intervention):
         tb_states = tb.state[selected]
         ages = ppl.age[selected]
 
-        # Get HIV state if HIV disease exists
         hiv_states = None
         if hasattr(sim.diseases, 'hiv'):
             hiv_states = sim.diseases.hiv.state[selected]
 
-        # Determine TB status
-        has_tb = np.isin(tb_states, [TBS.ACTIVE_SMPOS,
-                                     TBS.ACTIVE_SMNEG,
-                                     TBS.ACTIVE_EXPTB])
+        has_tb = np.isin(tb_states, _ACTIVE_TB_STATES)
 
         # Apply diagnostic testing — bernoulli with per-individual probabilities
         test_positive_uids = self.dist_test_positive.filter(selected)
@@ -607,30 +547,24 @@ class EnhancedTBDiagnostic(ss.Intervention):
             diagnostic_methods.append(method)
 
         # Update person state
-        ppl.tested[selected] = True
-        ppl.n_times_tested[selected] += 1
-        ppl.test_result[selected] = test_positive
-        ppl.diagnosed[selected[test_positive]] = True
+        self.tested[selected] = True
+        self.n_times_tested[selected] += 1
+        self.test_result[selected] = test_positive
+        self.diagnosed[selected[test_positive]] = True
 
-        # Optional: reset the health-seeking flag
         if self.pars.reset_flag:
-            ppl.sought_care[selected] = False
+            self.sought_care[selected] = False
 
-        # Handle false negatives: schedule another round of health-seeking
+        # Handle false negatives
         false_negative_uids = selected[~test_positive & has_tb]
 
         if len(false_negative_uids):
-            # Filter only those who haven't had multiplier applied yet
-            unboosted = false_negative_uids[~ppl.multiplier_applied[false_negative_uids]]
-
-            # Apply multiplier only to them
+            unboosted = false_negative_uids[~self.multiplier_applied[false_negative_uids]]
             if len(unboosted):
-                ppl.care_seeking_multiplier[unboosted] *= self.pars.care_seeking_multiplier
-                ppl.multiplier_applied[unboosted] = True
-
-            # Reset flags to allow re-care-seeking
-            ppl.sought_care[false_negative_uids] = False
-            ppl.tested[false_negative_uids] = False
+                self.care_seeking_multiplier[unboosted] *= self.pars.care_seeking_multiplier
+                self.multiplier_applied[unboosted] = True
+            self.sought_care[false_negative_uids] = False
+            self.tested[false_negative_uids] = False
 
         # Store for update_results
         self.tested_this_step = selected
@@ -736,8 +670,8 @@ if __name__ == '__main__':
 
     # Example simulation with enhanced diagnostic
     sim = ss.Sim(
-        people=ss.People(n_agents=1000, extra_states=tbsim.get_extrastates()),
-        diseases=tbsim.TB_EMOD({'init_prev': ss.bernoulli(0.25)}),
+        people=ss.People(n_agents=1000),
+        diseases=tbsim.TB_LSHTM(pars={'init_prev': 0.25}),
         interventions=[
             tbsim.HealthSeekingBehavior(pars={'initial_care_seeking_rate': ss.perday(0.25)}),
             EnhancedTBDiagnostic(pars={
