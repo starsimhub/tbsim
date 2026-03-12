@@ -3,7 +3,7 @@
   "checkpoint_id": "1e79b75af8c3",
   "strategy": "manual-commit",
   "branch": "refactor-interventions",
-  "checkpoints_count": 0,
+  "checkpoints_count": 1,
   "files_touched": [
     "tbsim/tb_lshtm.py",
     "tests/test_tb_lshtm.py"
@@ -14,13 +14,19 @@
       "transcript": "/1e/79b75af8c3/0/full.jsonl",
       "content_hash": "/1e/79b75af8c3/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/1e/79b75af8c3/1/metadata.json",
+      "transcript": "/1e/79b75af8c3/1/full.jsonl",
+      "content_hash": "/1e/79b75af8c3/1/content_hash.txt",
+      "prompt": "/1e/79b75af8c3/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 6,
+    "cache_creation_tokens": 1226,
+    "cache_read_tokens": 112608,
+    "output_tokens": 468,
+    "api_call_count": 4
   }
 }
