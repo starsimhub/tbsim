@@ -1,0 +1,2 @@
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/tbsim/interventions/drug_types.py in the IDE. This may or may not be related to the current task.</ide_opened_file>
+please refactor drug_types.py, in particular TBDrugTypeParameters. this is way too complicated. simplify as much as possible, and where possible just use plain classes (or even just dicts) rather than factory functions, generators, etc. if you can get rid of TBDrugType and the enum that's an added bonus!
