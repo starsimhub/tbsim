@@ -1,0 +1,5 @@
+<ide_opened_file>The user opened the file /temp/readonly/Agent tool input (s8l3i1) in the IDE. This may or may not be related to the current task.</ide_opened_file>
+you got started implementing this spec:
+/home/cliffk/idm/tbsim/docs/tb_diagnostic_treatment_refactor_spec.md
+
+I believe you implemented the first 3-4 tasks. please pick up from where you left off. use your superpower and starsim-ai skills where needed.
