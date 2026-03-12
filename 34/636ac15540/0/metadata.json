@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "34636ac15540",
+  "session_id": "0410b36f-17a8-4d37-b11f-1f280b6763e1",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-12T16:18:07.461294998Z",
+  "branch": "refactor-interventions",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "tbsim/interventions/diagnostics.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "c7eba20ea62e",
+  "checkpoint_transcript_start": 119,
+  "transcript_lines_at_start": 119,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-12T16:18:07.221868748Z",
+    "agent_lines": 107,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 107,
+    "agent_percentage": 100
+  }
+}
