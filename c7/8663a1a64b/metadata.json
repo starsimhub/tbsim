@@ -3,9 +3,10 @@
   "checkpoint_id": "c78663a1a64b",
   "strategy": "manual-commit",
   "branch": "refactor-interventions",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
-    "tbsim/interventions/dx_products.py"
+    "tbsim/interventions/dx_products.py",
+    "tbsim/interventions/tx_delivery.py"
   ],
   "sessions": [
     {
@@ -13,13 +14,19 @@
       "transcript": "/c7/8663a1a64b/0/full.jsonl",
       "content_hash": "/c7/8663a1a64b/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/c7/8663a1a64b/1/metadata.json",
+      "transcript": "/c7/8663a1a64b/1/full.jsonl",
+      "content_hash": "/c7/8663a1a64b/1/content_hash.txt",
+      "prompt": "/c7/8663a1a64b/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 5548,
-    "cache_creation_tokens": 369395,
-    "cache_read_tokens": 2068857,
-    "output_tokens": 20045,
-    "api_call_count": 28
+    "input_tokens": 7703,
+    "cache_creation_tokens": 403616,
+    "cache_read_tokens": 2201542,
+    "output_tokens": 23302,
+    "api_call_count": 34
   }
 }
