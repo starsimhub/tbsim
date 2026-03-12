@@ -146,8 +146,8 @@ class Xpert(Dx):
 
     columns = 'state,result,probability,age_min,age_max'.split(',')
     default_data = [
+        #state                result      prob   min max
         # Adults (15+)
-        #state              result     prob  amin  amax
         [TBSL.SYMPTOMATIC,    'positive', 0.909, 15, np.inf],
         [TBSL.SYMPTOMATIC,    'negative', 0.091, 15, np.inf],
         [TBSL.ASYMPTOMATIC,   'positive', 0.775, 15, np.inf],
@@ -173,8 +173,8 @@ class OralSwab(Dx):
 
     columns = 'state,result,probability,age_min,age_max'.split(',')
     default_data = [
+        #state                result      prob  min max
         # Adults (15+)
-        #state              result     prob  amin  amax
         [TBSL.SYMPTOMATIC,    'positive', 0.80, 15, np.inf],
         [TBSL.SYMPTOMATIC,    'negative', 0.20, 15, np.inf],
         [TBSL.ASYMPTOMATIC,   'positive', 0.30, 15, np.inf],
@@ -200,8 +200,8 @@ class FujiLAM(Dx):
 
     columns = 'state,result,probability,age_min,age_max,hiv'.split(',')
     default_data = [
+        #state                result      prob   min max      hiv
         # HIV+, adults
-        #state              result     prob   amin  amax    hiv
         [TBSL.SYMPTOMATIC,    'positive', 0.75,  15, np.inf, True],
         [TBSL.SYMPTOMATIC,    'negative', 0.25,  15, np.inf, True],
         [TBSL.ASYMPTOMATIC,   'positive', 0.75,  15, np.inf, True],
@@ -241,7 +241,7 @@ class CAD(Dx):
 
     columns = 'state,result,probability'.split(',')
     default_data = [
-        #state              result     prob
+        #state                result      prob
         [TBSL.SYMPTOMATIC,    'positive', 0.66],
         [TBSL.SYMPTOMATIC,    'negative', 0.34],
         [TBSL.ASYMPTOMATIC,   'positive', 0.66],
