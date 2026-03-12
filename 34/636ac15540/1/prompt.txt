@@ -1,0 +1,16 @@
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/tbsim/interventions/diagnostics.py in the IDE. This may or may not be related to the current task.</ide_opened_file>
+i'd like to refactor how data is loaded in diagnostic products.
+
+1. for each product (like Xpert, FujiLAM), define e.g. 
+self.columns = 'state,result,probability,age_min,age_max'.split(',')
+
+2. then define e.g.
+
+self.default_data = [
+[5,'positive',0.80,15,99],
+[5,'negative',0.20,15,99],
+...
+]
+(except align the columns horizontally so they're easier to read)
+
+3. if the user supplies a df, use it directly. if they supply a filename, use read_csv. if they supply neither, construct a dataframe from self.columns and self.default_data

@@ -3,7 +3,7 @@
   "checkpoint_id": "34636ac15540",
   "strategy": "manual-commit",
   "branch": "refactor-interventions",
-  "checkpoints_count": 0,
+  "checkpoints_count": 1,
   "files_touched": [
     "tbsim/interventions/diagnostics.py"
   ],
@@ -13,13 +13,19 @@
       "transcript": "/34/636ac15540/0/full.jsonl",
       "content_hash": "/34/636ac15540/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/34/636ac15540/1/metadata.json",
+      "transcript": "/34/636ac15540/1/full.jsonl",
+      "content_hash": "/34/636ac15540/1/content_hash.txt",
+      "prompt": "/34/636ac15540/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 24,
+    "cache_creation_tokens": 47931,
+    "cache_read_tokens": 623919,
+    "output_tokens": 7703,
+    "api_call_count": 19
   }
 }
