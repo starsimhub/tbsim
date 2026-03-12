@@ -3,7 +3,7 @@
   "checkpoint_id": "1cbf87000911",
   "strategy": "manual-commit",
   "branch": "refactor-interventions",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "docs/examples.md",
     "tbsim/interventions/archive/immigration.py",
@@ -28,13 +28,19 @@
       "transcript": "/1c/bf87000911/1/full.jsonl",
       "content_hash": "/1c/bf87000911/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/1c/bf87000911/2/metadata.json",
+      "transcript": "/1c/bf87000911/2/full.jsonl",
+      "content_hash": "/1c/bf87000911/2/content_hash.txt",
+      "prompt": "/1c/bf87000911/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 5548,
-    "cache_creation_tokens": 369395,
-    "cache_read_tokens": 2068857,
-    "output_tokens": 20045,
-    "api_call_count": 28
+    "input_tokens": 5554,
+    "cache_creation_tokens": 374899,
+    "cache_read_tokens": 2192865,
+    "output_tokens": 21552,
+    "api_call_count": 32
   }
 }
