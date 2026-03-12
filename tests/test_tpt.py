@@ -6,7 +6,6 @@ import pandas as pd
 import sciris as sc
 import starsim as ss
 import tbsim
-from tbsim.interventions.tpt import TPTTx, TPTSimple, TPTHousehold
 
 
 # ---------------------------------------------------------------------------
@@ -46,7 +45,7 @@ def test_tpt_default_values():
     """Test TPTSimple + TPTTx with default parameters."""
     nagents = 100
     pop, tb, net, pars = make_modules(agents=nagents)
-    itv = TPTSimple()
+    itv = tbsim.TPTSimple()
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     tpt = sim.interventions['tptsimple']
@@ -62,11 +61,11 @@ def test_tpt_custom_values():
     """Test TPTSimple + TPTTx with custom parameters."""
     nagents = 100
     pop, tb, net, pars = make_modules(agents=nagents)
-    product = TPTTx(pars={
+    product = tbsim.TPTTx(pars={
         'dur_treatment': ss.constant(v=ss.months(6)),
         'dur_protection': ss.constant(v=ss.years(5)),
     })
-    itv = TPTSimple(product=product, pars={
+    itv = tbsim.TPTSimple(product=product, pars={
         'coverage': 0.8,
         'age_range': [15, 65],
         'start': ss.date('2005-01-01'),
@@ -85,7 +84,7 @@ def test_tpt_targets_latent_only():
     nagents = 100
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = TPTSimple(pars={'coverage': 1.0})
+    itv = tbsim.TPTSimple(pars={'coverage': 1.0})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     tpt = sim.interventions['tptsimple']
@@ -103,11 +102,11 @@ def test_tpt_treatment_then_protection():
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    product = TPTTx(pars={
+    product = tbsim.TPTTx(pars={
         'dur_treatment': ss.constant(v=ss.years(1)),
         'dur_protection': ss.constant(v=ss.years(5)),
     })
-    itv = TPTSimple(product=product, pars={'coverage': 1.0})
+    itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     tpt = sim.interventions['tptsimple']
@@ -128,11 +127,11 @@ def test_tpt_protection_expiry():
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    product = TPTTx(pars={
+    product = tbsim.TPTTx(pars={
         'dur_treatment': ss.constant(v=ss.days(1)),
         'dur_protection': ss.constant(v=ss.days(1)),
     })
-    itv = TPTSimple(product=product, pars={'coverage': 1.0})
+    itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     tpt = sim.interventions['tptsimple']
@@ -150,11 +149,11 @@ def test_tpt_modifies_rr():
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    product = TPTTx(pars={
+    product = tbsim.TPTTx(pars={
         'dur_treatment': ss.constant(v=ss.days(0)),
         'dur_protection': ss.constant(v=ss.years(10)),
     })
-    itv = TPTSimple(product=product, pars={'coverage': 1.0})
+    itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
 
@@ -178,7 +177,7 @@ def test_tpt_result_metrics():
     nagents = 50
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    itv = TPTSimple()
+    itv = tbsim.TPTSimple()
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
     tpt = sim.interventions['tptsimple']
@@ -198,7 +197,7 @@ def test_tpt_with_age_range():
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    itv = TPTSimple(pars={
+    itv = tbsim.TPTSimple(pars={
         'coverage': 1.0,
         'age_range': [15, 50],
     })
@@ -220,11 +219,11 @@ def test_tpt_product_skips_on_treatment():
     nagents = 100
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
-    product = TPTTx(pars={
+    product = tbsim.TPTTx(pars={
         'dur_treatment': ss.constant(v=ss.days(0)),
         'dur_protection': ss.constant(v=ss.years(5)),
     })
-    itv = TPTSimple(product=product, pars={'coverage': 1.0})
+    itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
 
@@ -251,7 +250,7 @@ def test_tpt_household_init():
     hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
-    tpt_hh = TPTHousehold()
+    tpt_hh = tbsim.TPTHousehold()
 
     sim = ss.Sim(
         diseases=tb, networks=hh_net,
@@ -271,7 +270,7 @@ def test_tpt_household_traces_on_treatment_start():
     hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
-    tpt_hh = TPTHousehold(pars={'coverage': 1.0})
+    tpt_hh = tbsim.TPTHousehold(pars={'coverage': 1.0})
 
     sim = ss.Sim(
         diseases=tb, networks=hh_net,
@@ -305,7 +304,7 @@ def test_tpt_household_no_retrigger_same_index():
     hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
-    tpt_hh = TPTHousehold(pars={'coverage': 1.0})
+    tpt_hh = tbsim.TPTHousehold(pars={'coverage': 1.0})
 
     sim = ss.Sim(
         diseases=tb, networks=hh_net,
@@ -334,7 +333,7 @@ def test_tpt_household_full_sim_run():
     hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20, 'beta': ss.peryear(0.5)})
-    tpt_hh = TPTHousehold(pars={'coverage': 0.8})
+    tpt_hh = tbsim.TPTHousehold(pars={'coverage': 0.8})
 
     sim = ss.Sim(
         diseases=tb,

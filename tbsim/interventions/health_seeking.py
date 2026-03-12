@@ -18,7 +18,7 @@ class HealthSeekingBehavior(ss.Intervention):
 
         import starsim as ss
         import tbsim
-        from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
+        from tbsim.interventions.health_seeking import HealthSeekingBehavior
 
         tb  = tbsim.TB_LSHTM()
         hsb = HealthSeekingBehavior()
@@ -106,7 +106,7 @@ class HealthSeekingBehavior(ss.Intervention):
         self.n_care_sought[seeking_uids] += 1
         self.n_care_sought_total[seeking_uids] += 1
         self.ti_last_sought[seeking_uids] = self.ti
-        if hasattr(ppl, 'sought_care'):
+        if 'sought_care' in ppl.states:
             ppl.sought_care[seeking_uids] = True
         return
 

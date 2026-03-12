@@ -25,20 +25,19 @@ sim.plot()
 Adding BCG vaccination and treatment interventions:
 
 ```python
-from tbsim.interventions.bcg import BCGRoutine
-from tbsim.interventions.tpt import TPTSimple
+import tbsim
 from tbsim import TB_EMOD
 import starsim as ss
 
 # Add TB module and interventions
 tb = TB_EMOD()
-bcg = BCGRoutine(pars=dict(
+bcg = tbsim.BCGRoutine(pars=dict(
     coverage=ss.bernoulli(p=0.8),
     start=ss.date('1980-01-01'),
     stop=ss.date('2030-12-31'),
     age_range=[0, 5],
 ))
-tpt = TPTSimple(pars=dict(
+tpt = tbsim.TPTSimple(pars=dict(
     start=ss.date('1990-01-01'),
     stop=ss.date('2030-12-31'),
 ))
