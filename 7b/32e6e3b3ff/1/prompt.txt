@@ -1,0 +1,11 @@
+<ide_selection>The user selected the lines 327 to 328 from /home/cliffk/idm/tbsim/tbsim/tb_lshtm.py:
+            newly_cleared = ss.uids(~pre & (self.state == TBSL.CLEARED))  # agents cleared from INFECTION this step
+
+
+This may or may not be related to the current task.</ide_selection>
+in tb_lshtm.py, everywhere you see this pattern:
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
+            newly_cleared = ss.uids(~pre & (self.state == TBSL.CLEARED))  # agents cleared from INFECTION this step
+
+replace it with just
+            newly_cleared = (self.state[u] == TBSL.CLEARED).uids  # agents cleared from INFECTION this step
