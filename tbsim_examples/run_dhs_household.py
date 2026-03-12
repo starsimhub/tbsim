@@ -14,6 +14,7 @@ import sciris as sc
 import starsim as ss
 import tbsim
 
+raise NotImplementedError('Awaiting more permanent data solution')
 
 # -- 1. Construct synthetic DHS data -------------------------------------------
 np.random.seed(0)
