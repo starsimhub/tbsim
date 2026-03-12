@@ -18,13 +18,11 @@ class TBSL(IntEnum):
     """
     SUSCEPTIBLE     = -1    # Never infected (agents who clear/recover/treat remain in their last state, not here)
     INFECTION       = 0     # Latent infection (not yet active TB)
-    CLEARED         = 1     # Cleared infection without developing active TB
+    CLEARED         = 1     # Post-infection: cleared latent, recovered from non-infectious, or completed treatment
     NON_INFECTIOUS  = 2     # Non-infectious TB (early/smear-negative, corresponds to LSHTM diagram)
-    RECOVERED       = 3     # Recovered from non-infectious TB (susceptible to reinfection)
     ASYMPTOMATIC    = 4     # Active TB, asymptomatic (infectious)
     SYMPTOMATIC     = 5     # Active TB, symptomatic (infectious)
     TREATMENT       = 6     # On TB treatment
-    TREATED         = 7     # Completed treatment (susceptible to reinfection)
     DEAD            = 8     # Dead (TB-caused via sym_dead; general mortality via step_die also sets this)
     ACUTE           = 9     # Acute infection immediately after exposure (TB_LSHTM_Acute only)
 
@@ -48,9 +46,9 @@ class TB_LSHTM(BaseTB):
     Infectious states are `TBSL.ASYMPTOMATIC` and `TBSL.SYMPTOMATIC`; the force
     of infection depends on `pars.beta` and the prevalence of those states, with
     `pars.trans_asymp` (kappa) giving the relative infectiousness of asymptomatic vs symptomatic TB.
-    Reinfectable states (`TBSL.CLEARED`, `TBSL.RECOVERED`, `TBSL.TREATED`) use
-    `pars.rr_rec` (pi) and `pars.rr_treat` (rho). Per-agent modifiers ``rr_activation``, ``rr_clearance``,
-    ``rr_death`` scale selected rates. Interventions call `start_treatment`.
+    Reinfectable state (`TBSL.CLEARED`) uses per-agent `rr_reinfection`, set on entry from each
+    pathway (`rr_reinfection_cleared`, `rr_reinfection_rec`, `rr_reinfection_treat`). Per-agent modifiers
+    ``rr_activation``, ``rr_clearance``, ``rr_death`` scale selected rates. Interventions call `start_treatment`.
 
     Args (pars):
         *Transmission and reinfection*
@@ -58,8 +56,10 @@ class TB_LSHTM(BaseTB):
         - ``init_prev``:   Initial seed infections (prevalence).
         - ``beta``:        Transmission rate per year.
         - ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (kappa)
-        - ``rr_rec``:      Relative risk of reinfection for RECOVERED.  (pi)
-        - ``rr_treat``:    Relative risk of reinfection for TREATED. (rho)
+        - ``rr_reinfection_rec``:     Relative risk of reinfection after recovering from NON_INFECTIOUS. (pi)
+        - ``rr_reinfection_treat``:   Relative risk of reinfection after completing treatment. (rho)
+        - ``rr_reinfection_cleared``: Relative risk of reinfection after clearing latent infection. Default: 1.0
+        - ``dur_reinfection_protection``: Distribution of duration of reinfection protection. If None, never wanes.
 
         *From INFECTION (latent)*
 
@@ -80,7 +80,6 @@ class TB_LSHTM(BaseTB):
         *From SYMPTOMATIC*
 
         - ``sym_asy``:     Symptomatic -> Asymptomatic.
-        - ``sym_treat``:   Symptomatic -> Treatment. (theta)
         - ``sym_dead``:    Symptomatic -> Dead (TB-specific mortality, mu_TB).
 
         *From TREATMENT*
@@ -112,9 +111,11 @@ class TB_LSHTM(BaseTB):
 
         *Per-agent risk modifiers*
 
-        - ``rr_activation``  (FloatArr, default=1.0):  Multiplier on INFECTION -> NON_INFECTIOUS / ASYMPTOMATIC.
-        - ``rr_clearance``   (FloatArr, default=1.0):  Multiplier on NON_INFECTIOUS -> RECOVERED.
-        - ``rr_death``       (FloatArr, default=1.0):  Multiplier on SYMPTOMATIC -> DEAD.
+        - ``rr_activation``         (FloatArr, default=1.0):   Multiplier on INFECTION -> NON_INFECTIOUS / ASYMPTOMATIC.
+        - ``rr_clearance``          (FloatArr, default=1.0):   Multiplier on NON_INFECTIOUS -> CLEARED.
+        - ``rr_death``              (FloatArr, default=1.0):   Multiplier on SYMPTOMATIC -> DEAD.
+        - ``rr_reinfection``        (FloatArr, default=1.0):   Per-agent relative reinfection risk; set on entry to CLEARED.
+        - ``ti_rr_reinfection_wane`` (FloatArr, default=np.inf): Sim time at which ``rr_reinfection`` resets to 1.0.
 
     Example:
         ::
@@ -140,23 +141,24 @@ class TB_LSHTM(BaseTB):
         # --- Transmission and reinfection ---
         self.define_pars(
             init_prev=ss.bernoulli(0.05),       # Initial seed infections (prevalence)
-            beta=ss.permonth(0.2),              # Transmission rate per year
+            beta=ss.permonth(0.2),              # Transmission rate per month
             trans_asymp=0.82,                   # κ kappa: rel. transmissibility asymptomatic vs symptomatic
-            rr_rec=0.21,                        # π pi: RR reinfection after recovery
-            rr_treat=3.15,                      # ρ rho: RR reinfection after treatment
+            rr_reinfection_rec=0.21,            # π pi: RR reinfection after NON_INFECTIOUS → CLEARED
+            rr_reinfection_treat=3.15,          # ρ rho: RR reinfection after TREATMENT → CLEARED
+            rr_reinfection_cleared=1.0,         # RR reinfection after INFECTION → CLEARED (latent cleared)
+            dur_reinfection_protection=None,    # Distribution of protection duration; None = never wanes
             # --- From INFECTION (latent) ---
             inf_cle=ss.peryear(1.90),            # Clear infection (no active TB)
             inf_non=ss.peryear(0.16),            # Progress to non-infectious TB
             inf_asy=ss.peryear(0.06),            # Progress to asymptomatic active TB
             # --- From NON_INFECTIOUS ---
-            non_rec=ss.peryear(0.18),            # Recover (→ RECOVERED)
+            non_rec=ss.peryear(0.18),            # Non-infectious → CLEARED
             non_asy=ss.peryear(0.25),            # Progress to asymptomatic
             # --- From ASYMPTOMATIC ---
             asy_non=ss.peryear(1.66),            # Revert to non-infectious
             asy_sym=ss.peryear(0.88),            # Progress to symptomatic
             # --- From SYMPTOMATIC ---
-            sym_asy=ss.peryear(0.54),            # Regress to asymptomatic (still active, not recovered)
-            sym_treat=ss.peryear(0.46),          # θ theta: symptomatic → treatment
+            sym_asy=ss.peryear(0.54),            # Regress to asymptomatic (still active TB; does not enter CLEARED)
             sym_dead=ss.peryear(0.34),           # μ_TB: symptomatic → dead (TB mortality)
             # --- From TREATMENT ---
             fail_rate=ss.peryear(0.63),          # φ phi: treatment failure (→ symptomatic)
@@ -191,6 +193,9 @@ class TB_LSHTM(BaseTB):
             ss.FloatArr('rr_activation', default=1.0),
             ss.FloatArr('rr_clearance', default=1.0),
             ss.FloatArr('rr_death', default=1.0),
+            # Reinfection protection
+            ss.FloatArr('rr_reinfection', default=1.0),
+            ss.FloatArr('ti_rr_reinfection_wane', default=np.inf),
             reset=True,
         )
 
@@ -302,21 +307,34 @@ class TB_LSHTM(BaseTB):
         super().step()
 
         # --- Evaluate transitions (each mutates self.state in place) ---
+        # For transitions that lead to CLEARED, we snapshot the pre-transition CLEARED mask
+        # and compare after to identify agents newly entering CLEARED from each source state,
+        # so we can assign the correct pathway-specific rr_reinfection to each new entrant.
 
         u = ss.uids(self.state == TBSL.INFECTION)
         if len(u):
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
                 TBSL.CLEARED:        self.pars.inf_cle,
                 TBSL.NON_INFECTIOUS: self.pars.inf_non * self.rr_activation[u],
                 TBSL.ASYMPTOMATIC:   self.pars.inf_asy * self.rr_activation[u],
             }, rng=self._rng_inf)
+            newly_cleared = ss.uids(~pre & (self.state == TBSL.CLEARED))  # agents cleared from INFECTION this step
+            self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_cleared
+            if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
+                self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
 
         u = ss.uids(self.state == TBSL.NON_INFECTIOUS)
         if len(u):
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
-                TBSL.RECOVERED:    self.pars.non_rec * self.rr_clearance[u],
+                TBSL.CLEARED:      self.pars.non_rec * self.rr_clearance[u],
                 TBSL.ASYMPTOMATIC: self.pars.non_asy,
             }, rng=self._rng_non)
+            newly_cleared = ss.uids(~pre & (self.state == TBSL.CLEARED))  # agents cleared from NON_INFECTIOUS this step
+            self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_rec
+            if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
+                self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
 
         u = ss.uids(self.state == TBSL.ASYMPTOMATIC)
         if len(u):
@@ -329,23 +347,27 @@ class TB_LSHTM(BaseTB):
         if len(u):
             self.transition(u, to={
                 TBSL.ASYMPTOMATIC: self.pars.sym_asy,
-                TBSL.TREATMENT:    self.pars.sym_treat,
                 TBSL.DEAD:         self.pars.sym_dead * self.rr_death[u],
             }, rng=self._rng_sym)
 
         u = ss.uids(self.state == TBSL.TREATMENT)
         if len(u):
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
                 TBSL.SYMPTOMATIC: self.pars.fail_rate,
-                TBSL.TREATED:     self.pars.complete_rate,
+                TBSL.CLEARED:     self.pars.complete_rate,
             }, rng=self._rng_trt)
+            newly_cleared = ss.uids(~pre & (self.state == TBSL.CLEARED))  # agents cleared from TREATMENT this step
+            self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_treat
+            if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
+                self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
 
         # --- Bookkeep from current state ---
 
         self.infected[:] = ~np.isin(self.state,
-            [TBSL.SUSCEPTIBLE, TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED, TBSL.DEAD])
+            [TBSL.SUSCEPTIBLE, TBSL.CLEARED, TBSL.DEAD])
         self.susceptible[:] = np.isin(self.state,
-            [TBSL.SUSCEPTIBLE, TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED])
+            [TBSL.SUSCEPTIBLE, TBSL.CLEARED])
         self.on_treatment[:] = (self.state == TBSL.TREATMENT)
 
         # TB deaths
@@ -360,9 +382,15 @@ class TB_LSHTM(BaseTB):
         self.rr_death[:] = 1
 
         # rel_sus / rel_trans
+        # rel_sus is reset to 1 for all agents first; other modules can then *= their own factors
         self.rel_sus[:] = 1
-        self.rel_sus[self.state == TBSL.RECOVERED] = self.pars.rr_rec
-        self.rel_sus[self.state == TBSL.TREATED] = self.pars.rr_treat
+        cleared = ss.uids(self.state == TBSL.CLEARED)
+        if self.pars.dur_reinfection_protection is not None and len(cleared):
+            # Waning: agents whose protection period has elapsed revert to full susceptibility
+            waned = cleared[self.ti >= self.ti_rr_reinfection_wane[cleared]]
+            self.rr_reinfection[waned] = 1.0
+            self.ti_rr_reinfection_wane[waned] = np.inf
+        self.rel_sus[cleared] *= self.rr_reinfection[cleared]
         self.rel_trans[:] = 1
         self.rel_trans[self.state == TBSL.ASYMPTOMATIC] = self.pars.trans_asymp
 
@@ -385,6 +413,9 @@ class TB_LSHTM(BaseTB):
         # Latent infection: clear without active disease
         latent = uids[self.state[uids] == TBSL.INFECTION]
         self.state[latent] = TBSL.CLEARED
+        self.rr_reinfection[latent] = self.pars.rr_reinfection_cleared
+        if self.pars.dur_reinfection_protection is not None and len(latent):
+            self.ti_rr_reinfection_wane[latent] = self.ti + self.pars.dur_reinfection_protection.rvs(latent)
         self.infected[latent] = False
         self.susceptible[latent] = True
 
@@ -541,6 +572,9 @@ class TB_LSHTM_Acute(TB_LSHTM):
         super(TB_LSHTM, self).step()
 
         # --- Evaluate transitions ---
+        # For transitions that lead to CLEARED, we snapshot the pre-transition CLEARED mask
+        # and compare after to identify agents newly entering CLEARED from each source state,
+        # so we can assign the correct pathway-specific rr_reinfection to each new entrant.
 
         u = ss.uids(self.state == TBSL.ACUTE)
         if len(u):
@@ -548,18 +582,28 @@ class TB_LSHTM_Acute(TB_LSHTM):
 
         u = ss.uids(self.state == TBSL.INFECTION)
         if len(u):
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
                 TBSL.CLEARED:        self.pars.inf_cle,
                 TBSL.NON_INFECTIOUS: self.pars.inf_non * self.rr_activation[u],
                 TBSL.ASYMPTOMATIC:   self.pars.inf_asy * self.rr_activation[u],
             }, rng=self._rng_inf)
+            newly_cleared = ss.uids(~pre & (self.state == TBSL.CLEARED))  # agents cleared from INFECTION this step
+            self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_cleared
+            if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
+                self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
 
         u = ss.uids(self.state == TBSL.NON_INFECTIOUS)
         if len(u):
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
-                TBSL.RECOVERED:    self.pars.non_rec * self.rr_clearance[u],
+                TBSL.CLEARED:      self.pars.non_rec * self.rr_clearance[u],
                 TBSL.ASYMPTOMATIC: self.pars.non_asy,
             }, rng=self._rng_non)
+            newly_cleared = ss.uids(~pre & (self.state == TBSL.CLEARED))  # agents cleared from NON_INFECTIOUS this step
+            self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_rec
+            if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
+                self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
 
         u = ss.uids(self.state == TBSL.ASYMPTOMATIC)
         if len(u):
@@ -572,23 +616,27 @@ class TB_LSHTM_Acute(TB_LSHTM):
         if len(u):
             self.transition(u, to={
                 TBSL.ASYMPTOMATIC: self.pars.sym_asy,
-                TBSL.TREATMENT:    self.pars.sym_treat,
                 TBSL.DEAD:         self.pars.sym_dead * self.rr_death[u],
             }, rng=self._rng_sym)
 
         u = ss.uids(self.state == TBSL.TREATMENT)
         if len(u):
+            pre = (self.state == TBSL.CLEARED)   # TODO: can never be true, need to refactor
             self.transition(u, to={
                 TBSL.SYMPTOMATIC: self.pars.fail_rate,
-                TBSL.TREATED:     self.pars.complete_rate,
+                TBSL.CLEARED:     self.pars.complete_rate,
             }, rng=self._rng_trt)
+            newly_cleared = ss.uids(~pre & (self.state == TBSL.CLEARED))  # agents cleared from TREATMENT this step
+            self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_treat
+            if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
+                self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
 
         # --- Bookkeep from current state ---
 
         self.infected[:] = ~np.isin(self.state,
-            [TBSL.SUSCEPTIBLE, TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED, TBSL.DEAD])
+            [TBSL.SUSCEPTIBLE, TBSL.CLEARED, TBSL.DEAD])
         self.susceptible[:] = np.isin(self.state,
-            [TBSL.SUSCEPTIBLE, TBSL.CLEARED, TBSL.RECOVERED, TBSL.TREATED])
+            [TBSL.SUSCEPTIBLE, TBSL.CLEARED])
         self.on_treatment[:] = (self.state == TBSL.TREATMENT)
 
         dead = ss.uids((self.state == TBSL.DEAD) & self.sim.people.alive)
@@ -600,9 +648,16 @@ class TB_LSHTM_Acute(TB_LSHTM):
         self.rr_clearance[:] = 1
         self.rr_death[:] = 1
 
+        # rel_sus / rel_trans
+        # rel_sus is reset to 1 for all agents first; other modules can then *= their own factors
         self.rel_sus[:] = 1
-        self.rel_sus[self.state == TBSL.RECOVERED] = self.pars.rr_rec
-        self.rel_sus[self.state == TBSL.TREATED] = self.pars.rr_treat
+        cleared = ss.uids(self.state == TBSL.CLEARED)
+        if self.pars.dur_reinfection_protection is not None and len(cleared):
+            # Waning: agents whose protection period has elapsed revert to full susceptibility
+            waned = cleared[self.ti >= self.ti_rr_reinfection_wane[cleared]]
+            self.rr_reinfection[waned] = 1.0
+            self.ti_rr_reinfection_wane[waned] = np.inf
+        self.rel_sus[cleared] *= self.rr_reinfection[cleared]
         self.rel_trans[:] = 1
         self.rel_trans[self.state == TBSL.ACUTE] = self.pars.trans_acute
         self.rel_trans[self.state == TBSL.ASYMPTOMATIC] = self.pars.trans_asymp
@@ -617,6 +672,9 @@ class TB_LSHTM_Acute(TB_LSHTM):
         # ACUTE or INFECTION: clear
         latent = uids[(self.state[uids] == TBSL.ACUTE) | (self.state[uids] == TBSL.INFECTION)]
         self.state[latent] = TBSL.CLEARED
+        self.rr_reinfection[latent] = self.pars.rr_reinfection_cleared
+        if self.pars.dur_reinfection_protection is not None and len(latent):
+            self.ti_rr_reinfection_wane[latent] = self.ti + self.pars.dur_reinfection_protection.rvs(latent)
         self.infected[latent] = False
         self.susceptible[latent] = True
 

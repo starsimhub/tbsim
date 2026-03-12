@@ -25,8 +25,8 @@ tb_pars = {
     "init_prev": ss.bernoulli(0.01), # seed prevalence
     "beta": ss.peryear(0.20),       # transmission rate
     "trans_asymp": 0.82,           # κ kappa: asymp vs symp relative transmissibility
-    "rr_rec": 0.21,                # π pi: reinfection risk after recovery
-    "rr_treat": 3.15,              # ρ rho: reinfection risk after treatment
+    "rr_reinfection_rec": 0.21,    # π pi: reinfection risk after NON_INFECTIOUS → CLEARED
+    "rr_reinfection_treat": 3.15,  # ρ rho: reinfection risk after TREATMENT → CLEARED
     "cxr_asymp_sens": 1.0,         # CXR sensitivity for asymptomatic (0–1)
 }
 

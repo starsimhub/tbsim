@@ -31,7 +31,6 @@ class HealthSeekingBehavior(ss.Intervention):
         super().__init__(**kwargs)
         self.define_pars(
             initial_care_seeking_rate = ss.perday(0.1),
-            care_seeking_dist         = ss.bernoulli(p=0),
             care_retry_steps          = None, 
             start                     = None,  # if not provided will take the same value as the simulation start date
             stop                      = None,  # if not provided will take the same value as the simulation stop date
@@ -55,13 +54,11 @@ class HealthSeekingBehavior(ss.Intervention):
         """Locate the TB disease module and resolve eligible states."""
         super().init_post()
 
-        # Find and store the TB disease module
-        tb_class = 'tb_lshtm' # Currently only compatible with this TB model
+        # Find and store the TB disease module (works with TB_LSHTM and TB_LSHTM_Acute)
         try:
-            tb = self.sim.diseases[tb_class]
-            self._tb = tb
-        except:
-            raise KeyError(f"{self.__class__} requires the {tb_class} disease module.")
+            self._tb = tbsim.get_tb(self.sim)
+        except ValueError:
+            raise KeyError(f"{self.__class__} requires a TB_LSHTM or TB_LSHTM_Acute disease module.")
         
         if self.pars.custom_states is not None:
             self._states = np.asarray(self.pars.custom_states) 
@@ -100,8 +97,8 @@ class HealthSeekingBehavior(ss.Intervention):
             return
 
         rate = self.pars.initial_care_seeking_rate
-        self.pars.care_seeking_dist.set(p=rate.to_prob())
-        seeking_uids = self.pars.care_seeking_dist.filter(ss.uids(not_yet_sought))
+        self.care_seeking_dist.set(p=rate.to_prob())
+        seeking_uids = self.care_seeking_dist.filter(ss.uids(not_yet_sought))
 
         if len(seeking_uids) == 0:
             return

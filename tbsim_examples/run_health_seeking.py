@@ -29,8 +29,8 @@ tb_pars = dict(
     init_prev   = ss.bernoulli(0.05),
     beta        = ss.peryear(0.20),
     trans_asymp = 0.82,
-    rr_rec      = 0.21,
-    rr_treat    = 3.15,
+    rr_reinfection_rec   = 0.21,
+    rr_reinfection_treat = 3.15,
 )
 
 
