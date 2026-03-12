@@ -11,7 +11,6 @@ Three scenarios are run over 20 years and compared:
 import matplotlib.pyplot as plt
 import starsim as ss
 import tbsim as mtb
-from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
 
 
 N_AGENTS  = 3_000
@@ -54,13 +53,13 @@ scenarios = {
     "Baseline": build_sim(),
 
     "Low rate (10 %/day)": build_sim(
-        HealthSeekingBehavior(pars=dict(
+        mtb.HealthSeekingBehavior(pars=dict(
             initial_care_seeking_rate = ss.perday(0.10),
         ))
     ),
 
     "High rate (40 %/day) + retry": build_sim(
-        HealthSeekingBehavior(pars=dict(
+        mtb.HealthSeekingBehavior(pars=dict(
             initial_care_seeking_rate = ss.perday(0.40),
             care_retry_steps          = 4,
         ))

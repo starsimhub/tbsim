@@ -17,12 +17,9 @@ def make_sim(n_agents=1000):
 
 def test_dx_delivery_runs():
     """DxDelivery completes a full run with HealthSeekingBehavior."""
-    from tbsim.interventions.dx_products import xpert
-    from tbsim.interventions.dx_delivery import DxDelivery
-
     pop, tb, net, pars = make_sim()
     hsb = tbsim.HealthSeekingBehavior()
-    dx = DxDelivery(product=xpert())
+    dx = tbsim.DxDelivery(product=tbsim.xpert())
     sim = ss.Sim(people=pop, diseases=tb, networks=net, interventions=[hsb, dx], pars=pars)
     sim.run()
 
@@ -33,12 +30,9 @@ def test_dx_delivery_runs():
 
 def test_dx_delivery_diagnoses_agents():
     """DxDelivery sets diagnosed=True for positive results."""
-    from tbsim.interventions.dx_products import xpert
-    from tbsim.interventions.dx_delivery import DxDelivery
-
     pop, tb, net, pars = make_sim(n_agents=1000)
     hsb = tbsim.HealthSeekingBehavior()
-    dx = DxDelivery(product=xpert())
+    dx = tbsim.DxDelivery(product=tbsim.xpert())
     sim = ss.Sim(people=pop, diseases=tb, networks=net, interventions=[hsb, dx], pars=pars)
     sim.run()
 
@@ -49,12 +43,9 @@ def test_dx_delivery_diagnoses_agents():
 
 def test_dx_delivery_custom_result_state():
     """DxDelivery with custom result_state auto-registers and sets that state."""
-    from tbsim.interventions.dx_products import xpert
-    from tbsim.interventions.dx_delivery import DxDelivery
-
     pop, tb, net, pars = make_sim()
     hsb = tbsim.HealthSeekingBehavior()
-    dx = DxDelivery(product=xpert(), result_state='screen_positive')
+    dx = tbsim.DxDelivery(product=tbsim.xpert(), result_state='screen_positive')
     sim = ss.Sim(people=pop, diseases=tb, networks=net, interventions=[hsb, dx], pars=pars)
     sim.run()
 
@@ -66,21 +57,18 @@ def test_dx_delivery_custom_result_state():
 
 def test_dx_delivery_cascade():
     """Two DxDelivery steps can be chained: screen -> confirm."""
-    from tbsim.interventions.dx_products import cad_cxr, xpert
-    from tbsim.interventions.dx_delivery import DxDelivery
-
     pop, tb, net, pars = make_sim(n_agents=1000)
     hsb = tbsim.HealthSeekingBehavior()
 
-    screen = DxDelivery(
+    screen = tbsim.DxDelivery(
         name='screen',
-        product=cad_cxr(),
+        product=tbsim.cad_cxr(),
         coverage=0.9,
         result_state='screen_positive',
     )
-    confirm = DxDelivery(
+    confirm = tbsim.DxDelivery(
         name='confirm',
-        product=xpert(),
+        product=tbsim.xpert(),
         coverage=0.8,
         eligibility=lambda sim: sim.people.screen_positive.uids,
         result_state='diagnosed',
@@ -96,19 +84,16 @@ def test_dx_delivery_cascade():
 
 def test_dx_delivery_coverage():
     """DxDelivery with coverage < 1.0 tests fewer agents."""
-    from tbsim.interventions.dx_products import xpert
-    from tbsim.interventions.dx_delivery import DxDelivery
-
     pop, tb, net, pars = make_sim(n_agents=1000)
     hsb = tbsim.HealthSeekingBehavior()
-    dx_full = DxDelivery(product=xpert(), coverage=1.0)
+    dx_full = tbsim.DxDelivery(product=tbsim.xpert(), coverage=1.0)
     sim_full = ss.Sim(people=pop, diseases=tb, networks=net, interventions=[hsb, dx_full], pars=pars)
     sim_full.run()
     n_full = sim_full.results.dxdelivery.n_tested.values.sum()
 
     pop2, tb2, net2, pars2 = make_sim(n_agents=1000)
     hsb2 = tbsim.HealthSeekingBehavior()
-    dx_half = DxDelivery(product=xpert(), coverage=0.5)
+    dx_half = tbsim.DxDelivery(product=tbsim.xpert(), coverage=0.5)
     sim_half = ss.Sim(people=pop2, diseases=tb2, networks=net2, interventions=[hsb2, dx_half], pars=pars2)
     sim_half.run()
     n_half = sim_half.results.dxdelivery.n_tested.values.sum()

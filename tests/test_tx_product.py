@@ -20,8 +20,7 @@ def make_tx_sim(n_agents=200):
 
 def test_tx_basic():
     """Tx with efficacy=1.0 returns all agents as success."""
-    from tbsim.interventions.tx_products import Tx
-    tx = Tx(efficacy=1.0)
+    tx = tbsim.Tx(efficacy=1.0)
     sim = make_tx_sim()
     for _ in range(10):
         sim.run_one_step()
@@ -36,8 +35,7 @@ def test_tx_basic():
 
 def test_tx_zero_efficacy():
     """Tx with efficacy=0.0 returns all agents as failure."""
-    from tbsim.interventions.tx_products import Tx
-    tx = Tx(efficacy=0.0)
+    tx = tbsim.Tx(efficacy=0.0)
     sim = make_tx_sim()
     for _ in range(10):
         sim.run_one_step()
@@ -50,31 +48,26 @@ def test_tx_zero_efficacy():
 
 def test_tx_drug_type_overrides_efficacy():
     """Tx with drug_type overrides the efficacy parameter."""
-    from tbsim.interventions.tx_products import Tx
-    from tbsim.interventions.drug_types import TBDrugType
-    tx = Tx(efficacy=0.5, drug_type=TBDrugType.FIRST_LINE_COMBO)
+    tx = tbsim.Tx(efficacy=0.5, drug_type=tbsim.TBDrugType.FIRST_LINE_COMBO)
     # FIRST_LINE_COMBO has 95% cure rate, which should override 0.5
     assert np.isclose(tx.efficacy, 0.95)
 
 
 def test_dots_factory():
     """dots() returns a Tx with DOTS cure probability."""
-    from tbsim.interventions.tx_products import dots
-    tx = dots()
+    tx = tbsim.dots()
     assert np.isclose(tx.efficacy, 0.85)
 
 
 def test_first_line_factory():
     """first_line() returns a Tx with first-line cure probability."""
-    from tbsim.interventions.tx_products import first_line
-    tx = first_line()
+    tx = tbsim.first_line()
     assert np.isclose(tx.efficacy, 0.95)
 
 
 def test_dots_runs_in_sim():
     """dots() product can be administered in a running sim."""
-    from tbsim.interventions.tx_products import dots
-    tx = dots()
+    tx = tbsim.dots()
     sim = make_tx_sim()
     for _ in range(10):
         sim.run_one_step()

@@ -6,7 +6,6 @@ import pandas as pd
 import starsim as ss
 import tbsim
 from tbsim import TBSL
-from tbsim.interventions.dx_products import Dx
 
 
 def make_dx_sim(n_agents=200):
@@ -26,7 +25,7 @@ def test_dx_simple_dataframe():
         dict(state=TBSL.SYMPTOMATIC, result='positive', probability=1.0),
         dict(state=TBSL.SYMPTOMATIC, result='negative', probability=0.0),
     ])
-    dx = Dx(df=df, hierarchy=['positive', 'negative'])
+    dx = tbsim.Dx(df=df, hierarchy=['positive', 'negative'])
 
     sim = make_dx_sim()
     # Run a few steps so some agents become symptomatic
@@ -64,7 +63,7 @@ def test_dx_age_stratified():
         dict(state=TBSL.SYMPTOMATIC, result='positive', probability=0.0, age_min=0, age_max=15),
         dict(state=TBSL.SYMPTOMATIC, result='negative', probability=1.0, age_min=0, age_max=15),
     ])
-    dx = Dx(df=df, hierarchy=['positive', 'negative'])
+    dx = tbsim.Dx(df=df, hierarchy=['positive', 'negative'])
 
     sim = make_dx_sim(n_agents=500)
     for _ in range(20):
@@ -92,7 +91,7 @@ def test_dx_probabilities_sum_to_one_validation():
         dict(state=TBSL.SYMPTOMATIC, result='negative', probability=0.3),  # sums to 0.8, not 1.0
     ])
     with pytest.raises(ValueError, match="not 1.0"):
-        Dx(df=df, hierarchy=['positive', 'negative'])
+        tbsim.Dx(df=df, hierarchy=['positive', 'negative'])
 
 
 def test_dx_default_hierarchy():
@@ -101,15 +100,14 @@ def test_dx_default_hierarchy():
         dict(state=TBSL.SYMPTOMATIC, result='positive', probability=0.9),
         dict(state=TBSL.SYMPTOMATIC, result='negative', probability=0.1),
     ])
-    dx = Dx(df=df)
+    dx = tbsim.Dx(df=df)
     assert list(dx.hierarchy) == ['positive', 'negative']
 
 
 def test_xpert_factory():
     """xpert() returns a Dx with age-stratified, state-stratified DataFrame."""
-    from tbsim.interventions.dx_products import xpert
-    dx = xpert()
-    assert isinstance(dx, Dx)
+    dx = tbsim.xpert()
+    assert isinstance(dx, tbsim.Dx)
     assert 'age_min' in dx.df.columns
     assert 'age_max' in dx.df.columns
     assert 'hiv' not in dx.df.columns
@@ -121,31 +119,27 @@ def test_xpert_factory():
 
 def test_oral_swab_factory():
     """oral_swab() returns a Dx with age and state stratification."""
-    from tbsim.interventions.dx_products import oral_swab
-    dx = oral_swab()
-    assert isinstance(dx, Dx)
+    dx = tbsim.oral_swab()
+    assert isinstance(dx, tbsim.Dx)
     assert 'hiv' not in dx.df.columns
 
 
 def test_fujilam_factory():
     """fujilam() returns a Dx with HIV stratification."""
-    from tbsim.interventions.dx_products import fujilam
-    dx = fujilam()
-    assert isinstance(dx, Dx)
+    dx = tbsim.fujilam()
+    assert isinstance(dx, tbsim.Dx)
     assert 'hiv' in dx.df.columns
 
 
 def test_cad_cxr_factory():
     """cad_cxr() returns a Dx product."""
-    from tbsim.interventions.dx_products import cad_cxr
-    dx = cad_cxr()
-    assert isinstance(dx, Dx)
+    dx = tbsim.cad_cxr()
+    assert isinstance(dx, tbsim.Dx)
 
 
 def test_xpert_runs_in_sim():
     """xpert() product can be administered in a running sim."""
-    from tbsim.interventions.dx_products import xpert
-    dx = xpert()
+    dx = tbsim.xpert()
     sim = make_dx_sim(n_agents=200)
     for _ in range(20):
         sim.run_one_step()
