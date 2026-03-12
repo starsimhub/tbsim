@@ -18,7 +18,7 @@ def make_sim(n_agents=1000):
 def test_dx_delivery_runs():
     """DxDelivery completes a full run with HealthSeekingBehavior."""
     from tbsim.interventions.dx_products import xpert
-    from tbsim.interventions.diagnostics import DxDelivery
+    from tbsim.interventions.dx_delivery import DxDelivery
 
     pop, tb, net, pars = make_sim()
     hsb = tbsim.HealthSeekingBehavior()
@@ -34,7 +34,7 @@ def test_dx_delivery_runs():
 def test_dx_delivery_diagnoses_agents():
     """DxDelivery sets diagnosed=True for positive results."""
     from tbsim.interventions.dx_products import xpert
-    from tbsim.interventions.diagnostics import DxDelivery
+    from tbsim.interventions.dx_delivery import DxDelivery
 
     pop, tb, net, pars = make_sim(n_agents=1000)
     hsb = tbsim.HealthSeekingBehavior()
@@ -50,7 +50,7 @@ def test_dx_delivery_diagnoses_agents():
 def test_dx_delivery_custom_result_state():
     """DxDelivery with custom result_state auto-registers and sets that state."""
     from tbsim.interventions.dx_products import xpert
-    from tbsim.interventions.diagnostics import DxDelivery
+    from tbsim.interventions.dx_delivery import DxDelivery
 
     pop, tb, net, pars = make_sim()
     hsb = tbsim.HealthSeekingBehavior()
@@ -67,7 +67,7 @@ def test_dx_delivery_custom_result_state():
 def test_dx_delivery_cascade():
     """Two DxDelivery steps can be chained: screen -> confirm."""
     from tbsim.interventions.dx_products import cad_cxr, xpert
-    from tbsim.interventions.diagnostics import DxDelivery
+    from tbsim.interventions.dx_delivery import DxDelivery
 
     pop, tb, net, pars = make_sim(n_agents=1000)
     hsb = tbsim.HealthSeekingBehavior()
@@ -97,7 +97,7 @@ def test_dx_delivery_cascade():
 def test_dx_delivery_coverage():
     """DxDelivery with coverage < 1.0 tests fewer agents."""
     from tbsim.interventions.dx_products import xpert
-    from tbsim.interventions.diagnostics import DxDelivery
+    from tbsim.interventions.dx_delivery import DxDelivery
 
     pop, tb, net, pars = make_sim(n_agents=1000)
     hsb = tbsim.HealthSeekingBehavior()

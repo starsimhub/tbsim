@@ -81,3 +81,36 @@ def test_dots_runs_in_sim():
     uids = sim.people.alive.uids[:10]
     results = tx.administer(sim, uids)
     assert len(results['success']) + len(results['failure']) == len(uids)
+
+
+def test_tx_reproducible_with_same_seed():
+    """Tx.administer() produces identical results for same rand_seed (CRN).
+
+    The bug: Tx.administer() uses np.random.random() which draws from numpy's
+    global random state rather than a starsim-seeded distribution. This means
+    the results are sensitive to anything that perturbs the global state between
+    two runs with the same rand_seed, breaking CRN reproducibility.
+    """
+
+    def run_tx(seed, consume_global_state=False):
+        pop = ss.People(n_agents=200)
+        tb = tbsim.TB_LSHTM(pars={'init_prev': 0.30})
+        net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+        pars = dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2001-01-01'), rand_seed=seed)
+        sim = ss.Sim(people=pop, diseases=tb, networks=net, pars=pars)
+        sim.init()
+        if consume_global_state:
+            # Simulate other code drawing from numpy global state before administer
+            _ = np.random.random(100)
+        tx = tbsim.dots()
+        uids = sim.people.alive.uids[:50]
+        return tx.administer(sim, uids)
+
+    r1 = run_tx(42, consume_global_state=False)
+    r2 = run_tx(42, consume_global_state=True)  # same seed, but global state perturbed
+
+    # Same seed → identical success UIDs regardless of external numpy state perturbation.
+    # With proper CRN (starsim distribution), this must hold.
+    # With np.random.random() (the bug), it fails because global state is consumed.
+    assert np.array_equal(r1['success'], r2['success']), \
+        "Same seed should produce identical Tx outcomes regardless of global numpy state"

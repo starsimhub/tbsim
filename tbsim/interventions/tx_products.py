@@ -1,6 +1,5 @@
 """Treatment products for TB."""
 
-import numpy as np
 import starsim as ss
 from .drug_types import TBDrugType, TBDrugTypeParameters
 
@@ -23,6 +22,7 @@ class Tx(ss.Product):
             self.efficacy = params.cure_prob
         else:
             self.efficacy = efficacy
+        self.define_pars(dist_success=ss.bernoulli(p=self.efficacy))
 
     def administer(self, sim, uids):
         """
@@ -31,10 +31,9 @@ class Tx(ss.Product):
         Returns:
             dict with 'success' and 'failure' UIDs.
         """
-        rand_vals = np.random.random(len(uids))
-        success_mask = rand_vals < self.efficacy
-        success_uids = ss.uids(uids[success_mask])
-        failure_uids = ss.uids(uids[~success_mask])
+        if not self.initialized:
+            self.init_pre(sim)
+        success_uids, failure_uids = self.pars.dist_success.filter(uids, both=True)
         return {'success': success_uids, 'failure': failure_uids}
 
 

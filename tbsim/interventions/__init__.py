@@ -13,5 +13,5 @@ from .drug_types import *
 from .health_seeking import *
 from .dx_products import *
 from .tx_products import *
-from .diagnostics import *
-from .treatments import *
+from .dx_delivery import *
+from .tx_delivery import *
