@@ -46,9 +46,6 @@ class HealthSeekingBehavior(ss.Intervention):
             ss.IntArr("n_care_sought_total", default=0),  # lifetime count; never resets
             ss.FloatArr("ti_last_sought", default=-np.inf),
         )
-        self.care_seeking_dist = ss.bernoulli(
-            p=self.pars.initial_care_seeking_rate.to_prob()
-        )  # UNUSED?
         return
 
     @property
@@ -156,5 +153,5 @@ class HealthSeekingBehavior(ss.Intervention):
         active = np.isin(self._tb.state, self._states) & ppl.alive
         self.results["n_eligible"][self.ti] = np.count_nonzero(
             active & (self.n_care_sought == 0)
-        )  # make this true number of eliglible people (remove the n_sought_care == 0 condition)
+        )  # make this true number of eligible people (remove the n_sought_care == 0 condition)
         return
