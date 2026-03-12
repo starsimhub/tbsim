@@ -30,6 +30,7 @@ class Dx(ss.Product):
         self.hierarchy = hierarchy if hierarchy is not None else list(df.result.unique())
         self._filter_cols = [c for c in _FILTER_COLS if c in df.columns]
         self._validate()
+        self.rand_dist = ss.random()
         self.update_pars(**kwargs)
         return
 
@@ -67,7 +68,7 @@ class Dx(ss.Product):
         results = np.full(len(uids), self.default_value, dtype=int)
 
         # Get agent attributes needed for filtering
-        tb_states = np.asarray(tb.state[uids])
+        tb_states = tb.state[uids]
         ages = np.asarray(ppl.age[uids]) if ('age_min' in self._filter_cols or 'age_max' in self._filter_cols) else None
 
         hiv_states = None
@@ -90,8 +91,8 @@ class Dx(ss.Product):
             if 'hiv' in vals and hiv_states is not None:
                 mask = mask & (hiv_states == vals['hiv'])
 
-            matched_idx = np.where(mask)[0]
-            if len(matched_idx) == 0:
+            matched_uids = mask.uids
+            if len(matched_uids) == 0:
                 continue
 
             # Get probabilities in hierarchy order
@@ -103,17 +104,17 @@ class Dx(ss.Product):
 
             # Draw stochastic results using cumulative probabilities
             cumprobs = np.cumsum(probs)
-            rand_vals = np.random.random(len(matched_idx))
+            rand_vals = self.rand_dist.rvs(matched_uids)
             draws = np.searchsorted(cumprobs, rand_vals)
             draws = np.clip(draws, 0, len(self.hierarchy) - 1)
 
             # Take minimum (best/first result wins if agent matches multiple groups)
-            results[matched_idx] = np.minimum(draws, results[matched_idx])
+            results[matched_uids] = np.minimum(draws, results[matched_uids])
 
         # Convert to dict of UIDs per result
         output = {}
         for i, label in enumerate(self.hierarchy):
-            output[label] = ss.uids(uids[results == i])
+            output[label] = uids[results == i]
         return output
 
 
