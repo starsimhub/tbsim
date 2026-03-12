@@ -1,0 +1,5 @@
+throughout the codebase, look for multilevel imports like tbsim.interventions.dx_delivery import DxDelivery. replace them all with just `import tbsim`, then `tbsim.DxDelivery`
+
+---
+
+remove references to immigration.py
