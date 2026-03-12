@@ -3,7 +3,7 @@
 import starsim as ss
 from .drug_types import TBDrugType, TBDrugTypeParameters
 
-__all__ = ['Tx', 'dots', 'dots_improved', 'first_line', 'second_line']
+__all__ = ['Tx', 'DOTS', 'DOTSImproved', 'FirstLine', 'SecondLine']
 
 
 class Tx(ss.Product):
@@ -22,9 +22,9 @@ class Tx(ss.Product):
             self.efficacy = params.cure_prob
         else:
             self.efficacy = efficacy
-            
+
         self.define_pars(
-            p_success = ss.bernoulli(self.efficacy) # TODO: think about if there's a more efficient way
+            p_success = ss.bernoulli(self.efficacy)
         )
         self.update_pars(**kwargs)
         return
@@ -40,21 +40,29 @@ class Tx(ss.Product):
         return {'success': success_uids, 'failure': failure_uids}
 
 
-def dots():
+class DOTS(Tx):
     """Standard DOTS (85% cure)."""
-    return Tx(drug_type=TBDrugType.DOTS)
+
+    def __init__(self, **kwargs):
+        super().__init__(drug_type=TBDrugType.DOTS, **kwargs)
 
 
-def dots_improved():
+class DOTSImproved(Tx):
     """Enhanced DOTS (90% cure)."""
-    return Tx(drug_type=TBDrugType.DOTS_IMPROVED)
+
+    def __init__(self, **kwargs):
+        super().__init__(drug_type=TBDrugType.DOTS_IMPROVED, **kwargs)
 
 
-def first_line():
+class FirstLine(Tx):
     """First-line combination therapy (95% cure)."""
-    return Tx(drug_type=TBDrugType.FIRST_LINE_COMBO)
+
+    def __init__(self, **kwargs):
+        super().__init__(drug_type=TBDrugType.FIRST_LINE_COMBO, **kwargs)
 
 
-def second_line():
+class SecondLine(Tx):
     """Second-line therapy for MDR-TB (75% cure)."""
-    return Tx(drug_type=TBDrugType.SECOND_LINE_COMBO)
+
+    def __init__(self, **kwargs):
+        super().__init__(drug_type=TBDrugType.SECOND_LINE_COMBO, **kwargs)

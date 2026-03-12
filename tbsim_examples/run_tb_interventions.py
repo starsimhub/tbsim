@@ -228,18 +228,18 @@ def run_dx_tx_cascade():
 
     screen = tbsim.DxDelivery(
         name='screen',
-        product=tbsim.cad_cxr(),
+        product=tbsim.CAD(),
         coverage=0.9,
         result_state='screen_positive',
     )
     confirm = tbsim.DxDelivery(
         name='confirm',
-        product=tbsim.xpert(),
+        product=tbsim.Xpert(),
         coverage=0.8,
         eligibility=lambda sim: sim.people.screen_positive.uids,
         result_state='diagnosed',
     )
-    treat = tbsim.TxDelivery(product=tbsim.dots())
+    treat = tbsim.TxDelivery(product=tbsim.DOTS())
 
     sim = ss.Sim(
         people=pop,

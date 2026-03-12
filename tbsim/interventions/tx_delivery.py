@@ -7,8 +7,6 @@ from tbsim import TBSL
 
 __all__ = ['TxDelivery']
 
-_ACTIVE_TB_STATES = [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC]
-
 
 class TxDelivery(ss.Intervention):
     """
@@ -27,11 +25,10 @@ class TxDelivery(ss.Intervention):
     def __init__(self, product, eligibility=None, reseek_multiplier=2.0,
                  reset_flags=True, **kwargs):
         super().__init__()
-        product.name = f'{self.name}_product'
         self.product = product
-        self._eligibility_fn = eligibility
-        self._reseek_multiplier = reseek_multiplier
-        self._reset_flags = reset_flags
+        self.eligibility = eligibility
+        self.reseek_multiplier = reseek_multiplier
+        self.reset_flags = reset_flags
 
         # Person-level states (only states owned by TxDelivery; shared states
         # like diagnosed/sought_care/tested are read from ppl, set by DxDelivery)
@@ -40,24 +37,32 @@ class TxDelivery(ss.Intervention):
             ss.BoolState('tb_treatment_success', default=False),
             ss.BoolArr('treatment_failure', default=False),
         )
-
-        # Tracking for results
-        self._n_treated = 0
-        self._n_success = 0
-        self._n_failure = 0
         self.update_pars(**kwargs)
+        product.name = f'{self.name}_product'
         return
 
     def _get_eligible(self, sim):
         """Get eligible UIDs using custom or default eligibility."""
-        if self._eligibility_fn is not None:
-            return ss.uids(self._eligibility_fn(sim))
+        if self.eligibility is not None:
+            return ss.uids(self.eligibility(sim))
         # Default: diagnosed, active TB, alive (read diagnosed from ppl, set by DxDelivery)
         ppl = sim.people
         diagnosed_uids = (ppl.diagnosed & ppl.alive).uids
         tb = tbsim.get_tb(sim)
-        active_tb_uids = np.where(np.isin(np.asarray(tb.state), _ACTIVE_TB_STATES))[0]
-        return ss.uids(np.intersect1d(diagnosed_uids, active_tb_uids))
+        active_tb_mask = np.isin(tb.state, TBSL.active_tb_states())
+        active_tb_uids = ss.uids(np.where(active_tb_mask)[0])
+        return diagnosed_uids & active_tb_uids
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('n_treated', dtype=int),
+            ss.Result('n_success', dtype=int),
+            ss.Result('n_failure', dtype=int),
+            ss.Result('cum_success', dtype=int),
+            ss.Result('cum_failure', dtype=int),
+        )
+        return
 
     def step(self):
         sim = self.sim
@@ -66,7 +71,6 @@ class TxDelivery(ss.Intervention):
 
         uids = self._get_eligible(sim)
         if len(uids) == 0:
-            self._n_treated = self._n_success = self._n_failure = 0
             return
 
         # Start treatment (moves active -> TREATMENT state)
@@ -75,7 +79,6 @@ class TxDelivery(ss.Intervention):
         # Only proceed with agents actually on treatment
         tx_uids = uids[tb.on_treatment[uids]]
         if len(tx_uids) == 0:
-            self._n_treated = self._n_success = self._n_failure = 0
             return
 
         self.n_times_treated[tx_uids] += 1
@@ -98,7 +101,7 @@ class TxDelivery(ss.Intervention):
         if len(failure_uids) > 0:
             self.treatment_failure[failure_uids] = True
 
-            if self._reset_flags:
+            if self.reset_flags:
                 ppl.diagnosed[failure_uids] = False
                 if 'tested' in ppl.states:
                     ppl.tested[failure_uids] = False
@@ -107,41 +110,19 @@ class TxDelivery(ss.Intervention):
             if 'sought_care' in ppl.states:
                 ppl.sought_care[failure_uids] = False
             if 'care_seeking_multiplier' in ppl.states:
-                ppl.care_seeking_multiplier[failure_uids] *= self._reseek_multiplier
+                ppl.care_seeking_multiplier[failure_uids] *= self.reseek_multiplier
 
         # Store for results
-        self._n_treated = len(tx_uids)
-        self._n_success = len(success_uids)
-        self._n_failure = len(failure_uids)
-        return
-
-    def init_results(self):
-        super().init_results()
-        self.define_results(
-            ss.Result('n_treated', dtype=int),
-            ss.Result('n_success', dtype=int),
-            ss.Result('n_failure', dtype=int),
-            ss.Result('cum_success', dtype=int),
-            ss.Result('cum_failure', dtype=int),
-        )
+        self.results.n_treated[self.ti] = len(tx_uids)
+        self.results.n_success[self.ti] = len(success_uids)
+        self.results.n_failure[self.ti] = len(failure_uids)
         return
 
     def update_results(self):
-        self.results.n_treated[self.ti] = self._n_treated
-        self.results.n_success[self.ti] = self._n_success
-        self.results.n_failure[self.ti] = self._n_failure
-
-        if self.ti > 0:
-            self.results['cum_success'][self.ti] = self.results['cum_success'][self.ti - 1] + self._n_success
-            self.results['cum_failure'][self.ti] = self.results['cum_failure'][self.ti - 1] + self._n_failure
-        else:
-            self.results['cum_success'][self.ti] = self._n_success
-            self.results['cum_failure'][self.ti] = self._n_failure
-
-        self._n_treated = self._n_success = self._n_failure = 0
-        return
+        pass
 
     def finalize_results(self):
-        self.results.cum_success[:] = self.results.n_success.cumsum()
-        self.results.cum_failure[:] = self.results.n_failure.cumsum()
+        super().finalize_results()
+        self.results.cum_success[:] = np.cumsum(self.results.n_success)
+        self.results.cum_failure[:] = np.cumsum(self.results.n_failure)
         return

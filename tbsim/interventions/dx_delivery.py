@@ -7,8 +7,6 @@ from tbsim import TBSL
 
 __all__ = ['DxDelivery']
 
-_ACTIVE_TB_STATES = [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC]
-
 
 class DxDelivery(ss.Intervention):
     """
@@ -28,14 +26,10 @@ class DxDelivery(ss.Intervention):
     def __init__(self, product, coverage=1.0, eligibility=None, result_state='diagnosed',
                  care_seeking_multiplier=1.0, **kwargs):
         super().__init__()
-        # Give product a unique name based on this intervention's name to avoid
-        # collisions when multiple DxDelivery instances use the same product class
-        product.name = f'{self.name}_product'
         self.product = product
-        self._coverage_val = coverage
-        self._eligibility_fn = eligibility
+        self.eligibility = eligibility
         self.result_state = result_state
-        self._csm_value = care_seeking_multiplier  # Store parameter value with private name
+        self.care_seeking_multiplier_value = care_seeking_multiplier
 
         self.define_pars(
             p_coverage = ss.bernoulli(p=coverage)
@@ -51,12 +45,8 @@ class DxDelivery(ss.Intervention):
             ss.FloatArr('care_seeking_multiplier', default=1.0),
             ss.BoolState('multiplier_applied', default=False),
         )
-
-        # Tracking for results
-        self._n_tested = 0
-        self._n_positive = 0
-        self._n_negative = 0
         self.update_pars(**kwargs)
+        product.name = f'{self.name}_product'
         return
 
     def init_post(self):
@@ -82,61 +72,9 @@ class DxDelivery(ss.Intervention):
 
     def _get_eligible(self, sim):
         """Get eligible UIDs using custom or default eligibility."""
-        if self._eligibility_fn is not None:
-            return ss.uids(self._eligibility_fn(sim))
+        if self.eligibility is not None:
+            return ss.uids(self.eligibility(sim))
         return (self.sought_care & (~self.diagnosed) & sim.people.alive).uids
-
-    def step(self):
-        sim = self.sim
-        ppl = sim.people
-        tb = tbsim.get_tb(sim)
-
-        eligible = self._get_eligible(sim)
-        if len(eligible) == 0:
-            self._n_tested = self._n_positive = self._n_negative = 0
-            return
-
-        # Coverage filter
-        selected = self.pars.p_coverage.filter(eligible)
-        if len(selected) == 0:
-            self._n_tested = self._n_positive = self._n_negative = 0
-            return
-
-        # Administer diagnostic product
-        results = self.product.administer(sim, selected)
-        pos_uids = results.get('positive', ss.uids())
-        neg_uids = results.get('negative', ss.uids())
-
-        # Set result state
-        result_arr = getattr(ppl, self.result_state)
-        result_arr[pos_uids] = True
-
-        # Update tracking states
-        self.tested[selected] = True
-        self.n_times_tested[selected] += 1
-        self.test_result[selected] = np.isin(selected, pos_uids)
-
-        # Handle false negatives: TB-positive agents who tested negative
-        tb_states = np.asarray(tb.state[neg_uids])
-        has_tb = np.isin(tb_states, _ACTIVE_TB_STATES)
-        false_neg_uids = neg_uids[has_tb]
-
-        if len(false_neg_uids) > 0 and self._csm_value != 1.0:
-            unboosted = false_neg_uids[~self.multiplier_applied[false_neg_uids]]
-            if len(unboosted) > 0:
-                self.care_seeking_multiplier[unboosted] *= self._csm_value
-                self.multiplier_applied[unboosted] = True
-
-        # Reset flags for false negatives to allow retry
-        if len(false_neg_uids) > 0:
-            self.sought_care[false_neg_uids] = False
-            self.tested[false_neg_uids] = False
-
-        # Store for results
-        self._n_tested = len(selected)
-        self._n_positive = len(pos_uids)
-        self._n_negative = len(neg_uids)
-        return
 
     def init_results(self):
         super().init_results()
@@ -149,22 +87,61 @@ class DxDelivery(ss.Intervention):
         )
         return
 
-    def update_results(self):
-        self.results.n_tested[self.ti] = self._n_tested
-        self.results.n_positive[self.ti] = self._n_positive
-        self.results.n_negative[self.ti] = self._n_negative
+    def step(self):
+        sim = self.sim
+        ppl = sim.people
+        tb = tbsim.get_tb(sim)
 
-        if self.ti > 0:
-            self.results['cum_positive'][self.ti] = self.results['cum_positive'][self.ti - 1] + self._n_positive
-            self.results['cum_negative'][self.ti] = self.results['cum_negative'][self.ti - 1] + self._n_negative
-        else:
-            self.results['cum_positive'][self.ti] = self._n_positive
-            self.results['cum_negative'][self.ti] = self._n_negative
+        eligible = self._get_eligible(sim)
+        if len(eligible) == 0:
+            return
 
-        self._n_tested = self._n_positive = self._n_negative = 0
+        # Coverage filter
+        selected = self.pars.p_coverage.filter(eligible)
+        if len(selected) == 0:
+            return
+
+        # Administer diagnostic product
+        results = self.product.administer(sim, selected)
+        pos_uids = results.get('positive', ss.uids())
+        neg_uids = results.get('negative', ss.uids())
+
+        # Set result state
+        result_arr = ppl[self.result_state]
+        result_arr[pos_uids] = True
+
+        # Update tracking states
+        self.tested[selected] = True
+        self.n_times_tested[selected] += 1
+        self.test_result[selected] = np.isin(selected, pos_uids)
+
+        # Handle false negatives: TB-positive agents who tested negative
+        tb_states = tb.state[neg_uids]
+        has_tb = np.isin(tb_states, TBSL.active_tb_states())
+        false_neg_uids = neg_uids[has_tb]
+
+        if len(false_neg_uids) > 0 and self.care_seeking_multiplier_value != 1.0:
+            unboosted = false_neg_uids[~self.multiplier_applied[false_neg_uids]]
+            if len(unboosted) > 0:
+                self.care_seeking_multiplier[unboosted] *= self.care_seeking_multiplier_value
+                self.multiplier_applied[unboosted] = True
+
+        # Reset flags for false negatives to allow retry
+        if len(false_neg_uids) > 0:
+            self.sought_care[false_neg_uids] = False
+            self.tested[false_neg_uids] = False
+
+        # Store for results
+        self.results.n_tested[self.ti] = len(selected)
+        self.results.n_positive[self.ti] = len(pos_uids)
+        self.results.n_negative[self.ti] = len(neg_uids)
         return
-    
+
+    def update_results(self):
+        pass
+
     def finalize_results(self):
-        self.results.cum_positive[:] = self.results.n_positive.cumsum()
-        self.results.cum_negative[:] = self.results.n_negative.cumsum()
+        super().finalize_results()
+        self.results.cum_positive[:] = np.cumsum(self.results.n_positive)
+        self.results.cum_negative[:] = np.cumsum(self.results.n_negative)
         return

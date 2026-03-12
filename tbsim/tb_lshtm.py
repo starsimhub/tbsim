@@ -27,6 +27,11 @@ class TBSL(IntEnum):
     ACUTE           = 9     # Acute infection immediately after exposure (TB_LSHTM_Acute only)
 
     @staticmethod
+    def active_tb_states():
+        """States representing active TB disease (non-infectious, asymptomatic, symptomatic)."""
+        return [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC]
+
+    @staticmethod
     def care_seeking_eligible():
         """States eligible for care-seeking: only SYMPTOMATIC.
         Only individuals with clinical symptoms (cough, fever, night sweats, etc.)
