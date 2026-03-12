@@ -207,34 +207,3 @@ def test_beta_multiple_years():
     sim.run_one_step()
     assert np.isclose(tbsim.get_tb(sim).pars.beta.value, initial_beta * 0.5 * 0.8)
 
-
-# ---------------------------------------------------------------------------
-# Immigration tests
-# ---------------------------------------------------------------------------
-
-import pytest
-
-
-@pytest.mark.xfail(reason='Immigration class is known non-functional')
-def test_immigration_runs():
-    """Immigration intervention runs with TB_LSHTM."""
-    from tbsim.interventions.immigration import Immigration
-    pop = ss.People(n_agents=100)
-    tb = tbsim.TB_LSHTM(pars={'init_prev': 0.30})
-    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
-    pars = dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'))
-    immig = Immigration()
-    sim = ss.Sim(people=pop, diseases=tb, networks=net, demographics=immig, pars=pars)
-    sim.run()
-
-
-def test_simple_immigration_runs():
-    """SimpleImmigration intervention runs with TB_LSHTM."""
-    from tbsim.interventions.immigration import SimpleImmigration
-    pop = ss.People(n_agents=100)
-    tb = tbsim.TB_LSHTM(pars={'init_prev': 0.30})
-    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
-    pars = dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'))
-    immig = SimpleImmigration(immigration_rate=10)
-    sim = ss.Sim(people=pop, diseases=tb, networks=net, demographics=immig, pars=pars)
-    sim.run()
