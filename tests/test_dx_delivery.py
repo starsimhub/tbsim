@@ -115,3 +115,141 @@ def test_dx_delivery_coverage():
 
     # Half coverage should test substantially fewer (with noise)
     assert n_half < n_full
+
+
+# ---------------------------------------------------------------------------
+# BetaByYear tests
+# ---------------------------------------------------------------------------
+
+def make_sim_acute(agents=50, start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'), dt=ss.days(7)):
+    """Standard sim components using TB_LSHTM_Acute."""
+    pop = ss.People(n_agents=agents)
+    tb = tbsim.TB_LSHTM_Acute(pars={'init_prev': 0.30})
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    pars = dict(dt=dt, start=start, stop=stop)
+    return pop, tb, net, pars
+
+
+def test_beta_intervention_changes_beta():
+    """BetaByYear modifies beta at the specified year with TB_LSHTM."""
+    initial_beta = 0.01
+    x_beta = 0.5
+    intervention_year = 2005
+    stop_year = 2010
+
+    tb_pars = dict(beta=initial_beta, init_prev=0.25)
+    sim_pars = dict(start=f'{intervention_year-1}-01-01', stop=f'{stop_year}-01-01', dt=ss.days(7), rand_seed=42)
+
+    pop = ss.People(n_agents=100)
+    tb = tbsim.TB_LSHTM(pars=tb_pars)
+    net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
+
+    beta_intv = tbsim.BetaByYear(pars={'years': [intervention_year], 'x_beta': x_beta})
+
+    sim = ss.Sim(
+        people=pop,
+        networks=net,
+        diseases=tb,
+        interventions=[beta_intv],
+        pars=sim_pars,
+    )
+    sim.init()
+
+    pars = tbsim.get_tb(sim).pars
+    assert np.isclose(pars.beta.value, initial_beta)
+
+    while sim.t.now('year') < intervention_year:
+        sim.run_one_step()
+    assert np.isclose(pars.beta.value, initial_beta)
+
+    sim.run_one_step()
+    expected_beta = initial_beta * x_beta
+    assert np.isclose(pars.beta.value, expected_beta)
+
+    sim.run_one_step()
+    assert np.isclose(pars.beta.value, expected_beta)
+
+
+def test_beta_intervention_with_acute():
+    """BetaByYear works with TB_LSHTM_Acute."""
+    initial_beta = 0.02
+    x_beta = 0.6
+    intervention_year = 2005
+
+    tb_pars = dict(beta=initial_beta, init_prev=0.25)
+    sim_pars = dict(start='2004-01-01', stop='2007-01-01', dt=ss.days(7), rand_seed=42)
+
+    pop = ss.People(n_agents=100)
+    tb = tbsim.TB_LSHTM_Acute(pars=tb_pars)
+    net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
+
+    beta_intv = tbsim.BetaByYear(pars={'years': [intervention_year], 'x_beta': x_beta})
+    sim = ss.Sim(people=pop, networks=net, diseases=tb, interventions=[beta_intv], pars=sim_pars)
+    sim.init()
+
+    while sim.t.now('year') < intervention_year:
+        sim.run_one_step()
+
+    sim.run_one_step()
+    expected_beta = initial_beta * x_beta
+    beta_val = tbsim.get_tb(sim).pars.beta
+    actual = beta_val.value if hasattr(beta_val, 'value') else float(beta_val)
+    assert np.isclose(actual, expected_beta)
+
+
+def test_beta_multiple_years():
+    """BetaByYear applies different x_beta values at multiple years."""
+    initial_beta = 0.1
+    years = [2002, 2005]
+    x_betas = [0.5, 0.8]
+
+    pop = ss.People(n_agents=50)
+    tb = tbsim.TB_LSHTM(name='tb', pars=dict(beta=initial_beta, init_prev=0.25))
+    net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
+
+    beta_intv = tbsim.BetaByYear(pars={'years': years, 'x_beta': x_betas})
+    sim = ss.Sim(people=pop, networks=net, diseases=tb, interventions=[beta_intv],
+                 pars=dict(start='2001-01-01', stop='2007-01-01', dt=ss.days(7), rand_seed=42))
+    sim.init()
+
+    while sim.t.now('year') < 2002:
+        sim.run_one_step()
+    sim.run_one_step()
+    assert np.isclose(tbsim.get_tb(sim).pars.beta.value, initial_beta * 0.5)
+
+    while sim.t.now('year') < 2005:
+        sim.run_one_step()
+    sim.run_one_step()
+    assert np.isclose(tbsim.get_tb(sim).pars.beta.value, initial_beta * 0.5 * 0.8)
+
+
+# ---------------------------------------------------------------------------
+# Immigration tests
+# ---------------------------------------------------------------------------
+
+import pytest
+
+
+@pytest.mark.xfail(reason='Immigration class is known non-functional')
+def test_immigration_runs():
+    """Immigration intervention runs with TB_LSHTM."""
+    from tbsim.interventions.immigration import Immigration
+    pop = ss.People(n_agents=100)
+    tb = tbsim.TB_LSHTM(pars={'init_prev': 0.30})
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    pars = dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'))
+    immig = Immigration()
+    sim = ss.Sim(people=pop, diseases=tb, networks=net, demographics=immig, pars=pars)
+    sim.run()
+
+
+def test_simple_immigration_runs():
+    """SimpleImmigration intervention runs with TB_LSHTM."""
+    from tbsim.interventions.immigration import SimpleImmigration
+    pop = ss.People(n_agents=100)
+    tb = tbsim.TB_LSHTM(pars={'init_prev': 0.30})
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    pars = dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'))
+    immig = SimpleImmigration(immigration_rate=10)
+    sim = ss.Sim(people=pop, diseases=tb, networks=net, demographics=immig, pars=pars)
+    sim.run()
