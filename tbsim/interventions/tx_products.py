@@ -16,13 +16,18 @@ class Tx(ss.Product):
     """
 
     def __init__(self, efficacy=0.85, drug_type=None, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
         if drug_type is not None:
             params = TBDrugTypeParameters.create_parameters_for_type(drug_type)
             self.efficacy = params.cure_prob
         else:
             self.efficacy = efficacy
-        self.define_pars(dist_success=ss.bernoulli(p=self.efficacy))
+            
+        self.define_pars(
+            p_success = ss.bernoulli(self.efficacy) # TODO: think about if there's a more efficient way
+        )
+        self.update_pars(**kwargs)
+        return
 
     def administer(self, sim, uids):
         """
@@ -31,9 +36,7 @@ class Tx(ss.Product):
         Returns:
             dict with 'success' and 'failure' UIDs.
         """
-        if not self.initialized:
-            self.init_pre(sim)
-        success_uids, failure_uids = self.pars.dist_success.filter(uids, both=True)
+        success_uids, failure_uids = self.pars.p_success.filter(uids, both=True)
         return {'success': success_uids, 'failure': failure_uids}
 
 

@@ -27,7 +27,7 @@ class DxDelivery(ss.Intervention):
 
     def __init__(self, product, coverage=1.0, eligibility=None, result_state='diagnosed',
                  care_seeking_multiplier=1.0, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
         # Give product a unique name based on this intervention's name to avoid
         # collisions when multiple DxDelivery instances use the same product class
         product.name = f'{self.name}_product'
@@ -37,11 +37,9 @@ class DxDelivery(ss.Intervention):
         self.result_state = result_state
         self._csm_value = care_seeking_multiplier  # Store parameter value with private name
 
-        # Coverage distribution
-        if not isinstance(coverage, ss.Dist):
-            self.dist_coverage = ss.bernoulli(p=coverage)
-        else:
-            self.dist_coverage = coverage
+        self.define_pars(
+            p_coverage = ss.bernoulli(p=coverage)
+        )
 
         # Person-level states
         self.define_states(
@@ -58,13 +56,15 @@ class DxDelivery(ss.Intervention):
         self._n_tested = 0
         self._n_positive = 0
         self._n_negative = 0
+        self.update_pars(**kwargs)
+        return
 
     def init_post(self):
         super().init_post()
         ppl = self.sim.people
         # Expose key states directly on People so that HealthSeekingBehavior
         # (and other interventions) can find them via 'sought_care' in ppl.states.
-        if 'sought_care' not in ppl.states:
+        if 'sought_care' not in ppl.states: # TODO: use People method (not currently implemented)
             ppl.states['sought_care'] = self.sought_care
             setattr(ppl, 'sought_care', self.sought_care)
         if 'diagnosed' not in ppl.states:
@@ -76,8 +76,9 @@ class DxDelivery(ss.Intervention):
                 state = ss.BoolState(self.result_state, default=False)
                 state.link_people(ppl)
                 state.init_vals()
-                ppl.states[self.result_state] = state
+                ppl.states[self.result_state] = state # TODO: use People method (not currently implemented)
                 setattr(ppl, self.result_state, state)
+        return
 
     def _get_eligible(self, sim):
         """Get eligible UIDs using custom or default eligibility."""
@@ -96,7 +97,7 @@ class DxDelivery(ss.Intervention):
             return
 
         # Coverage filter
-        selected = self.dist_coverage.filter(eligible)
+        selected = self.pars.p_coverage.filter(eligible)
         if len(selected) == 0:
             self._n_tested = self._n_positive = self._n_negative = 0
             return
@@ -135,6 +136,7 @@ class DxDelivery(ss.Intervention):
         self._n_tested = len(selected)
         self._n_positive = len(pos_uids)
         self._n_negative = len(neg_uids)
+        return
 
     def init_results(self):
         super().init_results()
@@ -145,11 +147,12 @@ class DxDelivery(ss.Intervention):
             ss.Result('cum_positive', dtype=int),
             ss.Result('cum_negative', dtype=int),
         )
+        return
 
     def update_results(self):
-        self.results['n_tested'][self.ti] = self._n_tested
-        self.results['n_positive'][self.ti] = self._n_positive
-        self.results['n_negative'][self.ti] = self._n_negative
+        self.results.n_tested[self.ti] = self._n_tested
+        self.results.n_positive[self.ti] = self._n_positive
+        self.results.n_negative[self.ti] = self._n_negative
 
         if self.ti > 0:
             self.results['cum_positive'][self.ti] = self.results['cum_positive'][self.ti - 1] + self._n_positive
@@ -159,3 +162,9 @@ class DxDelivery(ss.Intervention):
             self.results['cum_negative'][self.ti] = self._n_negative
 
         self._n_tested = self._n_positive = self._n_negative = 0
+        return
+    
+    def finalize_results(self):
+        self.results.cum_positive[:] = self.results.n_positive.cumsum()
+        self.results.cum_negative[:] = self.results.n_negative.cumsum()
+        return

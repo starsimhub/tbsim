@@ -107,3 +107,6 @@ def test_tx_reproducible_with_same_seed():
     # With np.random.random() (the bug), it fails because global state is consumed.
     assert np.array_equal(r1['success'], r2['success']), \
         "Same seed should produce identical Tx outcomes regardless of global numpy state"
+
+if __name__ == '__main__':
+    pytest.main(["-x", "-v", __file__])
