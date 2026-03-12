@@ -2,7 +2,7 @@
 
 import numpy as np
 import starsim as ss
-from .tb_drug_types import TBDrugType, TBDrugTypeParameters
+from .drug_types import TBDrugType, TBDrugTypeParameters
 
 __all__ = ['Tx', 'dots', 'dots_improved', 'first_line', 'second_line']
 

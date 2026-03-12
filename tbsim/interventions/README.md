@@ -11,5 +11,5 @@ This folder contains all TBsim intervention modules.
 - `tb_health_seeking.py` -- Health-seeking behavior
 - `immigration.py` -- Immigration interventions
 - `beta.py` -- Time-varying transmission modifier
-- `tb_drug_types.py` -- TB drug type definitions
+- `drug_types.py` -- TB drug type definitions
 - `interventions.py` -- Base intervention classes

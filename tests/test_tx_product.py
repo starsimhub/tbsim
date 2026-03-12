@@ -51,7 +51,7 @@ def test_tx_zero_efficacy():
 def test_tx_drug_type_overrides_efficacy():
     """Tx with drug_type overrides the efficacy parameter."""
     from tbsim.interventions.tx_products import Tx
-    from tbsim.interventions.tb_drug_types import TBDrugType
+    from tbsim.interventions.drug_types import TBDrugType
     tx = Tx(efficacy=0.5, drug_type=TBDrugType.FIRST_LINE_COMBO)
     # FIRST_LINE_COMBO has 95% cure rate, which should override 0.5
     assert np.isclose(tx.efficacy, 0.95)
