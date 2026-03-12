@@ -1,0 +1,19 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "51197660af6e",
+  "session_id": "0410b36f-17a8-4d37-b11f-1f280b6763e1",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-12T00:38:35.402572475Z",
+  "branch": "refactor-interventions",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "turn_id": "c7eba20ea62e",
+  "token_usage": {
+    "input_tokens": 5548,
+    "cache_creation_tokens": 369395,
+    "cache_read_tokens": 2068857,
+    "output_tokens": 20045,
+    "api_call_count": 28
+  }
+}
