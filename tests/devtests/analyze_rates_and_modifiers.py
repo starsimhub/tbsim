@@ -10,7 +10,6 @@ Date: 2024
 """
 
 import tbsim
-from tbsim.interventions.bcg import BCGVx, BCGRoutine
 import starsim as ss
 import pandas as pd
 import numpy as np
@@ -89,7 +88,7 @@ def analyze_tb_rates_and_modifiers():
     print("BCG INTERVENTION ANALYSIS")
     print("-" * 40)
 
-    bcg = BCGRoutine(pars={
+    bcg = tbsim.BCGRoutine(pars={
         'coverage': 0.8,
         'age_range': (0, 5),
         'start': ss.date('2000-01-01'),

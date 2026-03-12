@@ -66,7 +66,7 @@ class Sim(ss.Sim):
 
         # Pull modules out for special processing
         modules = sc.objdict()
-        for mod_type in ['diseases', 'networks', 'demographics', 'interventions', 'connectors', 'analyzers']:
+        for mod_type in ['diseases', 'networks', 'demographics']:
             modules[mod_type] = sc.mergelists(pars.pop(mod_type, None))
 
         # Determine the TB model class and its default parameter keys

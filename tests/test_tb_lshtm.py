@@ -10,6 +10,7 @@ import sciris as sc
 import starsim as ss
 import tbsim
 from tbsim import TBSL # Used a lot so import separately
+import pytest
 
 
 def make_lshtm_sim(
@@ -506,4 +507,4 @@ def test_dt_change(do_plot=False):
 
 
 if __name__ == '__main__':
-    test_dt_change(do_plot=True)
+    pytest.main(["-x", "-v", __file__])

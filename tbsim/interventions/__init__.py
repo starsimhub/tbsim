@@ -9,7 +9,7 @@ from .interventions import *
 from .beta import *
 from .tpt import *
 from .bcg import *
-from .tb_treatment import *
-from .tb_drug_types import *
-from .tb_health_seeking import *
-from .tb_diagnostic import *
+from .drug_types import *
+from .health_seeking import *
+from .diagnostics import *
+from .treatments import *
