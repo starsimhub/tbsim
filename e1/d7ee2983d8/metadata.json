@@ -5,14 +5,24 @@
   "branch": "refactor-interventions",
   "checkpoints_count": 1,
   "files_touched": [
+    "tbsim/interventions/__init__.py",
     "tbsim/interventions/diagnostics.py",
-    "tests/test_dx_delivery.py"
+    "tbsim/interventions/treatments.py",
+    "tbsim_examples/run_tb_interventions.py",
+    "tests/test_dx_delivery.py",
+    "tests/test_tx_delivery.py"
   ],
   "sessions": [
     {
       "metadata": "/e1/d7ee2983d8/0/metadata.json",
       "transcript": "/e1/d7ee2983d8/0/full.jsonl",
       "content_hash": "/e1/d7ee2983d8/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/e1/d7ee2983d8/1/metadata.json",
+      "transcript": "/e1/d7ee2983d8/1/full.jsonl",
+      "content_hash": "/e1/d7ee2983d8/1/content_hash.txt",
       "prompt": ""
     }
   ],
