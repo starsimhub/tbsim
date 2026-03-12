@@ -1,0 +1,10 @@
+<ide_opened_file>The user opened the file /temp/readonly/Agent tool input (s8l3i1) in the IDE. This may or may not be related to the current task.</ide_opened_file>
+quickly check that the plan (/home/cliffk/idm/tbsim/docs/tb_diagnostic_refactor_plan.md) and spec (/home/cliffk/idm/tbsim/docs/tb_diagnostic_treatment_refactor_spec.md) have both been implemented.
+
+---
+
+yes, please do the cleanup now, and remove test_tbinterventions.py if all the functionality is corrected and duplicated in test_interventions.py
+
+---
+
+can you copy those tests (as-is) over into the new file, and then remove the old file?
