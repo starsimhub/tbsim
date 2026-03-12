@@ -25,11 +25,13 @@ class Dx(ss.Product):
     """
 
     def __init__(self, df, hierarchy=None, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
         self.df = df.copy()
         self.hierarchy = hierarchy if hierarchy is not None else list(df.result.unique())
         self._filter_cols = [c for c in _FILTER_COLS if c in df.columns]
         self._validate()
+        self.update_pars(**kwargs)
+        return
 
     def _validate(self):
         """Check that probabilities sum to 1.0 per group."""

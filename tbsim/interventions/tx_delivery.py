@@ -26,7 +26,7 @@ class TxDelivery(ss.Intervention):
 
     def __init__(self, product, eligibility=None, reseek_multiplier=2.0,
                  reset_flags=True, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
         product.name = f'{self.name}_product'
         self.product = product
         self._eligibility_fn = eligibility
@@ -45,6 +45,8 @@ class TxDelivery(ss.Intervention):
         self._n_treated = 0
         self._n_success = 0
         self._n_failure = 0
+        self.update_pars(**kwargs)
+        return
 
     def _get_eligible(self, sim):
         """Get eligible UIDs using custom or default eligibility."""
@@ -111,6 +113,7 @@ class TxDelivery(ss.Intervention):
         self._n_treated = len(tx_uids)
         self._n_success = len(success_uids)
         self._n_failure = len(failure_uids)
+        return
 
     def init_results(self):
         super().init_results()
@@ -121,11 +124,12 @@ class TxDelivery(ss.Intervention):
             ss.Result('cum_success', dtype=int),
             ss.Result('cum_failure', dtype=int),
         )
+        return
 
     def update_results(self):
-        self.results['n_treated'][self.ti] = self._n_treated
-        self.results['n_success'][self.ti] = self._n_success
-        self.results['n_failure'][self.ti] = self._n_failure
+        self.results.n_treated[self.ti] = self._n_treated
+        self.results.n_success[self.ti] = self._n_success
+        self.results.n_failure[self.ti] = self._n_failure
 
         if self.ti > 0:
             self.results['cum_success'][self.ti] = self.results['cum_success'][self.ti - 1] + self._n_success
@@ -135,3 +139,9 @@ class TxDelivery(ss.Intervention):
             self.results['cum_failure'][self.ti] = self._n_failure
 
         self._n_treated = self._n_success = self._n_failure = 0
+        return
+
+    def finalize_results(self):
+        self.results.cum_success[:] = self.results.n_success.cumsum()
+        self.results.cum_failure[:] = self.results.n_failure.cumsum()
+        return
