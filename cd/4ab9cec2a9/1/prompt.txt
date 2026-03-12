@@ -1,0 +1,12 @@
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/tbsim/interventions/dx_products.py in the IDE. This may or may not be related to the current task.</ide_opened_file>
+review all PR comments from cliffckerr on https://github.com/starsimhub/tbsim/pull/386 and make a plan for addressing them
+
+---
+
+yes that looks good, except:
+- 2. "Don't need private attributes" -- use your judgement of whether to keep or change.
+- 2. "Coverage dist "not Starsim style"" -- there is no "define_dists". use the starsim-ai skills (particularly starsim-ai:starsim-dev-distributions) to figure out how to do this correctly.
+- 6. do not just rename the functions to classes -- actually make them classes (but also rename them).
+- 8. do not try to run the tests until you've made these changes to the tests; they won't pass.
+- 8. in the tests, do not create modules outside of the sim and then try to use them. instead, create the modules, pass them to the sim, then init the sim (and run if needed), and THEN test the module. you can use Sim(..., copy_inputs=False) if you want to reuse the module object you created.
+some of these changes might already be implemented, so don't worry if they are.
