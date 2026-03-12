@@ -1,6 +1,5 @@
 """Diagnostic products and delivery for TB testing."""
 
-import os
 import numpy as np
 import pandas as pd
 import starsim as ss
@@ -11,9 +10,6 @@ __all__ = ['Dx', 'Xpert', 'OralSwab', 'FujiLAM', 'CAD', 'DxDelivery']
 
 # Optional filter columns recognized by Dx
 _FILTER_COLS = ['age_min', 'age_max', 'hiv']
-
-# Path to bundled data files
-_DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
 
 class Dx(ss.Product):
@@ -37,6 +33,23 @@ class Dx(ss.Product):
         self.rand_dist = ss.random()
         self.update_pars(**kwargs)
         return
+
+    @staticmethod
+    def _load_data(df, datafile, columns, default_data):
+        """
+        Load diagnostic data from one of three sources.
+
+        Args:
+            df        (DataFrame) : use directly if provided
+            datafile  (str)       : path to CSV file
+            columns   (list)      : column names for default data
+            default_data (list)   : list of lists with default values
+        """
+        if df is not None:
+            return df
+        if datafile is not None:
+            return pd.read_csv(datafile)
+        return pd.DataFrame(default_data, columns=columns)
 
     def _validate(self):
         """Check that probabilities sum to 1.0 per group."""
@@ -131,68 +144,114 @@ class Dx(ss.Product):
 class Xpert(Dx):
     """Xpert MTB/RIF -- age-stratified (child/adult), TB-state-stratified."""
 
-    def __init__(self, **kwargs):
-        df = pd.read_csv(os.path.join(_DATA_DIR, 'xpert.csv'))
+    columns = 'state,result,probability,age_min,age_max'.split(',')
+    default_data = [
+        # Adults (15+)
+        #state              result     prob  amin  amax
+        [TBSL.SYMPTOMATIC,    'positive', 0.909, 15, np.inf],
+        [TBSL.SYMPTOMATIC,    'negative', 0.091, 15, np.inf],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.775, 15, np.inf],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.225, 15, np.inf],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.775, 15, np.inf],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.225, 15, np.inf],
+        # Children (<15)
+        [TBSL.SYMPTOMATIC,    'positive', 0.73,  0,  15],
+        [TBSL.SYMPTOMATIC,    'negative', 0.27,  0,  15],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.73,  0,  15],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.27,  0,  15],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.73,  0,  15],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.27,  0,  15],
+    ]
+
+    def __init__(self, df=None, datafile=None, **kwargs):
+        df = self._load_data(df, datafile, self.columns, self.default_data)
         super().__init__(df=df, hierarchy=['positive', 'negative'], **kwargs)
 
 
 class OralSwab(Dx):
     """Oral swab -- age-stratified, TB-state-stratified."""
 
-    def __init__(self, **kwargs):
-        df = pd.read_csv(os.path.join(_DATA_DIR, 'oral_swab.csv'))
+    columns = 'state,result,probability,age_min,age_max'.split(',')
+    default_data = [
+        # Adults (15+)
+        #state              result     prob  amin  amax
+        [TBSL.SYMPTOMATIC,    'positive', 0.80, 15, np.inf],
+        [TBSL.SYMPTOMATIC,    'negative', 0.20, 15, np.inf],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.30, 15, np.inf],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.70, 15, np.inf],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.30, 15, np.inf],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.70, 15, np.inf],
+        # Children (<15)
+        [TBSL.SYMPTOMATIC,    'positive', 0.25, 0,  15],
+        [TBSL.SYMPTOMATIC,    'negative', 0.75, 0,  15],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.25, 0,  15],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.75, 0,  15],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.25, 0,  15],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.75, 0,  15],
+    ]
+
+    def __init__(self, df=None, datafile=None, **kwargs):
+        df = self._load_data(df, datafile, self.columns, self.default_data)
         super().__init__(df=df, hierarchy=['positive', 'negative'], **kwargs)
 
 
 class FujiLAM(Dx):
     """FujiLAM -- HIV-stratified, age-stratified."""
 
-    def __init__(self, **kwargs):
-        df = pd.DataFrame([
-            # HIV+, adults
-            dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.75,  age_min=15, age_max=np.inf, hiv=True),
-            dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.25,  age_min=15, age_max=np.inf, hiv=True),
-            dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.75,  age_min=15, age_max=np.inf, hiv=True),
-            dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.25,  age_min=15, age_max=np.inf, hiv=True),
-            dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.75,  age_min=15, age_max=np.inf, hiv=True),
-            dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.25,  age_min=15, age_max=np.inf, hiv=True),
-            # HIV-, adults
-            dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.58,  age_min=15, age_max=np.inf, hiv=False),
-            dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.42,  age_min=15, age_max=np.inf, hiv=False),
-            dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.58,  age_min=15, age_max=np.inf, hiv=False),
-            dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.42,  age_min=15, age_max=np.inf, hiv=False),
-            dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.58,  age_min=15, age_max=np.inf, hiv=False),
-            dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.42,  age_min=15, age_max=np.inf, hiv=False),
-            # HIV+, children
-            dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.579, age_min=0, age_max=15, hiv=True),
-            dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.421, age_min=0, age_max=15, hiv=True),
-            dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.579, age_min=0, age_max=15, hiv=True),
-            dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.421, age_min=0, age_max=15, hiv=True),
-            dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.579, age_min=0, age_max=15, hiv=True),
-            dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.421, age_min=0, age_max=15, hiv=True),
-            # HIV-, children
-            dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.51,  age_min=0, age_max=15, hiv=False),
-            dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.49,  age_min=0, age_max=15, hiv=False),
-            dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.51,  age_min=0, age_max=15, hiv=False),
-            dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.49,  age_min=0, age_max=15, hiv=False),
-            dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.51,  age_min=0, age_max=15, hiv=False),
-            dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.49,  age_min=0, age_max=15, hiv=False),
-        ])
+    columns = 'state,result,probability,age_min,age_max,hiv'.split(',')
+    default_data = [
+        # HIV+, adults
+        #state              result     prob   amin  amax    hiv
+        [TBSL.SYMPTOMATIC,    'positive', 0.75,  15, np.inf, True],
+        [TBSL.SYMPTOMATIC,    'negative', 0.25,  15, np.inf, True],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.75,  15, np.inf, True],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.25,  15, np.inf, True],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.75,  15, np.inf, True],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.25,  15, np.inf, True],
+        # HIV-, adults
+        [TBSL.SYMPTOMATIC,    'positive', 0.58,  15, np.inf, False],
+        [TBSL.SYMPTOMATIC,    'negative', 0.42,  15, np.inf, False],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.58,  15, np.inf, False],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.42,  15, np.inf, False],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.58,  15, np.inf, False],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.42,  15, np.inf, False],
+        # HIV+, children
+        [TBSL.SYMPTOMATIC,    'positive', 0.579, 0,  15,     True],
+        [TBSL.SYMPTOMATIC,    'negative', 0.421, 0,  15,     True],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.579, 0,  15,     True],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.421, 0,  15,     True],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.579, 0,  15,     True],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.421, 0,  15,     True],
+        # HIV-, children
+        [TBSL.SYMPTOMATIC,    'positive', 0.51,  0,  15,     False],
+        [TBSL.SYMPTOMATIC,    'negative', 0.49,  0,  15,     False],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.51,  0,  15,     False],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.49,  0,  15,     False],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.51,  0,  15,     False],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.49,  0,  15,     False],
+    ]
+
+    def __init__(self, df=None, datafile=None, **kwargs):
+        df = self._load_data(df, datafile, self.columns, self.default_data)
         super().__init__(df=df, hierarchy=['positive', 'negative'], **kwargs)
 
 
 class CAD(Dx):
     """CAD chest X-ray -- simple, no age/HIV stratification."""
 
-    def __init__(self, **kwargs):
-        df = pd.DataFrame([
-            dict(state=TBSL.SYMPTOMATIC,    result='positive', probability=0.66),
-            dict(state=TBSL.SYMPTOMATIC,    result='negative', probability=0.34),
-            dict(state=TBSL.ASYMPTOMATIC,   result='positive', probability=0.66),
-            dict(state=TBSL.ASYMPTOMATIC,   result='negative', probability=0.34),
-            dict(state=TBSL.NON_INFECTIOUS, result='positive', probability=0.66),
-            dict(state=TBSL.NON_INFECTIOUS, result='negative', probability=0.34),
-        ])
+    columns = 'state,result,probability'.split(',')
+    default_data = [
+        #state              result     prob
+        [TBSL.SYMPTOMATIC,    'positive', 0.66],
+        [TBSL.SYMPTOMATIC,    'negative', 0.34],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.66],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.34],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.66],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.34],
+    ]
+
+    def __init__(self, df=None, datafile=None, **kwargs):
+        df = self._load_data(df, datafile, self.columns, self.default_data)
         super().__init__(df=df, hierarchy=['positive', 'negative'], **kwargs)
 
 
