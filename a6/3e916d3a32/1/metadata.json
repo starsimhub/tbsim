@@ -1,7 +1,9 @@
 {
   "cli_version": "0.5.0",
   "checkpoint_id": "a63e916d3a32",
+  "session_id": "4620e24d-8b7f-4508-b855-72f2d35e9ca8",
   "strategy": "manual-commit",
+  "created_at": "2026-03-12T16:04:04.615171205Z",
   "branch": "refactor-interventions",
   "checkpoints_count": 1,
   "files_touched": [
@@ -13,25 +15,25 @@
     "tbsim/interventions/tx_delivery.py",
     "tbsim/interventions/tx_products.py"
   ],
-  "sessions": [
-    {
-      "metadata": "/a6/3e916d3a32/0/metadata.json",
-      "transcript": "/a6/3e916d3a32/0/full.jsonl",
-      "content_hash": "/a6/3e916d3a32/0/content_hash.txt",
-      "prompt": ""
-    },
-    {
-      "metadata": "/a6/3e916d3a32/1/metadata.json",
-      "transcript": "/a6/3e916d3a32/1/full.jsonl",
-      "content_hash": "/a6/3e916d3a32/1/content_hash.txt",
-      "prompt": "/a6/3e916d3a32/1/prompt.txt"
-    }
-  ],
+  "agent": "Claude Code",
+  "turn_id": "b2a9520867f3",
   "token_usage": {
     "input_tokens": 10,
     "cache_creation_tokens": 39350,
     "cache_read_tokens": 222328,
     "output_tokens": 8080,
     "api_call_count": 8
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-12T16:04:04.585763563Z",
+    "agent_lines": 527,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 527,
+    "agent_percentage": 100
   }
 }
