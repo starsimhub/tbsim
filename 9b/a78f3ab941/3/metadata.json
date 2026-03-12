@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "9ba78f3ab941",
+  "session_id": "fe7dfbe1-5255-4652-b667-d8486cf6c516",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-12T14:27:00.02724694Z",
+  "branch": "refactor-interventions",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "tests/test_tx_product.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "6327814b35da",
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 130914,
+    "cache_read_tokens": 959946,
+    "output_tokens": 15963,
+    "api_call_count": 20
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-12T14:26:59.947678167Z",
+    "agent_lines": 33,
+    "human_added": 309,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 342,
+    "agent_percentage": 9.649122807017543
+  }
+}
