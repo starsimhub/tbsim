@@ -4,12 +4,27 @@
   "strategy": "manual-commit",
   "branch": "refactor-interventions",
   "checkpoints_count": 1,
-  "files_touched": null,
+  "files_touched": [
+    "tbsim/interventions/__init__.py",
+    "tbsim/interventions/diagnostics.py",
+    "tbsim/interventions/dx_delivery.py",
+    "tbsim/interventions/treatments.py",
+    "tbsim/interventions/tx_delivery.py",
+    "tbsim/interventions/tx_products.py",
+    "tests/test_dx_delivery.py",
+    "tests/test_tx_product.py"
+  ],
   "sessions": [
     {
       "metadata": "/9b/a78f3ab941/0/metadata.json",
       "transcript": "/9b/a78f3ab941/0/full.jsonl",
       "content_hash": "/9b/a78f3ab941/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/9b/a78f3ab941/1/metadata.json",
+      "transcript": "/9b/a78f3ab941/1/full.jsonl",
+      "content_hash": "/9b/a78f3ab941/1/content_hash.txt",
       "prompt": ""
     }
   ],
