@@ -59,7 +59,7 @@ def test_dx_delivery_custom_result_state():
     sim.run()
 
     # The custom state should exist and have some True values
-    assert hasattr(sim.people, 'screen_positive')
+    assert 'screen_positive' in sim.people.states
     n_screen_pos = np.sum(np.asarray(sim.people.screen_positive))
     assert n_screen_pos > 0
 

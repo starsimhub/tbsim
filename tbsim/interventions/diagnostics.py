@@ -63,17 +63,20 @@ class DxDelivery(ss.Intervention):
         super().init_post()
         ppl = self.sim.people
         # Expose key states directly on People so that HealthSeekingBehavior
-        # (and other interventions) can find them via hasattr(ppl, 'sought_care').
-        if not hasattr(ppl, 'sought_care'):
-            ppl.sought_care = self.sought_care
-        if not hasattr(ppl, 'diagnosed'):
-            ppl.diagnosed = self.diagnosed
+        # (and other interventions) can find them via 'sought_care' in ppl.states.
+        if 'sought_care' not in ppl.states:
+            ppl.states['sought_care'] = self.sought_care
+            setattr(ppl, 'sought_care', self.sought_care)
+        if 'diagnosed' not in ppl.states:
+            ppl.states['diagnosed'] = self.diagnosed
+            setattr(ppl, 'diagnosed', self.diagnosed)
         # For custom result_state, create and register the state on People
         if self.result_state not in ('diagnosed', 'sought_care'):
-            if not hasattr(ppl, self.result_state):
+            if self.result_state not in ppl.states:
                 state = ss.BoolState(self.result_state, default=False)
                 state.link_people(ppl)
                 state.init_vals()
+                ppl.states[self.result_state] = state
                 setattr(ppl, self.result_state, state)
 
     def _get_eligible(self, sim):

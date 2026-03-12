@@ -98,13 +98,13 @@ class TxDelivery(ss.Intervention):
 
             if self._reset_flags:
                 ppl.diagnosed[failure_uids] = False
-                if hasattr(ppl, 'tested'):
+                if 'tested' in ppl.states:
                     ppl.tested[failure_uids] = False
 
             # Trigger renewed care-seeking
-            if hasattr(ppl, 'sought_care'):
+            if 'sought_care' in ppl.states:
                 ppl.sought_care[failure_uids] = False
-            if hasattr(ppl, 'care_seeking_multiplier'):
+            if 'care_seeking_multiplier' in ppl.states:
                 ppl.care_seeking_multiplier[failure_uids] *= self._reseek_multiplier
 
         # Store for results
