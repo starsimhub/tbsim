@@ -203,6 +203,68 @@ def run_scenarios(plot=True):
     
     return results
 
+def run_dx_tx_cascade():
+    """
+    Demonstrate the new Dx/Tx product + delivery API.
+
+    Cascade: HealthSeekingBehavior -> CXR screen -> Xpert confirm -> DOTS treat
+    """
+    pars = dict(
+        dt=ss.days(7),
+        start=ss.date('2000-01-01'),
+        stop=ss.date('2020-12-31'),
+        rand_seed=42,
+        verbose=0,
+    )
+    pop = ss.People(n_agents=1000, age_data=age_data)
+    tb = tbsim.TB_LSHTM(pars=dict(
+        init_prev=ss.bernoulli(p=0.25),
+        beta=ss.peryear(0.0025),
+    ))
+    net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
+
+    # Cascade interventions
+    hsb = tbsim.HealthSeekingBehavior()
+
+    screen = tbsim.DxDelivery(
+        name='screen',
+        product=tbsim.cad_cxr(),
+        coverage=0.9,
+        result_state='screen_positive',
+    )
+    confirm = tbsim.DxDelivery(
+        name='confirm',
+        product=tbsim.xpert(),
+        coverage=0.8,
+        eligibility=lambda sim: sim.people.screen_positive.uids,
+        result_state='diagnosed',
+    )
+    treat = tbsim.TxDelivery(product=tbsim.dots())
+
+    sim = ss.Sim(
+        people=pop,
+        diseases=tb,
+        networks=net,
+        interventions=[hsb, screen, confirm, treat],
+        pars=pars,
+    )
+    sim.run()
+
+    # Print summary
+    r = sim.results
+    print(f"\nDx/Tx Cascade Results:")
+    print(f"  Screened:  {r.screen.n_tested.values.sum()}")
+    print(f"  Confirmed: {r.confirm.n_tested.values.sum()}")
+    print(f"  Treated:   {r.txdelivery.n_treated.values.sum()}")
+    print(f"  Cured:     {r.txdelivery.cum_success.values[-1]}")
+    print(f"  Failed:    {r.txdelivery.cum_failure.values[-1]}")
+    return sim
+
+
 if __name__ == '__main__':
     # Run all scenarios
     results = run_scenarios(plot=True)
+
+    # Run Dx/Tx cascade example
+    print("\n--- Dx/Tx Cascade Example ---")
+    sim = run_dx_tx_cascade()

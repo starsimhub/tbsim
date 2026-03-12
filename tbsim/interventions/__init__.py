@@ -13,3 +13,7 @@ from .tb_treatment import *
 from .tb_drug_types import *
 from .tb_health_seeking import *
 from .tb_diagnostic import *
+from .dx_products import *
+from .tx_products import *
+from .diagnostics import *
+from .treatments import *
