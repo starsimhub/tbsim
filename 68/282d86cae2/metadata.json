@@ -3,21 +3,34 @@
   "checkpoint_id": "68282d86cae2",
   "strategy": "manual-commit",
   "branch": "refactor-interventions",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 2,
+  "files_touched": [
+    "tbsim/interventions/README.md",
+    "tbsim/interventions/__init__.py",
+    "tbsim/interventions/drug_types.py",
+    "tbsim/interventions/tb_drug_types.py",
+    "tbsim/interventions/tx_products.py",
+    "tests/test_tx_product.py"
+  ],
   "sessions": [
     {
       "metadata": "/68/282d86cae2/0/metadata.json",
       "transcript": "/68/282d86cae2/0/full.jsonl",
       "content_hash": "/68/282d86cae2/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/68/282d86cae2/1/metadata.json",
+      "transcript": "/68/282d86cae2/1/full.jsonl",
+      "content_hash": "/68/282d86cae2/1/content_hash.txt",
+      "prompt": "/68/282d86cae2/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 5548,
-    "cache_creation_tokens": 369395,
-    "cache_read_tokens": 2068857,
-    "output_tokens": 20045,
-    "api_call_count": 28
+    "input_tokens": 5564,
+    "cache_creation_tokens": 467969,
+    "cache_read_tokens": 2926753,
+    "output_tokens": 23412,
+    "api_call_count": 40
   }
 }

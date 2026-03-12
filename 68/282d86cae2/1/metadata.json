@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "68282d86cae2",
+  "session_id": "1db356b5-a51d-4da6-ae5e-3bcc087e379c",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-12T00:35:47.359357208Z",
+  "branch": "refactor-interventions",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "tbsim/interventions/README.md",
+    "tbsim/interventions/__init__.py",
+    "tbsim/interventions/drug_types.py",
+    "tbsim/interventions/tb_drug_types.py",
+    "tbsim/interventions/tx_products.py",
+    "tests/test_tx_product.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "35ffa5a568f5",
+  "checkpoint_transcript_start": 163,
+  "transcript_lines_at_start": 163,
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 98574,
+    "cache_read_tokens": 857896,
+    "output_tokens": 3367,
+    "api_call_count": 12
+  },
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-12T00:35:47.205393945Z",
+    "agent_lines": 622,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 622,
+    "agent_percentage": 100
+  }
+}
