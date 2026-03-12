@@ -10,7 +10,7 @@ Three scenarios are run over 20 years and compared:
 
 import matplotlib.pyplot as plt
 import starsim as ss
-import tbsim as mtb
+import tbsim
 
 
 N_AGENTS  = 3_000
@@ -34,7 +34,7 @@ tb_pars = dict(
 
 
 def build_sim(hsb=None):
-    tb  = mtb.TB_LSHTM(pars=tb_pars)
+    tb  = tbsim.TB_LSHTM(pars=tb_pars)
     pop = ss.People(n_agents=N_AGENTS)
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
     kwargs = dict(
@@ -53,13 +53,13 @@ scenarios = {
     "Baseline": build_sim(),
 
     "Low rate (10 %/day)": build_sim(
-        mtb.HealthSeekingBehavior(pars=dict(
+        tbsim.HealthSeekingBehavior(pars=dict(
             initial_care_seeking_rate = ss.perday(0.10),
         ))
     ),
 
     "High rate (40 %/day) + retry": build_sim(
-        mtb.HealthSeekingBehavior(pars=dict(
+        tbsim.HealthSeekingBehavior(pars=dict(
             initial_care_seeking_rate = ss.perday(0.40),
             care_retry_steps          = 4,
         ))
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         for label, sim in zip(scenarios.keys(), msim.sims)
     }
 
-    mtb.plot_combined(
+    tbsim.plot_combined(
         results,
         keywords = ["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"],
         title    = "Health-seeking behaviour – LSHTM TB model",
