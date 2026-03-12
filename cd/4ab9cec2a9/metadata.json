@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "cd4ab9cec2a9",
+  "strategy": "manual-commit",
+  "branch": "refactor-interventions",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "tbsim/interventions/dx_delivery.py",
+    "tbsim/interventions/dx_products.py",
+    "tbsim/interventions/tx_delivery.py",
+    "tbsim/interventions/tx_products.py",
+    "tbsim/sim.py",
+    "tbsim/tb_lshtm.py",
+    "tbsim_examples/run_tb_interventions.py",
+    "tests/test_dx_delivery.py",
+    "tests/test_dx_product.py",
+    "tests/test_tx_delivery.py",
+    "tests/test_tx_product.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/cd/4ab9cec2a9/0/metadata.json",
+      "transcript": "/cd/4ab9cec2a9/0/full.jsonl",
+      "content_hash": "/cd/4ab9cec2a9/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
