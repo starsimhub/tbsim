@@ -8,7 +8,7 @@ This folder contains all TBsim intervention modules.
 - `treatments.py` -- Treatment delivery intervention (`TxDelivery`)
 - `bcg.py` -- BCG vaccination product and routine delivery
 - `tpt.py` -- TB preventive therapy products and delivery
-- `tb_health_seeking.py` -- Health-seeking behavior
+- `health_seeking.py` -- Health-seeking behavior
 - `immigration.py` -- Immigration interventions
 - `beta.py` -- Time-varying transmission modifier
 - `drug_types.py` -- TB drug type definitions

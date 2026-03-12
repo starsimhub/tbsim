@@ -10,7 +10,7 @@ from .beta import *
 from .tpt import *
 from .bcg import *
 from .drug_types import *
-from .tb_health_seeking import *
+from .health_seeking import *
 from .dx_products import *
 from .tx_products import *
 from .diagnostics import *

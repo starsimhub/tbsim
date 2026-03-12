@@ -18,7 +18,7 @@ class HealthSeekingBehavior(ss.Intervention):
 
         import starsim as ss
         import tbsim
-        from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
+        from tbsim.interventions.health_seeking import HealthSeekingBehavior
 
         tb  = tbsim.TB_LSHTM()
         hsb = HealthSeekingBehavior()
