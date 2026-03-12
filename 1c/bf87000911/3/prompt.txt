@@ -1,0 +1,10 @@
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/tbsim/sim.py in the IDE. This may or may not be related to the current task.</ide_opened_file>
+review the comments on the PR:
+https://github.com/starsimhub/tbsim/pull/386
+
+make a plan for implementing them. use superpowers and starsim-ai skills.
+
+---
+
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/docs/superpowers/plans/2026-03-11-fix-np-random-in-products.md in the IDE. This may or may not be related to the current task.</ide_opened_file>
+i've updated the plan. ready to execute
