@@ -1,0 +1,11 @@
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/tbsim/interventions/diagnostics.py in the IDE. This may or may not be related to the current task.</ide_opened_file>
+currently, the diagnostic interventions try to create states for people.diagnosed and people.sought_care. make a plan for removing these shared states from people and storing states just in the intervention instead. they should still be available at e.g. people.dxdelivery.diagnosed instead.
+
+---
+
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/docs/superpowers/plans/2026-03-13-remove-shared-dx-states.md in the IDE. This may or may not be related to the current task.</ide_opened_file>
+no this isn't quite right. i edited the file so please reload for context. then please make the following changes:
+1. in addition to sim.get_dx(), add sim.get_hsb(). if hsb is found, then use hsb.sought_care for eligibility. otherwise, assume everyone is eligible by default. do this first, since everything else will fail otherwise.
+2. it should be tbsim.Sim.get_dx() (a class method, not a module function)
+3. get_dx() should return None if not found, not raise an exception
+4. overall, the plan is very long and complicated. see if you can simplify it.
