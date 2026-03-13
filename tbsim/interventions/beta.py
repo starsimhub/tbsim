@@ -1,5 +1,6 @@
 """Intervention that modifies the TB transmission rate (beta) at specified time points."""
 
+import sciris as sc
 import starsim as ss
 import tbsim
 
@@ -78,6 +79,8 @@ class BetaByYear(ss.Intervention):
         )
         self.update_pars(pars, **kwargs)
         self.applied_years = set()  # (Deprecated, kept for backward compatibility)
+
+        self.pars['years'] = sc.tolist(self.pars['years'])
 
         if isinstance(self.pars['x_beta'], (list, tuple)):
             if len(self.pars['x_beta']) != len(self.pars['years']):
