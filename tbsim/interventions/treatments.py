@@ -103,13 +103,18 @@ class TxDelivery(ss.Intervention):
         product.name = f'{self.name}_product'
         return
 
+    def init_post(self):
+        super().init_post()
+        self._dx = self.sim.get_dx(result_state='diagnosed')
+
     def _get_eligible(self, sim):
         """Get eligible UIDs using custom or default eligibility."""
         if self.eligibility is not None:
             return ss.uids(self.eligibility(sim))
-        # Default: diagnosed, active TB, alive (read diagnosed from ppl, set by DxDelivery)
-        ppl = sim.people
-        diagnosed_uids = (ppl.diagnosed & ppl.alive).uids
+        # Default: diagnosed, active TB, alive (read diagnosed from DxDelivery)
+        if self._dx is None:
+            return ss.uids()
+        diagnosed_uids = (self._dx.diagnosed & sim.people.alive).uids
         tb = tbsim.get_tb(sim)
         active_tb_mask = np.isin(tb.state, TBSL.active_tb_states())
         active_tb_uids = ss.uids(np.where(active_tb_mask)[0])
@@ -156,23 +161,23 @@ class TxDelivery(ss.Intervention):
             tb.on_treatment[success_uids] = False
             tb.susceptible[success_uids] = True
             tb.infected[success_uids] = False
-            ppl.diagnosed[success_uids] = False
+            if self._dx is not None:
+                self._dx.diagnosed[success_uids] = False
             self.tb_treatment_success[success_uids] = True
 
         # Handle failures
         if len(failure_uids) > 0:
             self.treatment_failure[failure_uids] = True
 
-            if self.reset_flags:
-                ppl.diagnosed[failure_uids] = False
-                if 'tested' in ppl.states:
-                    ppl.tested[failure_uids] = False
+            if self.reset_flags and self._dx is not None:
+                self._dx.diagnosed[failure_uids] = False
+                self._dx.tested[failure_uids] = False
 
             # Trigger renewed care-seeking
-            if 'sought_care' in ppl.states:
-                ppl.sought_care[failure_uids] = False
-            if 'care_seeking_multiplier' in ppl.states:
-                ppl.care_seeking_multiplier[failure_uids] *= self.reseek_multiplier
+            if hsb := sim.get_hsb():
+                hsb.sought_care[failure_uids] = False
+            if self._dx is not None:
+                self._dx.care_seeking_multiplier[failure_uids] *= self.reseek_multiplier
 
         # Store for results
         self.results.n_treated[self.ti] = len(tx_uids)

@@ -236,7 +236,7 @@ def run_dx_tx_cascade():
         name='confirm',
         product=tbsim.Xpert(),
         coverage=0.8,
-        eligibility=lambda sim: sim.people.screen_positive.uids,
+        eligibility=lambda sim: sim.people.screen.screen_positive.uids,
         result_state='diagnosed',
     )
     treat = tbsim.TxDelivery(product=tbsim.DOTS())

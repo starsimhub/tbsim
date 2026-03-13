@@ -35,7 +35,7 @@ def test_dx_delivery_diagnoses_agents():
     sim = make_sim(n_agents=1000, interventions=dx)
     sim.run()
 
-    n_diagnosed = sim.people.diagnosed.count()
+    n_diagnosed = sim.people.dxdelivery.diagnosed.count()
     assert n_diagnosed > 0
 
 
@@ -45,8 +45,7 @@ def test_dx_delivery_custom_result_state():
     sim = make_sim(interventions=dx)
     sim.run()
 
-    assert 'screen_positive' in sim.people.states
-    n_screen_pos = sim.people.screen_positive.count()
+    n_screen_pos = sim.people.dxdelivery.screen_positive.count()
     assert n_screen_pos > 0
 
 
@@ -63,7 +62,7 @@ def test_dx_delivery_cascade():
         name='confirm',
         product=tbsim.Xpert(),
         coverage=0.8,
-        eligibility=lambda sim: sim.people.screen_positive.uids,
+        eligibility=lambda sim: sim.people.screen.screen_positive.uids,
         result_state='diagnosed',
     )
     sim = make_sim(n_agents=1000, interventions=[hsb, screen, confirm])

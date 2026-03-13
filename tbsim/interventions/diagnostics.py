@@ -284,8 +284,7 @@ class DxDelivery(ss.Intervention):
 
         # Person-level states
         self.define_states(
-            ss.BoolState('sought_care', default=False),
-            ss.BoolState('diagnosed', default=False),
+            ss.BoolState(result_state, default=False),
             ss.BoolArr('tested', default=False),
             ss.IntArr('n_times_tested', default=0),
             ss.BoolState('test_result', default=False),
@@ -296,32 +295,16 @@ class DxDelivery(ss.Intervention):
         product.name = f'{self.name}_product'
         return
 
-    def init_post(self):
-        super().init_post()
-        ppl = self.sim.people
-        # Expose key states directly on People so that HealthSeekingBehavior
-        # (and other interventions) can find them via 'sought_care' in ppl.states.
-        if 'sought_care' not in ppl.states: # TODO: use People method (not currently implemented)
-            ppl.states['sought_care'] = self.sought_care
-            setattr(ppl, 'sought_care', self.sought_care)
-        if 'diagnosed' not in ppl.states:
-            ppl.states['diagnosed'] = self.diagnosed
-            setattr(ppl, 'diagnosed', self.diagnosed)
-        # For custom result_state, create and register the state on People
-        if self.result_state not in ('diagnosed', 'sought_care'):
-            if self.result_state not in ppl.states:
-                state = ss.BoolState(self.result_state, default=False)
-                state.link_people(ppl)
-                state.init_vals()
-                ppl.states[self.result_state] = state # TODO: use People method (not currently implemented)
-                setattr(ppl, self.result_state, state)
-        return
-
     def _get_eligible(self, sim):
         """Get eligible UIDs using custom or default eligibility."""
         if self.eligibility is not None:
             return ss.uids(self.eligibility(sim))
-        return (self.sought_care & (~self.diagnosed) & sim.people.alive).uids
+        # Default: use HSB sought_care if available, otherwise all alive
+        hsb = sim.get_hsb()
+        result_arr = self[self.result_state]
+        if hsb is not None:
+            return (hsb.sought_care & (~result_arr) & sim.people.alive).uids
+        return (~result_arr & sim.people.alive).uids
 
     def init_results(self):
         super().init_results()
@@ -336,7 +319,6 @@ class DxDelivery(ss.Intervention):
 
     def step(self):
         sim = self.sim
-        ppl = sim.people
         tb = tbsim.get_tb(sim)
 
         eligible = self._get_eligible(sim)
@@ -354,7 +336,7 @@ class DxDelivery(ss.Intervention):
         neg_uids = results.get('negative', ss.uids())
 
         # Set result state
-        result_arr = ppl[self.result_state]
+        result_arr = self[self.result_state]
         result_arr[pos_uids] = True
 
         # Update tracking states
@@ -375,7 +357,8 @@ class DxDelivery(ss.Intervention):
 
         # Reset flags for false negatives to allow retry
         if len(false_neg_uids) > 0:
-            self.sought_care[false_neg_uids] = False
+            if hsb := sim.get_hsb():
+                hsb.sought_care[false_neg_uids] = False
             self.tested[false_neg_uids] = False
 
         # Store for results
