@@ -63,6 +63,7 @@ dev = [
 
 [tool.pytest.ini_options]
 env = ["MPLBACKEND=Agg"]
+pythonpath = ["."]
 
 [tool.setuptools.packages.find]
 where = ["."]

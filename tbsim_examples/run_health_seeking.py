@@ -76,13 +76,13 @@ if __name__ == "__main__":
         for label, sim in zip(scenarios.keys(), msim.sims)
     }
 
-    mtb.plot(
+    tbsim.plot(
         results,
-        select = dict(like=["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"]),
-        title    = "Health-seeking behaviour – LSHTM TB model",
-        n_cols   = 3,
-        output_dir   = "results",
-        theme     = 'light',
+        select=dict(like=["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"]),
+        title="Health-seeking behaviour – LSHTM TB model",
+        n_cols=3,
+        output_dir="results",
+        theme='light',
     )
     plt.show()
-    
+
