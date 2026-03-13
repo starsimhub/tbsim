@@ -1,0 +1,9 @@
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/docs/superpowers/plans/2026-03-13-remove-shared-dx-states.md in the IDE. This may or may not be related to the current task.</ide_opened_file>
+help me understand and fix this error:
+FAILED test_dx_delivery.py::test_beta_intervention_with_acute - TypeError: object of type 'int' has no len()
+
+it seems like a new error, and yet, nothing should've changed this test or this file?
+
+---
+
+ah. betabyyear should call sc.tolist() to sanitize the years input before checking len. test should pass with int year

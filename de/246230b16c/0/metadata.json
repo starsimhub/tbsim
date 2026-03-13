@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "de246230b16c",
+  "session_id": "5b1f2bef-19d0-4e00-881d-39b229a82821",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-13T21:49:50.715001483Z",
+  "branch": "refactor-refactor-interventions",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "tbsim/interventions/beta.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "ebeed6cd89d6",
+  "token_usage": {
+    "input_tokens": 15,
+    "cache_creation_tokens": 27066,
+    "cache_read_tokens": 255164,
+    "output_tokens": 1864,
+    "api_call_count": 11
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-13T21:49:50.681408572Z",
+    "agent_lines": 3,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 3,
+    "agent_percentage": 100
+  }
+}
