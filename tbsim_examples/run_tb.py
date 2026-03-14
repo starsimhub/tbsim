@@ -16,6 +16,6 @@ if __name__ == '__main__':
     sim.run()
     print(sim.pars)
     results = {'TB DEFAULTS  ': sim.results.flatten()}
-    tbsim.plot_combined(results, title='TB MODEL WITH DEFAULT PARAMETERS', dark=False, heightfold=1.5)
+    tbsim.plot(results, title='TB MODEL WITH DEFAULT PARAMETERS', theme='light', row_height=1.5)
     
     plt.show()

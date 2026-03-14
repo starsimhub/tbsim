@@ -1,9 +1,12 @@
 """LSHTM TB natural history model. State definitions and transition diagram are in the API docs (tbsim.tb_lshtm)."""
 
 from enum import IntEnum
+
 import numpy as np
-import matplotlib.pyplot as plt
 import starsim as ss
+
+from .plots import plot as _tbsim_plot
+
 
 __all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL', 'get_tb']
 
@@ -517,15 +520,18 @@ class TB_LSHTM(BaseTB):
         res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
         return
 
-    def plot(self):
-        """Plot all result time series on one figure."""
-        fig = plt.figure()
-        for rkey in self.results.keys():
-            if rkey == 'timevec':
-                continue
-            plt.plot(self.results['timevec'], self.results[rkey], label=rkey.title())
-        plt.legend()
-        return fig
+    def plot(self, **kwargs):
+        """Plot TB result time series using tbsim.plot().
+
+        Args:
+            **kwargs: Forwarded to :func:`tbsim.plots.plot`. Common options
+                include ``select``, ``title``, ``n_cols``, ``theme``,
+                ``savefig``, ``filename``, ``output_dir``, and ``show``.
+
+        Returns:
+            matplotlib.figure.Figure
+        """
+        return _tbsim_plot(self.sim, **kwargs)
 
 
 class TB_LSHTM_Acute(TB_LSHTM):

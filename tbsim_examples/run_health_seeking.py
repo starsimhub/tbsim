@@ -76,13 +76,13 @@ if __name__ == "__main__":
         for label, sim in zip(scenarios.keys(), msim.sims)
     }
 
-    tbsim.plot_combined(
+    tbsim.plot(
         results,
-        keywords = ["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"],
-        title    = "Health-seeking behaviour – LSHTM TB model",
-        n_cols   = 3,
-        outdir   = "results",
-        dark     = False,
+        select=dict(like=["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"]),
+        title="Health-seeking behaviour – LSHTM TB model",
+        n_cols=3,
+        output_dir="results",
+        theme='light',
     )
     plt.show()
-    
+

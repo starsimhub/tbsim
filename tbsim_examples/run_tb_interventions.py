@@ -195,8 +195,8 @@ def run_scenarios(plot=True):
         results[name] = sim.results.flatten()
     
     if plot:
-        pl.plot_combined(results, 
-                        heightfold=2, outdir='results/interventions')
+        pl.plot(results, 
+                        row_height=2, output_dir='results/interventions')
                         
                         # filter=tbsim.FILTERS.important_metrics)
         plt.show()
