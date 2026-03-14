@@ -9,7 +9,6 @@ control appearance.  See :func:`plot` for the full parameter list and examples.
 
 import re
 import sys
-
 import numpy as np
 import sciris as sc
 import starsim as ss
@@ -140,7 +139,7 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
     return fig
 
 
-def _flatten_by_result_name(flat):
+def _rename_results(flat):
     """Re-key a flat result dict using each result's own name, dropping the module prefix."""
     out = {}
     for prefixed_key, result in flat.items():
@@ -156,14 +155,17 @@ def _normalize_results(results):
     results, then re-keys by result name so metrics align across sims that
     use different module class names (e.g. ``TB_LSHTM`` vs ``TB_LSHTM_Acute``).
     """
-    if hasattr(results, 'sims') and results.sims is not None:
-        return {sim.label: _flatten_by_result_name(ss.utils.match_result_keys(sim.results, key=None))
-                for sim in results.sims}
-    if hasattr(results, 'results') and hasattr(results, 'label'):
-        return {results.label: _flatten_by_result_name(ss.utils.match_result_keys(results.results, key=None))}
-    if isinstance(results, dict):
+    if isinstance(results, ss.MultiSim):
+        sims = results.sims
+        return {sim.label: _rename_results(ss.utils.match_result_keys(sim.results, key=None)) for sim in sims}
+    elif isinstance(results, ss.Sim):
+        sim = results
+        return {sim.label: _rename_results(ss.utils.match_result_keys(sim.results, key=None))} # TODO: can probably just be sim.results.flatten()?
+    elif isinstance(results, dict):
         return results
-    raise TypeError(f"results must be MultiSim, Sim, or dict of flat results; got {type(results).__name__}")
+    else:
+        errormsg = f"Results must be MultiSim, Sim, or dict of flat results; got {type(results).__name__}"
+        raise TypeError(errormsg)
 
 
 def _validate_flat_results(flat_results):
@@ -261,7 +263,7 @@ class _ZeroResult:
         self.values = np.asarray(values, dtype=float)
 
 
-def _as_1d_xy(result):
+def _as_1d_xy(result): # TODO: is this needed?
     """Return ``(x, y)`` 1-D arrays from a result object; ``(None, None)`` if invalid."""
     if result is None or not hasattr(result, 'timevec') or not hasattr(result, 'values'):
         return None, None
@@ -290,21 +292,3 @@ def _safe_min_max(x):
         return np.nanmin(a), np.nanmax(a)
     except (TypeError, ValueError):
         return None, None
-
-
-_run_timestamp = None  # shared across all plot() calls in one Python session
-
-
-def _out_path(filename, output_dir):
-    """Return a full output path inside a timestamped run subfolder.
-    """
-    global _run_timestamp
-    if _run_timestamp is None:
-        _run_timestamp = sc.now(dateformat='%Y%m%d_%H%M%S')
-    try:
-        main = sys.modules.get('__main__')
-        script_dir = sc.thispath(main.__file__, aspath=False) if hasattr(main, '__file__') else sc.thispath(aspath=False)
-        output_dir = 'results' if output_dir is None else output_dir
-        return sc.makefilepath(filename, folder=[script_dir, output_dir, _run_timestamp], makedirs=True)
-    except OSError as e:
-        raise OSError(f"Cannot create output path for figure: {e}") from e
