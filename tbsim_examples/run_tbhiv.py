@@ -78,5 +78,5 @@ if __name__ == '__main__':
         sim.run()
         results[label] = sim.results.flatten()
 
-    tbsim.plot_combined(results, title='TB-HIV Coinfection Model')
+    tbsim.plot(results, title='TB-HIV Coinfection Model', )
     plt.show()
