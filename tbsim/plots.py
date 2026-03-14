@@ -108,8 +108,8 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
                     seen.add(scen)
 
             ax.set_title(metric_label, fontsize=10, fontweight='light')
-            ax.set_xlabel('Time', fontsize=6, color=fg)
-            ax.tick_params(axis='both', labelsize=6, colors=fg)
+            ax.set_xlabel('Time', fontsize=6)
+            ax.tick_params(axis='both', labelsize=6)
             ax.grid(True, color='gray', alpha=0.25, linestyle='--', linewidth=0.2)
             if all_x_min is not None and all_x_max is not None:
                 ax.set_xlim(all_x_min, all_x_max)
@@ -120,12 +120,9 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
         if all_handles:
             leg = fig.legend(all_handles, all_labels, loc='upper left', fontsize=7, frameon=True, fancybox=True)
             leg.get_frame().set_alpha(0.9)
-            leg.get_frame().set_facecolor(fig_bg)
-            for t in leg.get_texts():
-                t.set_color(fg)
 
         if title:
-            fig.suptitle(title, fontsize=12, color=fg)
+            fig.suptitle(title, fontsize=12)
 
         plt.tight_layout(pad=2.0)
 
