@@ -3,13 +3,12 @@ Plotting utilities for visualizing TB simulation results.
 
 The main entry point is :func:`plot`, which accepts a ``MultiSim``, a single
 ``Sim``, or a pre-built flat results dict.  Use the ``select`` argument to
-filter metrics (by name, substring, or regex) and ``theme``/``style`` to
+filter metrics (by name, substring, or regex) and ``style`` to
 control appearance.  See :func:`plot` for the full parameter list and examples.
 """
 
 import re
 import sys
-
 import numpy as np
 import sciris as sc
 import starsim as ss
@@ -18,24 +17,19 @@ import matplotlib.pyplot as plt
 __all__ = ['plot']
 
 
-def plot(results, select=None, title='', savefig=False, filename='tbsim.png',
-         output_dir=None, theme='light', n_cols=6, row_height=1.5, style=None, show=True):
+def plot(results, select=None, title='', filename=None, n_cols=None, row_height=1.5, style=None, show=True):
     """Plot simulation results (MultiSim, Sim, or flat results dict).
 
     Args:
         results:      MultiSim, single Sim, or dict of flat results per scenario.
-        select:       Metrics to plot. None = all. List of exact names, or a dict
+        select:       What to plot. None = all. List of exact names, or a dict
                       with keys ``like`` (substring), ``regex``, ``items``, and/or
                       ``exclude``. Prefix a list entry with ``'~'`` to exclude it.
         title (str):  Figure suptitle.
-        savefig (bool): Save the figure to disk.
-        filename (str): Output filename. Default ``'tbsim.png'``.
-        output_dir (str): Output folder. Default ``'results'``.
-        theme (str):  ``'light'`` or ``'dark'``.
-        n_cols (int): Number of subplot columns. Default 6.
+        filename (str/path): Output filename; if provided, save figure
+        n_cols (int): Number of subplot columns
         row_height (float): Row height in inches. Default 1.5.
-        style (str):  Any ``ss.style()``-compatible style name
-                      (e.g. ``'starsim'``, ``'seaborn-v0_8-whitegrid'``).
+        style (str):  Any ``ss.style()``-compatible style name (e.g. ``'starsim'``, ``'seaborn-v0_8-whitegrid'``).
         show (bool):  Call ``plt.show()`` when done.
 
     Returns:
@@ -48,24 +42,15 @@ def plot(results, select=None, title='', savefig=False, filename='tbsim.png',
         tbsim.plot(msim, select=dict(like='prevalence'))           # substring match
         tbsim.plot(msim, select=dict(regex=r'^n_'))                # regex match
         tbsim.plot(msim, select=['~15+', '~None'])                 # exclude patterns
-        tbsim.plot(msim, theme='dark', style='starsim', n_cols=3)  # appearance
-        tbsim.plot(msim, savefig=True, filename='abc.png')         # save to disk
+        tbsim.plot(msim, style='starsim', n_cols=3)                # appearance
+        tbsim.plot(msim, filename='abc.png')                       # save to disk
         tbsim.get_tb(sim).plot()                                   # via disease object
     """
-    try:
-        flat_results = _normalize_results(results)
-        if not flat_results:
-            sc.printred("No scenarios to plot.")
-            return
-        flat_results = _validate_flat_results(flat_results)
-    except (TypeError, ValueError) as e:
-        sc.printred(f"Cannot plot: {e}")
+    flat_results = _normalize_results(results)
+    if not flat_results:
+        sc.printred("No scenarios to plot.")
         return
-
-    dark = str(theme).lower() == 'dark'
-    fg = '#eaeaea' if dark else '#111'
-    ax_bg = '#2b2b2b' if dark else '#f0f0f0'
-    fig_bg = '#1e1e1e' if dark else '#f7f7f7'
+    flat_results = _validate_flat_results(flat_results)
 
     all_metrics = {m for flat in flat_results.values() for m in flat}
     metrics = _select_metrics(all_metrics, select, flat_results)
@@ -75,16 +60,9 @@ def plot(results, select=None, title='', savefig=False, filename='tbsim.png',
 
     flat_results, _ = _fill_missing_metrics(flat_results, metrics)
 
-    n_cols = max(1, int(n_cols))
-    n_rows = int(np.ceil(len(metrics) / n_cols))
+    n_rows, n_cols  = sc.getrowscols(len(metrics), ncols=n_cols)
 
-    try:
-        style_ctx = ss.style(style)
-    except (ValueError, OSError):
-        sc.printyellow(f"Warning: style '{style}' not found; using default.")
-        style_ctx = ss.style(None)
-
-    with style_ctx:
+    with ss.style(style):
         fig, axs = plt.subplots(n_rows, n_cols, figsize=(4.0 * n_cols, row_height * n_rows + 1))
         axs = np.array(axs).flatten()
 
@@ -97,19 +75,15 @@ def plot(results, select=None, title='', savefig=False, filename='tbsim.png',
                     all_x_min = tmin if all_x_min is None else min(all_x_min, tmin)
                     all_x_max = tmax if all_x_max is None else max(all_x_max, tmax)
 
-        fig.patch.set_facecolor(fig_bg)
         for ax in axs:
-            ax.set_facecolor(ax_bg)
             ax.set_axisbelow(True)
             for spine in ax.spines.values():
                 spine.set_visible(False)
 
-        try:
-            _cm = plt.colormaps.get_cmap('tab10')
-        except (AttributeError, KeyError):
-            _cm = plt.cm.get_cmap('tab10')
-
-        all_handles, all_labels, seen = [], [], set()
+        _cm = plt.colormaps.get_cmap('tab10')
+        all_handles = []
+        all_labels = []
+        seen = set()
 
         for i, metric in enumerate(metrics):
             ax = axs[i]
@@ -133,10 +107,10 @@ def plot(results, select=None, title='', savefig=False, filename='tbsim.png',
                     all_labels.append(scen)
                     seen.add(scen)
 
-            ax.set_title(metric_label, fontsize=10, fontweight='light', color=fg)
-            ax.set_xlabel('Time', fontsize=6, color=fg)
-            ax.tick_params(axis='both', labelsize=6, colors=fg)
-            ax.grid(True, color='white' if dark else 'gray', alpha=0.25, linestyle='--', linewidth=0.2)
+            ax.set_title(metric_label, fontsize=10, fontweight='light')
+            ax.set_xlabel('Time', fontsize=6)
+            ax.tick_params(axis='both', labelsize=6)
+            ax.grid(True, color='gray', alpha=0.25, linestyle='--', linewidth=0.2)
             if all_x_min is not None and all_x_max is not None:
                 ax.set_xlim(all_x_min, all_x_max)
 
@@ -146,18 +120,15 @@ def plot(results, select=None, title='', savefig=False, filename='tbsim.png',
         if all_handles:
             leg = fig.legend(all_handles, all_labels, loc='upper left', fontsize=7, frameon=True, fancybox=True)
             leg.get_frame().set_alpha(0.9)
-            leg.get_frame().set_facecolor(fig_bg)
-            for t in leg.get_texts():
-                t.set_color(fg)
 
         if title:
-            fig.suptitle(title, fontsize=12, color=fg)
+            fig.suptitle(title, fontsize=12)
 
         plt.tight_layout(pad=2.0)
 
-        if savefig:
-            out = _out_path(filename, output_dir)
-            sc.savefig(out, fig=fig)
+        if filename:
+            filepath = sc.makefilepath(filename, makedirs=True)
+            sc.savefig(filepath, fig=fig)
 
         if show:
             plt.show()
@@ -165,7 +136,7 @@ def plot(results, select=None, title='', savefig=False, filename='tbsim.png',
     return fig
 
 
-def _flatten_by_result_name(flat):
+def _rename_results(flat):
     """Re-key a flat result dict using each result's own name, dropping the module prefix."""
     out = {}
     for prefixed_key, result in flat.items():
@@ -181,14 +152,17 @@ def _normalize_results(results):
     results, then re-keys by result name so metrics align across sims that
     use different module class names (e.g. ``TB_LSHTM`` vs ``TB_LSHTM_Acute``).
     """
-    if hasattr(results, 'sims') and results.sims is not None:
-        return {sim.label: _flatten_by_result_name(ss.utils.match_result_keys(sim.results, key=None))
-                for sim in results.sims}
-    if hasattr(results, 'results') and hasattr(results, 'label'):
-        return {results.label: _flatten_by_result_name(ss.utils.match_result_keys(results.results, key=None))}
-    if isinstance(results, dict):
+    if isinstance(results, ss.MultiSim):
+        sims = results.sims
+        return {sim.label: _rename_results(ss.utils.match_result_keys(sim.results, key=None)) for sim in sims}
+    elif isinstance(results, ss.Sim):
+        sim = results
+        return {sim.label: _rename_results(ss.utils.match_result_keys(sim.results, key=None))} # TODO: can probably just be sim.results.flatten()?
+    elif isinstance(results, dict):
         return results
-    raise TypeError(f"results must be MultiSim, Sim, or dict of flat results; got {type(results).__name__}")
+    else:
+        errormsg = f"Results must be MultiSim, Sim, or dict of flat results; got {type(results).__name__}"
+        raise TypeError(errormsg)
 
 
 def _validate_flat_results(flat_results):
@@ -286,7 +260,7 @@ class _ZeroResult:
         self.values = np.asarray(values, dtype=float)
 
 
-def _as_1d_xy(result):
+def _as_1d_xy(result): # TODO: is this needed?
     """Return ``(x, y)`` 1-D arrays from a result object; ``(None, None)`` if invalid."""
     if result is None or not hasattr(result, 'timevec') or not hasattr(result, 'values'):
         return None, None
@@ -315,21 +289,3 @@ def _safe_min_max(x):
         return np.nanmin(a), np.nanmax(a)
     except (TypeError, ValueError):
         return None, None
-
-
-_run_timestamp = None  # shared across all plot() calls in one Python session
-
-
-def _out_path(filename, output_dir):
-    """Return a full output path inside a timestamped run subfolder.
-    """
-    global _run_timestamp
-    if _run_timestamp is None:
-        _run_timestamp = sc.now(dateformat='%Y%m%d_%H%M%S')
-    try:
-        main = sys.modules.get('__main__')
-        script_dir = sc.thispath(main.__file__, aspath=False) if hasattr(main, '__file__') else sc.thispath(aspath=False)
-        output_dir = 'results' if output_dir is None else output_dir
-        return sc.makefilepath(filename, folder=[script_dir, output_dir, _run_timestamp], makedirs=True)
-    except OSError as e:
-        raise OSError(f"Cannot create output path for figure: {e}") from e

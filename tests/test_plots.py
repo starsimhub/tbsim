@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import sciris as sc
 import starsim as ss
 import tbsim
-from tbsim.plots import _flatten_by_result_name
 
 do_plot = False
 
@@ -24,27 +23,20 @@ def make_msim(use_acute=False):
     return msim
 
 
-def make_flat_results(msim):
-    return {
-        sim.label: _flatten_by_result_name(ss.utils.match_result_keys(sim.results, key=None))
-        for sim in msim.sims
-    }
-
-
 def test_plot_accepts_all_input_types():
     """The public API works for Sim, MultiSim, and flat dict inputs."""
     msim = make_msim()
-    flat = make_flat_results(msim)
+    flat = tbsim.plots._normalize_results(msim)
 
-    fig = tbsim.plot(msim.sims[0], savefig=False, n_cols=2, show=do_plot)
+    fig = tbsim.plot(msim.sims[0], n_cols=2, show=do_plot)
     assert fig is not None
     plt.close(fig)
 
-    fig = tbsim.plot(msim, savefig=False, n_cols=3, show=do_plot)
+    fig = tbsim.plot(msim, n_cols=3, show=do_plot)
     assert fig is not None
     plt.close(fig)
 
-    fig = tbsim.plot(flat, savefig=False, n_cols=3, show=do_plot)
+    fig = tbsim.plot(flat, n_cols=3, show=do_plot)
     assert fig is not None
     plt.close(fig)
 
@@ -52,7 +44,7 @@ def test_plot_accepts_all_input_types():
 def test_plot_handles_mixed_tb_modules():
     """TB_LSHTM and TB_LSHTM_Acute results align on shared metrics."""
     msim = make_msim(use_acute=True)
-    fig = tbsim.plot(msim, select=['n_infectious', 'prevalence_active'], savefig=False, n_cols=2, show=do_plot)
+    fig = tbsim.plot(msim, select=['n_infectious', 'prevalence_active'], n_cols=2, show=do_plot)
     assert fig is not None
     titles = {ax.get_title() for ax in fig.axes if ax.get_title()}
     assert any('Infectious' in t or 'infectious' in t for t in titles)
@@ -62,32 +54,13 @@ def test_plot_handles_mixed_tb_modules():
 def test_plot_select_and_fill_missing_metric():
     """A metric missing in one scenario is zero-filled and still plotted."""
     msim = make_msim()
-    flat = make_flat_results(msim)
+    flat = tbsim.plots._normalize_results(msim)
     patched = {label: d.copy() for label, d in flat.items()}
     metric = 'n_infectious'
     patched['Scenario B'].pop(metric, None)
-    fig = tbsim.plot(patched, select=[metric], savefig=False, n_cols=1, show=do_plot)
+    fig = tbsim.plot(patched, select=[metric], n_cols=1, show=do_plot)
     assert fig is not None
     assert len(fig.axes[0].lines) == len(patched)
-    plt.close(fig)
-
-
-def test_plot_saves_and_falls_back_from_bad_style(tmp_path, capsys):
-    """savefig works and an invalid style name falls back to the default."""
-    msim = make_msim()
-    fig = tbsim.plot(
-        msim,
-        select=['n_infectious'],
-        savefig=True,
-        filename='test_out.png',
-        output_dir=str(tmp_path),
-        style='definitely-not-a-style',
-        n_cols=1,
-        show=do_plot,
-    )
-    assert fig is not None
-    assert list(tmp_path.rglob('test_out.png'))  # file lives in a timestamped subfolder
-    assert 'Warning' in capsys.readouterr().out
     plt.close(fig)
 
 
