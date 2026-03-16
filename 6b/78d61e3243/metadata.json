@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "6b78d61e3243",
+  "strategy": "manual-commit",
+  "branch": "remove-tb-emod",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "tbsim/analyzers.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/6b/78d61e3243/0/metadata.json",
+      "transcript": "/6b/78d61e3243/0/full.jsonl",
+      "content_hash": "/6b/78d61e3243/0/content_hash.txt",
+      "prompt": "/6b/78d61e3243/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 34,
+    "cache_creation_tokens": 33038,
+    "cache_read_tokens": 1881203,
+    "output_tokens": 9031,
+    "api_call_count": 28
+  }
+}

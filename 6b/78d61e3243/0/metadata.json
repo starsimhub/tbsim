@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "6b78d61e3243",
+  "session_id": "23003509-abee-420f-b571-9789815db49c",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-16T02:50:42.933451994Z",
+  "branch": "remove-tb-emod",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "tbsim/analyzers.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "c94516dfc608",
+  "checkpoint_transcript_start": 56,
+  "transcript_lines_at_start": 56,
+  "token_usage": {
+    "input_tokens": 34,
+    "cache_creation_tokens": 33038,
+    "cache_read_tokens": 1881203,
+    "output_tokens": 9031,
+    "api_call_count": 28
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-16T02:50:42.72553803Z",
+    "agent_lines": 6,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 6,
+    "agent_percentage": 100
+  }
+}
