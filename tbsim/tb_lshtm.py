@@ -696,7 +696,7 @@ class choice2d(ss.choice):
                 errormsg = f'Must supply p as a 2D array of probabilities'
                 raise ValueError(errormsg)
             a = np.arange(p.shape[1])
-        ss.distributions.Dist.__init__(self, distname='choice2d', a=a, p=p, replace=replace, **kwargs)
+        ss.Dist.__init__(self, distname='choice2d', a=a, p=p, replace=replace, **kwargs)
         self._use_ppf = True # Always use array parameters
         return
 
