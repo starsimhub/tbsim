@@ -1,5 +1,7 @@
 """Intervention that modifies the TB transmission rate (beta) at specified time points."""
 
+import numpy as np
+import sciris as sc
 import starsim as ss
 import tbsim
 
@@ -32,7 +34,6 @@ class BetaByYear(ss.Intervention):
         x_beta (float or list): Multiplicative factor(s) to apply to the current beta value.
             - If a single value, it is applied to all years.
             - If a list, it must be the same length as years, and each value is applied to the corresponding year.
-        applied_years (set): (Deprecated) No longer used; interventions are now removed after application.
 
     Behavior:
         - Each (year, x_beta) pair is applied only once. After application, both are removed from their lists.
@@ -73,36 +74,37 @@ class BetaByYear(ss.Intervention):
         """
         super().__init__()
         self.define_pars(
-            years = [2000],  # Default year to apply intervention
+            years = 2000,  # Default year to apply intervention
             x_beta = 1,      # Default multiplier (no change)
         )
         self.update_pars(pars, **kwargs)
-        self.applied_years = set()  # (Deprecated, kept for backward compatibility)
+        p = self.pars  # For convenience
+        p.years = sc.tolist(p.years)
 
-        if isinstance(self.pars['x_beta'], (list, tuple)):
-            if len(self.pars['x_beta']) != len(self.pars['years']):
+        if isinstance(p.x_beta, (list, tuple)):
+            if len(p.x_beta) != len(p.years):
                 raise ValueError("If x_beta is a list, it must be the same length as years.")
-            self._x_beta_list = list(self.pars['x_beta'])
+            self._x_beta_list = list(p.x_beta)
         else:
-            self._x_beta_list = [self.pars['x_beta']] * len(self.pars['years'])
+            self._x_beta_list = [p.x_beta] * len(p.years)
         return
 
     def step(self):
         """
         Execute the intervention step, applying beta modifications at specified years.
         """
+        p = self.pars # For convenience
         year = int(self.sim.t.now('year'))
-        if len(self.pars.years)>0:
-            target_year = self.pars.years[0]
+        if len(p.years) > 0:
+            target_year = p.years[0]
             x_beta = self._x_beta_list[0]
             
             # Apply intervention only when we first reach the target year
             # This ensures it's applied only once, not repeatedly
-            if year == target_year:
-                tbsim.get_tb(self.sim).pars['beta'] *= x_beta
-                print(f"At year:{year}, Modified BetaValue:{x_beta}")
+            if np.isclose(year, target_year):
+                tbsim.get_tb(self.sim).pars.beta *= x_beta
                 # Always remove the year and x_beta after application
-                self.pars.years.pop(0)
+                p.years.pop(0)
                 self._x_beta_list.pop(0)
                 # Do not increment idx, as lists have shifted
         return

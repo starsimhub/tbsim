@@ -145,6 +145,24 @@ class Sim(ss.Sim):
         """
         return tbsim.get_tb(self, which=which)
 
+    def get_dx(self, name=None, result_state=None):
+        """Get a DxDelivery instance. Returns None if not found."""
+        for intv in self.interventions.values():
+            if isinstance(intv, tbsim.DxDelivery):
+                if name is not None and intv.name != name:
+                    continue
+                if result_state is not None and intv.result_state != result_state:
+                    continue
+                return intv
+        return None
+
+    def get_hsb(self):
+        """Get the HealthSeekingBehavior instance. Returns None if not found."""
+        for intv in self.interventions.values():
+            if isinstance(intv, tbsim.HealthSeekingBehavior):
+                return intv
+        return None
+
     def plot(self, key=None, **kwargs):
         """
         Plot sim results. If key is 'tb', shows a curated panel of TB results.

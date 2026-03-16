@@ -1,20 +1,20 @@
 """Tests for the DxDelivery diagnostic intervention."""
 
 import numpy as np
+import sciris as sc
 import starsim as ss
 import tbsim
 from tbsim import TBSL
 
 
-def make_sim(n_agents=1000, interventions=None):
+def make_sim(n_agents=1000, interventions=None, **kwargs):
     """Create and return a tbsim.Sim with HSB and optional interventions."""
-    hsb = tbsim.HealthSeekingBehavior()
-    all_interventions = [hsb] + (interventions or [])
     sim = tbsim.Sim(
         n_agents=n_agents,
-        interventions=all_interventions,
-        sim_pars=dict(start=ss.date('2000-01-01'), stop=ss.date('2005-12-31'), rand_seed=42),
+        interventions=interventions,
+        sim_pars=dict(start=ss.date('2000-01-01'), stop=ss.date('2005-12-31')),
         tb_pars=dict(init_prev=0.30),
+        **kwargs
     )
     return sim
 
@@ -22,7 +22,7 @@ def make_sim(n_agents=1000, interventions=None):
 def test_dx_delivery_runs():
     """DxDelivery completes a full run with HealthSeekingBehavior."""
     dx = tbsim.DxDelivery(product=tbsim.Xpert())
-    sim = make_sim(interventions=[dx])
+    sim = make_sim(interventions=dx)
     sim.run()
 
     assert sim.results.dxdelivery.n_tested.sum() > 0
@@ -32,26 +32,26 @@ def test_dx_delivery_runs():
 def test_dx_delivery_diagnoses_agents():
     """DxDelivery sets diagnosed=True for positive results."""
     dx = tbsim.DxDelivery(product=tbsim.Xpert())
-    sim = make_sim(n_agents=1000, interventions=[dx])
+    sim = make_sim(n_agents=1000, interventions=dx)
     sim.run()
 
-    n_diagnosed = sim.people.diagnosed.count()
+    n_diagnosed = sim.people.dxdelivery.diagnosed.count()
     assert n_diagnosed > 0
 
 
 def test_dx_delivery_custom_result_state():
     """DxDelivery with custom result_state auto-registers and sets that state."""
     dx = tbsim.DxDelivery(product=tbsim.Xpert(), result_state='screen_positive')
-    sim = make_sim(interventions=[dx])
+    sim = make_sim(interventions=dx)
     sim.run()
 
-    assert 'screen_positive' in sim.people.states
-    n_screen_pos = sim.people.screen_positive.count()
+    n_screen_pos = sim.people.dxdelivery.screen_positive.count()
     assert n_screen_pos > 0
 
 
 def test_dx_delivery_cascade():
-    """Two DxDelivery steps can be chained: screen -> confirm."""
+    """Three DxDelivery steps can be chained: screen -> confirm."""
+    hsb = tbsim.HealthSeekingBehavior()
     screen = tbsim.DxDelivery(
         name='screen',
         product=tbsim.CAD(),
@@ -62,10 +62,10 @@ def test_dx_delivery_cascade():
         name='confirm',
         product=tbsim.Xpert(),
         coverage=0.8,
-        eligibility=lambda sim: sim.people.screen_positive.uids,
+        eligibility=lambda sim: sim.people.screen.screen_positive.uids,
         result_state='diagnosed',
     )
-    sim = make_sim(n_agents=1000, interventions=[screen, confirm])
+    sim = make_sim(n_agents=1000, interventions=[hsb, screen, confirm])
     sim.run()
 
     assert sim.results.screen.n_tested.sum() > 0
@@ -75,12 +75,12 @@ def test_dx_delivery_cascade():
 def test_dx_delivery_coverage():
     """DxDelivery with coverage < 1.0 tests fewer agents."""
     dx_full = tbsim.DxDelivery(product=tbsim.Xpert(), coverage=1.0)
-    sim_full = make_sim(n_agents=1000, interventions=[dx_full])
+    sim_full = make_sim(n_agents=1000, interventions=dx_full)
     sim_full.run()
     n_full = sim_full.results.dxdelivery.n_tested.sum()
 
     dx_half = tbsim.DxDelivery(product=tbsim.Xpert(), coverage=0.5)
-    sim_half = make_sim(n_agents=1000, interventions=[dx_half])
+    sim_half = make_sim(n_agents=1000, interventions=dx_half)
     sim_half.run()
     n_half = sim_half.results.dxdelivery.n_tested.sum()
 
@@ -111,7 +111,7 @@ def test_beta_intervention_changes_beta():
         people=pop,
         networks=net,
         diseases=tb,
-        interventions=[beta_intv],
+        interventions=beta_intv,
         pars=sim_pars,
     )
     sim.init()
@@ -144,8 +144,8 @@ def test_beta_intervention_with_acute():
     tb = tbsim.TB_LSHTM_Acute(pars=tb_pars)
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
-    beta_intv = tbsim.BetaByYear(pars={'years': [intervention_year], 'x_beta': x_beta})
-    sim = ss.Sim(people=pop, networks=net, diseases=tb, interventions=[beta_intv], pars=sim_pars)
+    beta_intv = tbsim.BetaByYear(pars={'years': intervention_year, 'x_beta': x_beta})
+    sim = ss.Sim(people=pop, networks=net, diseases=tb, interventions=beta_intv, pars=sim_pars)
     sim.init()
 
     while sim.t.now('year') < intervention_year:
@@ -169,7 +169,7 @@ def test_beta_multiple_years():
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     beta_intv = tbsim.BetaByYear(pars={'years': years, 'x_beta': x_betas})
-    sim = ss.Sim(people=pop, networks=net, diseases=tb, interventions=[beta_intv],
+    sim = ss.Sim(people=pop, networks=net, diseases=tb, interventions=beta_intv,
                  pars=dict(start='2001-01-01', stop='2007-01-01', dt=ss.days(7), rand_seed=42))
     sim.init()
 
