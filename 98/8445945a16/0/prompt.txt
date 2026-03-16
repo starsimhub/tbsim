@@ -1,0 +1,2 @@
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/tbsim/interventions/treatments.py in the IDE. This may or may not be related to the current task.</ide_opened_file>
+can you remove references to TB_LSHTM.start_treatment() in the tests? either remove the test entirely if irrelevant, or else use TxDelivery.start_treatment(), as appropriate

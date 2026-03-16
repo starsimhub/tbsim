@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "988445945a16",
+  "session_id": "cd6804d8-8e2d-47c8-abf1-b2a74d6b4383",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-16T02:29:55.415837153Z",
+  "branch": "remove-tb-start-treatment",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "tbsim/interventions/treatments.py",
+    "tbsim/tb_lshtm.py",
+    "tests/test_tb_lshtm.py",
+    "tests/test_tx_delivery.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "079365713bf2",
+  "token_usage": {
+    "input_tokens": 23,
+    "cache_creation_tokens": 42382,
+    "cache_read_tokens": 681346,
+    "output_tokens": 6821,
+    "api_call_count": 21
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-16T02:29:55.351201603Z",
+    "agent_lines": 136,
+    "human_added": 1,
+    "human_modified": 1,
+    "human_removed": 0,
+    "total_committed": 138,
+    "agent_percentage": 98.55072463768117
+  }
+}
