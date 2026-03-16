@@ -27,21 +27,21 @@ class Xpert(Dx):
 
     columns = 'state,result,probability,age_min,age_max'.split(',')
     default_data = [
-        #state                result      prob   min max
+        #state                result      prob   min  max
         # Adults (15+)
-        [TBSL.SYMPTOMATIC,    'positive', 0.909, 15, np.inf],
-        [TBSL.SYMPTOMATIC,    'negative', 0.091, 15, np.inf],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.775, 15, np.inf],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.225, 15, np.inf],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.775, 15, np.inf],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.225, 15, np.inf],
+        [TBSL.SYMPTOMATIC,    'positive', 0.909, 15,  99],
+        [TBSL.SYMPTOMATIC,    'negative', 0.091, 15,  99],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.775, 15,  99],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.225, 15,  99],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.775, 15,  99],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.225, 15,  99],
         # Children (<15)
-        [TBSL.SYMPTOMATIC,    'positive', 0.73,  0,  15],
-        [TBSL.SYMPTOMATIC,    'negative', 0.27,  0,  15],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.73,  0,  15],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.27,  0,  15],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.73,  0,  15],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.27,  0,  15],
+        [TBSL.SYMPTOMATIC,    'positive', 0.73,   0,  15],
+        [TBSL.SYMPTOMATIC,    'negative', 0.27,   0,  15],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.73,   0,  15],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.27,   0,  15],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.73,   0,  15],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.27,   0,  15],
     ]
 
     def __init__(self, df=None, datafile=None, **kwargs):
@@ -54,21 +54,21 @@ class OralSwab(Dx):
 
     columns = 'state,result,probability,age_min,age_max'.split(',')
     default_data = [
-        #state                result      prob  min max
+        #state                result      prob  min  max
         # Adults (15+)
-        [TBSL.SYMPTOMATIC,    'positive', 0.80, 15, np.inf],
-        [TBSL.SYMPTOMATIC,    'negative', 0.20, 15, np.inf],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.30, 15, np.inf],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.70, 15, np.inf],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.30, 15, np.inf],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.70, 15, np.inf],
+        [TBSL.SYMPTOMATIC,    'positive', 0.80, 15,  99],
+        [TBSL.SYMPTOMATIC,    'negative', 0.20, 15,  99],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.30, 15,  99],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.70, 15,  99],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.30, 15,  99],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.70, 15,  99],
         # Children (<15)
-        [TBSL.SYMPTOMATIC,    'positive', 0.25, 0,  15],
-        [TBSL.SYMPTOMATIC,    'negative', 0.75, 0,  15],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.25, 0,  15],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.75, 0,  15],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.25, 0,  15],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.75, 0,  15],
+        [TBSL.SYMPTOMATIC,    'positive', 0.25,  0,  15],
+        [TBSL.SYMPTOMATIC,    'negative', 0.75,  0,  15],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.25,  0,  15],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.75,  0,  15],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.25,  0,  15],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.75,  0,  15],
     ]
 
     def __init__(self, df=None, datafile=None, **kwargs):
@@ -81,35 +81,35 @@ class FujiLAM(Dx):
 
     columns = 'state,result,probability,age_min,age_max,hiv'.split(',')
     default_data = [
-        #state                result      prob   min max      hiv
+        #state                result      prob   min  max  hiv
         # HIV+, adults
-        [TBSL.SYMPTOMATIC,    'positive', 0.75,  15, np.inf, True],
-        [TBSL.SYMPTOMATIC,    'negative', 0.25,  15, np.inf, True],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.75,  15, np.inf, True],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.25,  15, np.inf, True],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.75,  15, np.inf, True],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.25,  15, np.inf, True],
+        [TBSL.SYMPTOMATIC,    'positive', 0.75,  15,  99,  True],
+        [TBSL.SYMPTOMATIC,    'negative', 0.25,  15,  99,  True],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.75,  15,  99,  True],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.25,  15,  99,  True],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.75,  15,  99,  True],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.25,  15,  99,  True],
         # HIV-, adults
-        [TBSL.SYMPTOMATIC,    'positive', 0.58,  15, np.inf, False],
-        [TBSL.SYMPTOMATIC,    'negative', 0.42,  15, np.inf, False],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.58,  15, np.inf, False],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.42,  15, np.inf, False],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.58,  15, np.inf, False],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.42,  15, np.inf, False],
+        [TBSL.SYMPTOMATIC,    'positive', 0.58,  15,  99,  False],
+        [TBSL.SYMPTOMATIC,    'negative', 0.42,  15,  99,  False],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.58,  15,  99,  False],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.42,  15,  99,  False],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.58,  15,  99,  False],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.42,  15,  99,  False],
         # HIV+, children
-        [TBSL.SYMPTOMATIC,    'positive', 0.579, 0,  15,     True],
-        [TBSL.SYMPTOMATIC,    'negative', 0.421, 0,  15,     True],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.579, 0,  15,     True],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.421, 0,  15,     True],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.579, 0,  15,     True],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.421, 0,  15,     True],
+        [TBSL.SYMPTOMATIC,    'positive', 0.579,  0,  15,  True],
+        [TBSL.SYMPTOMATIC,    'negative', 0.421,  0,  15,  True],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.579,  0,  15,  True],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.421,  0,  15,  True],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.579,  0,  15,  True],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.421,  0,  15,  True],
         # HIV-, children
-        [TBSL.SYMPTOMATIC,    'positive', 0.51,  0,  15,     False],
-        [TBSL.SYMPTOMATIC,    'negative', 0.49,  0,  15,     False],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.51,  0,  15,     False],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.49,  0,  15,     False],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.51,  0,  15,     False],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.49,  0,  15,     False],
+        [TBSL.SYMPTOMATIC,    'positive', 0.51,   0,  15,  False],
+        [TBSL.SYMPTOMATIC,    'negative', 0.49,   0,  15,  False],
+        [TBSL.ASYMPTOMATIC,   'positive', 0.51,   0,  15,  False],
+        [TBSL.ASYMPTOMATIC,   'negative', 0.49,   0,  15,  False],
+        [TBSL.NON_INFECTIOUS, 'positive', 0.51,   0,  15,  False],
+        [TBSL.NON_INFECTIOUS, 'negative', 0.49,   0,  15,  False],
     ]
 
     def __init__(self, df=None, datafile=None, **kwargs):
