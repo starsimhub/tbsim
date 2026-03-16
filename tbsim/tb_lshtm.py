@@ -56,7 +56,7 @@ class TB_LSHTM(BaseTB):
     `pars.trans_asymp` (kappa) giving the relative infectiousness of asymptomatic vs symptomatic TB.
     Reinfectable state (`TBSL.CLEARED`) uses per-agent `rr_reinfection`, set on entry from each
     pathway (`rr_reinfection_cleared`, `rr_reinfection_rec`, `rr_reinfection_treat`). Per-agent modifiers
-    ``rr_activation``, ``rr_clearance``, ``rr_death`` scale selected rates. Interventions call `start_treatment`.
+    ``rr_activation``, ``rr_clearance``, ``rr_death`` scale selected rates.
 
     Args (pars):
         *Transmission and reinfection*
@@ -401,38 +401,6 @@ class TB_LSHTM(BaseTB):
 
         return
 
-    def start_treatment(self, uids):
-        """
-        Move specified agents onto TB treatment (or clear latent infection).
-
-        Called by interventions (e.g. screening/case-finding) when an agent is
-        identified for treatment. State is changed immediately.
-
-        - Latent (INFECTION): cleared without treatment (→ CLEARED).
-        - Active (NON_INFECTIOUS, ASYMPTOMATIC, SYMPTOMATIC): moved to TREATMENT.
-        - Records new notifications (15+) for active cases starting treatment.
-        """
-        if len(uids) == 0:
-            return
-
-        # Latent infection: clear without active disease
-        latent = uids[self.state[uids] == TBSL.INFECTION]
-        self.state[latent] = TBSL.CLEARED
-        self.rr_reinfection[latent] = self.pars.rr_reinfection_cleared
-        if self.pars.dur_reinfection_protection is not None and len(latent):
-            self.ti_rr_reinfection_wane[latent] = self.ti + self.pars.dur_reinfection_protection.rvs(latent)
-        self.infected[latent] = False
-        self.susceptible[latent] = True
-
-        # Active TB: put on treatment
-        active = uids[np.isin(self.state[uids], [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC])]
-        self.state[active] = TBSL.TREATMENT
-        self.on_treatment[active] = True
-
-        self.results['new_notifications_15+'][self.ti] += np.count_nonzero(self.sim.people.age[active] >= 15)
-
-        return
-
     def step_die(self, uids):
         """
         Apply death for the given agents and update TB state.
@@ -671,29 +639,6 @@ class TB_LSHTM_Acute(TB_LSHTM):
         self.rel_trans[:] = 1
         self.rel_trans[self.state == TBSL.ACUTE] = self.pars.trans_acute
         self.rel_trans[self.state == TBSL.ASYMPTOMATIC] = self.pars.trans_asymp
-
-        return
-
-    def start_treatment(self, uids):
-        """ACUTE or INFECTION -> CLEARED; active -> TREATMENT."""
-        if len(uids) == 0:
-            return
-
-        # ACUTE or INFECTION: clear
-        latent = uids[(self.state[uids] == TBSL.ACUTE) | (self.state[uids] == TBSL.INFECTION)]
-        self.state[latent] = TBSL.CLEARED
-        self.rr_reinfection[latent] = self.pars.rr_reinfection_cleared
-        if self.pars.dur_reinfection_protection is not None and len(latent):
-            self.ti_rr_reinfection_wane[latent] = self.ti + self.pars.dur_reinfection_protection.rvs(latent)
-        self.infected[latent] = False
-        self.susceptible[latent] = True
-
-        # Active TB: put on treatment
-        active = uids[np.isin(self.state[uids], [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC])]
-        self.state[active] = TBSL.TREATMENT
-        self.on_treatment[active] = True
-
-        self.results['new_notifications_15+'][self.ti] += np.count_nonzero(self.sim.people.age[active] >= 15)
 
         return
 

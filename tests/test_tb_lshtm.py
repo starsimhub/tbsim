@@ -117,54 +117,6 @@ def test_step_die_empty_uids():
     tb.step_die(np.array([], dtype=int))
 
 
-# --- start_treatment ---
-
-def test_start_treatment_latent_cleared():
-    """start_treatment on INFECTION (latent) sets state to CLEARED immediately."""
-    sim = make_lshtm_sim(n_agents=50)
-    sim.init()
-    tb = tbsim.get_tb(sim)
-    uids = ss.uids([1, 2, 3])
-    tb.state[uids] = TBSL.INFECTION
-    tb.start_treatment(uids)
-    assert np.all(tb.state[uids] == TBSL.CLEARED)
-    assert not tb.infected[uids].any()
-    assert tb.susceptible[uids].all()
-
-
-def test_start_treatment_active_to_treatment():
-    """start_treatment on NON_INFECTIOUS/ASYMPTOMATIC/SYMPTOMATIC sets state to TREATMENT."""
-    sim = make_lshtm_sim(n_agents=50)
-    sim.init()
-    tb = tbsim.get_tb(sim)
-    for state in [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC]:
-        uids = ss.uids([0])
-        tb.state[uids] = state
-        tb.start_treatment(uids)
-        assert np.all(tb.state[uids] == TBSL.TREATMENT)
-        assert tb.on_treatment[uids].all()
-
-
-def test_start_treatment_empty_uids():
-    """start_treatment with empty uids does not raise."""
-    sim = make_lshtm_sim(n_agents=10)
-    sim.init()
-    tb = tbsim.get_tb(sim)
-    tb.start_treatment(np.array([], dtype=int))
-
-
-def test_start_treatment_acute_latent_cleared():
-    """TB_LSHTM_Acute: start_treatment on ACUTE or INFECTION sets state to CLEARED."""
-    sim = make_lshtm_sim(n_agents=20, use_acute=True)
-    sim.init()
-    tb = tbsim.get_tb(sim)
-    tb.state[ss.uids([0])] = TBSL.ACUTE
-    tb.state[ss.uids([1])] = TBSL.INFECTION
-    tb.start_treatment(ss.uids([0, 1]))
-    assert tb.state[0] == TBSL.CLEARED
-    assert tb.state[1] == TBSL.CLEARED
-
-
 # --- Sim run and results ---
 
 def test_sim_run_tb_lshtm():
@@ -335,20 +287,6 @@ def test_rel_sus_rel_trans_after_step():
         assert np.allclose(tb.rel_sus[cleared_uids], tb.rr_reinfection[cleared_uids])
     if len(asymp_uids) > 0:
         assert np.allclose(tb.rel_trans[asymp_uids], tb.pars.trans_asymp)
-
-
-def test_start_treatment_mixed_latent_active_ignores_cleared():
-    """start_treatment with mix of INFECTION, SYMPTOMATIC, CLEARED: only INFECTION and SYMPTOMATIC are changed."""
-    sim = make_lshtm_sim(n_agents=50)
-    sim.init()
-    tb = tbsim.get_tb(sim)
-    tb.state[ss.uids([0])] = TBSL.INFECTION
-    tb.state[ss.uids([1])] = TBSL.SYMPTOMATIC
-    tb.state[ss.uids([2])] = TBSL.CLEARED
-    tb.start_treatment(ss.uids([0, 1, 2]))
-    assert tb.state[0] == TBSL.CLEARED  # INFECTION → CLEARED
-    assert tb.state[1] == TBSL.TREATMENT  # SYMPTOMATIC → TREATMENT
-    assert tb.state[2] == TBSL.CLEARED  # CLEARED stays CLEARED (not affected)
 
 
 def test_transition_single_destination():
