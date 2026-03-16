@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "5dcf7be07c97",
+  "session_id": "2f59818e-eac4-49a7-933b-9f0e2bd81c8b",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-16T02:38:53.413297582Z",
+  "branch": "remove-tb-emod",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CLAUDE.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "c28166c8d697",
+  "token_usage": {
+    "input_tokens": 8,
+    "cache_creation_tokens": 30853,
+    "cache_read_tokens": 134470,
+    "output_tokens": 2218,
+    "api_call_count": 6
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-16T02:38:53.390666856Z",
+    "agent_lines": 70,
+    "human_added": 874,
+    "human_modified": 11,
+    "human_removed": 0,
+    "total_committed": 955,
+    "agent_percentage": 7.329842931937172
+  }
+}
