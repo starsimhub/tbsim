@@ -321,13 +321,13 @@ class SimpleImmigration(ss.Demographics):
             # 90% susceptible, 5% latent slow, 3% latent fast, 2% active
             rand = np.random.random()
             if rand < 0.90:
-                tb.state[uid] = tbsim.TBS.NONE  # Susceptible
+                tb.state[uid] = tbsim.TBSL.SUSCEPTIBLE
             elif rand < 0.95:
-                tb.state[uid] = tbsim.TBS.LATENT_SLOW
+                tb.state[uid] = tbsim.TBSL.INFECTION
             elif rand < 0.98:
-                tb.state[uid] = tbsim.TBS.LATENT_FAST
+                tb.state[uid] = tbsim.TBSL.NON_INFECTIOUS
             else:
-                tb.state[uid] = tbsim.TBS.ACTIVE_PRESYMP
+                tb.state[uid] = tbsim.TBSL.ASYMPTOMATIC
         
         # Assign to households
         self.assign_to_households(new_uids)

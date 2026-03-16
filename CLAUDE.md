@@ -19,10 +19,10 @@ pip install -e .[dev]
 cd tests && bash run_tests
 
 # Run a single test file
-pytest tests/test_basics.py
+pytest tests/test_tb_lshtm.py
 
 # Run a single test function
-pytest tests/test_basics.py::test_something -v
+pytest tests/test_tb_lshtm.py::test_something -v
 
 # Run tests in parallel
 pytest tests/test_*.py -n auto
@@ -34,14 +34,13 @@ mkdocs build  # build static site
 
 ## Architecture
 
-### Core Disease Models
+### Core Disease Model
 
-Two TB natural history models exist in `tbsim/`:
+The TB natural history model lives in `tbsim/`:
 
-- **TB_LSHTM** ([tb_lshtm.py](tbsim/tb_lshtm.py)) — Current/primary model. LSHTM "spectrum of disease" approach with states: SUSCEPTIBLE → INFECTION → NON_INFECTIOUS → ASYMPTOMATIC → SYMPTOMATIC → TREATMENT (or CLEARED/DEAD). State enum is `TBSL`. Variant `TB_LSHTM_Acute` adds an ACUTE state post-exposure.
-- **TB_EMOD** ([tb_emod.py](tbsim/tb_emod.py)) — Legacy model with fast/slow latency. State enum is `TBS`. Deprecated but still importable.
+- **TB_LSHTM** ([tb_lshtm.py](tbsim/tb_lshtm.py)) — LSHTM "spectrum of disease" approach with states: SUSCEPTIBLE → INFECTION → NON_INFECTIOUS → ASYMPTOMATIC → SYMPTOMATIC → TREATMENT (or CLEARED/DEAD). State enum is `TBSL`. Variant `TB_LSHTM_Acute` adds an ACUTE state post-exposure.
 
-Both extend `ss.Disease` from Starsim.
+Extends `ss.Disease` from Starsim.
 
 ### Sim Wrapper
 

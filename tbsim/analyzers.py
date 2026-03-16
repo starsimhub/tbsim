@@ -41,7 +41,7 @@ class DwellTime(ss.Analyzer):
         file_path (str, optional):             Path to a single CSV file with dwell-time data.
         directory (str, optional):             Directory containing CSV result files for aggregation.
         prefix (str, optional):                File prefix filter used with *directory*.
-        states_ennumerator (IntEnum, optional): State enumeration class (default ``tbsim.TBS``).
+        states_ennumerator (IntEnum, optional): State enumeration class (default ``tbsim.TBSL``).
         scenario_name (str, optional):         Label for the simulation scenario.
         debug (bool, optional):                Enable verbose output.
 
@@ -61,7 +61,7 @@ class DwellTime(ss.Analyzer):
 
         During simulation::
 
-            sim = ss.Sim(diseases=[TB_EMOD()], analyzers=DwellTime(scenario_name="Baseline"))
+            sim = ss.Sim(diseases=[TB_LSHTM()], analyzers=DwellTime(scenario_name="Baseline"))
             sim.run()
             sim.analyzers[0].plot('validation')
     """
@@ -71,7 +71,7 @@ class DwellTime(ss.Analyzer):
         """Auto-detect mode (plotter, aggregate, or analyzer) from the supplied arguments."""
         self.debug = debug
         self.scenario_name = scenario_name
-        self.eSTATES = states_ennumerator or tbsim.TBS
+        self.eSTATES = states_ennumerator or tbsim.TBSL
         self.file_path = file_path
 
         if isinstance(data, pd.DataFrame):

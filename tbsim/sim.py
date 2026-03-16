@@ -22,7 +22,7 @@ class Sim(ss.Sim):
         sim_pars (dict): Explicit sim-level parameter overrides.
         tb_pars (dict): Explicit TB parameter overrides.
         tb_model (str/Disease): Which TB model to use. Options: 'lshtm' (default),
-            'lshtm_acute', 'emod', or a pre-built Disease instance.
+            'lshtm_acute', or a pre-built Disease instance.
         location (str): Placeholder for future location-based data.
         **kwargs: Additional parameters (auto-routed like ``pars``).
 
@@ -50,7 +50,6 @@ class Sim(ss.Sim):
     _tb_models = {
         'lshtm':       'TB_LSHTM',
         'lshtm_acute': 'TB_LSHTM_Acute',
-        'emod':        'TB_EMOD',
     }
 
     def __init__(self, pars=None, sim_pars=None, tb_pars=None, tb_model=None,
