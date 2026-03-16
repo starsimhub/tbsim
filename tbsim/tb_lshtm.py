@@ -4,11 +4,10 @@ from enum import IntEnum
 
 import numpy as np
 import starsim as ss
-
 from .plots import plot as _tbsim_plot
 
 
-__all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL', 'get_tb']
+__all__ = ['TB_LSHTM', 'TB_LSHTM_Acute', 'TBSL', 'get_tb', 'choice2d']
 
 
 class TBSL(IntEnum):
@@ -656,3 +655,55 @@ def get_tb(sim, which=None): # TODO: Create tbsim.Sim and move this to sim.get_t
         if isinstance(disease, which):
             return disease
     raise ValueError("No TB module found in sim.diseases")
+
+class choice2d(ss.choice):
+    """ 
+    Version of ss.choice() allowing different per-agent probabilities.
+
+    Temporary location; to be ported to Starsim and potentially merged
+    with ss.choice().
+
+    Args:
+        a (1D array): the values to choose from (default: np.arange(p.shape[1]))
+        p (2D array): the probability of each choice for each agent
+
+    **Example**:
+        # Choose between specified options each with a specified probability (must sum to 1)
+        p = np.array([ # Per-agent array of outcome probabilities across 3 options
+            [0.1, 0.5, 0.4],
+            [0.2, 0.3, 0.5],
+            [0.3, 0.4, 0.3],
+            [0.4, 0.2, 0.4],
+            [0.5, 0.3, 0.2],
+            [0.8, 0.1, 0.1],
+        ])
+        n = len(p)
+        choices = tbsim.choice2d(p=p, strict=False)(n)
+    """
+    valid_pars = ['a', 'p', 'replace', 'dtype']
+    scaling = ss.distributions.scale_types.false
+
+    def __init__(self, a=None, p=None, replace=True, **kwargs):
+        if p is None and a is not None:
+            if np.ndim(a) == 2:
+                p = a # Swap, to allow calling choice2d(p) directly
+                a = np.arange(p.shape[1])
+            else:
+                errormsg = f'Must supply p as a 2D array of probabilities (n_agents x n_choices); got a={a} (shape {np.shape(a)})'
+                raise ValueError(errormsg)
+        if a is None:
+            if p is None or np.ndim(p) != 2:
+                errormsg = f'Must supply p as a 2D array of probabilities'
+                raise ValueError(errormsg)
+            a = np.arange(p.shape[1])
+        ss.Dist.__init__(self, distname='choice2d', a=a, p=p, replace=replace, **kwargs)
+        self._use_ppf = True # Always use array parameters
+        return
+
+    def ppf(self, rands):
+        """ Always use ppf to allow per-agent probabilities """
+        pars = self._pars
+        pcum = np.cumsum(pars.p, axis=1) # Sum probabilities to equal one
+        inds = (rands[:, np.newaxis] >= pcum).sum(axis=1) # 2D equivalent of np.searchsorted
+        rvs = pars.a[inds] # Map to outcomes
+        return rvs
