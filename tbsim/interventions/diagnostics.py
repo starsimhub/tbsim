@@ -48,6 +48,7 @@ class Xpert(Dx):
     def __init__(self, df=None, datafile=None, **kwargs):
         df = self._load_data(df, datafile, self.columns, self.default_data)
         super().__init__(df=df, hierarchy=['positive', 'negative'], **kwargs)
+        return
 
 
 class OralSwab(Dx):
@@ -75,6 +76,7 @@ class OralSwab(Dx):
     def __init__(self, df=None, datafile=None, **kwargs):
         df = self._load_data(df, datafile, self.columns, self.default_data)
         super().__init__(df=df, hierarchy=['positive', 'negative'], **kwargs)
+        return
 
 
 class FujiLAM(Dx):
@@ -116,6 +118,7 @@ class FujiLAM(Dx):
     def __init__(self, df=None, datafile=None, **kwargs):
         df = self._load_data(df, datafile, self.columns, self.default_data)
         super().__init__(df=df, hierarchy=['positive', 'negative'], **kwargs)
+        return
 
 
 class CAD(Dx):
@@ -135,6 +138,7 @@ class CAD(Dx):
     def __init__(self, df=None, datafile=None, **kwargs):
         df = self._load_data(df, datafile, self.columns, self.default_data)
         super().__init__(df=df, hierarchy=['positive', 'negative'], **kwargs)
+        return
 
 
 class DxDelivery(ss.Intervention):
