@@ -4,7 +4,8 @@ import numpy as np
 import starsim as ss
 import tbsim
 from tbsim import TBSL
-__all__ = ['drug_params', 'Tx', 'DOTS', 'DOTSImproved', 'FirstLine', 'SecondLine', 'TxDelivery']
+
+__all__ = ['drug_params', 'Tx', 'TxMulti', 'DOTS', 'DOTSImproved', 'FirstLine', 'SecondLine', 'TxDelivery']
 
 # Drug parameters keyed by drug type name.
 # Each entry maps to a dict of clinical parameters.
@@ -52,32 +53,19 @@ class Tx(ss.Product):
         return {'success': success_uids, 'failure': failure_uids}
 
 
-class TxMulti(ss.Product):
+class TxMulti(tbsim.ProductMulti):
     """
     TB treatment product that supports more than one outcome (e.g. success, failure, partial).
 
+    Uses a DataFrame of state-to-outcome probabilities, just like Dx.
+    See ProductMulti for full details on the df format.
+
     Args:
-        data: Outcome data by agent category; see tbsim.Dx for details
+        df: DataFrame with required columns (state, result, probability) and
+            optional filter columns (age_min, age_max, hiv).
+        hierarchy: List of result strings in priority order, e.g. ['success', 'failure'].
     """
-    def __init__(self, data, **kwargs):
-        super().__init__()
-        self.data = data
-
-        self.define_pars(
-            p_success = ss.bernoulli(self.efficacy)
-        )
-        self.update_pars(**kwargs)
-        return
-
-    def administer(self, sim, uids):
-        """
-        Administer treatment to agents.
-
-        Returns:
-            dict with 'success' and 'failure' UIDs.
-        """
-        success_uids, failure_uids = self.pars.p_success.filter(uids, both=True)
-        return {'success': success_uids, 'failure': failure_uids}
+    pass
 
 
 class DOTS(Tx):
