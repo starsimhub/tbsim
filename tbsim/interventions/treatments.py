@@ -52,30 +52,54 @@ class Tx(ss.Product):
         return {'success': success_uids, 'failure': failure_uids}
 
 
+class TxMulti(ss.Product):
+    """
+    TB treatment product that supports more than one outcome (e.g. success, failure, partial).
+
+    Args:
+        data: Outcome data by agent category; see tbsim.Dx for details
+    """
+    def __init__(self, data, **kwargs):
+        super().__init__()
+        self.data = data
+
+        self.define_pars(
+            p_success = ss.bernoulli(self.efficacy)
+        )
+        self.update_pars(**kwargs)
+        return
+
+    def administer(self, sim, uids):
+        """
+        Administer treatment to agents.
+
+        Returns:
+            dict with 'success' and 'failure' UIDs.
+        """
+        success_uids, failure_uids = self.pars.p_success.filter(uids, both=True)
+        return {'success': success_uids, 'failure': failure_uids}
+
+
 class DOTS(Tx):
     """Standard DOTS (85% cure)."""
-
     def __init__(self, **kwargs):
         super().__init__(drug_type='dots', **kwargs)
 
 
 class DOTSImproved(Tx):
     """Enhanced DOTS (90% cure)."""
-
     def __init__(self, **kwargs):
         super().__init__(drug_type='dots_improved', **kwargs)
 
 
 class FirstLine(Tx):
     """First-line combination therapy (95% cure)."""
-
     def __init__(self, **kwargs):
         super().__init__(drug_type='first_line_combo', **kwargs)
 
 
 class SecondLine(Tx):
     """Second-line therapy for MDR-TB (75% cure)."""
-
     def __init__(self, **kwargs):
         super().__init__(drug_type='second_line_combo', **kwargs)
 
@@ -93,7 +117,6 @@ class TxDelivery(ss.Intervention):
         reseek_multiplier: Care-seeking multiplier applied after treatment failure. Default 2.0.
         reset_flags: Whether to reset diagnosed/tested flags after failure. Default True.
     """
-
     def __init__(self, product, eligibility=None, reseek_multiplier=2.0,
                  reset_flags=True, **kwargs):
         super().__init__()

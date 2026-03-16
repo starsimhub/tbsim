@@ -1,7 +1,7 @@
 """Diagnostic products and delivery for TB testing."""
 
 import numpy as np
-import pandas as pd
+import sciris as sc
 import starsim as ss
 import tbsim
 from tbsim import TBSL
@@ -48,8 +48,8 @@ class Dx(ss.Product):
         if df is not None:
             return df
         if datafile is not None:
-            return pd.read_csv(datafile)
-        return pd.DataFrame(default_data, columns=columns)
+            return sc.dataframe.read_csv(datafile)
+        return sc.dataframe(default_data, columns=columns)
 
     def _validate(self):
         """Check that probabilities sum to 1.0 per group."""
