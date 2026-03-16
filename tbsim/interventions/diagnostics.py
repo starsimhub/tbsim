@@ -4,11 +4,12 @@ import numpy as np
 import starsim as ss
 import tbsim
 from tbsim import TBSL
+from .products import ProductMulti # Not yet available for import in TBsim
 
 __all__ = ['Dx', 'Xpert', 'OralSwab', 'FujiLAM', 'CAD', 'DxDelivery']
 
 
-class Dx(tbsim.ProductMulti):
+class Dx(ProductMulti):
     """
     TB diagnostic product defined by a DataFrame of state-to-result probabilities.
 

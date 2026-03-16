@@ -4,6 +4,7 @@ import numpy as np
 import starsim as ss
 import tbsim
 from tbsim import TBSL
+from .products import ProductMulti # Not yet available for import in TBsim
 
 __all__ = ['drug_params', 'Tx', 'TxMulti', 'DOTS', 'DOTSImproved', 'FirstLine', 'SecondLine', 'TxDelivery']
 
@@ -53,7 +54,7 @@ class Tx(ss.Product):
         return {'success': success_uids, 'failure': failure_uids}
 
 
-class TxMulti(tbsim.ProductMulti):
+class TxMulti(ProductMulti):
     """
     TB treatment product that supports more than one outcome (e.g. success, failure, partial).
 
