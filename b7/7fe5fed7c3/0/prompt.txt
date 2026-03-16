@@ -1,0 +1,2 @@
+<ide_opened_file>The user opened the file /home/cliffk/idm/tbsim/tbsim/analyzers.py in the IDE. This may or may not be related to the current task.</ide_opened_file>
+in analyzers.py, remove "states_ennumerator" and just use tbsim.TBSL

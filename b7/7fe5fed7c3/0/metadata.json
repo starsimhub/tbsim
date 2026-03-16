@@ -1,0 +1,24 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "b77fe5fed7c3",
+  "session_id": "23003509-abee-420f-b571-9789815db49c",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-16T02:45:58.353412773Z",
+  "branch": "remove-tb-emod",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "tbsim/analyzers.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "7f2682c27bbe",
+  "token_usage": {
+    "input_tokens": 14,
+    "cache_creation_tokens": 34597,
+    "cache_read_tokens": 346229,
+    "output_tokens": 1480,
+    "api_call_count": 10
+  },
+  "session_metrics": {
+    "turn_count": 1
+  }
+}
