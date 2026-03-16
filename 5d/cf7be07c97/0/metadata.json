@@ -1,0 +1,51 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "5dcf7be07c97",
+  "session_id": "0bfe5f03-669f-4f9d-aa9e-97442d908927",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-16T02:38:53.375644462Z",
+  "branch": "remove-tb-emod",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CLAUDE.md",
+    "README.md",
+    "docs/api.md",
+    "docs/examples.md",
+    "docs/tutorials/comprehensive_analyzer_plots_example.ipynb",
+    "docs/tutorials/run_tbhiv_scens.ipynb",
+    "docs/tutorials/tb_interventions_tutorial.ipynb",
+    "docs/tutorials/tbhiv_comorbidity.ipynb",
+    "docs/tutorials/tuberculosis_sim.ipynb",
+    "docs/user_guide.md",
+    "tbsim/__init__.py",
+    "tbsim/analyzers.py",
+    "tbsim/interventions/archive/immigration.py",
+    "tbsim/sim.py",
+    "tbsim/tb_emod.py",
+    "tbsim_examples/run_malnutrition.py",
+    "tbsim_examples/run_tb.py",
+    "tbsim_examples/run_tbhiv.py",
+    "tests/test_basics.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "7c5f81792c87",
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 64592,
+    "cache_read_tokens": 1471477,
+    "output_tokens": 9294,
+    "api_call_count": 28
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-16T02:38:53.248788072Z",
+    "agent_lines": 37,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 37,
+    "agent_percentage": 100
+  }
+}
