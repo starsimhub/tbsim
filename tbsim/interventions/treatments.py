@@ -132,30 +132,57 @@ class TxDelivery(ss.Intervention):
         return
 
     def step(self):
-        sim = self.sim
-        ppl = sim.people
-        tb = tbsim.get_tb(sim)
+        """ Coordinate everything that happens on the step; details are in methods below """
+        self.step_eligibility() # Check eligibility
+        self.step_start_treatment() # Start treatment for eligible agents
+        self.step_administer() # Administer product and handle outcomes
+        self.step_success() # Handle success
+        self.step_failures() # Handle failures
+        return
+    
+    def step_eligibility(self):
+        """ Check agents for eligibility, and start treatment for those eligible """
+        self._elig_uids = self._get_eligible(self.sim)
+        return self._elig_uids
 
-        uids = self._get_eligible(sim)
-        if len(uids) == 0:
-            return
+    def step_start_treatment(self):
+        """ Start treatment for eligible agents """
+        tb = self.sim.get_tb()
+        uids = self._elig_uids
 
-        # Start treatment (moves active -> TREATMENT state)
-        tb.start_treatment(uids)
+        # ACUTE or INFECTION: clear (NB, acute may not be present in all models, but fine to check)
+        latent = uids[np.isin(tb.state[uids], [TBSL.ACUTE, TBSL.INFECTION])]
+        tb.state[latent] = TBSL.CLEARED
+        tb.rr_reinfection[latent] = tb.pars.rr_reinfection_cleared
+        if tb.pars.dur_reinfection_protection is not None and len(latent):
+            self.ti_rr_reinfection_wane[latent] = self.ti + tb.pars.dur_reinfection_protection.rvs(latent)
+        tb.infected[latent] = False
+        tb.susceptible[latent] = True
+
+        # Active TB: put on treatment
+        active = uids[np.isin(tb.state[uids], [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC])]
+        tb.state[active] = TBSL.TREATMENT
+        tb.on_treatment[active] = True
+        tb.results['new_notifications_15+'][tb.ti] += np.count_nonzero(self.sim.people.age[active] >= 15) # TODO: should this result be in the intervention instead?
 
         # Only proceed with agents actually on treatment
         tx_uids = uids[tb.on_treatment[uids]]
-        if len(tx_uids) == 0:
-            return
-
         self.n_times_treated[tx_uids] += 1
-
-        # Administer product to get success/failure
-        outcomes = self.product.administer(sim, tx_uids)
-        success_uids = outcomes.get('success', ss.uids())
-        failure_uids = outcomes.get('failure', ss.uids())
-
-        # Successful treatment clears infection
+        self._tx_uids = tx_uids
+        return
+    
+    def step_administer(self):
+        """ Administer product to get success/failure """
+        outcomes = self.product.administer(self.sim, self._tx_uids)
+        self._outcomes = outcomes
+        self._success = outcomes.get('success', ss.uids())
+        self._fail = outcomes.get('failure', ss.uids())
+        return
+    
+    def step_success(self):
+        """ Successful treatment clears infection """
+        tb = self.sim.get_tb()
+        success_uids = self._success
         if len(success_uids) > 0:
             tb.state[success_uids] = TBSL.CLEARED
             tb.on_treatment[success_uids] = False
@@ -164,8 +191,11 @@ class TxDelivery(ss.Intervention):
             if self._dx is not None:
                 self._dx.diagnosed[success_uids] = False
             self.tb_treatment_success[success_uids] = True
-
-        # Handle failures
+        return
+    
+    def step_failures(self):
+        """ Handle failures """
+        failure_uids = self._fail
         if len(failure_uids) > 0:
             self.treatment_failure[failure_uids] = True
 
@@ -174,22 +204,30 @@ class TxDelivery(ss.Intervention):
                 self._dx.tested[failure_uids] = False
 
             # Trigger renewed care-seeking
-            if hsb := sim.get_hsb():
+            if hsb := self.sim.get_hsb():
                 hsb.sought_care[failure_uids] = False
             if self._dx is not None:
                 self._dx.care_seeking_multiplier[failure_uids] *= self.reseek_multiplier
-
-        # Store for results
-        self.results.n_treated[self.ti] = len(tx_uids)
-        self.results.n_success[self.ti] = len(success_uids)
-        self.results.n_failure[self.ti] = len(failure_uids)
         return
 
     def update_results(self):
-        pass
+        self.results.n_treated[self.ti] = len(self._tx_uids)
+        self.results.n_success[self.ti] = len(self._success)
+        self.results.n_failure[self.ti] = len(self._fail)
+        return
 
     def finalize_results(self):
         super().finalize_results()
         self.results.cum_success[:] = np.cumsum(self.results.n_success)
         self.results.cum_failure[:] = np.cumsum(self.results.n_failure)
+        return
+    
+    def shrink(self):
+        """ Remove temporary results """
+        self._outcomes = None
+        self._elig_uids = None
+        self._tx_uids = None
+        self._success = None
+        self._fail = None
+        self._dx = None # Link to treatment module
         return
