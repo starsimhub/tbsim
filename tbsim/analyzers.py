@@ -3,15 +3,12 @@
 
 import os
 import datetime as ddtt
-import warnings
-from enum import IntEnum
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 from lifelines import KaplanMeierFitter
 
-import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import seaborn as sns
 import networkx as nx
@@ -21,8 +18,6 @@ import starsim as ss
 import tbsim
 
 __all__ = ['DwellTime', 'DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor', 'HouseholdStats']
-
-warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 class DwellTime(ss.Analyzer):
@@ -41,7 +36,6 @@ class DwellTime(ss.Analyzer):
         file_path (str, optional):             Path to a single CSV file with dwell-time data.
         directory (str, optional):             Directory containing CSV result files for aggregation.
         prefix (str, optional):                File prefix filter used with *directory*.
-        states_ennumerator (IntEnum, optional): State enumeration class (default ``tbsim.TBSL``).
         scenario_name (str, optional):         Label for the simulation scenario.
         debug (bool, optional):                Enable verbose output.
 
@@ -67,11 +61,10 @@ class DwellTime(ss.Analyzer):
     """
 
     def __init__(self, data=None, file_path=None, directory=None, prefix='',
-                 states_ennumerator=None, scenario_name='', debug=False):
+                 scenario_name='', debug=False):
         """Auto-detect mode (plotter, aggregate, or analyzer) from the supplied arguments."""
         self.debug = debug
         self.scenario_name = scenario_name
-        self.eSTATES = states_ennumerator or tbsim.TBSL
         self.file_path = file_path
 
         if isinstance(data, pd.DataFrame):
@@ -500,13 +493,9 @@ class DwellTime(ss.Analyzer):
                 age=self.sim.people.age[
                     ss.uids(relevant_rows['agent_id'].values)].copy())
 
-        tb = tbsim.get_tb(self.sim)
-        if isinstance(tb, tbsim.TB_LSHTM):
-            self.eSTATES = tbsim.TBSL
-
         state_dict = {
             state.value: state.name.replace('_', ' ').title()
-            for state in self.eSTATES}
+            for state in tbsim.TBSL}
         state_dict[-3] = 'NON-TB DEATH'
         state_dict[-2] = 'NEVER INFECTED'
         self.data['state_name'] = self.data['state'].map(state_dict)
@@ -517,10 +506,7 @@ class DwellTime(ss.Analyzer):
             axis=1)
         self.data['state_name'] = self.data.apply(
             lambda row: f"{row['state']}.{row['state_name']}", axis=1)
-        self.data['state_name'] = self.data['state_name'].replace(
-            'None', 'Susceptible')
-
-        self.file_path = self._save_to_file()
+        self.data['state_name'] = self.data['state_name'].replace('None', 'Susceptible')
 
         return
 
@@ -542,24 +528,11 @@ class DwellTime(ss.Analyzer):
 
         return
 
-    def _save_to_file(self):
+    def save(self, filename='dwelltime.csv'):
         """Save dwell time data to CSV and metadata files."""
-        resdir = os.path.join(os.getcwd(), 'results')
-        os.makedirs(resdir, exist_ok=True)
-        t = ddtt.datetime.now()
-        prefix = sc.sanitizefilename(self.scenario_name)
-        if not prefix:
-            prefix = 'dwt_logs'
-        t = t.strftime("%m%d%H%M%S")
-        fn = os.path.join(resdir, f'{prefix}-{t}.csv')
-        self.data.to_csv(fn, index=False)
-
-        fn_meta = os.path.join(resdir, f'{prefix}-{t}.json')
-        with open(fn_meta, 'w') as f:
-            f.write(f'{self.sim.pars}')
-
-        print(f"===> Dwell time logs saved to:\n {fn}\n")
-        return fn
+        sc.makefilepath(filename, makedirs=True)
+        self.data.to_csv(filename, index=False)
+        return
 
     def validate_dwell_time_distributions(self, expected_distributions=None):
         """Validate dwell time distributions using KS tests."""
