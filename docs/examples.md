@@ -7,11 +7,11 @@ This section provides practical examples of TBsim usage across different scenari
 The simplest way to run a TB simulation:
 
 ```python
-from tbsim import TB_EMOD
+from tbsim import TB_LSHTM
 import starsim as ss
 
 # Create a basic TB simulation
-sim = ss.Sim(diseases=TB_EMOD())
+sim = ss.Sim(diseases=TB_LSHTM())
 
 # Run the simulation
 sim.run()
@@ -26,11 +26,11 @@ Adding BCG vaccination and treatment interventions:
 
 ```python
 import tbsim
-from tbsim import TB_EMOD
+from tbsim import TB_LSHTM
 import starsim as ss
 
 # Add TB module and interventions
-tb = TB_EMOD()
+tb = TB_LSHTM()
 bcg = tbsim.BCGRoutine(pars=dict(
     coverage=ss.bernoulli(p=0.8),
     start=ss.date('1980-01-01'),
@@ -56,11 +56,11 @@ Modeling TB and HIV together:
 
 ```python
 from tbsim.comorbidities.hiv import HIV
-from tbsim import TB_EMOD
+from tbsim import TB_LSHTM
 import starsim as ss
 
 # Add both modules
-tb = TB_EMOD()
+tb = TB_LSHTM()
 hiv = HIV()
 
 sim = ss.Sim(diseases=[tb, hiv])
@@ -73,12 +73,12 @@ Using household-based social networks:
 
 ```python
 from tbsim.networks import HouseholdNet
-from tbsim import TB_EMOD
+from tbsim import TB_LSHTM
 import starsim as ss
 
 # Create household network and TB
 households = HouseholdNet()
-tb = TB_EMOD()
+tb = TB_LSHTM()
 
 sim = ss.Sim(
     networks=households,
@@ -92,12 +92,12 @@ sim.run()
 Using the built-in analyzers:
 
 ```python
-from tbsim import TB_EMOD
+from tbsim import TB_LSHTM
 from tbsim.analyzers import DwellTime
 import starsim as ss
 
 # Run simulation with dwell time analyzer
-sim = ss.Sim(diseases=[TB_EMOD()], analyzers=DwellTime(scenario_name="Baseline"))
+sim = ss.Sim(diseases=[TB_LSHTM()], analyzers=DwellTime(scenario_name="Baseline"))
 sim.run()
 
 # Create plots from the analyzer
@@ -111,7 +111,7 @@ sim.analyzers[0].plot('kaplan_meier')
 Running multiple parameter combinations:
 
 ```python
-from tbsim import TB_EMOD
+from tbsim import TB_LSHTM
 import starsim as ss
 import numpy as np
 
@@ -120,7 +120,7 @@ transmission_rates = np.linspace(0.1, 0.5, 5)
 
 results = []
 for rate in transmission_rates:
-    sim = ss.Sim(diseases=TB_EMOD(pars={'beta': ss.peryear(rate)}))
+    sim = ss.Sim(diseases=TB_LSHTM(pars={'beta': ss.peryear(rate)}))
     sim.run()
     results.append(sim.results)
 ```

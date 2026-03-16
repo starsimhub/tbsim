@@ -3,15 +3,12 @@
 
 import os
 import datetime as ddtt
-import warnings
-from enum import IntEnum
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 from lifelines import KaplanMeierFitter
 
-import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import seaborn as sns
 import networkx as nx
@@ -21,8 +18,6 @@ import starsim as ss
 import tbsim
 
 __all__ = ['DwellTime', 'DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor', 'HouseholdStats']
-
-warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 class DwellTime(ss.Analyzer):
@@ -41,7 +36,6 @@ class DwellTime(ss.Analyzer):
         file_path (str, optional):             Path to a single CSV file with dwell-time data.
         directory (str, optional):             Directory containing CSV result files for aggregation.
         prefix (str, optional):                File prefix filter used with *directory*.
-        states_ennumerator (IntEnum, optional): State enumeration class (default ``tbsim.TBS``).
         scenario_name (str, optional):         Label for the simulation scenario.
         debug (bool, optional):                Enable verbose output.
 
@@ -61,17 +55,16 @@ class DwellTime(ss.Analyzer):
 
         During simulation::
 
-            sim = ss.Sim(diseases=[TB_EMOD()], analyzers=DwellTime(scenario_name="Baseline"))
+            sim = ss.Sim(diseases=[TB_LSHTM()], analyzers=DwellTime(scenario_name="Baseline"))
             sim.run()
             sim.analyzers[0].plot('validation')
     """
 
     def __init__(self, data=None, file_path=None, directory=None, prefix='',
-                 states_ennumerator=None, scenario_name='', debug=False):
+                 scenario_name='', debug=False):
         """Auto-detect mode (plotter, aggregate, or analyzer) from the supplied arguments."""
         self.debug = debug
         self.scenario_name = scenario_name
-        self.eSTATES = states_ennumerator or tbsim.TBS
         self.file_path = file_path
 
         if isinstance(data, pd.DataFrame):
@@ -125,6 +118,8 @@ class DwellTime(ss.Analyzer):
             valid = ', '.join(sorted(kinds))
             raise ValueError(
                 f"Unknown plot kind {kind!r}. Valid kinds: {valid}")
+        if self._data_error():
+            return
         return kinds[kind](self, **kwargs)
 
     # ------------------------------------------------------------------
@@ -133,9 +128,6 @@ class DwellTime(ss.Analyzer):
 
     def _plot_histogram(self, subtitle=""):
         """Histograms with KDE for dwell-time distributions per state."""
-        if self._data_error():
-            return
-
         df = self.data
         states = df['state_name'].unique()
         num_states = len(states)
@@ -190,9 +182,6 @@ class DwellTime(ss.Analyzer):
     def _plot_kaplan_meier(self, dwell_time_col='dwell_time',
                            event_observed_col=None):
         """Kaplan-Meier survival curve for dwell times."""
-        if self._data_error():
-            return
-
         data = self.data
         durations = data[dwell_time_col]
         event_observed = (data[event_observed_col]
@@ -215,9 +204,6 @@ class DwellTime(ss.Analyzer):
                       curved_ratio=0.09, colormap='Paired', onlymodel=True,
                       graphseed=42):
         """Directed graph of state transitions with curved edges."""
-        if self._data_error():
-            return
-
         df = self.data
         if states is not None:
             df = df[df['state_name'].isin(states)]
@@ -297,13 +283,9 @@ class DwellTime(ss.Analyzer):
 
     def _plot_validation(self):
         """Overlaid histograms for dwell-time validation."""
-        if self._data_error():
-            return
-
-        fig, ax = plt.subplots()
         data = self.data
         model_states = data['state_name'].unique()
-        plt.figure(figsize=(15, 10), facecolor='black')
+        fig, ax = plt.subplots(figsize=(15, 10))
         for state in model_states:
             dwell_times = data[data['state_name'] == state]['dwell_time']
             if dwell_times.empty:
@@ -352,41 +334,12 @@ class DwellTime(ss.Analyzer):
 
         return pd.concat(data_frames, ignore_index=True)
 
-    def save_combined_dataframe(self, output_file):
-        """Save the combined DataFrame to a CSV file."""
-        if self.data is None or self.data.empty:
-            print("No data available to save.")
-            return
-        try:
-            self.data.to_csv(output_file, index=False)
-            if self.debug:
-                print(f"Combined DataFrame saved to {output_file}")
-        except Exception as e:
-            print(f"Error saving DataFrame to {output_file}: {e}")
-
-        return
-
     # ------------------------------------------------------------------
     # Analyzer methods (from former DwtAnalyzer)
     # ------------------------------------------------------------------
 
-    def _initialize_dataframes(self):
-        """Initialize internal DataFrames on the first simulation step."""
-        agent_ids = self.sim.people.auids.copy()
-        population = len(agent_ids)
-        new_logs = pd.DataFrame({
-            'agent_id': agent_ids,
-            'last_state': np.full(population, -1.0),
-            'last_state_time': np.zeros(population)
-        })
-        # The original code did not assign new_logs; keeping the same
-        # behaviour (the _check_for_new_borns call fills _latest_sts_df).
-        return
-
     def step(self):
         """Execute one time step of dwell time analysis."""
-        if not self.sim.ti:
-            self._initialize_dataframes()
         self._check_for_new_borns()
         self._update_state_change_data()
         self._record_natural_deaths()
@@ -430,7 +383,7 @@ class DwellTime(ss.Analyzer):
         """Record dwell times for agents who died from natural causes."""
         ti = self.ti
         dead_uids = ss.uids(self.sim.people.dead)
-        if not dead_uids.all():
+        if len(dead_uids) == 0:
             return
 
         relevant_rows = self._latest_sts_df[
@@ -465,22 +418,6 @@ class DwellTime(ss.Analyzer):
             })
             self._latest_sts_df = pd.concat(
                 [self._latest_sts_df, new_logs], ignore_index=True)
-
-        if len(self.sim.people.auids) != len(self._latest_sts_df):
-            new_agent_ids = list(
-                set(self.sim.people.auids)
-                - set(self._latest_sts_df.agent_id))
-            new_logs = pd.DataFrame({
-                'agent_id': new_agent_ids,
-                'last_state': np.full(len(new_agent_ids), -1.0),
-                'last_state_time': np.zeros(len(new_agent_ids))
-            })
-            if not new_logs.empty:
-                self._latest_sts_df = pd.concat(
-                    [self._latest_sts_df,
-                     new_logs.loc[:, ~new_logs.isna().all()]],
-                    ignore_index=True, copy=False)
-
         return
 
     def finalize(self):
@@ -500,13 +437,9 @@ class DwellTime(ss.Analyzer):
                 age=self.sim.people.age[
                     ss.uids(relevant_rows['agent_id'].values)].copy())
 
-        tb = tbsim.get_tb(self.sim)
-        if isinstance(tb, tbsim.TB_LSHTM):
-            self.eSTATES = tbsim.TBSL
-
         state_dict = {
             state.value: state.name.replace('_', ' ').title()
-            for state in self.eSTATES}
+            for state in tbsim.TBSL}
         state_dict[-3] = 'NON-TB DEATH'
         state_dict[-2] = 'NEVER INFECTED'
         self.data['state_name'] = self.data['state'].map(state_dict)
@@ -517,10 +450,7 @@ class DwellTime(ss.Analyzer):
             axis=1)
         self.data['state_name'] = self.data.apply(
             lambda row: f"{row['state']}.{row['state_name']}", axis=1)
-        self.data['state_name'] = self.data['state_name'].replace(
-            'None', 'Susceptible')
-
-        self.file_path = self._save_to_file()
+        self.data['state_name'] = self.data['state_name'].replace('None', 'Susceptible')
 
         return
 
@@ -542,30 +472,14 @@ class DwellTime(ss.Analyzer):
 
         return
 
-    def _save_to_file(self):
+    def save(self, filename='dwelltime.csv'):
         """Save dwell time data to CSV and metadata files."""
-        resdir = os.path.join(os.getcwd(), 'results')
-        os.makedirs(resdir, exist_ok=True)
-        t = ddtt.datetime.now()
-        prefix = sc.sanitizefilename(self.scenario_name)
-        if not prefix:
-            prefix = 'dwt_logs'
-        t = t.strftime("%m%d%H%M%S")
-        fn = os.path.join(resdir, f'{prefix}-{t}.csv')
-        self.data.to_csv(fn, index=False)
+        sc.makefilepath(filename, makedirs=True)
+        self.data.to_csv(filename, index=False)
+        return
 
-        fn_meta = os.path.join(resdir, f'{prefix}-{t}.json')
-        with open(fn_meta, 'w') as f:
-            f.write(f'{self.sim.pars}')
-
-        print(f"===> Dwell time logs saved to:\n {fn}\n")
-        return fn
-
-    def validate_dwell_time_distributions(self, expected_distributions=None):
+    def validate_dwell_time_distributions(self, expected_distributions):
         """Validate dwell time distributions using KS tests."""
-        expected_distributions = (
-            expected_distributions or self.expected_distributions)
-
         print("Validating dwell time distributions...")
         for state, expected_cdf in expected_distributions.items():
             dwell_times = self.data[
@@ -612,7 +526,7 @@ class DwellTime(ss.Analyzer):
     @staticmethod
     def _select_graph_pos(G, layout='shell_layout', seed=42):
         """Select a NetworkX layout algorithm for graph visualizations."""
-        func = getattr(x, layout)
+        func = getattr(nx, layout)
         if layout == 'spring_layout':
             return func(G, seed=seed)
         else:
