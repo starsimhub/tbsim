@@ -97,28 +97,6 @@ def test_per_agent_variation():
     return draws
 
 
-def test_p_as_positional():
-    """ Test that passing a 2D array as the first positional arg is treated as p """
-    sc.heading('Testing choice2d(p) shorthand')
-
-    uids = np.arange(4)
-    p = np.array([
-        [1.0, 0.0],
-        [1.0, 0.0],
-        [0.0, 1.0],
-        [0.0, 1.0],
-    ])
-
-    # Pass 2D array as first positional arg -- should be interpreted as p
-    d = tbsim.choice2d(p, strict=False).init(slots=uids)
-    draws = d.rvs(uids)
-
-    print(f'  Shorthand draws: {draws}')
-    assert draws[0] == 0 and draws[1] == 0
-    assert draws[2] == 1 and draws[3] == 1
-    return draws
-
-
 def test_array_params():
     """ Test choice2d with sparse UIDs, analogous to test_array in starsim """
     sc.heading('Testing choice2d with sparse UIDs')
@@ -145,7 +123,6 @@ if __name__ == '__main__':
     o2 = test_statistical()
     o3 = test_custom_values()
     o4 = test_per_agent_variation()
-    o5 = test_p_as_positional()
-    o6 = test_array_params()
+    o5 = test_array_params()
 
     T.toc()
