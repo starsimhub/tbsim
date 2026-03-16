@@ -130,7 +130,7 @@ class Dx(ss.Product):
             probs[matched_idx] = row_probs
 
         # Draw results using choice2d
-        self.outcome_dist.set(p=probs)
+        self.outcome_dist.set(a=np.arange(probs.shape[1]), p=probs)
         temp_uids = ss.uids(np.arange(len(uids))) # TODO: WARNING: not CRN safe!! See https://github.com/starsimhub/starsim/issues/1254
         results = self.outcome_dist.rvs(temp_uids) 
 
