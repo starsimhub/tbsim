@@ -30,8 +30,8 @@ class Dx(ss.Product):
         self.hierarchy = hierarchy if hierarchy is not None else list(df.result.unique())
         self._filter_cols = [c for c in _FILTER_COLS if c in df.columns]
         self._validate()
-        self.rand_dist = ss.random()
         self.update_pars(**kwargs)
+        self.outcome_dist = tbsim.choice2d(p=np.array([[1]])) # Probabilities set in administer()
         return
 
     @staticmethod
@@ -81,21 +81,28 @@ class Dx(ss.Product):
         Returns:
             dict keyed by hierarchy strings, e.g. {'positive': uids, 'negative': uids}
         """
+        # Create output, and return immediately if nothing to do
+        output = {}
+        if not len(uids):
+            return output
+        
         tb = tbsim.get_tb(sim)
         ppl = sim.people
+        n_choices = len(self.hierarchy)
 
-        # Pre-fill with default (last hierarchy entry = most benign result)
-        results = np.full(len(uids), self.default_value, dtype=int)
+        # Build per-agent probability matrix; default: all probability on last hierarchy entry
+        probs = np.zeros((len(uids), n_choices))
+        probs[:, self.default_value] = 1.0
 
         # Get agent attributes needed for filtering
         tb_states = tb.state[uids]
         ages = ppl.age[uids] if ('age_min' in self._filter_cols or 'age_max' in self._filter_cols) else None
 
         hiv_states = None
-        if 'hiv' in self._filter_cols and hasattr(sim.diseases, 'hiv'):
+        if 'hiv' in self._filter_cols and 'hiv' in sim.diseases:
             hiv_states = sim.diseases.hiv.infected[uids]
 
-        # Group df rows by (state + filter columns)
+        # Group df rows by (state + filter columns) and fill per-agent probabilities
         group_cols = ['state'] + self._filter_cols
         for group_key, group_df in self.df.groupby(group_cols):
             if not isinstance(group_key, tuple):
@@ -115,27 +122,19 @@ class Dx(ss.Product):
             if len(matched_idx) == 0:
                 continue
 
-            # Get the actual UIDs for matched agents (needed for CRN-safe rvs)
-            matched_agent_uids = uids[matched_idx]
-
             # Get probabilities in hierarchy order
-            probs = []
+            row_probs = []
             for r in self.hierarchy:
                 row = group_df[group_df.result == r]
-                probs.append(row.probability.values[0] if len(row) > 0 else 0.0)
-            probs = np.array(probs)
+                row_probs.append(row.probability.values[0] if len(row) > 0 else 0.0)
+            probs[matched_idx] = row_probs
 
-            # Draw stochastic results using cumulative probabilities
-            cumprobs = np.cumsum(probs)
-            rand_vals = self.rand_dist.rvs(matched_agent_uids)
-            draws = np.searchsorted(cumprobs, rand_vals)
-            draws = np.clip(draws, 0, len(self.hierarchy) - 1)
-
-            # Take minimum (best/first result wins if agent matches multiple groups)
-            results[matched_idx] = np.minimum(draws, results[matched_idx])
+        # Draw results using choice2d
+        self.outcome_dist.set(p=probs)
+        temp_uids = ss.uids(np.arange(len(uids))) # TODO: WARNING: not CRN safe!! See https://github.com/starsimhub/starsim/issues/1254
+        results = self.outcome_dist.rvs(temp_uids) 
 
         # Convert to dict of UIDs per result
-        output = {}
         for i, label in enumerate(self.hierarchy):
             output[label] = uids[results == i]
         return output
