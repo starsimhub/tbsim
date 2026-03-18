@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Run all tbsim examples in parallel (skipping run_dhs_household.py).
+
+set -e
+
+export MPLBACKEND='Agg' # Silence plots
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Collect example scripts (exclude this script and run_dhs_household.py)
+scripts=()
+for f in run_*.py; do
+    [[ "$f" == "run_dhs_household.py" ]] && continue
+    scripts+=("$f")
+done
+
+echo "Running ${#scripts[@]} examples in parallel..."
+
+# Launch all in background, capturing PIDs
+pids=()
+for script in "${scripts[@]}"; do
+    echo "  Starting $script"
+    python "$script" &
+    pids+=($!)
+done
+
+# Wait for all and track failures
+failed=()
+for i in "${!scripts[@]}"; do
+    if ! wait "${pids[$i]}"; then
+        failed+=("${scripts[$i]}")
+    fi
+done
+
+echo ""
+if [ ${#failed[@]} -eq 0 ]; then
+    echo "All ${#scripts[@]} examples completed successfully."
+else
+    echo "FAILED (${#failed[@]}/${#scripts[@]}):"
+    for f in "${failed[@]}"; do
+        echo "  $f"
+    done
+    exit 1
+fi
