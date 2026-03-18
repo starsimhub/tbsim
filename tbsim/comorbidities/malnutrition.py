@@ -43,7 +43,7 @@ class Malnutrition(ss.Disease):
         import tbsim
         from tbsim.comorbidities.malnutrition import Malnutrition, TB_Nutrition_Connector
 
-        tb   = tbsim.TB_LSHTM(name='tb')
+        tb   = tbsim.TB(name='tb')
         mn   = Malnutrition(name='malnutrition')
         conn = TB_Nutrition_Connector()
         sim  = ss.Sim(diseases=[tb, mn], connectors=conn,

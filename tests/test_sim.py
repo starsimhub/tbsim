@@ -9,7 +9,7 @@ def test_sim():
     sim = tbsim.Sim(n_agents=200, verbose=0)
     sim.run()
     tb = sim.get_tb()
-    assert isinstance(tb, tbsim.TB_LSHTM)
+    assert isinstance(tb, tbsim.TB)
     assert len(tb.results['timevec']) > 0
 
 

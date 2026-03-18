@@ -12,7 +12,7 @@ import tbsim
 
 def make_sim(agents=20, start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'), dt=ss.days(7)):
     pop = ss.People(n_agents=agents)
-    tb = tbsim.TB_LSHTM(name='tb')
+    tb = tbsim.TB(name='tb')
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     pars = dict(dt=dt, start=start, stop=stop)
     return pop, tb, net, pars
@@ -221,7 +221,7 @@ def test_bcg_modifiers_reapplied_each_step():
     bcg = sim.interventions['bcgroutine']
 
     bcg.step()  # Vaccinate and apply modifiers
-    tb = sim.diseases.tb # tb instead of tb_lshtm because name='tb' in make_sim()
+    tb = sim.diseases.tb
     protected = bcg.product.bcg_protected.uids
     assert len(protected) > 0, "Some individuals should be protected"
 

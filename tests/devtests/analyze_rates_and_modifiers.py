@@ -38,7 +38,7 @@ def analyze_tb_rates_and_modifiers():
     pop = ss.People(n_agents=500, age_data=age_data)
 
     # Initialize TB model
-    tb = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb = tbsim.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     sim = ss.Sim(
@@ -49,7 +49,7 @@ def analyze_tb_rates_and_modifiers():
     )
     sim.init()
 
-    print("TB DISEASE MODEL PARAMETERS (TB_LSHTM)")
+    print("TB DISEASE MODEL PARAMETERS (TB)")
     print("-" * 40)
     print(f"Transmission Rate (beta): {tb.pars.beta}")
     print(f"Initial Prevalence: {tb.pars.init_prev}")
@@ -94,7 +94,7 @@ def analyze_tb_rates_and_modifiers():
     })
 
     pop_bcg = ss.People(n_agents=500, age_data=age_data)
-    tb_bcg = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb_bcg = tbsim.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net_bcg = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     sim_bcg = ss.Sim(

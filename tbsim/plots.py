@@ -150,7 +150,7 @@ def _normalize_results(results):
 
     Uses ``ss.utils.match_result_keys(key=None)`` to flatten each sim's
     results, then re-keys by result name so metrics align across sims that
-    use different module class names (e.g. ``TB_LSHTM`` vs ``TB_LSHTM_Acute``).
+    use different module class names (e.g. ``TB`` vs ``TBAcute``).
     """
     if isinstance(results, ss.MultiSim):
         sims = results.sims

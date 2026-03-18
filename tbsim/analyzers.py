@@ -55,7 +55,7 @@ class DwellTime(ss.Analyzer):
 
         During simulation::
 
-            sim = ss.Sim(diseases=[TB_LSHTM()], analyzers=DwellTime(scenario_name="Baseline"))
+            sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
             sim.run()
             sim.analyzers[0].plot('validation')
     """
@@ -439,7 +439,7 @@ class DwellTime(ss.Analyzer):
 
         state_dict = {
             state.value: state.name.replace('_', ' ').title()
-            for state in tbsim.TBSL}
+            for state in tbsim.TBS}
         state_dict[-3] = 'NON-TB DEATH'
         state_dict[-2] = 'NEVER INFECTED'
         self.data['state_name'] = self.data['state'].map(state_dict)

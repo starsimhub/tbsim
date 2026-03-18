@@ -35,9 +35,9 @@ tb_pars_acute = dict(
 )
 
 
-def build_lshtm_sim(tb_pars, interventions=None, use_acute=False, label=None):
+def build_sim(tb_pars, interventions=None, use_acute=False, label=None):
     """Build a tbsim simulation comparing acute vs non-acute TB models."""
-    tb_model = 'lshtm_acute' if use_acute else 'lshtm'
+    tb_model = 'acute' if use_acute else 'default'
     all_tb_pars = {**tb_pars, **(tb_pars_acute if use_acute else {})}
 
     sim = tbsim.Sim(
@@ -51,9 +51,9 @@ def build_lshtm_sim(tb_pars, interventions=None, use_acute=False, label=None):
 
 
 def build_sims_acute_vs_no_acute():
-    """Build two sims: with acute (TB_LSHTM_Acute) and without (TB_LSHTM)."""
-    sim_acute = build_lshtm_sim(tb_pars, use_acute=True, label="TB Acute")
-    sim_no_acute = build_lshtm_sim(tb_pars, use_acute=False, label="LSHTM (without acute)")
+    """Build two sims: with acute (TBAcute) and without (TB)."""
+    sim_acute = build_sim(tb_pars, use_acute=True, label="TB Acute")
+    sim_no_acute = build_sim(tb_pars, use_acute=False, label="TB (without acute)")
     return [sim_acute, sim_no_acute]
 
 

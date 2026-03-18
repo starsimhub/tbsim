@@ -51,7 +51,7 @@ def run_baseline_simulation(n_agents=500):
     """
     age_data = create_test_population()
     pop = ss.People(n_agents=n_agents, age_data=age_data)
-    tb = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb = tbsim.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     sim = ss.Sim(
@@ -93,7 +93,7 @@ def run_bcg_simulation(n_agents=500):
     """
     age_data = create_test_population()
     pop = ss.People(n_agents=n_agents, age_data=age_data)
-    tb = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb = tbsim.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     bcg = tbsim.BCGRoutine(pars={
@@ -153,7 +153,7 @@ def test_bcg_individual_impact(n_agents=200):
     """
     age_data = create_test_population()
     pop = ss.People(n_agents=n_agents, age_data=age_data)
-    tb = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb = tbsim.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     bcg = tbsim.BCGRoutine(pars={

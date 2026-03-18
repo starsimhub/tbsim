@@ -120,7 +120,7 @@ class BCGRoutine(TBProductRoutine):
         import tbsim
         from tbsim.interventions.bcg import BCGRoutine
 
-        tb  = tbsim.TB_LSHTM(name='tb')
+        tb  = tbsim.TB(name='tb')
         bcg = BCGRoutine()
         sim = ss.Sim(diseases=tb, interventions=bcg, pars=dict(start='2000', stop='2020'))
         sim.run()

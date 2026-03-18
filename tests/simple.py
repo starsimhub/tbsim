@@ -5,7 +5,7 @@ Simple TBsim run with default parameters
 import starsim as ss
 import tbsim as tbs
 
-tb = tbs.TB_LSHTM()
+tb = tbs.TB()
 sim = ss.Sim(
     diseases=tb, 
     networks='random', 

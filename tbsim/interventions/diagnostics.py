@@ -3,7 +3,7 @@
 import numpy as np
 import starsim as ss
 import tbsim
-from tbsim import TBSL
+from tbsim import TBS
 from .products import ProductMulti # Not yet available for import in TBsim
 
 __all__ = ['Dx', 'Xpert', 'OralSwab', 'FujiLAM', 'CAD', 'DxDelivery']
@@ -30,19 +30,19 @@ class Xpert(Dx):
     default_data = [
         #state                result      prob   min  max
         # Adults (15+)
-        [TBSL.SYMPTOMATIC,    'positive', 0.909, 15,  99],
-        [TBSL.SYMPTOMATIC,    'negative', 0.091, 15,  99],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.775, 15,  99],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.225, 15,  99],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.775, 15,  99],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.225, 15,  99],
+        [TBS.SYMPTOMATIC,    'positive', 0.909, 15,  99],
+        [TBS.SYMPTOMATIC,    'negative', 0.091, 15,  99],
+        [TBS.ASYMPTOMATIC,   'positive', 0.775, 15,  99],
+        [TBS.ASYMPTOMATIC,   'negative', 0.225, 15,  99],
+        [TBS.NON_INFECTIOUS, 'positive', 0.775, 15,  99],
+        [TBS.NON_INFECTIOUS, 'negative', 0.225, 15,  99],
         # Children (<15)
-        [TBSL.SYMPTOMATIC,    'positive', 0.73,   0,  15],
-        [TBSL.SYMPTOMATIC,    'negative', 0.27,   0,  15],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.73,   0,  15],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.27,   0,  15],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.73,   0,  15],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.27,   0,  15],
+        [TBS.SYMPTOMATIC,    'positive', 0.73,   0,  15],
+        [TBS.SYMPTOMATIC,    'negative', 0.27,   0,  15],
+        [TBS.ASYMPTOMATIC,   'positive', 0.73,   0,  15],
+        [TBS.ASYMPTOMATIC,   'negative', 0.27,   0,  15],
+        [TBS.NON_INFECTIOUS, 'positive', 0.73,   0,  15],
+        [TBS.NON_INFECTIOUS, 'negative', 0.27,   0,  15],
     ]
 
     def __init__(self, df=None, datafile=None, **kwargs):
@@ -58,19 +58,19 @@ class OralSwab(Dx):
     default_data = [
         #state                result      prob  min  max
         # Adults (15+)
-        [TBSL.SYMPTOMATIC,    'positive', 0.80, 15,  99],
-        [TBSL.SYMPTOMATIC,    'negative', 0.20, 15,  99],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.30, 15,  99],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.70, 15,  99],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.30, 15,  99],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.70, 15,  99],
+        [TBS.SYMPTOMATIC,    'positive', 0.80, 15,  99],
+        [TBS.SYMPTOMATIC,    'negative', 0.20, 15,  99],
+        [TBS.ASYMPTOMATIC,   'positive', 0.30, 15,  99],
+        [TBS.ASYMPTOMATIC,   'negative', 0.70, 15,  99],
+        [TBS.NON_INFECTIOUS, 'positive', 0.30, 15,  99],
+        [TBS.NON_INFECTIOUS, 'negative', 0.70, 15,  99],
         # Children (<15)
-        [TBSL.SYMPTOMATIC,    'positive', 0.25,  0,  15],
-        [TBSL.SYMPTOMATIC,    'negative', 0.75,  0,  15],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.25,  0,  15],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.75,  0,  15],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.25,  0,  15],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.75,  0,  15],
+        [TBS.SYMPTOMATIC,    'positive', 0.25,  0,  15],
+        [TBS.SYMPTOMATIC,    'negative', 0.75,  0,  15],
+        [TBS.ASYMPTOMATIC,   'positive', 0.25,  0,  15],
+        [TBS.ASYMPTOMATIC,   'negative', 0.75,  0,  15],
+        [TBS.NON_INFECTIOUS, 'positive', 0.25,  0,  15],
+        [TBS.NON_INFECTIOUS, 'negative', 0.75,  0,  15],
     ]
 
     def __init__(self, df=None, datafile=None, **kwargs):
@@ -86,33 +86,33 @@ class FujiLAM(Dx):
     default_data = [
         #state                result      prob   min  max  hiv
         # HIV+, adults
-        [TBSL.SYMPTOMATIC,    'positive', 0.75,  15,  99,  True],
-        [TBSL.SYMPTOMATIC,    'negative', 0.25,  15,  99,  True],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.75,  15,  99,  True],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.25,  15,  99,  True],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.75,  15,  99,  True],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.25,  15,  99,  True],
+        [TBS.SYMPTOMATIC,    'positive', 0.75,  15,  99,  True],
+        [TBS.SYMPTOMATIC,    'negative', 0.25,  15,  99,  True],
+        [TBS.ASYMPTOMATIC,   'positive', 0.75,  15,  99,  True],
+        [TBS.ASYMPTOMATIC,   'negative', 0.25,  15,  99,  True],
+        [TBS.NON_INFECTIOUS, 'positive', 0.75,  15,  99,  True],
+        [TBS.NON_INFECTIOUS, 'negative', 0.25,  15,  99,  True],
         # HIV-, adults
-        [TBSL.SYMPTOMATIC,    'positive', 0.58,  15,  99,  False],
-        [TBSL.SYMPTOMATIC,    'negative', 0.42,  15,  99,  False],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.58,  15,  99,  False],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.42,  15,  99,  False],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.58,  15,  99,  False],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.42,  15,  99,  False],
+        [TBS.SYMPTOMATIC,    'positive', 0.58,  15,  99,  False],
+        [TBS.SYMPTOMATIC,    'negative', 0.42,  15,  99,  False],
+        [TBS.ASYMPTOMATIC,   'positive', 0.58,  15,  99,  False],
+        [TBS.ASYMPTOMATIC,   'negative', 0.42,  15,  99,  False],
+        [TBS.NON_INFECTIOUS, 'positive', 0.58,  15,  99,  False],
+        [TBS.NON_INFECTIOUS, 'negative', 0.42,  15,  99,  False],
         # HIV+, children
-        [TBSL.SYMPTOMATIC,    'positive', 0.579,  0,  15,  True],
-        [TBSL.SYMPTOMATIC,    'negative', 0.421,  0,  15,  True],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.579,  0,  15,  True],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.421,  0,  15,  True],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.579,  0,  15,  True],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.421,  0,  15,  True],
+        [TBS.SYMPTOMATIC,    'positive', 0.579,  0,  15,  True],
+        [TBS.SYMPTOMATIC,    'negative', 0.421,  0,  15,  True],
+        [TBS.ASYMPTOMATIC,   'positive', 0.579,  0,  15,  True],
+        [TBS.ASYMPTOMATIC,   'negative', 0.421,  0,  15,  True],
+        [TBS.NON_INFECTIOUS, 'positive', 0.579,  0,  15,  True],
+        [TBS.NON_INFECTIOUS, 'negative', 0.421,  0,  15,  True],
         # HIV-, children
-        [TBSL.SYMPTOMATIC,    'positive', 0.51,   0,  15,  False],
-        [TBSL.SYMPTOMATIC,    'negative', 0.49,   0,  15,  False],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.51,   0,  15,  False],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.49,   0,  15,  False],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.51,   0,  15,  False],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.49,   0,  15,  False],
+        [TBS.SYMPTOMATIC,    'positive', 0.51,   0,  15,  False],
+        [TBS.SYMPTOMATIC,    'negative', 0.49,   0,  15,  False],
+        [TBS.ASYMPTOMATIC,   'positive', 0.51,   0,  15,  False],
+        [TBS.ASYMPTOMATIC,   'negative', 0.49,   0,  15,  False],
+        [TBS.NON_INFECTIOUS, 'positive', 0.51,   0,  15,  False],
+        [TBS.NON_INFECTIOUS, 'negative', 0.49,   0,  15,  False],
     ]
 
     def __init__(self, df=None, datafile=None, **kwargs):
@@ -127,12 +127,12 @@ class CAD(Dx):
     columns = 'state,result,probability'.split(',')
     default_data = [
         #state                result      prob
-        [TBSL.SYMPTOMATIC,    'positive', 0.66],
-        [TBSL.SYMPTOMATIC,    'negative', 0.34],
-        [TBSL.ASYMPTOMATIC,   'positive', 0.66],
-        [TBSL.ASYMPTOMATIC,   'negative', 0.34],
-        [TBSL.NON_INFECTIOUS, 'positive', 0.66],
-        [TBSL.NON_INFECTIOUS, 'negative', 0.34],
+        [TBS.SYMPTOMATIC,    'positive', 0.66],
+        [TBS.SYMPTOMATIC,    'negative', 0.34],
+        [TBS.ASYMPTOMATIC,   'positive', 0.66],
+        [TBS.ASYMPTOMATIC,   'negative', 0.34],
+        [TBS.NON_INFECTIOUS, 'positive', 0.66],
+        [TBS.NON_INFECTIOUS, 'negative', 0.34],
     ]
 
     def __init__(self, df=None, datafile=None, **kwargs):
@@ -251,7 +251,7 @@ class DxDelivery(ss.Intervention):
 
         tb = tbsim.get_tb(self.sim)
         tb_states = tb.state[neg_uids]
-        has_tb = np.isin(tb_states, TBSL.active_tb_states())
+        has_tb = np.isin(tb_states, TBS.active_tb_states())
         false_neg_uids = neg_uids[has_tb]
 
         if len(false_neg_uids) > 0 and self.care_seeking_multiplier_value != 1.0:
