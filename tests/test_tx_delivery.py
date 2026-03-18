@@ -151,12 +151,16 @@ def test_full_cascade():
         name='confirm',
         product=tbsim.Xpert(),
         coverage=0.8,
-        eligibility=lambda sim: sim.people.screen.screen_positive.uids,
+        eligibility=lambda sim: (
+            sim.people.screen.screen_positive
+            & ~sim.people.confirm.tested
+            & sim.people.alive
+        ).uids,
         result_state='diagnosed',
     )
     treat = tbsim.TxDelivery(product=tbsim.DOTS())
 
-    sim = make_sim(interventions=[screen, confirm, treat])
+    sim = make_sim(n_agents=5000, interventions=[screen, confirm, treat])
     sim.run()
 
     assert sim.results.screen.n_tested.sum() > 0
