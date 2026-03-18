@@ -1,9 +1,11 @@
-import tbsim
-import starsim as ss
+"""
+TB interventions example: scenarios with BCG, TPT, BetaByYear, and Dx/Tx cascade.
+"""
+
 import sciris as sc
+import starsim as ss
+import tbsim
 import matplotlib.pyplot as plt
-import pprint as pprint
-import pandas as pd
 
 # Simple default parameters
 DEFAULT_SPARS = dict(
@@ -17,142 +19,98 @@ DEFAULT_SPARS = dict(
 DEFAULT_TBPARS = dict(
     beta=ss.peryear(0.0025),
     init_prev=ss.bernoulli(p=0.25),
-    dt=ss.days(7),      
-    start=ss.date('1975-02-01'),
-    stop=ss.date('2030-12-31'),
 )
 
 # Simple age distribution
-age_data = pd.DataFrame({
+age_data = sc.dataframe({
     'age': [0, 2, 4, 10, 15, 20, 30, 40, 50, 60, 70, 80],
-    'value': [20, 10, 25, 15, 10, 5, 4, 3, 2, 1, 1, 1]  # Skewed toward younger ages
+    'value': [20, 10, 25, 15, 10, 5, 4, 3, 2, 1, 1, 1]
 })
+
 
 def build_sim(scenario=None, spars=None):
     """
-    Build and return a complete Starsim-based simulation instance for TB modeling,
-    incorporating optional interventions and user-defined parameters.
+    Build a TB simulation with optional interventions.
 
     Args:
-        scenario (dict, optional): A dictionary defining scenario-specific components,
-            such as intervention parameters and TB simulation settings. Expected keys:
-                - 'tbpars' (dict): TB-specific simulation parameters.
-                - 'tptintervention' (dict, optional): Parameters for TPT intervention.
-                - 'bcgintervention' (dict, optional): Parameters for BCG intervention.
-        spars (dict, optional): General simulation parameters (e.g., timestep, duration).
-            These override values in the DEFAULT_SPARS global dictionary.
+        scenario (dict, optional): Scenario-specific components including:
+            - 'tbpars' (dict): TB-specific simulation parameters.
+            - 'bcgintervention' (dict/list): BCG intervention parameters.
+            - 'tptintervention' (dict/list): TPT intervention parameters.
+            - 'betabyyear' (dict/list): BetaByYear intervention parameters.
+        spars (dict, optional): Sim parameter overrides.
 
     Returns:
-        ss.Sim: A fully initialized simulation object containing:
-            - A population (`People`) with TB-related extra states.
-            - A TB disease module initialized with merged parameters.
-            - A list of social and household network layers.
-            - Optional interventions (TPT, BCG or Beta) as defined by the scenario.
-            - Demographic processes like births and deaths.
-            - Core simulation parameters merged from defaults and user inputs.
-
-    Notes:
-        - If no parameters are provided, it will use the default values of the participating
-          simulation components.
-    
-    Example:
-        sim = build_sim(scenario=my_scenario, spars={'n_steps': 200})
-        sim.run()
+        tbsim.Sim: A fully initialized simulation.
     """
     scenario = scenario or {}
-    
+
     # Merge parameters
-    spars = {**DEFAULT_SPARS, **(spars or {})}
+    spars = sc.objdict({**DEFAULT_SPARS, **(spars or {})})
     tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})}
-    
+
     # Create interventions list
     interventions = []
-    
+
     # Add BCG interventions (can be single or multiple)
     bcg_params = scenario.get('bcgintervention')
     if bcg_params:
         if isinstance(bcg_params, dict):
-            # Single BCG intervention
             interventions.append(tbsim.BCGRoutine(pars=bcg_params))
         elif isinstance(bcg_params, list):
-            # Multiple BCG interventions
             for i, params in enumerate(bcg_params):
-                params['name'] = f'BCG_{i}'  # Give unique name
+                params['name'] = f'BCG_{i}'
                 interventions.append(tbsim.BCGRoutine(pars=params))
-    
+
     # Add TPT interventions (can be single or multiple)
     tpt_params = scenario.get('tptintervention')
     if tpt_params:
         if isinstance(tpt_params, dict):
-            # Single TPT intervention
             interventions.append(tbsim.TPTSimple(pars=tpt_params))
         elif isinstance(tpt_params, list):
-            # Multiple TPT interventions
             for i, params in enumerate(tpt_params):
-                params['name'] = f'TPT_{i}'  # Give unique name
+                params['name'] = f'TPT_{i}'
                 interventions.append(tbsim.TPTSimple(pars=params))
-    
+
     # Add Beta interventions (can be single or multiple)
     beta_params = scenario.get('betabyyear')
     if beta_params:
         if isinstance(beta_params, dict):
-            # Single Beta intervention
             interventions.append(tbsim.BetaByYear(pars=beta_params))
         elif isinstance(beta_params, list):
-            # Multiple Beta interventions
             for i, params in enumerate(beta_params):
-                params['name'] = f'Beta_{i}'  # Give unique name
+                params['name'] = f'Beta_{i}'
                 interventions.append(tbsim.BetaByYear(pars=params))
-    
-    # Create simulation components
-    pop = ss.People(n_agents=500, age_data=age_data)
-    tb = tbsim.TB_LSHTM(pars=tbpars, name='tb')
+
+    # Create simulation using tbsim.Sim
     networks = [
         ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
-        tbsim.HouseholdNet()
+        tbsim.HouseholdNet(),
     ]
-    
-    # Create and return simulation
-    return ss.Sim(
-        people=pop,
+
+    spars.n_agents = 500
+
+    return tbsim.Sim(
+        people=ss.People(n_agents=spars.n_agents, age_data=age_data),
         networks=networks,
         interventions=interventions,
-        diseases=[tb],
-        pars=spars,
+        tb_pars=tbpars,
+        sim_pars=spars,
     )
 
-def get_scenarios():
-    """ HELP
-    Define a set of simulation scenarios for evaluating TB interventions.
 
-    Returns:
-        dict: A dictionary where each key is the name of a scenario and the value is 
-        a dictionary of simulation parameters. Each scenario may include:
-            - 'name' (str): A human-readable scenario name.
-            - 'tbpars' (dict, optional): Parameters controlling the simulation timeframe.
-            - 'bcgintervention' (dict, optional): BCG vaccine intervention settings.
-            - 'tptintervention' (dict, optional): Tuberculosis Preventive Therapy settings.
-            - 'betabyyear' : (dict, optional): For changing the value of beta during the same simulation period.
-    
-    Scenarios included:
-        - 'Baseline': No intervention, default simulation window.
-        - 'BCG': BCG vaccination with 90% coverage.
-        - 'TPT': TPT with full eligibility, conditional on HIV status.
-    """
-    
+def get_scenarios():
+    """Define simulation scenarios for evaluating TB interventions."""
     return {
         'Baseline': {
             'name': 'No interventions',
-            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
         },
         'Baseline and BetaByYear': {
             'name': 'No interventions',
-            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
-            'betabyyear':dict(years=[1990, 2000], x_beta=[0.5, 1.4])
+            'betabyyear': dict(years=[1990, 2000], x_beta=[0.5, 1.4]),
         },
         'Single BCG': {
             'name': 'Single BCG intervention',
-            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
             'bcgintervention': dict(
                 coverage=0.8,
                 start=ss.date('1980-01-01'),
@@ -160,49 +118,87 @@ def get_scenarios():
                 age_range=[1, 5],
             ),
         },
-        
-        'Multiple BCG': {
-            'name': 'Multiple BCG interventions',
-            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
-            'bcgintervention': [
-                dict(
-                    coverage=0.9,
-                    start=ss.date('1980-01-01'),
-                    stop=ss.date('2020-12-31'),
-                    age_range=[0, 2],           # For children
-                ),
-                dict(
-                    coverage=0.3,
-                    start=ss.date('1985-01-01'),
-                    stop=ss.date('2015-12-31'),
-                    age_range=[25, 40],         # For adults
-                ),
-            ],
-        },
+        # NOTE: Multiple BCG scenario currently broken (duplicate product module registration)
+        # 'Multiple BCG': {
+        #     'name': 'Multiple BCG interventions',
+        #     'bcgintervention': [
+        #         dict(coverage=0.9, start=ss.date('1980-01-01'), stop=ss.date('2020-12-31'), age_range=[0, 2]),
+        #         dict(coverage=0.3, start=ss.date('1985-01-01'), stop=ss.date('2015-12-31'), age_range=[25, 40]),
+        #     ],
+        # },
     }
+
 
 def run_scenarios(plot=True):
     """Run all scenarios and optionally plot results."""
-    import tbsim.plots as pl
-    
     scenarios = get_scenarios()
     results = {}
-    
+
     for name, scenario in scenarios.items():
         print(f"\nRunning: {name}")
         sim = build_sim(scenario=scenario)
         sim.run()
         results[name] = sim.results.flatten()
-    
+
     if plot:
-        pl.plot_combined(results, 
-                        heightfold=2, outdir='results/interventions')
-                        
-                        # filter=tbsim.FILTERS.important_metrics)
+        tbsim.plot(results, row_height=2)
         plt.show()
-    
+
     return results
+
+
+def run_dx_tx_cascade():
+    """
+    Demonstrate the Dx/Tx product + delivery API.
+
+    Cascade: HealthSeekingBehavior -> CXR screen -> Xpert confirm -> DOTS treat
+    """
+    # Cascade interventions
+    hsb = tbsim.HealthSeekingBehavior()
+    screen = tbsim.DxDelivery(
+        name='screen',
+        product=tbsim.CAD(),
+        coverage=0.9,
+        result_state='screen_positive',
+    )
+    confirm = tbsim.DxDelivery(
+        name='confirm',
+        product=tbsim.Xpert(),
+        coverage=0.8,
+        eligibility=lambda sim: (
+            sim.people.screen.screen_positive
+            & ~sim.people.confirm.tested
+        ).uids,
+        result_state='diagnosed',
+    )
+    treat = tbsim.TxDelivery(product=tbsim.DOTS())
+
+    sim = tbsim.Sim(
+        n_agents=1000,
+        start='2000',
+        stop='2020',
+        rand_seed=42,
+        init_prev=ss.bernoulli(p=0.25),
+        beta=ss.peryear(0.0025),
+        interventions=[hsb, screen, confirm, treat],
+    )
+    sim.run()
+
+    # Print summary
+    r = sim.results
+    print(f"\nDx/Tx Cascade Results:")
+    print(f"  Screened:  {r.screen.n_tested.values.sum()}")
+    print(f"  Confirmed: {r.confirm.n_tested.values.sum()}")
+    print(f"  Treated:   {r.txdelivery.n_treated.values.sum()}")
+    print(f"  Cured:     {r.txdelivery.cum_success.values[-1]}")
+    print(f"  Failed:    {r.txdelivery.cum_failure.values[-1]}")
+    return sim
+
 
 if __name__ == '__main__':
     # Run all scenarios
     results = run_scenarios(plot=True)
+
+    # Run Dx/Tx cascade example
+    print("\n--- Dx/Tx Cascade Example ---")
+    sim = run_dx_tx_cascade()

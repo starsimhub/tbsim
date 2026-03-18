@@ -40,7 +40,7 @@ dependencies = [
   "networkx",
   "matplotlib",
   "seaborn",
-  "starsim>=3.1.1",
+  "starsim>=3.2.1",
 ]
 
 [project.optional-dependencies]
@@ -60,6 +60,10 @@ dev = [
 [project.urls]
 "Website" = "https://starsim.org/tbsim"
 "Source" = "https://github.com/starsimhub/tbsim/"
+
+[tool.pytest.ini_options]
+env = ["MPLBACKEND=Agg"]
+pythonpath = ["."]
 
 [tool.setuptools.packages.find]
 where = ["."]

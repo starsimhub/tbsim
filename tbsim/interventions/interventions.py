@@ -26,7 +26,7 @@ class TBProductRoutine(ss.Intervention):
         coverage (ss.bernoulli): Fraction of eligible individuals who accept (applied once per person).
         start / stop (ss.date): Campaign window.
         age_range (list or None): ``[min_age, max_age]`` filter, or ``None`` to skip.
-        eligible_states (list or None): List of disease-state values (e.g. ``[TBSL.INFECTION]``) to filter on,
+        eligible_states (list or None): List of disease-state values (e.g. ``[TBS.INFECTION]``) to filter on,
             or ``None`` to skip.
         eligibility (callable or None): User-provided ``fn(sim) -> BoolArr | uids`` for custom filtering
             (passed through to ``ss.Intervention``).

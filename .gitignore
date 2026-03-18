@@ -1,5 +1,7 @@
-# Results files
+# Custom
 figs/
+.claude/
+.entire/
 
 # Calibration databases
 *.db

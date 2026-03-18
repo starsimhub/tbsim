@@ -15,9 +15,7 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
 - **Customizable Parameters:** Allows adjustment of various parameters to simulate different scenarios.
 - **Visualization Tools:** Includes tools for visualizing the simulation results.
 - **IBM and NBM:** Leverages Individual-Based Models and Network-Based Models for more accurate and comprehensive simulations.
-- **TB natural history model structures:**
-  - **Natural history model** (`TB_EMOD`): Agent-based (stochastic) TB progression with latent infection split into fast/slow pathways, progression through an active pre-symptomatic stage, and active disease stratified into smear-positive, smear-negative, and extra-pulmonary states, with TB mortality. See Abu-Raddad et al. (2009) for background: https://doi.org/10.1073/pnas.0901720106
-  - **LSHTM-style spectrum model** (`TB_LSHTM`, `TB_LSHTM_Acute`): Agent-based implementation of the LSHTM “spectrum of TB disease” natural history (susceptible → infection/cleared → non-infectious → asymptomatic → symptomatic → treatment/treated/death; optional acute infectious state), designed to support evaluating active case-finding / population-wide screening algorithms (e.g., CXR and NAAT workflows) as in Schwalb et al. 2025 ([PLOS Glob Public Health](https://journals.plos.org/globalpublichealth/article?id=10.1371/journal.pgph.0005050)).
+- **TB natural history model:** (`TB`, `TBAcute`): Agent-based implementation of the LSHTM “spectrum of TB disease” natural history (susceptible → infection/cleared → non-infectious → asymptomatic → symptomatic → treatment/treated/death; optional acute infectious state), designed to support evaluating active case-finding / population-wide screening algorithms (e.g., CXR and NAAT workflows) as in Schwalb et al. 2025 ([PLOS Glob Public Health](https://journals.plos.org/globalpublichealth/article?id=10.1371/journal.pgph.0005050)).
 
 ## Getting Started
 
@@ -47,7 +45,7 @@ TBsim is not yet released on PyPI, so you need to install from source:
 1. Navigate to the folder `tbsim_examples`
 2. Run the script:
    ```bash
-   python run_tb_lshtm.py
+   python run_tb_acute.py
    ```
 3. Running this script should result in basic charts being displayed.
 
@@ -57,7 +55,7 @@ Or run directly in Python:
 import starsim as ss
 import tbsim
 
-sim = ss.Sim(diseases=tbsim.TB_LSHTM(), networks='random', demographics=True, start=2000, stop=2010, dt='month')
+sim = ss.Sim(diseases=tbsim.TB(), networks='random', demographics=True, start=2000, stop=2010, dt='month')
 sim.run()
 sim.plot()
 ```

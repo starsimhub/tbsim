@@ -3,15 +3,12 @@
 
 import os
 import datetime as ddtt
-import warnings
-from enum import IntEnum
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 from lifelines import KaplanMeierFitter
 
-import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import seaborn as sns
 import networkx as nx
@@ -20,9 +17,7 @@ import sciris as sc
 import starsim as ss
 import tbsim
 
-__all__ = ['DwellTime', 'DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor']
-
-warnings.simplefilter(action='ignore', category=FutureWarning)
+__all__ = ['DwellTime', 'DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor', 'HouseholdStats']
 
 
 class DwellTime(ss.Analyzer):
@@ -41,7 +36,6 @@ class DwellTime(ss.Analyzer):
         file_path (str, optional):             Path to a single CSV file with dwell-time data.
         directory (str, optional):             Directory containing CSV result files for aggregation.
         prefix (str, optional):                File prefix filter used with *directory*.
-        states_ennumerator (IntEnum, optional): State enumeration class (default ``tbsim.TBS``).
         scenario_name (str, optional):         Label for the simulation scenario.
         debug (bool, optional):                Enable verbose output.
 
@@ -61,17 +55,16 @@ class DwellTime(ss.Analyzer):
 
         During simulation::
 
-            sim = ss.Sim(diseases=[TB_EMOD()], analyzers=DwellTime(scenario_name="Baseline"))
+            sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
             sim.run()
             sim.analyzers[0].plot('validation')
     """
 
     def __init__(self, data=None, file_path=None, directory=None, prefix='',
-                 states_ennumerator=None, scenario_name='', debug=False):
+                 scenario_name='', debug=False):
         """Auto-detect mode (plotter, aggregate, or analyzer) from the supplied arguments."""
         self.debug = debug
         self.scenario_name = scenario_name
-        self.eSTATES = states_ennumerator or tbsim.TBS
         self.file_path = file_path
 
         if isinstance(data, pd.DataFrame):
@@ -125,6 +118,8 @@ class DwellTime(ss.Analyzer):
             valid = ', '.join(sorted(kinds))
             raise ValueError(
                 f"Unknown plot kind {kind!r}. Valid kinds: {valid}")
+        if self._data_error():
+            return
         return kinds[kind](self, **kwargs)
 
     # ------------------------------------------------------------------
@@ -133,9 +128,6 @@ class DwellTime(ss.Analyzer):
 
     def _plot_histogram(self, subtitle=""):
         """Histograms with KDE for dwell-time distributions per state."""
-        if self._data_error():
-            return
-
         df = self.data
         states = df['state_name'].unique()
         num_states = len(states)
@@ -190,9 +182,6 @@ class DwellTime(ss.Analyzer):
     def _plot_kaplan_meier(self, dwell_time_col='dwell_time',
                            event_observed_col=None):
         """Kaplan-Meier survival curve for dwell times."""
-        if self._data_error():
-            return
-
         data = self.data
         durations = data[dwell_time_col]
         event_observed = (data[event_observed_col]
@@ -215,9 +204,6 @@ class DwellTime(ss.Analyzer):
                       curved_ratio=0.09, colormap='Paired', onlymodel=True,
                       graphseed=42):
         """Directed graph of state transitions with curved edges."""
-        if self._data_error():
-            return
-
         df = self.data
         if states is not None:
             df = df[df['state_name'].isin(states)]
@@ -297,13 +283,9 @@ class DwellTime(ss.Analyzer):
 
     def _plot_validation(self):
         """Overlaid histograms for dwell-time validation."""
-        if self._data_error():
-            return
-
-        fig, ax = plt.subplots()
         data = self.data
         model_states = data['state_name'].unique()
-        plt.figure(figsize=(15, 10), facecolor='black')
+        fig, ax = plt.subplots(figsize=(15, 10))
         for state in model_states:
             dwell_times = data[data['state_name'] == state]['dwell_time']
             if dwell_times.empty:
@@ -352,41 +334,12 @@ class DwellTime(ss.Analyzer):
 
         return pd.concat(data_frames, ignore_index=True)
 
-    def save_combined_dataframe(self, output_file):
-        """Save the combined DataFrame to a CSV file."""
-        if self.data is None or self.data.empty:
-            print("No data available to save.")
-            return
-        try:
-            self.data.to_csv(output_file, index=False)
-            if self.debug:
-                print(f"Combined DataFrame saved to {output_file}")
-        except Exception as e:
-            print(f"Error saving DataFrame to {output_file}: {e}")
-
-        return
-
     # ------------------------------------------------------------------
     # Analyzer methods (from former DwtAnalyzer)
     # ------------------------------------------------------------------
 
-    def _initialize_dataframes(self):
-        """Initialize internal DataFrames on the first simulation step."""
-        agent_ids = self.sim.people.auids.copy()
-        population = len(agent_ids)
-        new_logs = pd.DataFrame({
-            'agent_id': agent_ids,
-            'last_state': np.full(population, -1.0),
-            'last_state_time': np.zeros(population)
-        })
-        # The original code did not assign new_logs; keeping the same
-        # behaviour (the _check_for_new_borns call fills _latest_sts_df).
-        return
-
     def step(self):
         """Execute one time step of dwell time analysis."""
-        if not self.sim.ti:
-            self._initialize_dataframes()
         self._check_for_new_borns()
         self._update_state_change_data()
         self._record_natural_deaths()
@@ -430,7 +383,7 @@ class DwellTime(ss.Analyzer):
         """Record dwell times for agents who died from natural causes."""
         ti = self.ti
         dead_uids = ss.uids(self.sim.people.dead)
-        if not dead_uids.all():
+        if len(dead_uids) == 0:
             return
 
         relevant_rows = self._latest_sts_df[
@@ -465,22 +418,6 @@ class DwellTime(ss.Analyzer):
             })
             self._latest_sts_df = pd.concat(
                 [self._latest_sts_df, new_logs], ignore_index=True)
-
-        if len(self.sim.people.auids) != len(self._latest_sts_df):
-            new_agent_ids = list(
-                set(self.sim.people.auids)
-                - set(self._latest_sts_df.agent_id))
-            new_logs = pd.DataFrame({
-                'agent_id': new_agent_ids,
-                'last_state': np.full(len(new_agent_ids), -1.0),
-                'last_state_time': np.zeros(len(new_agent_ids))
-            })
-            if not new_logs.empty:
-                self._latest_sts_df = pd.concat(
-                    [self._latest_sts_df,
-                     new_logs.loc[:, ~new_logs.isna().all()]],
-                    ignore_index=True, copy=False)
-
         return
 
     def finalize(self):
@@ -500,13 +437,9 @@ class DwellTime(ss.Analyzer):
                 age=self.sim.people.age[
                     ss.uids(relevant_rows['agent_id'].values)].copy())
 
-        tb = tbsim.get_tb(self.sim)
-        if isinstance(tb, tbsim.TB_LSHTM):
-            self.eSTATES = tbsim.TBSL
-
         state_dict = {
             state.value: state.name.replace('_', ' ').title()
-            for state in self.eSTATES}
+            for state in tbsim.TBS}
         state_dict[-3] = 'NON-TB DEATH'
         state_dict[-2] = 'NEVER INFECTED'
         self.data['state_name'] = self.data['state'].map(state_dict)
@@ -517,10 +450,7 @@ class DwellTime(ss.Analyzer):
             axis=1)
         self.data['state_name'] = self.data.apply(
             lambda row: f"{row['state']}.{row['state_name']}", axis=1)
-        self.data['state_name'] = self.data['state_name'].replace(
-            'None', 'Susceptible')
-
-        self.file_path = self._save_to_file()
+        self.data['state_name'] = self.data['state_name'].replace('None', 'Susceptible')
 
         return
 
@@ -542,30 +472,14 @@ class DwellTime(ss.Analyzer):
 
         return
 
-    def _save_to_file(self):
+    def save(self, filename='dwelltime.csv'):
         """Save dwell time data to CSV and metadata files."""
-        resdir = os.path.join(os.getcwd(), 'results')
-        os.makedirs(resdir, exist_ok=True)
-        t = ddtt.datetime.now()
-        prefix = sc.sanitizefilename(self.scenario_name)
-        if not prefix:
-            prefix = 'dwt_logs'
-        t = t.strftime("%m%d%H%M%S")
-        fn = os.path.join(resdir, f'{prefix}-{t}.csv')
-        self.data.to_csv(fn, index=False)
+        sc.makefilepath(filename, makedirs=True)
+        self.data.to_csv(filename, index=False)
+        return
 
-        fn_meta = os.path.join(resdir, f'{prefix}-{t}.json')
-        with open(fn_meta, 'w') as f:
-            f.write(f'{self.sim.pars}')
-
-        print(f"===> Dwell time logs saved to:\n {fn}\n")
-        return fn
-
-    def validate_dwell_time_distributions(self, expected_distributions=None):
+    def validate_dwell_time_distributions(self, expected_distributions):
         """Validate dwell time distributions using KS tests."""
-        expected_distributions = (
-            expected_distributions or self.expected_distributions)
-
         print("Validating dwell time distributions...")
         for state, expected_cdf in expected_distributions.items():
             dwell_times = self.data[
@@ -612,7 +526,7 @@ class DwellTime(ss.Analyzer):
     @staticmethod
     def _select_graph_pos(G, layout='shell_layout', seed=42):
         """Select a NetworkX layout algorithm for graph visualizations."""
-        func = getattr(x, layout)
+        func = getattr(nx, layout)
         if layout == 'spring_layout':
             return func(G, seed=seed)
         else:
@@ -631,3 +545,338 @@ DwellTime._PLOT_KINDS = {
 DwtPlotter = DwellTime
 DwtPostProcessor = DwellTime
 DwtAnalyzer = DwellTime
+
+
+class HouseholdStats(ss.Analyzer):
+    """
+    Track household size, age, and contact-mixing statistics over time.
+
+    Works with any network that exposes a ``household_ids`` state (e.g.
+    ``starsim.HouseholdNet``).  At each timestep the
+    analyzer counts alive agents per household and records summary statistics.
+
+    Args:
+        network_name (str): Name of the household network on ``sim.networks``
+            (default ``'householdnet'``).
+        age_bins (tuple): Bin edges for the age distribution histogram
+            (default ``(0, 5, 15, 50, 100)``).
+
+    Results (per timestep):
+        mean_hh_size, median_hh_size, max_hh_size, n_households,
+        mean_hh_age, median_hh_age, mean_age, and one count per age bin.
+
+    Plots:
+        ``plot_stats()`` -- four-panel figure: household size over time,
+            number of households, average household age over time, and
+            initial vs. final household size distribution.
+        ``plot_matrix()`` -- three-panel figure: age distribution over time,
+            age-mixing matrix at simulation start, age-mixing matrix at end.
+        ``plot_normalized_matrix()`` -- four-panel figure: contacts per person
+            (C_ij / n_j) and proportionate mixing ratio (C_ij / E_ij) at
+            simulation start and end.
+        ``plot()`` -- calls all three of the above.
+
+    Example::
+
+        import starsim as ss
+        import starsim_examples as sse
+        import tbsim
+
+        dhs_data = ...  # pandas DataFrame with hh_id and ages columns
+        net = ss.HouseholdNet(dhs_data=dhs_data)
+        analyzer = tbsim.HouseholdStats(network_name='householdnet')
+        sim = ss.Sim(
+            diseases='sis', networks=net,
+            demographics=[ss.Pregnancy(fertility_rate=20), ss.Deaths(death_rate=10)],
+            analyzers=analyzer,
+        )
+        sim.run()
+        analyzer.plot()
+    """
+
+    def __init__(self, network_name='householdnet', age_bins=(0, 5, 15, 50, 100), **kwargs):
+        super().__init__(**kwargs)
+        self.network_name = network_name
+        self.age_bins = list(age_bins)
+        self.hh_size_hists = []         # per-timestep arrays of per-household sizes
+        self.age_mixing_initial = None  # age-mixing matrix at t=0
+        self.age_mixing_final = None    # age-mixing matrix at last step
+        self.age_counts_initial = None  # per-bin population counts at t=0
+        self.age_counts_final = None    # per-bin population counts at last step
+        return
+
+    def init_results(self):
+        super().init_results()
+        results = [
+            ss.Result('mean_hh_size'),
+            ss.Result('median_hh_size'),
+            ss.Result('max_hh_size'),
+            ss.Result('n_households'),
+            ss.Result('mean_hh_age'),
+            ss.Result('median_hh_age'),
+            ss.Result('mean_age'),
+        ]
+        for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:]):
+            results.append(ss.Result(f'age_{lo}_{hi}'))
+        self.define_results(*results)
+        return
+
+    def step(self):
+        sim = self.sim
+        ti = sim.ti
+        net = sim.networks[self.network_name]
+        ppl = sim.people
+        alive = ppl.alive
+
+        # --- Gather per-agent data and sort by household for efficient grouping ---
+        hh_ids = net.household_ids[alive.uids]
+        ages = ppl.age[alive.uids]
+
+        sort_idx = np.argsort(hh_ids)
+        hh_ids_sorted = hh_ids[sort_idx]
+        ages_sorted = ages[sort_idx]
+
+        unique_ids, counts = np.unique(hh_ids_sorted, return_counts=True)
+        split_pts = np.cumsum(counts)[:-1]
+        hh_age_groups = np.split(ages_sorted, split_pts)
+
+        # --- Household sizes ---
+        self.results['mean_hh_size'][ti] = np.mean(counts) if len(counts) else 0
+        self.results['median_hh_size'][ti] = np.median(counts) if len(counts) else 0
+        self.results['max_hh_size'][ti] = np.max(counts) if len(counts) else 0
+        self.results['n_households'][ti] = len(unique_ids)
+        self.hh_size_hists.append(counts.copy())
+
+        # --- Per-household mean age ---
+        hh_mean_ages = np.array([np.mean(g) for g in hh_age_groups])
+        self.results['mean_hh_age'][ti] = np.mean(hh_mean_ages) if len(hh_mean_ages) else 0
+        self.results['median_hh_age'][ti] = np.median(hh_mean_ages) if len(hh_mean_ages) else 0
+
+        # --- Population age distribution ---
+        self.results['mean_age'][ti] = np.mean(ages) if len(ages) else 0
+        for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:]):
+            self.results[f'age_{lo}_{hi}'][ti] = np.sum((ages >= lo) & (ages < hi))
+
+        # --- Age-mixing matrix (pairwise network contacts) ---
+        n_bins = len(self.age_bins) - 1
+        mix = np.zeros((n_bins, n_bins), dtype=float)
+        p1, p2 = net.edges.p1, net.edges.p2
+        if len(p1) > 0:
+            bins_p1 = np.clip(np.digitize(ppl.age[p1], self.age_bins) - 1, 0, n_bins - 1)
+            bins_p2 = np.clip(np.digitize(ppl.age[p2], self.age_bins) - 1, 0, n_bins - 1)
+            np.add.at(mix, (bins_p1, bins_p2), 1)
+            mix = (mix + mix.T) / 2
+
+        age_counts = np.array([
+            np.sum((ages >= lo) & (ages < hi))
+            for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:])
+        ], dtype=float)
+
+        if ti == 0:
+            self.age_mixing_initial = mix.copy()
+            self.age_counts_initial = age_counts.copy()
+        self.age_mixing_final = mix          # updated every step; final value persists
+        self.age_counts_final = age_counts   # updated every step; final value persists
+
+        return
+
+    def finalize_results(self):
+        super().finalize_results()
+        self.hh_size_hists = [np.array(h) for h in self.hh_size_hists]
+        return
+
+    def plot(self, **kwargs):
+        """Plot all household statistics (calls plot_stats, plot_matrix, and plot_normalized_matrix)."""
+        fig1 = self.plot_stats(**kwargs)
+        fig2 = self.plot_matrix(**kwargs)
+        fig3 = self.plot_normalized_matrix(**kwargs)
+        return fig1, fig2, fig3
+
+    def plot_stats(self, **kwargs):
+        """Four-panel figure: household size, n_households, average household age, size distribution."""
+        kw = ss.plot_args(kwargs)
+        timevec = self.sim.t.timevec
+
+        with ss.style(**kw.style):
+            fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+            # -- Household size over time --
+            ax = axes[0, 0]
+            ax.plot(timevec, self.results['mean_hh_size'], label='Mean')
+            ax.plot(timevec, self.results['median_hh_size'], label='Median', linestyle='--')
+            ax.set_ylabel('Household size')
+            ax.set_xlabel('Year')
+            ax.set_title('Household size over time')
+            ax.legend()
+            ax.set_ylim(bottom=0)
+
+            # -- Number of households --
+            ax = axes[0, 1]
+            ax.plot(timevec, self.results['n_households'])
+            ax.set_ylabel('Count')
+            ax.set_xlabel('Year')
+            ax.set_title('Number of households')
+            ax.set_ylim(bottom=0)
+
+            # -- Average household age over time --
+            ax = axes[1, 0]
+            ax.plot(timevec, self.results['mean_hh_age'], label='Mean')
+            ax.plot(timevec, self.results['median_hh_age'], label='Median', linestyle='--')
+            ax.set_ylabel('Mean age (years)')
+            ax.set_xlabel('Year')
+            ax.set_title('Average household age over time')
+            ax.legend()
+            ax.set_ylim(bottom=0)
+
+            # -- Initial vs final household size distribution --
+            ax = axes[1, 1]
+            if len(self.hh_size_hists) >= 2:
+                initial_sizes = self.hh_size_hists[0]
+                final_sizes = self.hh_size_hists[-1]
+                max_size = int(max(np.max(initial_sizes), np.max(final_sizes)))
+                size_range = np.arange(1, max_size + 1)
+                initial_counts = np.array([np.sum(initial_sizes == s) for s in size_range]) / len(initial_sizes)
+                final_counts = np.array([np.sum(final_sizes == s) for s in size_range]) / len(final_sizes)
+                width = 0.35
+                ax.bar(size_range - width/2, initial_counts, width, edgecolor='black', label=f'Initial (t={float(timevec[0]):.0f})')
+                ax.bar(size_range + width/2, final_counts, width, edgecolor='black', label=f'Final (t={float(timevec[-1]):.0f})')
+                ax.set_xlabel('Household size')
+                ax.set_ylabel('Proportion of households')
+                ax.set_title('Household size distribution')
+                ax.set_xticks(size_range)
+                ax.legend()
+
+            plt.tight_layout()
+
+        return ss.return_fig(fig, **kw.return_fig)
+
+    def plot_normalized_matrix(self, **kwargs):
+        """Four-panel figure: contacts-per-person and proportionate-mixing ratio at start and end.
+
+        Top row: contacts per person in the x-axis age group (C_ij / n_j).
+        Bottom row: departure from proportionate mixing (C_ij / E_ij), where
+        E_ij = C_total * p_i * p_j and p_k = n_k / N.
+        Left column: simulation start; right column: simulation end.
+        """
+        kw = ss.plot_args(kwargs)
+        timevec = self.sim.t.timevec
+        bin_labels = [f'{lo}-{hi}' for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:])]
+
+        def _contacts_per_person(mix, counts):
+            """C_ij / n_j — average contacts with age-i individuals per person of age j."""
+            n_j = counts.copy()
+            n_j[n_j == 0] = np.nan
+            return mix / n_j[np.newaxis, :]
+
+        def _prop_mixing_ratio(mix, counts):
+            """C_ij / E_ij where E_ij = C_total * p_i * p_j."""
+            C_total = mix.sum()
+            if C_total == 0:
+                return np.full_like(mix, np.nan)
+            N = counts.sum()
+            if N == 0:
+                return np.full_like(mix, np.nan)
+            p = counts / N
+            expected = C_total * np.outer(p, p)
+            with np.errstate(invalid='ignore', divide='ignore'):
+                ratio = np.where(expected > 0, mix / expected, np.nan)
+            return ratio
+
+        panels = [
+            (self.age_mixing_initial, self.age_counts_initial,
+             f't={float(timevec[0]):.0f}'),
+            (self.age_mixing_final, self.age_counts_final,
+             f't={float(timevec[-1]):.0f}'),
+        ]
+
+        with ss.style(**kw.style):
+            fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+            for col, (mix, counts, t_label) in enumerate(panels):
+                if mix is None or counts is None:
+                    continue
+
+                # -- Contacts per person --
+                ax = axes[0, col]
+                cpp = _contacts_per_person(mix, counts)
+                sns.heatmap(
+                    cpp, ax=ax,
+                    xticklabels=bin_labels, yticklabels=bin_labels,
+                    cmap='YlOrRd', annot=True, fmt='.2f',
+                    cbar_kws={'label': 'Contacts per person'},
+                )
+                ax.set_title(f'Contacts per person ({t_label})')
+                ax.set_xlabel('Age group (contact)')
+                ax.set_ylabel('Age group')
+                ax.invert_yaxis()
+
+                # -- Proportionate mixing ratio --
+                ax = axes[1, col]
+                ratio = _prop_mixing_ratio(mix, counts)
+                # Centre the diverging colormap on 1 (proportionate mixing)
+                vmax = np.nanmax(np.abs(ratio - 1)) + 1 if not np.all(np.isnan(ratio)) else 2
+                sns.heatmap(
+                    ratio, ax=ax,
+                    xticklabels=bin_labels, yticklabels=bin_labels,
+                    cmap='RdBu_r', center=1, vmin=max(0, 2 - vmax), vmax=vmax,
+                    annot=True, fmt='.2f',
+                    cbar_kws={'label': 'Observed / expected contacts'},
+                )
+                ax.set_title(f'Proportionate mixing ratio ({t_label})')
+                ax.set_xlabel('Age group (contact)')
+                ax.set_ylabel('Age group')
+                ax.invert_yaxis()
+
+            plt.tight_layout()
+
+        return ss.return_fig(fig, **kw.return_fig)
+
+    def plot_matrix(self, **kwargs):
+        """Three-panel figure: age distribution over time, initial and final age-mixing matrices."""
+        kw = ss.plot_args(kwargs)
+        timevec = self.sim.t.timevec
+        bin_labels = [f'{lo}-{hi}' for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:])]
+
+        with ss.style(**kw.style):
+            fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+            # -- Age distribution over time (stacked area) --
+            ax = axes[0]
+            bin_data = [np.array(self.results[f'age_{lo}_{hi}']) for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:])]
+            ax.stackplot(timevec, *bin_data, labels=bin_labels, alpha=0.8)
+            ax.set_ylabel('Number of agents')
+            ax.set_xlabel('Year')
+            ax.set_title('Age distribution over time')
+            ax.legend(loc='upper left', fontsize=8)
+
+            # -- Age-mixing matrix: initial --
+            ax = axes[1]
+            if self.age_mixing_initial is not None:
+                sns.heatmap(
+                    self.age_mixing_initial, ax=ax,
+                    xticklabels=bin_labels, yticklabels=bin_labels,
+                    cmap='YlOrRd', annot=True, fmt='.0f',
+                    cbar_kws={'label': 'Contact pairs'},
+                )
+                ax.set_title(f'Age-mixing matrix (t={float(timevec[0]):.0f})')
+                ax.set_xlabel('Age group')
+                ax.set_ylabel('Age group')
+                ax.invert_yaxis()
+
+            # -- Age-mixing matrix: final --
+            ax = axes[2]
+            if self.age_mixing_final is not None:
+                sns.heatmap(
+                    self.age_mixing_final, ax=ax,
+                    xticklabels=bin_labels, yticklabels=bin_labels,
+                    cmap='YlOrRd', annot=True, fmt='.0f',
+                    cbar_kws={'label': 'Contact pairs'},
+                )
+                ax.set_title(f'Age-mixing matrix (t={float(timevec[-1]):.0f})')
+                ax.set_xlabel('Age group')
+                ax.set_ylabel('Age group')
+                ax.invert_yaxis()
+
+            plt.tight_layout()
+
+        return ss.return_fig(fig, **kw.return_fig)

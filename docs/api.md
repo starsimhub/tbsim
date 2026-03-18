@@ -4,9 +4,7 @@ This section provides comprehensive API documentation for all TBsim modules and 
 
 ## Core Modules
 
-::: tbsim.tb_emod
-
-::: tbsim.tb_lshtm
+::: tbsim.tb
 
 ::: tbsim.networks
 

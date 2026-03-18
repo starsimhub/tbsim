@@ -10,59 +10,48 @@ Three scenarios are run over 20 years and compared:
 
 import matplotlib.pyplot as plt
 import starsim as ss
-import tbsim as mtb
-from tbsim.interventions.tb_health_seeking import HealthSeekingBehavior
+import tbsim
 
 
 N_AGENTS  = 3_000
 RAND_SEED = 42
 
-sim_pars = dict(
+common_pars = dict(
+    n_agents  = N_AGENTS,
     start     = ss.date("1990-01-01"),
     stop      = ss.date("2010-12-31"),
     dt        = ss.days(7),
     rand_seed = RAND_SEED,
     verbose   = 0,
-)
-
-tb_pars = dict(
     init_prev   = ss.bernoulli(0.05),
     beta        = ss.peryear(0.20),
     trans_asymp = 0.82,
-    rr_rec      = 0.21,
-    rr_treat    = 3.15,
+    rr_reinfection_rec   = 0.21,
+    rr_reinfection_treat = 3.15,
+    demographics = [ss.Births(pars=dict(birth_rate=20)), ss.Deaths(pars=dict(death_rate=10))],
 )
 
 
 def build_sim(hsb=None):
-    tb  = mtb.TB_LSHTM(pars=tb_pars)
-    pop = ss.People(n_agents=N_AGENTS)
-    net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
-    kwargs = dict(
-        people       = pop,
-        networks     = net,
-        diseases     = tb,
-        demographics = [ss.Births(pars=dict(birth_rate=20)), ss.Deaths(pars=dict(death_rate=10))],
-        pars         = sim_pars,
-    )
+    kwargs = dict(**common_pars)
     if hsb is not None:
         kwargs["interventions"] = hsb
-    return ss.Sim(**kwargs)
+    return tbsim.Sim(**kwargs)
 
 
 scenarios = {
     "Baseline": build_sim(),
 
     "Low rate (10 %/day)": build_sim(
-        HealthSeekingBehavior(pars=dict(
-            initial_care_seeking_rate = ss.perday(0.10),
+        tbsim.HealthSeekingBehavior(pars=dict(
+            initial_care_seeking_rate=ss.perday(0.10),
         ))
     ),
 
     "High rate (40 %/day) + retry": build_sim(
-        HealthSeekingBehavior(pars=dict(
-            initial_care_seeking_rate = ss.perday(0.40),
-            care_retry_steps          = 4,
+        tbsim.HealthSeekingBehavior(pars=dict(
+            initial_care_seeking_rate=ss.perday(0.40),
+            care_retry_steps=4,
         ))
     ),
 }
@@ -77,13 +66,10 @@ if __name__ == "__main__":
         for label, sim in zip(scenarios.keys(), msim.sims)
     }
 
-    mtb.plot_combined(
+    tbsim.plot(
         results,
-        keywords = ["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"],
-        title    = "Health-seeking behaviour – LSHTM TB model",
-        n_cols   = 3,
-        outdir   = "results",
-        dark     = False,
+        select=dict(like=["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"]),
+        title="Health-seeking behaviour – LSHTM TB model",
+        n_cols=3,
     )
     plt.show()
-    

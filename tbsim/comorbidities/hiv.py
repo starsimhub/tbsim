@@ -303,7 +303,7 @@ class TB_HIV_Connector(ss.Connector):
         import tbsim
         from tbsim.comorbidities.hiv import HIV, HivInterventions, TB_HIV_Connector
 
-        tb   = tbsim.TB_LSHTM(name='tb')
+        tb   = tbsim.TB(name='tb')
         hiv  = HIV(name='hiv')
         conn = TB_HIV_Connector()
         intv = HivInterventions()

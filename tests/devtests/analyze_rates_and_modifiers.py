@@ -10,7 +10,6 @@ Date: 2024
 """
 
 import tbsim
-from tbsim.interventions.bcg import BCGVx, BCGRoutine
 import starsim as ss
 import pandas as pd
 import numpy as np
@@ -39,7 +38,7 @@ def analyze_tb_rates_and_modifiers():
     pop = ss.People(n_agents=500, age_data=age_data)
 
     # Initialize TB model
-    tb = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb = tbsim.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     sim = ss.Sim(
@@ -50,7 +49,7 @@ def analyze_tb_rates_and_modifiers():
     )
     sim.init()
 
-    print("TB DISEASE MODEL PARAMETERS (TB_LSHTM)")
+    print("TB DISEASE MODEL PARAMETERS (TB)")
     print("-" * 40)
     print(f"Transmission Rate (beta): {tb.pars.beta}")
     print(f"Initial Prevalence: {tb.pars.init_prev}")
@@ -62,15 +61,12 @@ def analyze_tb_rates_and_modifiers():
     print(f"INFECTION -> CLEARED:        {tb.pars.inf_cle}")
     print(f"INFECTION -> NON_INFECTIOUS: {tb.pars.inf_non}")
     print(f"INFECTION -> ASYMPTOMATIC:   {tb.pars.inf_asy}")
-    print(f"NON_INFECTIOUS -> RECOVERED: {tb.pars.non_rec}")
+    print(f"NON_INFECTIOUS -> CLEARED:      {tb.pars.non_rec}")
     print(f"NON_INFECTIOUS -> ASYMPTOMATIC: {tb.pars.non_asy}")
     print(f"ASYMPTOMATIC -> NON_INFECTIOUS: {tb.pars.asy_non}")
     print(f"ASYMPTOMATIC -> SYMPTOMATIC:    {tb.pars.asy_sym}")
     print(f"SYMPTOMATIC -> ASYMPTOMATIC: {tb.pars.sym_asy}")
-    print(f"SYMPTOMATIC -> TREATMENT:    {tb.pars.sym_treat}")
     print(f"SYMPTOMATIC -> DEAD:         {tb.pars.sym_dead}")
-    print(f"TREATMENT -> SYMPTOMATIC (fail): {tb.pars.fail_rate}")
-    print(f"TREATMENT -> TREATED (complete): {tb.pars.complete_rate}")
     print()
 
     print("BASELINE RISK MODIFIERS")
@@ -90,7 +86,7 @@ def analyze_tb_rates_and_modifiers():
     print("BCG INTERVENTION ANALYSIS")
     print("-" * 40)
 
-    bcg = BCGRoutine(pars={
+    bcg = tbsim.BCGRoutine(pars={
         'coverage': 0.8,
         'age_range': (0, 5),
         'start': ss.date('2000-01-01'),
@@ -98,7 +94,7 @@ def analyze_tb_rates_and_modifiers():
     })
 
     pop_bcg = ss.People(n_agents=500, age_data=age_data)
-    tb_bcg = tbsim.TB_LSHTM(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
+    tb_bcg = tbsim.TB(pars={'beta': ss.peryear(0.01), 'init_prev': 0.25}, name='tb')
     net_bcg = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     sim_bcg = ss.Sim(
