@@ -131,7 +131,7 @@ def test_tx_delivery_custom_eligibility():
     dx = tbsim.DxDelivery(product=tbsim.Xpert())
     tx = tbsim.TxDelivery(
         product=tbsim.DOTS(),
-        eligibility=lambda sim: (sim.people.dxdelivery.diagnosed & sim.people.alive).uids,
+        eligibility=lambda sim: (sim.people.dxdelivery.diagnosed).uids,
     )
     sim = make_sim(interventions=[dx, tx])
     sim.run()
@@ -151,12 +151,16 @@ def test_full_cascade():
         name='confirm',
         product=tbsim.Xpert(),
         coverage=0.8,
-        eligibility=lambda sim: sim.people.screen.screen_positive.uids,
+        eligibility=lambda sim: (
+            sim.people.screen.screen_positive
+            & ~sim.people.confirm.tested
+            & sim.people.alive
+        ).uids,
         result_state='diagnosed',
     )
     treat = tbsim.TxDelivery(product=tbsim.DOTS())
 
-    sim = make_sim(interventions=[screen, confirm, treat])
+    sim = make_sim(n_agents=2000, interventions=[screen, confirm, treat]) # TODO: check why so many agents are needed
     sim.run()
 
     assert sim.results.screen.n_tested.sum() > 0

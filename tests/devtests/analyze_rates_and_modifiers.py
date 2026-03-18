@@ -67,8 +67,6 @@ def analyze_tb_rates_and_modifiers():
     print(f"ASYMPTOMATIC -> SYMPTOMATIC:    {tb.pars.asy_sym}")
     print(f"SYMPTOMATIC -> ASYMPTOMATIC: {tb.pars.sym_asy}")
     print(f"SYMPTOMATIC -> DEAD:         {tb.pars.sym_dead}")
-    print(f"TREATMENT -> SYMPTOMATIC (fail): {tb.pars.fail_rate}")
-    print(f"TREATMENT -> CLEARED (complete): {tb.pars.complete_rate}")
     print()
 
     print("BASELINE RISK MODIFIERS")
