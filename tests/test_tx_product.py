@@ -78,12 +78,12 @@ def test_tx_drug_type_overrides_params():
 
 def test_all_tx_products_in_sim():
     """All Tx product classes can be instantiated and run in a sim."""
-    # Verify dur_treatment from drug_params
+    # Verify dur_treatment from drug_params (stored in days)
     dp = tbsim.drug_params
-    assert np.isclose(tbsim.DOTS().pars.dur_treatment.pars.v, dp['dots']['duration'])
-    assert np.isclose(tbsim.DOTSImproved().pars.dur_treatment.pars.v, dp['dots_improved']['duration'])
-    assert np.isclose(tbsim.FirstLine().pars.dur_treatment.pars.v, dp['first_line_combo']['duration'])
-    assert np.isclose(tbsim.SecondLine().pars.dur_treatment.pars.v, dp['second_line_combo']['duration'])
+    assert np.isclose(tbsim.DOTS().pars.dur_treatment.pars.v, dp['dots']['duration'].days)
+    assert np.isclose(tbsim.DOTSImproved().pars.dur_treatment.pars.v, dp['dots_improved']['duration'].days)
+    assert np.isclose(tbsim.FirstLine().pars.dur_treatment.pars.v, dp['first_line_combo']['duration'].days)
+    assert np.isclose(tbsim.SecondLine().pars.dur_treatment.pars.v, dp['second_line_combo']['duration'].days)
 
     # Verify one can be administered in a sim
     sim = make_tx_sim(tx_product=tbsim.DOTS())

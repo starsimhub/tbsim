@@ -161,6 +161,7 @@ def run_dx_tx_cascade():
         product=tbsim.CAD(),
         coverage=0.9,
         result_state='screen_positive',
+        result_validity=ss.days(180),  # Screen result valid for 6 months
     )
     confirm = tbsim.DxDelivery(
         name='confirm',
@@ -171,6 +172,7 @@ def run_dx_tx_cascade():
             & ~sim.people.confirm.tested
         ).uids,
         result_state='diagnosed',
+        result_validity=ss.days(365),  # Diagnosis valid for 1 year
     )
     treat = tbsim.TxDelivery(product=tbsim.DOTS())
 
