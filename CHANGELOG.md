@@ -13,7 +13,7 @@ All notable changes to the codebase are documented in this file.
     - Added `TxDelivery` intervention for delivering treatments with success/failure tracking and retry logic
     - Simplified `drug_types.py` to a single dictionary of drug parameters (previously ~600 lines of class hierarchy)
     - Removed old monolithic `tb_diagnostic.py`, `tb_drug_types.py`, and `tb_treatment.py`
-- Removed `TB_EMOD`; only `TB_LSHTM` and `TB_LSHTM_Acute` are supported now
+- Removed `TB_EMOD` and renamed `TB_LSHTM` to TB; only `TB` and `TBAcute` are supported now
 - Added `HouseholdStats` analyzer for tracking household size distributions, age-mixing matrices, and contact patterns over time when using `ss.HouseholdNet`. Includes visualization methods for household statistics, age-mixing heatmaps, and normalized contact matrices.
 - Renamed `tb_health_seeking.py` to `health_seeking.py` and simplified the `HealthSeekingBehavior` class
 - Moved `immigration.py` to an archive folder

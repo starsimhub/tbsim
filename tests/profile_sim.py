@@ -7,7 +7,7 @@ import starsim as ss
 import tbsim
 
 def make_sim():
-    tb = tbsim.TB_LSHTM()
+    tb = tbsim.TB()
     net = 'random'
     kw = dict(n_agents=10e3, start=1990, stop=2020, dt=0.1, diseases=tb, networks=net, demographics=True)
     sim = ss.Sim(**kw)

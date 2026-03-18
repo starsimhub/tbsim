@@ -4,7 +4,7 @@ import numpy as np
 import sciris as sc
 import starsim as ss
 import tbsim
-from tbsim import TBSL
+from tbsim import TBS
 
 
 def make_sim(n_agents=1000, interventions=None, **kwargs):
@@ -92,7 +92,7 @@ def test_dx_delivery_coverage():
 # ---------------------------------------------------------------------------
 
 def test_beta_intervention_changes_beta():
-    """BetaByYear modifies beta at the specified year with TB_LSHTM."""
+    """BetaByYear modifies beta at the specified year with TB."""
     initial_beta = 0.01
     x_beta = 0.5
     intervention_year = 2005
@@ -102,7 +102,7 @@ def test_beta_intervention_changes_beta():
     sim_pars = dict(start=f'{intervention_year-1}-01-01', stop=f'{stop_year}-01-01', dt=ss.days(7), rand_seed=42)
 
     pop = ss.People(n_agents=100)
-    tb = tbsim.TB_LSHTM(pars=tb_pars)
+    tb = tbsim.TB(pars=tb_pars)
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     beta_intv = tbsim.BetaByYear(pars={'years': [intervention_year], 'x_beta': x_beta})
@@ -132,7 +132,7 @@ def test_beta_intervention_changes_beta():
 
 
 def test_beta_intervention_with_acute():
-    """BetaByYear works with TB_LSHTM_Acute."""
+    """BetaByYear works with TBAcute."""
     initial_beta = 0.02
     x_beta = 0.6
     intervention_year = 2005
@@ -141,7 +141,7 @@ def test_beta_intervention_with_acute():
     sim_pars = dict(start='2004-01-01', stop='2007-01-01', dt=ss.days(7), rand_seed=42)
 
     pop = ss.People(n_agents=100)
-    tb = tbsim.TB_LSHTM_Acute(pars=tb_pars)
+    tb = tbsim.TBAcute(pars=tb_pars)
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     beta_intv = tbsim.BetaByYear(pars={'years': intervention_year, 'x_beta': x_beta})
@@ -165,7 +165,7 @@ def test_beta_multiple_years():
     x_betas = [0.5, 0.8]
 
     pop = ss.People(n_agents=50)
-    tb = tbsim.TB_LSHTM(name='tb', pars=dict(beta=initial_beta, init_prev=0.25))
+    tb = tbsim.TB(name='tb', pars=dict(beta=initial_beta, init_prev=0.25))
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     beta_intv = tbsim.BetaByYear(pars={'years': years, 'x_beta': x_betas})

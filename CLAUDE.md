@@ -19,10 +19,10 @@ pip install -e .[dev]
 cd tests && bash run_tests
 
 # Run a single test file
-pytest tests/test_tb_lshtm.py
+pytest tests/test_tb.py
 
 # Run a single test function
-pytest tests/test_tb_lshtm.py::test_something -v
+pytest tests/test_tb.py::test_something -v
 
 # Run tests in parallel
 pytest tests/test_*.py -n auto
@@ -38,13 +38,13 @@ mkdocs build  # build static site
 
 The TB natural history model lives in `tbsim/`:
 
-- **TB_LSHTM** ([tb_lshtm.py](tbsim/tb_lshtm.py)) — LSHTM "spectrum of disease" approach with states: SUSCEPTIBLE → INFECTION → NON_INFECTIOUS → ASYMPTOMATIC → SYMPTOMATIC → TREATMENT (or CLEARED/DEAD). State enum is `TBSL`. Variant `TB_LSHTM_Acute` adds an ACUTE state post-exposure.
+- **TB** ([tb.py](tbsim/tb.py)) — LSHTM "spectrum of disease" approach with states: SUSCEPTIBLE → INFECTION → NON_INFECTIOUS → ASYMPTOMATIC → SYMPTOMATIC → TREATMENT (or CLEARED/DEAD). State enum is `TBS`. Variant `TBAcute` adds an ACUTE state post-exposure.
 
 Extends `ss.Disease` from Starsim.
 
 ### Sim Wrapper
 
-[tbsim/sim.py](tbsim/sim.py) provides `tbsim.Sim`, a convenience wrapper around `ss.Sim` that auto-routes flat parameters to the sim or TB module, and provides sensible defaults (demographics, random network, TB_LSHTM disease).
+[tbsim/sim.py](tbsim/sim.py) provides `tbsim.Sim`, a convenience wrapper around `ss.Sim` that auto-routes flat parameters to the sim or TB module, and provides sensible defaults (demographics, random network, TB disease).
 
 ### Intervention Architecture (Product/Delivery Pattern)
 

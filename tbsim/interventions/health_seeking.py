@@ -8,7 +8,7 @@ __all__ = ['HealthSeekingBehavior']
 
 class HealthSeekingBehavior(ss.Intervention):
     """
-    Eligible agents (symptomatic in LSHTM; smear+/smear-/EPTB in legacy TB) seek care
+    Eligible agents (symptomatic) seek care
     at a rate per timestep. If the people object has a sought_care attribute, it is set
     to True for agents who seek care (for use by downstream interventions).
 
@@ -20,7 +20,7 @@ class HealthSeekingBehavior(ss.Intervention):
         import tbsim
         from tbsim.interventions.health_seeking import HealthSeekingBehavior
 
-        tb  = tbsim.TB_LSHTM()
+        tb  = tbsim.TB()
         hsb = HealthSeekingBehavior()
         sim = ss.Sim(diseases=tb, interventions=hsb, pars=dict(start='2000', stop='2020'))
         sim.run()
@@ -47,18 +47,18 @@ class HealthSeekingBehavior(ss.Intervention):
 
     @property
     def tbsl(self):
-        """Shortcut to the TBSL state enum."""
-        return tbsim.TBSL
+        """Shortcut to the TBS state enum."""
+        return tbsim.TBS
 
     def init_post(self):
         """Locate the TB disease module and resolve eligible states."""
         super().init_post()
 
-        # Find and store the TB disease module (works with TB_LSHTM and TB_LSHTM_Acute)
+        # Find and store the TB disease module (works with TB and TB_Acute)
         try:
             self._tb = tbsim.get_tb(self.sim)
         except ValueError:
-            raise KeyError(f"{self.__class__} requires a TB_LSHTM or TB_LSHTM_Acute disease module.")
+            raise KeyError(f"{self.__class__} requires a TB disease module.")
         
         if self.pars.custom_states is not None:
             self._states = np.asarray(self.pars.custom_states) 

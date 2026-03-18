@@ -15,14 +15,14 @@ class Sim(ss.Sim):
 
     Parses input parameters among the sim and the TB module, and provides
     default demographics (births and deaths), networks (random), and disease
-    (TB_LSHTM).
+    (TB).
 
     Args:
         pars (dict): Flat parameter dict; keys are auto-routed to sim vs TB pars.
         sim_pars (dict): Explicit sim-level parameter overrides.
         tb_pars (dict): Explicit TB parameter overrides.
-        tb_model (str/Disease): Which TB model to use. Options: 'lshtm' (default),
-            'lshtm_acute', or a pre-built Disease instance.
+        tb_model (str/Disease): Which TB model to use. Options: 'default' (default),
+            'acute', or a pre-built Disease instance.
         location (str): Placeholder for future location-based data.
         **kwargs: Additional parameters (auto-routed like ``pars``).
 
@@ -39,17 +39,17 @@ class Sim(ss.Sim):
         sim = tbsim.Sim(n_agents=2000, beta=ss.peryear(0.3), start=1990, stop=2020)
 
         # Use a different TB model
-        sim = tbsim.Sim(tb_model='lshtm_acute')
+        sim = tbsim.Sim(tb_model='acute')
 
         # Pass a pre-built TB instance
-        tb = tbsim.TB_LSHTM(pars=dict(beta=ss.peryear(0.5)))
+        tb = tbsim.TB(pars=dict(beta=ss.peryear(0.5)))
         sim = tbsim.Sim(tb_model=tb)
     """
 
     # Map of string names to TB model classes
     _tb_models = {
-        'lshtm':       'TB_LSHTM',
-        'lshtm_acute': 'TB_LSHTM_Acute',
+        'default':  'TB',
+        'acute':    'TBAcute',
     }
 
     def __init__(self, pars=None, sim_pars=None, tb_pars=None, tb_model=None, name='tb', **kwargs):
@@ -118,7 +118,7 @@ class Sim(ss.Sim):
     def _resolve_tb_class(cls, tb_model):
         """Resolve a string name or None to a TB disease class."""
         if tb_model is None:
-            tb_model = 'lshtm'
+            tb_model = 'default'
         if isinstance(tb_model, str):
             key = tb_model.lower().replace('-', '_').replace(' ', '_')
             if key not in cls._tb_models:
@@ -132,7 +132,7 @@ class Sim(ss.Sim):
         Get the TB disease module from this sim.
 
         Args:
-            which (type, optional): Class of TB module to find (e.g. TB_LSHTM).
+            which (type, optional): Class of TB module to find (e.g. TB).
                 If None, returns the first BaseTB subclass found.
 
         Returns:

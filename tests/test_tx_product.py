@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 import starsim as ss
 import tbsim
-from tbsim import TBSL
+from tbsim import TBS
 
 
 def make_tx_sim(n_agents=200, tx_product=None):

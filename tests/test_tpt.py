@@ -14,7 +14,7 @@ import tbsim
 
 def make_modules(agents=50, start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'), dt=ss.days(7)):
     pop = ss.People(n_agents=agents)
-    tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.30})
+    tb = tbsim.TB(name='tb', pars={'init_prev': 0.30})
     net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
     pars = dict(dt=dt, start=start, stop=stop)
     return pop, tb, net, pars
@@ -51,7 +51,7 @@ def test_tpt_default_values():
     tpt = sim.interventions['tptsimple']
 
     assert '0.5' in str(tpt.pars.coverage) or '0.50' in str(tpt.pars.coverage)
-    assert tpt.pars.eligible_states == [tbsim.TBSL.INFECTION]
+    assert tpt.pars.eligible_states == [tbsim.TBS.INFECTION]
     assert hasattr(tpt.product.pars, 'dur_treatment')
     assert hasattr(tpt.product.pars, 'dur_protection')
     assert tpt.product.pars.disease == 'tb'
@@ -249,7 +249,7 @@ def test_tpt_household_init():
     dhs_data = make_dhs_data(50)
     hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
-    tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
+    tb = tbsim.TB(name='tb', pars={'init_prev': 0.20})
     tpt_hh = tbsim.TPTHousehold()
 
     sim = ss.Sim(
@@ -269,7 +269,7 @@ def test_tpt_household_traces_on_treatment_start():
     dhs_data = make_dhs_data(50)
     hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
-    tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
+    tb = tbsim.TB(name='tb', pars={'init_prev': 0.20})
     tpt_hh = tbsim.TPTHousehold(pars={'coverage': 1.0})
 
     sim = ss.Sim(
@@ -303,7 +303,7 @@ def test_tpt_household_no_retrigger_same_index():
     dhs_data = make_dhs_data(50)
     hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
-    tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20})
+    tb = tbsim.TB(name='tb', pars={'init_prev': 0.20})
     tpt_hh = tbsim.TPTHousehold(pars={'coverage': 1.0})
 
     sim = ss.Sim(
@@ -332,7 +332,7 @@ def test_tpt_household_full_sim_run():
     dhs_data = make_dhs_data(30)
     hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
-    tb = tbsim.TB_LSHTM(name='tb', pars={'init_prev': 0.20, 'beta': ss.peryear(0.5)})
+    tb = tbsim.TB(name='tb', pars={'init_prev': 0.20, 'beta': ss.peryear(0.5)})
     tpt_hh = tbsim.TPTHousehold(pars={'coverage': 0.8})
 
     sim = ss.Sim(

@@ -4,7 +4,7 @@ import numpy as np
 import sciris as sc
 import starsim as ss
 import tbsim
-from tbsim import TBSL
+from tbsim import TBS
 
 __all__ = ['ProductMulti']
 

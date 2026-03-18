@@ -156,7 +156,7 @@ class HouseholdNet(ss.Network):
             import starsim as ss
             import tbsim
 
-            tb  = tbsim.TB_LSHTM()
+            tb  = tbsim.TB()
             net = tbsim.HouseholdNet()
             sim = ss.Sim(diseases=tb, networks=net, pars=dict(start='2000', stop='2020'))
             sim.run()

@@ -178,7 +178,7 @@ import tbsim
 
 # Create simulation with TB model and analyzer
 sim = ss.Sim(
-    diseases=[tbsim.TB_LSHTM()],
+    diseases=[tbsim.TB()],
     networks=tbsim.HouseholdNet(),
     analyzers=[tbsim.DwellTime(scenario_name="Baseline")]
 )

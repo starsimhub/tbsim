@@ -13,7 +13,7 @@ def make_msim(use_acute=False):
     tb_pars = dict(init_prev=0.2, beta=ss.peryear(1.0))
     sims = [
         ss.Sim(label=label, n_agents=300,
-               diseases=(tbsim.TB_LSHTM_Acute if (use_acute and i == 0) else tbsim.TB_LSHTM)(name='tb', pars=tb_pars),
+               diseases=(tbsim.TBAcute if (use_acute and i == 0) else tbsim.TB)(name='tb', pars=tb_pars),
                networks=ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=30)),
                pars=pars)
         for i, label in enumerate(('Scenario A', 'Scenario B', 'Scenario C'))
@@ -42,7 +42,7 @@ def test_plot_accepts_all_input_types():
 
 
 def test_plot_handles_mixed_tb_modules():
-    """TB_LSHTM and TB_LSHTM_Acute results align on shared metrics."""
+    """TB and TBAcute results align on shared metrics."""
     msim = make_msim(use_acute=True)
     fig = tbsim.plot(msim, select=['n_infectious', 'prevalence_active'], n_cols=2, show=do_plot)
     assert fig is not None

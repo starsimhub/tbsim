@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import starsim as ss
 import tbsim
-from tbsim import TBSL
+from tbsim import TBS
 
 
 def make_dx_sim(n_agents=200, dx=None, hierarchy=None):
@@ -36,8 +36,8 @@ def make_dx_sim(n_agents=200, dx=None, hierarchy=None):
 def test_dx_simple_dataframe():
     """Dx with only required columns (state, result, probability) returns correct dict."""
     df = pd.DataFrame([
-        dict(state=TBSL.SYMPTOMATIC, result='positive', probability=1.0),
-        dict(state=TBSL.SYMPTOMATIC, result='negative', probability=0.0),
+        dict(state=TBS.SYMPTOMATIC, result='positive', probability=1.0),
+        dict(state=TBS.SYMPTOMATIC, result='negative', probability=0.0),
     ])
     sim = make_dx_sim(dx=df)
 
@@ -53,7 +53,7 @@ def test_dx_simple_dataframe():
     assert 'negative' in results
 
     # With sensitivity=1.0 for SYMPTOMATIC, all symptomatic agents should test positive
-    symptomatic_uids = (tb.state == TBSL.SYMPTOMATIC).uids
+    symptomatic_uids = (tb.state == TBS.SYMPTOMATIC).uids
     symptomatic_alive = symptomatic_uids & all_uids
     positive_uids = results['positive']
     for uid in symptomatic_alive:
@@ -70,11 +70,11 @@ def test_dx_age_stratified():
     """Dx with age_min/age_max columns filters agents by age."""
     df = pd.DataFrame([
         # Adults: high sensitivity
-        dict(state=TBSL.SYMPTOMATIC, result='positive', probability=1.0, age_min=15, age_max=np.inf),
-        dict(state=TBSL.SYMPTOMATIC, result='negative', probability=0.0, age_min=15, age_max=np.inf),
+        dict(state=TBS.SYMPTOMATIC, result='positive', probability=1.0, age_min=15, age_max=np.inf),
+        dict(state=TBS.SYMPTOMATIC, result='negative', probability=0.0, age_min=15, age_max=np.inf),
         # Children: zero sensitivity (always negative)
-        dict(state=TBSL.SYMPTOMATIC, result='positive', probability=0.0, age_min=0, age_max=15),
-        dict(state=TBSL.SYMPTOMATIC, result='negative', probability=1.0, age_min=0, age_max=15),
+        dict(state=TBS.SYMPTOMATIC, result='positive', probability=0.0, age_min=0, age_max=15),
+        dict(state=TBS.SYMPTOMATIC, result='negative', probability=1.0, age_min=0, age_max=15),
     ])
     sim = make_dx_sim(n_agents=500, dx=df)
 
@@ -87,7 +87,7 @@ def test_dx_age_stratified():
     results = dx.administer(sim, all_uids)
 
     # Check that symptomatic children test negative
-    symptomatic = tb.state == TBSL.SYMPTOMATIC
+    symptomatic = tb.state == TBS.SYMPTOMATIC
     children = sim.people.age < 15
     child_symptomatic_alive = (symptomatic & children).uids & all_uids
 
@@ -99,8 +99,8 @@ def test_dx_age_stratified():
 def test_dx_probabilities_sum_to_one_validation():
     """Dx raises an error if probabilities don't sum to 1.0 per group."""
     df = pd.DataFrame([
-        dict(state=TBSL.SYMPTOMATIC, result='positive', probability=0.5),
-        dict(state=TBSL.SYMPTOMATIC, result='negative', probability=0.3),  # sums to 0.8, not 1.0
+        dict(state=TBS.SYMPTOMATIC, result='positive', probability=0.5),
+        dict(state=TBS.SYMPTOMATIC, result='negative', probability=0.3),  # sums to 0.8, not 1.0
     ])
     with pytest.raises(ValueError, match="not 1.0"):
         tbsim.Dx(df=df, hierarchy=['positive', 'negative'])
@@ -109,8 +109,8 @@ def test_dx_probabilities_sum_to_one_validation():
 def test_dx_default_hierarchy():
     """Dx infers hierarchy from df.result.unique() if not provided."""
     df = pd.DataFrame([
-        dict(state=TBSL.SYMPTOMATIC, result='positive', probability=0.9),
-        dict(state=TBSL.SYMPTOMATIC, result='negative', probability=0.1),
+        dict(state=TBS.SYMPTOMATIC, result='positive', probability=0.9),
+        dict(state=TBS.SYMPTOMATIC, result='negative', probability=0.1),
     ])
     dx = tbsim.Dx(df=df)
     assert list(dx.hierarchy) == ['positive', 'negative']

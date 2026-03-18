@@ -9,7 +9,7 @@ Tuberculosis Preventive Therapy (TPT): Product + Delivery.
 import numpy as np
 import starsim as ss
 from .interventions import TBProductRoutine
-from ..tb_lshtm import TBSL
+from ..tb import TBS
 
 __all__ = ['TPTTx', 'TPTSimple', 'TPTHousehold']
 
@@ -140,7 +140,7 @@ class TPTSimple(TBProductRoutine):
     Simple TPT delivery targeting latently infected agents.
 
     Thin wrapper over :class:`TBProductRoutine` that defaults to targeting
-    agents in ``TBSL.INFECTION`` state (latent TB).  Creates a
+    agents in ``TBS.INFECTION`` state (latent TB).  Creates a
     :class:`TPTTx` product automatically if none is provided.
 
     Args:
@@ -154,7 +154,7 @@ class TPTSimple(TBProductRoutine):
         import tbsim
         from tbsim.interventions.tpt import TPTSimple
 
-        tb  = tbsim.TB_LSHTM(name='tb')
+        tb  = tbsim.TB(name='tb')
         tpt = TPTSimple()
         sim = ss.Sim(diseases=tb, interventions=tpt, pars=dict(start='2000', stop='2020'))
         sim.run()
@@ -169,7 +169,7 @@ class TPTSimple(TBProductRoutine):
         )
         # Default: target latently infected agents
         if pars is None or 'eligible_states' not in (pars or {}):
-            self.pars.eligible_states = [TBSL.INFECTION]
+            self.pars.eligible_states = [TBS.INFECTION]
         return
 
     def update_results(self):

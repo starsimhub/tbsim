@@ -3,7 +3,7 @@
 import numpy as np
 import starsim as ss
 import tbsim
-from tbsim import TBSL
+from tbsim import TBS
 from .products import ProductMulti # Not yet available for import in TBsim
 
 __all__ = ['drug_params', 'Tx', 'TxMulti', 'DOTS', 'DOTSImproved', 'FirstLine', 'SecondLine', 'TxDelivery']
@@ -138,7 +138,7 @@ class TxDelivery(ss.Intervention):
             return ss.uids()
         diagnosed_uids = (self._dx.diagnosed & sim.people.alive).uids
         tb = tbsim.get_tb(sim)
-        active_tb_mask = np.isin(tb.state, TBSL.active_tb_states())
+        active_tb_mask = np.isin(tb.state, TBS.active_tb_states())
         active_tb_uids = ss.uids(np.where(active_tb_mask)[0])
         return diagnosed_uids & active_tb_uids
 
@@ -173,8 +173,8 @@ class TxDelivery(ss.Intervention):
         uids = self._elig_uids
 
         # ACUTE or INFECTION: clear (NB, acute may not be present in all models, but fine to check)
-        latent = uids[np.isin(tb.state[uids], [TBSL.ACUTE, TBSL.INFECTION])]
-        tb.state[latent] = TBSL.CLEARED
+        latent = uids[np.isin(tb.state[uids], [TBS.ACUTE, TBS.INFECTION])]
+        tb.state[latent] = TBS.CLEARED
         tb.rr_reinfection[latent] = tb.pars.rr_reinfection_cleared
         if tb.pars.dur_reinfection_protection is not None and len(latent):
             self.ti_rr_reinfection_wane[latent] = self.ti + tb.pars.dur_reinfection_protection.rvs(latent)
@@ -182,8 +182,8 @@ class TxDelivery(ss.Intervention):
         tb.susceptible[latent] = True
 
         # Active TB: put on treatment
-        active = uids[np.isin(tb.state[uids], [TBSL.NON_INFECTIOUS, TBSL.ASYMPTOMATIC, TBSL.SYMPTOMATIC])]
-        tb.state[active] = TBSL.TREATMENT
+        active = uids[np.isin(tb.state[uids], [TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC, TBS.SYMPTOMATIC])]
+        tb.state[active] = TBS.TREATMENT
         tb.on_treatment[active] = True
         tb.results['new_notifications_15+'][tb.ti] += np.count_nonzero(self.sim.people.age[active] >= 15) # TODO: should this result be in the intervention instead?
 
@@ -206,7 +206,7 @@ class TxDelivery(ss.Intervention):
         tb = self.sim.get_tb()
         success_uids = self._success
         if len(success_uids) > 0:
-            tb.state[success_uids] = TBSL.CLEARED
+            tb.state[success_uids] = TBS.CLEARED
             tb.on_treatment[success_uids] = False
             tb.susceptible[success_uids] = True
             tb.infected[success_uids] = False
@@ -214,7 +214,7 @@ class TxDelivery(ss.Intervention):
                 self._dx.diagnosed[success_uids] = False
             self.tb_treatment_success[success_uids] = True
 
-            # Reinfection protection (moved from tb_lshtm natural history)
+            # Reinfection protection (moved from TB natural history)
             tb.rr_reinfection[success_uids] = tb.pars.rr_reinfection_treat
             if tb.pars.dur_reinfection_protection is not None and len(success_uids):
                 tb.ti_rr_reinfection_wane[success_uids] = tb.ti + tb.pars.dur_reinfection_protection.rvs(success_uids)
@@ -225,7 +225,7 @@ class TxDelivery(ss.Intervention):
         tb = self.sim.get_tb()
         failure_uids = self._fail
         if len(failure_uids) > 0:
-            tb.state[failure_uids] = TBSL.SYMPTOMATIC
+            tb.state[failure_uids] = TBS.SYMPTOMATIC
             tb.on_treatment[failure_uids] = False
             self.treatment_failure[failure_uids] = True
 
