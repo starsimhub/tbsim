@@ -86,7 +86,7 @@ class Sim(ss.Sim):
                         val = pars.pop(key)  # TB-only: pop
                     tb_pars[key] = val
 
-            tb = tb_cls(pars=tb_pars)
+            tb = tb_cls(name='tb', pars=tb_pars)
 
         modules.diseases.insert(0, tb)
 
