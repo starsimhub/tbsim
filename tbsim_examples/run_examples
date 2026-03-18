@@ -14,6 +14,7 @@ for f in run_*.py; do
     scripts+=("$f")
 done
 
+START_TIME=$SECONDS
 echo "Running ${#scripts[@]} examples in parallel..."
 
 # Launch all in background, capturing PIDs
@@ -40,5 +41,7 @@ else
     for f in "${failed[@]}"; do
         echo "  $f"
     done
+    echo "Done in $((SECONDS - START_TIME)) seconds"
     exit 1
 fi
+echo "Done in $((SECONDS - START_TIME)) seconds"
