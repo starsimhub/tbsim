@@ -131,7 +131,7 @@ def test_tx_delivery_custom_eligibility():
     dx = tbsim.DxDelivery(product=tbsim.Xpert())
     tx = tbsim.TxDelivery(
         product=tbsim.DOTS(),
-        eligibility=lambda sim: (sim.people.dxdelivery.diagnosed & sim.people.alive).uids,
+        eligibility=lambda sim: (sim.people.dxdelivery.diagnosed).uids,
     )
     sim = make_sim(interventions=[dx, tx])
     sim.run()
