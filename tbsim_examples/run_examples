@@ -8,10 +8,9 @@ export MPLBACKEND='Agg' # Silence plots
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Collect example scripts (exclude this script and run_dhs_household.py)
+# Collect example scripts
 scripts=()
 for f in run_*.py; do
-    [[ "$f" == "run_dhs_household.py" ]] && continue
     scripts+=("$f")
 done
 
