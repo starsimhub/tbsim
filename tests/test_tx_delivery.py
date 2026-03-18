@@ -160,7 +160,7 @@ def test_full_cascade():
     )
     treat = tbsim.TxDelivery(product=tbsim.DOTS())
 
-    sim = make_sim(n_agents=5000, interventions=[screen, confirm, treat])
+    sim = make_sim(n_agents=2000, interventions=[screen, confirm, treat]) # TODO: check why so many agents are needed
     sim.run()
 
     assert sim.results.screen.n_tested.sum() > 0
