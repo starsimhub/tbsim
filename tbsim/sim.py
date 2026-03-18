@@ -52,11 +52,7 @@ class Sim(ss.Sim):
         'lshtm_acute': 'TB_LSHTM_Acute',
     }
 
-    def __init__(self, pars=None, sim_pars=None, tb_pars=None, tb_model=None,
-                 location=None, **kwargs):
-
-        if location is not None:
-            raise NotImplementedError('Location-based sim creation is not implemented yet')
+    def __init__(self, pars=None, sim_pars=None, tb_pars=None, tb_model=None, name='tb', **kwargs):
 
         # Merge all user inputs into a single dict
         pars = sc.mergedicts(pars, kwargs)
@@ -86,7 +82,7 @@ class Sim(ss.Sim):
                         val = pars.pop(key)  # TB-only: pop
                     tb_pars[key] = val
 
-            tb = tb_cls(name='tb', pars=tb_pars)
+            tb = tb_cls(name=name, pars=tb_pars)
 
         modules.diseases.insert(0, tb)
 
