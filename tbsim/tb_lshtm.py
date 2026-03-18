@@ -89,11 +89,6 @@ class TB_LSHTM(BaseTB):
         - ``sym_asy``:     Symptomatic -> Asymptomatic.
         - ``sym_dead``:    Symptomatic -> Dead (TB-specific mortality, mu_TB).
 
-        *From TREATMENT*
-
-        - ``fail_rate``:     Treatment -> Symptomatic (failure). (phi)
-        - ``complete_rate``: Treatment -> Treated (completion).  (delta)
-
         *Background (general mortality is handled by* ``ss.Deaths`` *demographics, not this module)*
 
         - ``cxr_asymp_sens``:   CXR sensitivity for screening asymptomatic (0-1).
@@ -167,9 +162,6 @@ class TB_LSHTM(BaseTB):
             # --- From SYMPTOMATIC ---
             sym_asy=ss.peryear(0.54),            # Regress to asymptomatic (still active TB; does not enter CLEARED)
             sym_dead=ss.peryear(0.34),           # μ_TB: symptomatic → dead (TB mortality)
-            # --- From TREATMENT ---
-            fail_rate=ss.peryear(0.63),          # φ phi: treatment failure (→ symptomatic)
-            complete_rate=ss.peryear(2.00),      # δ delta: treatment completion (→ treated)
             # --- Background ---
             cxr_asymp_sens=1.0,                 # CXR sensitivity for screening asymptomatic (0–1)
             # --- For ACUTE ---
@@ -183,7 +175,6 @@ class TB_LSHTM(BaseTB):
         self._rng_non = ss.random(name='tb_rng_non')   # NON_INFECTIOUS exits
         self._rng_asy = ss.random(name='tb_rng_asy')   # ASYMPTOMATIC exits
         self._rng_sym = ss.random(name='tb_rng_sym')   # SYMPTOMATIC exits
-        self._rng_trt = ss.random(name='tb_rng_trt')   # TREATMENT exits
 
         # Per-agent state: redefine base Infection states and add TB-specific ones
         self.define_states(
@@ -355,16 +346,9 @@ class TB_LSHTM(BaseTB):
                 TBSL.DEAD:         self.pars.sym_dead * self.rr_death[u],
             }, rng=self._rng_sym)
 
-        u = ss.uids(self.state == TBSL.TREATMENT)
-        if len(u):
-            self.transition(u, to={
-                TBSL.SYMPTOMATIC: self.pars.fail_rate,
-                TBSL.CLEARED:     self.pars.complete_rate,
-            }, rng=self._rng_trt)
-            newly_cleared = u[self.state[u] == TBSL.CLEARED]  # agents cleared from TREATMENT this step
-            self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_treat
-            if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
-                self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
+        # NOTE: TREATMENT outcomes (success → CLEARED, failure → SYMPTOMATIC) are
+        # handled by TxDelivery, not the natural history. Agents in TREATMENT state
+        # without a TxDelivery intervention will remain in TREATMENT indefinitely.
 
         # --- Bookkeep from current state ---
 
@@ -597,16 +581,9 @@ class TB_LSHTM_Acute(TB_LSHTM):
                 TBSL.DEAD:         self.pars.sym_dead * self.rr_death[u],
             }, rng=self._rng_sym)
 
-        u = ss.uids(self.state == TBSL.TREATMENT)
-        if len(u):
-            self.transition(u, to={
-                TBSL.SYMPTOMATIC: self.pars.fail_rate,
-                TBSL.CLEARED:     self.pars.complete_rate,
-            }, rng=self._rng_trt)
-            newly_cleared = u[self.state[u] == TBSL.CLEARED]  # agents cleared from TREATMENT this step
-            self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_treat
-            if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
-                self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
+        # NOTE: TREATMENT outcomes (success → CLEARED, failure → SYMPTOMATIC) are
+        # handled by TxDelivery, not the natural history. Agents in TREATMENT state
+        # without a TxDelivery intervention will remain in TREATMENT indefinitely.
 
         # --- Bookkeep from current state ---
 

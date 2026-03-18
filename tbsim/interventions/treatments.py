@@ -202,7 +202,7 @@ class TxDelivery(ss.Intervention):
         return
     
     def step_success(self):
-        """ Successful treatment clears infection """
+        """Successful treatment clears infection and sets reinfection protection"""
         tb = self.sim.get_tb()
         success_uids = self._success
         if len(success_uids) > 0:
@@ -213,12 +213,20 @@ class TxDelivery(ss.Intervention):
             if self._dx is not None:
                 self._dx.diagnosed[success_uids] = False
             self.tb_treatment_success[success_uids] = True
+
+            # Reinfection protection (moved from tb_lshtm natural history)
+            tb.rr_reinfection[success_uids] = tb.pars.rr_reinfection_treat
+            if tb.pars.dur_reinfection_protection is not None and len(success_uids):
+                tb.ti_rr_reinfection_wane[success_uids] = tb.ti + tb.pars.dur_reinfection_protection.rvs(success_uids)
         return
-    
+
     def step_failures(self):
-        """ Handle failures """
+        """Handle failures: return to symptomatic and trigger re-care-seeking"""
+        tb = self.sim.get_tb()
         failure_uids = self._fail
         if len(failure_uids) > 0:
+            tb.state[failure_uids] = TBSL.SYMPTOMATIC
+            tb.on_treatment[failure_uids] = False
             self.treatment_failure[failure_uids] = True
 
             if self.reset_flags and self._dx is not None:
