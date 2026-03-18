@@ -23,34 +23,47 @@ drug_params = dict(
 
 class Tx(ss.Product):
     """
-    TB treatment product that encapsulates drug efficacy.
+    TB treatment product that encapsulates drug efficacy, duration, and adherence.
 
     Args:
-        efficacy: Probability of treatment success (0-1). Default 0.85.
-        drug_type: If provided (e.g. 'dots', 'first_line_combo'), overrides efficacy with drug-specific cure probability.
+        efficacy: Probability of cure given adherence (0-1). Default 0.85.
+        dur_treatment: Treatment duration distribution. Default 180 days.
+        adherence: Probability of completing the full course (0-1). Default 0.85.
+        drug_type: If provided (e.g. 'dots', 'first_line_combo'), overrides
+            efficacy, dur_treatment, and adherence with drug-specific values.
     """
 
-    def __init__(self, efficacy=0.85, drug_type=None, **kwargs):
+    def __init__(self, efficacy=0.85, dur_treatment=None, adherence=0.85, drug_type=None, **kwargs):
         super().__init__()
         if drug_type is not None:
-            self.efficacy = drug_params[drug_type]['cure_prob']
+            dp = drug_params[drug_type]
+            efficacy = dp['cure_prob']
+            dur_treatment = dur_treatment or ss.constant(v=dp['duration'])
+            adherence = dp['adherence_rate']
         else:
-            self.efficacy = efficacy
+            dur_treatment = dur_treatment or ss.constant(v=180)
 
         self.define_pars(
-            p_success = ss.bernoulli(self.efficacy)
+            p_adherence = ss.bernoulli(adherence),
+            p_success = ss.bernoulli(efficacy),
+            dur_treatment = dur_treatment,
         )
         self.update_pars(**kwargs)
         return
 
     def administer(self, sim, uids):
         """
-        Administer treatment to agents.
+        Roll treatment outcomes for agents starting treatment.
+
+        First rolls adherence (will they complete the course?), then rolls
+        cure probability for adherent agents. Non-adherent agents are failures.
 
         Returns:
             dict with 'success' and 'failure' UIDs.
         """
-        success_uids, failure_uids = self.pars.p_success.filter(uids, both=True)
+        adherent, non_adherent = self.pars.p_adherence.filter(uids, both=True)
+        success_uids, adherent_fail = self.pars.p_success.filter(adherent, both=True)
+        failure_uids = ss.uids.cat([non_adherent, adherent_fail])
         return {'success': success_uids, 'failure': failure_uids}
 
 
@@ -120,6 +133,10 @@ class TxDelivery(ss.Intervention):
             ss.IntArr('n_times_treated', default=0),
             ss.BoolState('tb_treatment_success', default=False),
             ss.BoolArr('treatment_failure', default=False),
+            ss.FloatArr('ti_treatment_start'),
+            ss.FloatArr('ti_treatment_end'),
+            ss.BoolArr('pending_success', default=False),
+            ss.BoolArr('pending_failure', default=False),
         )
         self.update_pars(**kwargs)
         product.name = f'{self.name}_product'
@@ -155,93 +172,123 @@ class TxDelivery(ss.Intervention):
 
     def step(self):
         """ Coordinate everything that happens on the step; details are in methods below """
-        self.step_eligibility() # Check eligibility
-        self.step_start_treatment() # Start treatment for eligible agents
-        self.step_administer() # Administer product and handle outcomes
-        self.step_success() # Handle success
-        self.step_failures() # Handle failures
+        self.step_eligibility()        # Check eligibility
+        self.step_start_treatment()    # Start treatment for newly eligible agents
+        self.step_check_completion()   # Check if any on-treatment agents have completed
+        self.step_success()            # Handle completed successes
+        self.step_failures()           # Handle completed failures
         return
-    
+
     def step_eligibility(self):
         """ Check agents for eligibility, and start treatment for those eligible """
         self._elig_uids = self._get_eligible(self.sim)
         return self._elig_uids
 
     def step_start_treatment(self):
-        """ Start treatment for eligible agents """
+        """
+        Start treatment for eligible agents.
+
+        Latent/acute agents are cleared immediately. Active TB agents are put
+        into TREATMENT state and their outcome (success/failure) is pre-rolled
+        via the product, but not resolved until dur_treatment has elapsed.
+        """
         tb = self.sim.get_tb()
         uids = self._elig_uids
 
-        # ACUTE or INFECTION: clear (NB, acute may not be present in all models, but fine to check)
+        # ACUTE or INFECTION: clear immediately (no treatment course needed)
         latent = uids[np.isin(tb.state[uids], [TBS.ACUTE, TBS.INFECTION])]
         tb.state[latent] = TBS.CLEARED
         tb.rr_reinfection[latent] = tb.pars.rr_reinfection_cleared
         if tb.pars.dur_reinfection_protection is not None and len(latent):
-            self.ti_rr_reinfection_wane[latent] = self.ti + tb.pars.dur_reinfection_protection.rvs(latent)
+            tb.ti_rr_reinfection_wane[latent] = self.ti + tb.pars.dur_reinfection_protection.rvs(latent)
         tb.infected[latent] = False
         tb.susceptible[latent] = True
 
         # Active TB: put on treatment
         active = uids[np.isin(tb.state[uids], [TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC, TBS.SYMPTOMATIC])]
+        if len(active) == 0:
+            self._newly_treated = ss.uids()
+            return
+
         tb.state[active] = TBS.TREATMENT
         tb.on_treatment[active] = True
-        tb.results['new_notifications_15+'][tb.ti] += np.count_nonzero(self.sim.people.age[active] >= 15) # TODO: should this result be in the intervention instead?
+        tb.results['new_notifications_15+'][tb.ti] += np.count_nonzero(self.sim.people.age[active] >= 15)
 
-        # Only proceed with agents actually on treatment
-        tx_uids = uids[tb.on_treatment[uids]]
-        self.n_times_treated[tx_uids] += 1
-        self._tx_uids = tx_uids
+        # Record treatment timing
+        dur = self.product.pars.dur_treatment.rvs(active)
+        self.ti_treatment_start[active] = self.ti
+        self.ti_treatment_end[active] = self.ti + dur
+        self.n_times_treated[active] += 1
+
+        # Pre-roll outcomes (stored as pending, resolved when treatment completes)
+        outcomes = self.product.administer(self.sim, active)
+        self.pending_success[outcomes.get('success', ss.uids())] = True
+        self.pending_failure[outcomes.get('failure', ss.uids())] = True
+
+        self._newly_treated = active
         return
-    
-    def step_administer(self):
-        """ Administer product to get success/failure """
-        outcomes = self.product.administer(self.sim, self._tx_uids)
-        self._outcomes = outcomes
-        self._success = outcomes.get('success', ss.uids())
-        self._fail = outcomes.get('failure', ss.uids())
+
+    def step_check_completion(self):
+        """ Find agents whose treatment course has completed this step """
+        tb = self.sim.get_tb()
+        on_tx = tb.on_treatment.uids
+        if len(on_tx) == 0:
+            self._success = ss.uids()
+            self._fail = ss.uids()
+            return
+
+        completed = on_tx[self.ti >= self.ti_treatment_end[on_tx]]
+        self._success = completed[self.pending_success[completed]]
+        self._fail = completed[self.pending_failure[completed]]
         return
-    
+
     def step_success(self):
-        """Successful treatment clears infection and sets reinfection protection"""
+        """ Successful treatment clears infection and sets reinfection protection """
         tb = self.sim.get_tb()
         success_uids = self._success
-        if len(success_uids) > 0:
-            tb.state[success_uids] = TBS.CLEARED
-            tb.on_treatment[success_uids] = False
-            tb.susceptible[success_uids] = True
-            tb.infected[success_uids] = False
-            if self._dx is not None:
-                self._dx.diagnosed[success_uids] = False
-            self.tb_treatment_success[success_uids] = True
+        if len(success_uids) == 0:
+            return
 
-            # Reinfection protection (moved from TB natural history)
-            tb.rr_reinfection[success_uids] = tb.pars.rr_reinfection_treat
-            if tb.pars.dur_reinfection_protection is not None and len(success_uids):
-                tb.ti_rr_reinfection_wane[success_uids] = tb.ti + tb.pars.dur_reinfection_protection.rvs(success_uids)
+        tb.state[success_uids] = TBS.CLEARED
+        tb.on_treatment[success_uids] = False
+        tb.susceptible[success_uids] = True
+        tb.infected[success_uids] = False
+        if self._dx is not None:
+            self._dx.diagnosed[success_uids] = False
+        self.tb_treatment_success[success_uids] = True
+        self.pending_success[success_uids] = False
+
+        # Reinfection protection
+        tb.rr_reinfection[success_uids] = tb.pars.rr_reinfection_treat
+        if tb.pars.dur_reinfection_protection is not None and len(success_uids):
+            tb.ti_rr_reinfection_wane[success_uids] = tb.ti + tb.pars.dur_reinfection_protection.rvs(success_uids)
         return
 
     def step_failures(self):
-        """Handle failures: return to symptomatic and trigger re-care-seeking"""
+        """ Handle failures: return to symptomatic and trigger re-care-seeking """
         tb = self.sim.get_tb()
         failure_uids = self._fail
-        if len(failure_uids) > 0:
-            tb.state[failure_uids] = TBS.SYMPTOMATIC
-            tb.on_treatment[failure_uids] = False
-            self.treatment_failure[failure_uids] = True
+        if len(failure_uids) == 0:
+            return
 
-            if self.reset_flags and self._dx is not None:
-                self._dx.diagnosed[failure_uids] = False
-                self._dx.tested[failure_uids] = False
+        tb.state[failure_uids] = TBS.SYMPTOMATIC
+        tb.on_treatment[failure_uids] = False
+        self.treatment_failure[failure_uids] = True
+        self.pending_failure[failure_uids] = False
 
-            # Trigger renewed care-seeking
-            if hsb := self.sim.get_hsb():
-                hsb.sought_care[failure_uids] = False
-            if self._dx is not None:
-                self._dx.care_seeking_multiplier[failure_uids] *= self.reseek_multiplier
+        if self.reset_flags and self._dx is not None:
+            self._dx.diagnosed[failure_uids] = False
+            self._dx.tested[failure_uids] = False
+
+        # Trigger renewed care-seeking
+        if hsb := self.sim.get_hsb():
+            hsb.sought_care[failure_uids] = False
+        if self._dx is not None:
+            self._dx.care_seeking_multiplier[failure_uids] *= self.reseek_multiplier
         return
 
     def update_results(self):
-        self.results.n_treated[self.ti] = len(self._tx_uids)
+        self.results.n_treated[self.ti] = len(self._newly_treated)
         self.results.n_success[self.ti] = len(self._success)
         self.results.n_failure[self.ti] = len(self._fail)
         return
@@ -254,10 +301,9 @@ class TxDelivery(ss.Intervention):
     
     def shrink(self):
         """ Remove temporary results """
-        self._outcomes = None
         self._elig_uids = None
-        self._tx_uids = None
+        self._newly_treated = None
         self._success = None
         self._fail = None
-        self._dx = None # Link to treatment module
+        self._dx = None
         return
