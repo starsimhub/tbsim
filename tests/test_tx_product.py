@@ -27,8 +27,8 @@ def make_tx_sim(n_agents=200, tx_product=None):
 
 
 def test_tx_basic():
-    """Tx with efficacy=1.0 returns all agents as success."""
-    sim = make_tx_sim(tx_product=tbsim.Tx(efficacy=1.0))
+    """Tx with efficacy=1.0 and adherence=1.0 returns all agents as success."""
+    sim = make_tx_sim(tx_product=tbsim.Tx(efficacy=1.0, adherence=1.0))
     tx = sim.interventions.txdelivery.product
     for _ in range(10):
         sim.run_one_step()
@@ -43,7 +43,7 @@ def test_tx_basic():
 
 def test_tx_zero_efficacy():
     """Tx with efficacy=0.0 returns all agents as failure."""
-    sim = make_tx_sim(tx_product=tbsim.Tx(efficacy=0.0))
+    sim = make_tx_sim(tx_product=tbsim.Tx(efficacy=0.0, adherence=1.0))
     tx = sim.interventions.txdelivery.product
     for _ in range(10):
         sim.run_one_step()
@@ -54,20 +54,36 @@ def test_tx_zero_efficacy():
     assert len(results['failure']) == len(uids)
 
 
-def test_tx_drug_type_overrides_efficacy():
-    """Tx with drug_type overrides the efficacy parameter."""
+def test_tx_zero_adherence():
+    """Tx with adherence=0.0 returns all agents as failure regardless of efficacy."""
+    sim = make_tx_sim(tx_product=tbsim.Tx(efficacy=1.0, adherence=0.0))
+    tx = sim.interventions.txdelivery.product
+    for _ in range(10):
+        sim.run_one_step()
+
+    uids = sim.people.alive.uids[:20]
+    results = tx.administer(sim, uids)
+    assert len(results['success']) == 0
+    assert len(results['failure']) == len(uids)
+
+
+def test_tx_drug_type_overrides_params():
+    """Tx with drug_type overrides efficacy, adherence, and dur_treatment."""
     tx = tbsim.Tx(efficacy=0.5, drug_type='first_line_combo')
-    # first_line_combo has 95% cure rate, which should override 0.5
-    assert np.isclose(tx.efficacy, 0.95)
+    dp = tbsim.drug_params['first_line_combo']
+    # first_line_combo values should override the passed-in efficacy
+    assert np.isclose(tx.pars.p_success.pars.p, dp['cure_prob'])
+    assert np.isclose(tx.pars.p_adherence.pars.p, dp['adherence_rate'])
 
 
 def test_all_tx_products_in_sim():
-    """All Tx product classes can be instantiated and have expected efficacies."""
-    # Verify efficacies
-    assert np.isclose(tbsim.DOTS().efficacy, 0.85)
-    assert np.isclose(tbsim.DOTSImproved().efficacy, 0.90)
-    assert np.isclose(tbsim.FirstLine().efficacy, 0.95)
-    assert np.isclose(tbsim.SecondLine().efficacy, 0.75)
+    """All Tx product classes can be instantiated and run in a sim."""
+    # Verify dur_treatment from drug_params
+    dp = tbsim.drug_params
+    assert np.isclose(tbsim.DOTS().pars.dur_treatment.pars.v, dp['dots']['duration'])
+    assert np.isclose(tbsim.DOTSImproved().pars.dur_treatment.pars.v, dp['dots_improved']['duration'])
+    assert np.isclose(tbsim.FirstLine().pars.dur_treatment.pars.v, dp['first_line_combo']['duration'])
+    assert np.isclose(tbsim.SecondLine().pars.dur_treatment.pars.v, dp['second_line_combo']['duration'])
 
     # Verify one can be administered in a sim
     sim = make_tx_sim(tx_product=tbsim.DOTS())
