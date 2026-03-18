@@ -61,6 +61,8 @@ class Tx(ss.Product):
         Returns:
             dict with 'success' and 'failure' UIDs.
         """
+        # TODO: non-adherent agents currently get zero efficacy; consider partial
+        # efficacy for incomplete courses (e.g. scaled by fraction of course completed)
         adherent, non_adherent = self.pars.p_adherence.filter(uids, both=True)
         success_uids, adherent_fail = self.pars.p_success.filter(adherent, both=True)
         failure_uids = ss.uids.cat([non_adherent, adherent_fail])
