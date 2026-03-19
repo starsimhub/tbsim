@@ -198,73 +198,6 @@ def run_dx_tx_cascade():
     return sim
 
 
-def run_tpt_household():
-    """
-    Demonstrate household contact tracing TPT.
-
-    When an index case starts TB treatment, their household contacts
-    are traced and offered TPT (preventive therapy).
-    """
-    # Create synthetic DHS household data
-    n_households = 200
-    hh_ids = np.arange(n_households)
-    age_strings = []
-    for _ in range(n_households):
-        hh_size = np.random.randint(2, 6)
-        ages = np.random.randint(1, 70, hh_size)
-        age_strings.append(sc.strjoin(ages))
-    dhs_data = sc.dataframe(hh_id=hh_ids, ages=age_strings)
-
-    # Household network + random community network
-    hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
-    community_net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=3), dur=0))
-
-    # Dx/Tx cascade to get index cases onto treatment
-    hsb = tbsim.HealthSeekingBehavior()
-    screen = tbsim.DxDelivery(
-        name='screen',
-        product=tbsim.CAD(),
-        coverage=0.9,
-        result_state='screen_positive',
-    )
-    confirm = tbsim.DxDelivery(
-        name='confirm',
-        product=tbsim.Xpert(),
-        coverage=0.8,
-        eligibility=lambda sim: (
-            sim.people.screen.screen_positive
-            & ~sim.people.confirm.tested
-            & sim.people.alive
-        ).uids,
-        result_state='diagnosed',
-    )
-    treat = tbsim.TxDelivery(product=tbsim.DOTS())
-
-    # TPT household contact tracing: 80% follow-up coverage
-    tpt_hh = tbsim.TPTHousehold(pars={'coverage': 0.8})
-
-    sim = tbsim.Sim(
-        n_agents=5000,
-        start='2000',
-        stop='2020',
-        rand_seed=42,
-        init_prev=ss.bernoulli(p=0.30),
-        beta=ss.peryear(0.05),
-        networks=[hh_net, community_net],
-        interventions=[hsb, screen, confirm, treat, tpt_hh],
-    )
-    sim.run()
-
-    # Print summary
-    r = sim.results
-    tpt_r = r.tpthousehold
-    tx_r = r.txdelivery
-    print(f"\nTPT Household Contact Tracing Results:")
-    print(f"  Index cases treated: {tx_r.n_treated.values.sum()}")
-    print(f"  Contacts initiated:  {tpt_r.n_newly_initiated.values.sum()}")
-    print(f"  Currently protected (final): {tpt_r.n_protected.values[-1]}")
-    return sim
-
 
 def run_tpt_cascade():
     """
@@ -375,9 +308,6 @@ if __name__ == '__main__':
     print("\n--- Dx/Tx Cascade Example ---")
     sim = run_dx_tx_cascade()
 
-    # Run TPT household contact tracing example
-    print("\n--- TPT Household Contact Tracing Example ---")
-    sim_tpt = run_tpt_household()
 
     # Run full TPT cascade example
     print("\n--- Full TPT Cascade Example ---")
