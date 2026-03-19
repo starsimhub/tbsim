@@ -266,6 +266,107 @@ def run_tpt_household():
     return sim
 
 
+def run_tpt_cascade():
+    """
+    Full TPT cascade: HSB → Dx → household contact tracing → triage.
+
+    Index case pathway:
+        HSB → CXR screen → Xpert confirm → DOTS treatment
+
+    Contact tracing pathway:
+        HouseholdContactTracing detects new treatment starts →
+        DxDelivery screens contacts →
+        Active TB contacts → TxDelivery (via diagnosed flag) →
+        Non-active contacts → TPTDelivery (preventive therapy)
+    """
+    # Create synthetic DHS household data
+    n_households = 200
+    hh_ids = np.arange(n_households)
+    age_strings = []
+    for _ in range(n_households):
+        hh_size = np.random.randint(2, 6)
+        ages = np.random.randint(1, 70, hh_size)
+        age_strings.append(sc.strjoin(ages))
+    dhs_data = sc.dataframe(hh_id=hh_ids, ages=age_strings)
+
+    # Networks
+    hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    community_net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=3), dur=0))
+
+    # --- Index case pathway ---
+    hsb = tbsim.HealthSeekingBehavior()
+    screen = tbsim.DxDelivery(
+        name='screen',
+        product=tbsim.CAD(),
+        coverage=0.9,
+        result_state='screen_positive',
+        result_validity=ss.days(180),
+    )
+    confirm = tbsim.DxDelivery(
+        name='confirm',
+        product=tbsim.Xpert(),
+        coverage=0.8,
+        eligibility=lambda sim: (
+            sim.people.screen.screen_positive
+            & ~sim.people.confirm.tested
+            & sim.people.alive
+        ).uids,
+        result_state='diagnosed',
+    )
+    treat = tbsim.TxDelivery(product=tbsim.DOTS())
+
+    # --- Contact tracing pathway ---
+    hh_tracing = tbsim.HouseholdContactTracing(coverage=0.8)
+
+    # Screen contacts for active TB
+    contact_screen = tbsim.DxDelivery(
+        name='contact_screen',
+        product=tbsim.Xpert(),
+        coverage=1.0,
+        eligibility=lambda sim: (
+            sim.people.householdcontacttracing.contact_identified
+            & ~sim.people.contact_screen.tested
+            & sim.people.alive
+        ).uids,
+        result_state='diagnosed',  # positive contacts → TxDelivery picks them up
+    )
+
+    # TPT for contacts screened negative (no active disease)
+    tpt = tbsim.TPTDelivery(
+        product=tbsim.TPTTx(),
+        contact_tracing='householdcontacttracing',
+        contact_screen='contact_screen',
+    )
+
+    sim = tbsim.Sim(
+        n_agents=5000,
+        start='2000',
+        stop='2020',
+        rand_seed=42,
+        init_prev=ss.bernoulli(p=0.30),
+        beta=ss.peryear(0.05),
+        networks=[hh_net, community_net],
+        interventions=[hsb, screen, confirm, treat, hh_tracing, contact_screen, tpt],
+    )
+    sim.run()
+
+    # Print summary
+    r = sim.results
+    ct_r = r.householdcontacttracing
+    cs_r = r.contact_screen
+    tx_r = r.txdelivery
+    tpt_r = r.tptdelivery
+    print(f"\nTPT Cascade Results:")
+    print(f"  Index cases followed up:  {ct_r.n_index_followed_up.values.sum()}")
+    print(f"  Contacts identified:      {ct_r.n_contacts_identified.values.sum()}")
+    print(f"  Contacts screened:        {cs_r.n_tested.values.sum()}")
+    print(f"  Contacts diagnosed (active TB): {cs_r.n_positive.values.sum()}")
+    print(f"  Total treated:            {tx_r.n_treated.values.sum()}")
+    print(f"  TPT initiated:            {tpt_r.n_tpt_initiated.values.sum()}")
+    print(f"  TPT protected (final):    {tpt_r.n_protected.values[-1]}")
+    return sim
+
+
 if __name__ == '__main__':
     # Run all scenarios
     # results = run_scenarios(plot=True)
@@ -277,3 +378,7 @@ if __name__ == '__main__':
     # Run TPT household contact tracing example
     print("\n--- TPT Household Contact Tracing Example ---")
     sim_tpt = run_tpt_household()
+
+    # Run full TPT cascade example
+    print("\n--- Full TPT Cascade Example ---")
+    sim_cascade = run_tpt_cascade()

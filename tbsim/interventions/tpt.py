@@ -1,9 +1,11 @@
 """
 Tuberculosis Preventive Therapy (TPT): Product + Delivery.
 
-``TPTTx``         — treatment product  (biological effect, per-agent state)
-``TPTSimple``     — simple delivery    (targets latently infected by default)
-``TPTHousehold``  — household contact tracing delivery
+``TPTTx``                    — treatment product  (biological effect, per-agent state)
+``TPTSimple``                — simple delivery    (targets latently infected by default)
+``TPTHousehold``             — household contact tracing delivery (legacy)
+``HouseholdContactTracing``  — identifies household contacts of new treatment cases
+``TPTDelivery``              — delivers TPT to screened contacts without active disease
 """
 
 import numpy as np
@@ -11,7 +13,7 @@ import starsim as ss
 from .interventions import TBProductRoutine
 from ..tb import TBS
 
-__all__ = ['TPTTx', 'TPTSimple', 'TPTHousehold']
+__all__ = ['TPTTx', 'TPTSimple', 'TPTHousehold', 'HouseholdContactTracing', 'TPTDelivery']
 
 
 # ---------------------------------------------------------------------------
@@ -79,8 +81,10 @@ class TPTTx(ss.Product):
             tb = self.sim.diseases[self.pars.disease]
             uids = uids[~tb.on_treatment[uids]]
 
-        # Skip agents already protected (don't restart their clock)
+        # Skip agents already protected or in treatment phase (don't restart their clock)
         uids = uids[~self.tpt_protected[uids]]
+        already_initiated = ~np.isnan(self.ti_protection_starts[uids])
+        uids = uids[~already_initiated]
 
         if len(uids) == 0:
             return ss.uids()
@@ -272,4 +276,194 @@ class TPTHousehold(TBProductRoutine):
     def shrink(self):
         """ Delete link to household net """
         self.hh_net = None
+        return
+
+
+# ---------------------------------------------------------------------------
+# Composable household contact tracing + TPT delivery
+# ---------------------------------------------------------------------------
+
+class HouseholdContactTracing(ss.Intervention):
+    """
+    Identifies household contacts of agents who newly start TB treatment.
+
+    Sets ``contact_identified=True`` on household members of followed-up
+    index cases. Downstream interventions (e.g. ``DxDelivery`` for screening,
+    ``TPTDelivery`` for preventive therapy) read this flag.
+
+    Requires a household network with ``household_ids`` (e.g. ``ss.HouseholdNet``).
+
+    Args:
+        coverage (float): Probability that a given index case's household is
+            followed up (per-index-case Bernoulli). Default 0.8.
+        disease (str): Key of the TB disease module. Default ``'tb'``.
+    """
+
+    def __init__(self, coverage=0.8, disease='tb', **kwargs):
+        super().__init__(**kwargs)
+        self.disease = disease
+        self.define_pars(
+            coverage = ss.bernoulli(p=coverage),
+        )
+        self.define_states(
+            ss.BoolArr('prev_on_treatment', default=False),
+            ss.BoolArr('contact_identified', default=False),
+            ss.FloatArr('ti_contact_identified', default=np.nan),
+        )
+        self.hh_net = None
+        return
+
+    def find_household_net(self):
+        """Find the network that has ``household_ids``."""
+        for net in self.sim.networks.values():
+            if hasattr(net, 'household_ids'):
+                return net
+        raise ValueError("No household network with household_ids found in sim")
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('n_contacts_identified', dtype=int),
+            ss.Result('n_index_followed_up', dtype=int),
+        )
+        return
+
+    def step(self):
+        """Detect new treatment starts, trace household contacts, set flags."""
+        tb = self.sim.diseases[self.disease]
+        if self.hh_net is None:
+            self.hh_net = self.find_household_net()
+        hh_net = self.hh_net
+
+        # 1. Detect NEW treatment starts (on_treatment: False → True)
+        newly_on_treatment = (tb.on_treatment & ~self.prev_on_treatment).uids
+        self.prev_on_treatment[:] = tb.on_treatment
+
+        self._n_followed = 0
+        self._n_contacts = 0
+
+        if len(newly_on_treatment) == 0:
+            return
+
+        # 2. Coverage: per index case (does health system follow up?)
+        followed_up = self.pars.coverage.filter(newly_on_treatment)
+        if len(followed_up) == 0:
+            return
+        self._n_followed = len(followed_up)
+
+        # 3. Find their household IDs
+        hhids = np.asarray(hh_net.household_ids[followed_up])
+        target_hhids = np.unique(hhids[~np.isnan(hhids)])
+
+        if len(target_hhids) == 0:
+            return
+
+        # 4. Find household contacts (excluding index cases)
+        all_hh = np.isin(np.asarray(hh_net.household_ids), target_hhids)
+        contacts = ss.uids(all_hh)
+        contacts = contacts.remove(followed_up)
+
+        # 5. Filter to alive agents only
+        contacts = contacts.intersect(self.sim.people.alive.uids)
+
+        if len(contacts) == 0:
+            return
+
+        # 6. Set contact_identified flag
+        self.contact_identified[contacts] = True
+        self.ti_contact_identified[contacts] = self.ti
+        self._n_contacts = len(contacts)
+        return
+
+    def update_results(self):
+        self.results.n_contacts_identified[self.ti] = self._n_contacts
+        self.results.n_index_followed_up[self.ti] = self._n_followed
+        return
+
+    def shrink(self):
+        self.hh_net = None
+        return
+
+
+class TPTDelivery(ss.Intervention):
+    """
+    Delivers TPT to household contacts who were screened and found NOT to
+    have active disease.
+
+    Reads flags from ``HouseholdContactTracing`` (``contact_identified``) and
+    a screening ``DxDelivery`` (``tested`` and result state) to determine
+    eligibility: contacts who were identified, screened, and not diagnosed
+    with active TB.
+
+    Args:
+        product (TPTTx): The TPT treatment product. Created automatically if not provided.
+        contact_tracing (str): Name of the ``HouseholdContactTracing`` intervention.
+            Default ``'householdcontacttracing'``.
+        contact_screen (str): Name of the screening ``DxDelivery`` intervention.
+            Default ``'contact_screen'``.
+        result_state (str): The result state name on the screening DxDelivery
+            that indicates a positive (active TB) result. Default ``'diagnosed'``.
+    """
+
+    def __init__(self, product=None, contact_tracing='householdcontacttracing',
+                 contact_screen='contact_screen', result_state='diagnosed', **kwargs):
+        super().__init__(**kwargs)
+        self.product = product if product is not None else TPTTx()
+        self._ct_name = contact_tracing
+        self._cs_name = contact_screen
+        self._result_state = result_state
+        self._ct = None
+        self._cs = None
+        self.product.name = f'{self.name}_product'
+        return
+
+    def init_post(self):
+        super().init_post()
+        # Resolve references to other interventions
+        self._ct = self.sim.interventions[self._ct_name]
+        self._cs = self.sim.interventions[self._cs_name]
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('n_tpt_initiated', dtype=int),
+            ss.Result('n_protected', dtype=int),
+        )
+        return
+
+    def _get_eligible(self):
+        """Get contacts who were identified, screened, and not diagnosed with active TB."""
+        ct = self._ct
+        cs = self._cs
+        ppl = self.sim.people
+
+        # Must be: contact_identified AND screened (tested) AND NOT diagnosed AND alive
+        result_arr = cs[self._result_state]
+        eligible = (ct.contact_identified & cs.tested & ~result_arr & ppl.alive).uids
+        return eligible
+
+    def step(self):
+        """Deliver TPT to eligible contacts; manage product lifecycle."""
+        # Product-internal transitions (expire protection, complete treatment)
+        self.product.update_roster()
+
+        # Find and deliver to eligible contacts
+        eligible = self._get_eligible()
+        self._n_initiated = 0
+        if len(eligible) > 0:
+            started = self.product.administer(self.sim.people, eligible)
+            self._n_initiated = len(started)
+
+        # Apply rr_* modifiers for all currently protected
+        self.product.apply_protection()
+        return
+
+    def update_results(self):
+        self.results.n_tpt_initiated[self.ti] = self._n_initiated
+        self.results.n_protected[self.ti] = np.count_nonzero(self.product.tpt_protected)
+        return
+
+    def shrink(self):
+        self._ct = None
+        self._cs = None
         return

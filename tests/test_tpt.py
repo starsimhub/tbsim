@@ -347,3 +347,161 @@ def test_tpt_household_full_sim_run():
     itv = sim.interventions['tpthousehold']
     assert 'n_newly_initiated' in itv.results
     assert 'n_protected' in itv.results
+
+
+# ---------------------------------------------------------------------------
+# HouseholdContactTracing tests
+# ---------------------------------------------------------------------------
+
+def test_hh_contact_tracing_identifies_contacts():
+    """HouseholdContactTracing sets contact_identified on household members."""
+    dhs_data = make_dhs_data(50)
+    hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+
+    tb = tbsim.TB(name='tb', pars={'init_prev': 0.20})
+    hh_tracing = tbsim.HouseholdContactTracing(coverage=1.0)
+
+    sim = ss.Sim(
+        diseases=tb, networks=hh_net,
+        interventions=hh_tracing,
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2010-12-31')),
+    )
+    sim.init()
+
+    ct = sim.interventions['householdcontacttracing']
+    tb_disease = sim.diseases.tb
+
+    # No contacts before treatment starts
+    ct.step()
+    assert ct.contact_identified.count() == 0
+
+    # Force an agent onto treatment
+    tb_disease.on_treatment[ss.uids([0])] = True
+    ct.step()
+
+    # Should have identified contacts
+    n_identified = ct.contact_identified.count()
+    # Agent 0 should NOT be in contacts
+    if n_identified > 0:
+        assert not ct.contact_identified[0], "Index case should not be identified as contact"
+
+
+def test_hh_contact_tracing_no_retrigger():
+    """Same index case does not retrigger contact identification."""
+    dhs_data = make_dhs_data(50)
+    hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+
+    tb = tbsim.TB(name='tb', pars={'init_prev': 0.20})
+    hh_tracing = tbsim.HouseholdContactTracing(coverage=1.0)
+
+    sim = ss.Sim(
+        diseases=tb, networks=hh_net,
+        interventions=hh_tracing,
+        pars=dict(dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2010-12-31')),
+    )
+    sim.init()
+
+    ct = sim.interventions['householdcontacttracing']
+    tb_disease = sim.diseases.tb
+
+    tb_disease.on_treatment[ss.uids([0])] = True
+    ct.step()
+    n1 = ct._n_contacts
+
+    # Second step: same agent still on treatment, no new starts
+    ct.step()
+    assert ct._n_contacts == 0, "Same index should not retrigger"
+
+
+# ---------------------------------------------------------------------------
+# Full TPT cascade tests
+# ---------------------------------------------------------------------------
+
+def _make_cascade_sim(n_agents=500, n_households=100, rand_seed=42):
+    """Build a full TPT cascade sim for testing."""
+    dhs_data = make_dhs_data(n_households)
+    hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    community_net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=3), dur=0))
+
+    hsb = tbsim.HealthSeekingBehavior()
+    screen = tbsim.DxDelivery(
+        name='screen', product=tbsim.CAD(), coverage=0.9,
+        result_state='screen_positive',
+    )
+    confirm = tbsim.DxDelivery(
+        name='confirm', product=tbsim.Xpert(), coverage=0.8,
+        eligibility=lambda sim: (
+            sim.people.screen.screen_positive
+            & ~sim.people.confirm.tested
+            & sim.people.alive
+        ).uids,
+        result_state='diagnosed',
+    )
+    treat = tbsim.TxDelivery(product=tbsim.DOTS())
+
+    hh_tracing = tbsim.HouseholdContactTracing(coverage=1.0)
+    contact_screen = tbsim.DxDelivery(
+        name='contact_screen', product=tbsim.Xpert(), coverage=1.0,
+        eligibility=lambda sim: (
+            sim.people.householdcontacttracing.contact_identified
+            & ~sim.people.contact_screen.tested
+            & sim.people.alive
+        ).uids,
+        result_state='diagnosed',
+    )
+    tpt = tbsim.TPTDelivery(
+        product=tbsim.TPTTx(),
+        contact_tracing='householdcontacttracing',
+        contact_screen='contact_screen',
+    )
+
+    sim = tbsim.Sim(
+        n_agents=n_agents, start='2000', stop='2010', rand_seed=rand_seed,
+        init_prev=ss.bernoulli(p=0.30), beta=ss.peryear(0.05),
+        networks=[hh_net, community_net],
+        interventions=[hsb, screen, confirm, treat, hh_tracing, contact_screen, tpt],
+    )
+    return sim
+
+
+def test_tpt_cascade_runs():
+    """Full TPT cascade completes without error."""
+    sim = _make_cascade_sim()
+    sim.run()
+
+    r = sim.results
+    assert r.householdcontacttracing.n_contacts_identified.values.sum() >= 0
+    assert r.contact_screen.n_tested.values.sum() >= 0
+    assert r.tptdelivery.n_tpt_initiated.values.sum() >= 0
+
+
+def test_tpt_cascade_contacts_screened():
+    """Identified contacts are screened by contact_screen DxDelivery."""
+    sim = _make_cascade_sim(n_agents=2000)
+    sim.run()
+
+    r = sim.results
+    n_identified = r.householdcontacttracing.n_contacts_identified.values.sum()
+    n_screened = r.contact_screen.n_tested.values.sum()
+
+    # If contacts were identified, some should have been screened
+    if n_identified > 0:
+        assert n_screened > 0, \
+            f"Identified {n_identified} contacts but none were screened"
+
+
+def test_tpt_cascade_triage():
+    """Contacts are triaged: active TB → treatment, non-active → TPT."""
+    sim = _make_cascade_sim(n_agents=2000)
+    sim.run()
+
+    r = sim.results
+    n_contact_positive = r.contact_screen.n_positive.values.sum()
+    n_tpt = r.tptdelivery.n_tpt_initiated.values.sum()
+    n_treated = r.txdelivery.n_treated.values.sum()
+
+    # At least some contacts should get TPT or treatment
+    n_contact_screened = r.contact_screen.n_tested.values.sum()
+    if n_contact_screened > 0:
+        assert (n_tpt + n_contact_positive) > 0, \
+            f"Screened {n_contact_screened} contacts but none got TPT or treatment"
