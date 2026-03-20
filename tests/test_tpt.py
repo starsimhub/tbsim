@@ -518,7 +518,7 @@ def test_tpt_sterilization_clears_infection():
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
     product = tbsim.TPTTx(pars={
-        'p_sterilization': 1.0, 'p_suppression': 0.0,
+        'efficacy': ss.bernoulli(p=1.0), 'p_sterilize': ss.bernoulli(p=1.0),
         'dur_treatment': ss.constant(v=ss.days(0)),  # Instant treatment
     })
     itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
@@ -546,7 +546,7 @@ def test_tpt_sterilization_clears_infection():
 
     # None should be protected (suppression)
     assert tpt.product.tpt_protected.count() == 0, \
-        "No agents should be in suppression protection with p_suppression=0"
+        "No agents should be in suppression protection with p_sterilization=1"
 
 
 def test_tpt_suppression_applies_modifiers():
@@ -556,7 +556,7 @@ def test_tpt_suppression_applies_modifiers():
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
     product = tbsim.TPTTx(pars={
-        'p_sterilization': 0.0, 'p_suppression': 1.0,
+        'efficacy': ss.bernoulli(p=1.0),
         'dur_treatment': ss.constant(v=ss.days(0)),
         'dur_protection': ss.constant(v=ss.years(10)),
     })
@@ -587,7 +587,7 @@ def test_tpt_neither_gets_no_benefit():
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
     product = tbsim.TPTTx(pars={
-        'p_sterilization': 0.0, 'p_suppression': 0.0,
+        'efficacy': ss.bernoulli(p=0.0),
         'dur_treatment': ss.constant(v=ss.days(7)),
     })
     itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
@@ -610,7 +610,7 @@ def test_tpt_mechanisms_mutually_exclusive():
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
     product = tbsim.TPTTx(pars={
-        'p_sterilization': 0.5, 'p_suppression': 0.5,
+        'efficacy': ss.bernoulli(p=1.0), 'p_sterilize': ss.bernoulli(p=0.5),
         'dur_treatment': ss.constant(v=ss.days(7)),
     })
     itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
@@ -631,9 +631,9 @@ def test_tpt_mechanisms_mutually_exclusive():
     assert len(both) == 0, "No agent should have both sterilization and suppression"
 
 
-def test_tpt_backward_compatible_defaults():
-    """Default params (p_sterilization=0, p_suppression=1) produce suppression-only behavior."""
-    nagents = 100
+def test_tpt_default_efficacy():
+    """Default params (efficacy=0.6, p_sterilize=0) produce suppression or nothing."""
+    nagents = 200
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
@@ -649,24 +649,24 @@ def test_tpt_backward_compatible_defaults():
     tpt.step()
     tpt.step()
 
-    # All initiated agents should have suppression mechanism
+    # With default p_sterilize=0, mechanisms should be SUPPRESS or NONE only
     initiated = tpt.initiated.uids
     if len(initiated) > 0:
         mechs = np.asarray(tpt.product.tpt_mechanism[initiated])
-        assert np.all(mechs == tbsim.TPTTx.MECH_SUPPRESS), \
-            "Default should assign all agents to suppression"
-    # No sterilized agents
-    assert tpt.product.tpt_resolved.count() == 0
-
-
-def test_tpt_invalid_probabilities():
-    """Raise error if p_sterilization + p_suppression > 1."""
-    with pytest.raises(ValueError, match="must be <= 1.0"):
-        tbsim.TPTTx(pars={'p_sterilization': 0.6, 'p_suppression': 0.6})
+        assert np.all(np.isin(mechs, [tbsim.TPTTx.MECH_NONE, tbsim.TPTTx.MECH_SUPPRESS])), \
+            "Default should assign agents to suppression or nothing (no sterilization)"
+        # Some should be protected (suppression) and some resolved (no benefit)
+        n_suppress = np.count_nonzero(mechs == tbsim.TPTTx.MECH_SUPPRESS)
+        n_none     = np.count_nonzero(mechs == tbsim.TPTTx.MECH_NONE)
+        assert n_suppress > 0, "Some agents should get suppression"
+        assert n_none > 0, "Some agents should get no benefit (efficacy < 1)"
 
 
 def test_tpt_mechanism_via_pars_dict():
     """Mechanism probabilities can be passed via pars dict."""
-    product = tbsim.TPTTx(pars={'p_sterilization': 0.7, 'p_suppression': 0.3})
-    assert np.isclose(product.pars.p_sterilization, 0.7)
-    assert np.isclose(product.pars.p_suppression, 0.3)
+    product = tbsim.TPTTx(pars={
+        'efficacy': ss.bernoulli(p=0.8),
+        'p_sterilize': ss.bernoulli(p=0.3),
+    })
+    assert np.isclose(product.pars.efficacy.pars.p, 0.8)
+    assert np.isclose(product.pars.p_sterilize.pars.p, 0.3)

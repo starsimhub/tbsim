@@ -24,22 +24,18 @@ class TPTTx(ss.Product):
     """
     TPT treatment product with sterilization and suppression mechanisms.
 
-    Each agent receiving TPT is assigned one of three outcomes via a
-    multinomial draw (``ss.choice``):
+    TPT efficacy is modeled in two stages:
 
-    - **Sterilization** (``p_sterilization``): infection is cleared at
-      treatment completion (INFECTION → CLEARED). Only effective if the
-      agent is still in INFECTION state when treatment ends.
-    - **Suppression** (``p_suppression``): residual risk reduction via
-      ``rr_*`` modifiers during a post-treatment protection window.
-    - **Neither** (remainder): no benefit (e.g., non-adherent).
-
-    These are mutually exclusive; no agent gets both.
+    1. ``efficacy`` determines whether TPT works at all for a given agent.
+    2. Among efficacious agents, ``p_sterilize`` determines who gets
+       sterilization (infection cleared) vs suppression (risk reduction
+       via ``rr_*`` modifiers). These are mutually exclusive.
 
     Args:
         disease (str): Key of the disease module to target (default ``'tb'``).
-        p_sterilization (float): Probability of sterilization benefit (default 0.0).
-        p_suppression (float): Probability of suppression benefit (default 1.0).
+        efficacy (ss.bernoulli): Probability that TPT works (default 0.6).
+        p_sterilize (ss.bernoulli): Among efficacious agents, probability of
+            sterilization vs suppression (default 0.0 = all suppression).
         dur_treatment (ss.Dist): Duration of the antibiotic course (default 3 months).
         dur_protection (ss.Dist): Duration of post-treatment protection (default 2 years).
         activation_modifier / clearance_modifier / death_modifier (ss.Dist):
@@ -58,8 +54,8 @@ class TPTTx(ss.Product):
 
         self.define_pars(
             disease='tb',
-            p_sterilization=0.0,
-            p_suppression=1.0,
+            efficacy=ss.bernoulli(p=0.6),
+            p_sterilize=ss.bernoulli(p=0.0),
             dur_treatment=ss.constant(v=ss.months(3)),
             dur_protection=ss.constant(v=ss.years(2)),
             activation_modifier=ss.uniform(0.3, 0.5),
@@ -68,16 +64,6 @@ class TPTTx(ss.Product):
             exclude_on_treatment=True,
         )
         self.update_pars(pars)
-
-        # Build mechanism_dist from final p_sterilization / p_suppression
-        p_sterilization = self.pars.p_sterilization
-        p_suppression   = self.pars.p_suppression
-        p_neither = 1.0 - p_sterilization - p_suppression
-        if p_neither < -1e-10:
-            raise ValueError(f"p_sterilization ({p_sterilization}) + p_suppression ({p_suppression}) must be <= 1.0")
-        p_neither = max(0.0, p_neither)  # Clamp rounding errors
-        self.pars.mechanism_dist = ss.choice(a=[self.MECH_NONE, self.MECH_STERILIZE, self.MECH_SUPPRESS],
-                                             p=[p_neither, p_sterilization, p_suppression])
 
         self.define_states(
             ss.IntArr('tpt_mechanism', default=self.MECH_NONE),
@@ -118,17 +104,19 @@ class TPTTx(ss.Product):
         if len(uids) == 0:
             return ss.uids()
 
-        # Roll mechanism assignment
-        mechanism = self.pars.mechanism_dist.rvs(uids)
-        self.tpt_mechanism[uids] = mechanism
+        # Draw 1: is TPT effective?
+        effective, ineffective = self.pars.efficacy.filter(uids, both=True)
+        self.tpt_mechanism[ineffective] = self.MECH_NONE
+
+        # Draw 2: among effective agents, sterilization or suppression?
+        sterilize, suppress = self.pars.p_sterilize.filter(effective, both=True)
+        self.tpt_mechanism[sterilize] = self.MECH_STERILIZE
+        self.tpt_mechanism[suppress]  = self.MECH_SUPPRESS
 
         # Schedule treatment duration for all agents (ti_protection_starts is used
         # by update_roster to detect treatment completion, regardless of mechanism)
         dur_tx = self.pars.dur_treatment.rvs(uids)
         self.ti_protection_starts[uids] = self.ti + dur_tx
-
-        # Suppression agents also need protection window and rr_* modifiers
-        suppress = uids[mechanism == self.MECH_SUPPRESS]
         if len(suppress) > 0:
             dur_prot = self.pars.dur_protection.rvs(suppress)
             self.ti_protection_expires[suppress] = self.ti_protection_starts[suppress] + dur_prot
