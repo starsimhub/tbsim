@@ -24,7 +24,7 @@ class TBProductRoutine(ss.Intervention):
     Args:
         product (ss.Vx): The vaccine/treatment product.
         coverage (ss.bernoulli): Fraction of eligible individuals who accept (applied once per person).
-        start / stop (ss.date): Campaign window.
+        start / stop (ss.date): Campaign window (defaults to sim start/stop if not provided).
         age_range (list or None): ``[min_age, max_age]`` filter, or ``None`` to skip.
         eligible_states (list or None): List of disease-state values (e.g. ``[TBS.INFECTION]``) to filter on,
             or ``None`` to skip.
@@ -37,8 +37,8 @@ class TBProductRoutine(ss.Intervention):
         super().__init__(**kwargs)
 
         self.define_pars(
-            start=ss.date('1900-01-01'),
-            stop=ss.date('2100-12-31'),
+            start=None,
+            stop=None,
             coverage=ss.bernoulli(p=0.5),
             age_range=None,
             eligible_states=None,
@@ -52,6 +52,15 @@ class TBProductRoutine(ss.Intervention):
             ss.BoolArr('initiated', default=False),
             ss.FloatArr('ti_initiated'),
         )
+        return
+
+    def init_pre(self, sim):
+        """Fill in start/stop from sim timeline if not explicitly set."""
+        if self.pars.start is None:
+            self.pars.start = sim.t.start
+        if self.pars.stop is None:
+            self.pars.stop = sim.t.stop
+        super().init_pre(sim)
         return
 
     def check_eligibility(self):
@@ -86,24 +95,23 @@ class TBProductRoutine(ss.Intervention):
         Routine delivery step:
 
         1. Check date window.
-        2. Product handles internal phase transitions (``update_roster``).
-        3. Find and deliver to newly eligible agents.
-        4. Product applies ``rr_*`` modifiers for all currently protected.
+        2. Product handles internal phase transitions (``update_roster``) - even outside of date window
+        3. Find and deliver to newly eligible agents - only during date window
+        4. Product applies ``rr_*`` modifiers for all currently protected - even outside of date window
         """
         now = self.sim.now
         now_date = now.date() if hasattr(now, 'date') else now
-        if now_date < self.pars.start.date() or now_date > self.pars.stop.date():
-            return
-
+        
         # Product-internal transitions (expire protection, complete treatment, etc.)
         self.product.update_roster()
 
-        # Deliver to newly eligible
-        eligible = self.check_eligibility()
-        if len(eligible) > 0:
-            self.initiated[eligible] = True
-            self.ti_initiated[eligible] = self.ti
-            self.product.administer(self.sim.people, eligible)
+        # Deliver to newly eligible - only during date window
+        if now_date >= self.pars.start.date() and now_date <= self.pars.stop.date():
+            eligible = self.check_eligibility()
+            if len(eligible) > 0:
+                self.initiated[eligible] = True
+                self.ti_initiated[eligible] = self.ti
+                self.product.administer(self.sim.people, eligible)
 
         # Apply modifiers for all currently protected
         self.product.apply_protection()
