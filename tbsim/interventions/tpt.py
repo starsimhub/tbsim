@@ -52,27 +52,14 @@ class TPTTx(ss.Product):
     MECH_STERILIZE = 1
     MECH_SUPPRESS = 2
 
-    def __init__(self, pars=None, p_sterilization=0.0, p_suppression=1.0, **kwargs):
+    def __init__(self, pars=None, **kwargs):
         """Initialize TPT product with mechanism probabilities and efficacy parameters."""
         super().__init__(**kwargs)
 
-        # Allow mechanism probabilities via pars dict or constructor args
-        pars = dict(pars) if pars else {}
-        p_sterilization = pars.pop('p_sterilization', p_sterilization)
-        p_suppression   = pars.pop('p_suppression', p_suppression)
-
-        # Validate mechanism probabilities
-        p_neither = 1.0 - p_sterilization - p_suppression
-        if p_neither < -1e-10:
-            raise ValueError(f"p_sterilization ({p_sterilization}) + p_suppression ({p_suppression}) must be <= 1.0")
-        p_neither = max(0.0, p_neither)  # Clamp rounding errors
-
         self.define_pars(
             disease='tb',
-            p_sterilization=p_sterilization,
-            p_suppression=p_suppression,
-            mechanism_dist=ss.choice(a=[self.MECH_NONE, self.MECH_STERILIZE, self.MECH_SUPPRESS],
-                                     p=[p_neither, p_sterilization, p_suppression]),
+            p_sterilization=0.0,
+            p_suppression=1.0,
             dur_treatment=ss.constant(v=ss.months(3)),
             dur_protection=ss.constant(v=ss.years(2)),
             activation_modifier=ss.uniform(0.3, 0.5),
@@ -81,6 +68,16 @@ class TPTTx(ss.Product):
             exclude_on_treatment=True,
         )
         self.update_pars(pars)
+
+        # Build mechanism_dist from final p_sterilization / p_suppression
+        p_sterilization = self.pars.p_sterilization
+        p_suppression   = self.pars.p_suppression
+        p_neither = 1.0 - p_sterilization - p_suppression
+        if p_neither < -1e-10:
+            raise ValueError(f"p_sterilization ({p_sterilization}) + p_suppression ({p_suppression}) must be <= 1.0")
+        p_neither = max(0.0, p_neither)  # Clamp rounding errors
+        self.pars.mechanism_dist = ss.choice(a=[self.MECH_NONE, self.MECH_STERILIZE, self.MECH_SUPPRESS],
+                                             p=[p_neither, p_sterilization, p_suppression])
 
         self.define_states(
             ss.IntArr('tpt_mechanism', default=self.MECH_NONE),

@@ -517,10 +517,10 @@ def test_tpt_sterilization_clears_infection():
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    product = tbsim.TPTTx(
-        p_sterilization=1.0, p_suppression=0.0,
-        pars={'dur_treatment': ss.constant(v=ss.days(0))},  # Instant treatment
-    )
+    product = tbsim.TPTTx(pars={
+        'p_sterilization': 1.0, 'p_suppression': 0.0,
+        'dur_treatment': ss.constant(v=ss.days(0)),  # Instant treatment
+    })
     itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
@@ -555,13 +555,11 @@ def test_tpt_suppression_applies_modifiers():
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    product = tbsim.TPTTx(
-        p_sterilization=0.0, p_suppression=1.0,
-        pars={
-            'dur_treatment': ss.constant(v=ss.days(0)),
-            'dur_protection': ss.constant(v=ss.years(10)),
-        },
-    )
+    product = tbsim.TPTTx(pars={
+        'p_sterilization': 0.0, 'p_suppression': 1.0,
+        'dur_treatment': ss.constant(v=ss.days(0)),
+        'dur_protection': ss.constant(v=ss.years(10)),
+    })
     itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
@@ -588,10 +586,10 @@ def test_tpt_neither_gets_no_benefit():
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    product = tbsim.TPTTx(
-        p_sterilization=0.0, p_suppression=0.0,
-        pars={'dur_treatment': ss.constant(v=ss.days(7))},
-    )
+    product = tbsim.TPTTx(pars={
+        'p_sterilization': 0.0, 'p_suppression': 0.0,
+        'dur_treatment': ss.constant(v=ss.days(7)),
+    })
     itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
@@ -611,10 +609,10 @@ def test_tpt_mechanisms_mutually_exclusive():
     pop, tb, net, pars = make_modules(agents=nagents)
     pop = ss.People(n_agents=nagents, age_data=age_data)
 
-    product = tbsim.TPTTx(
-        p_sterilization=0.5, p_suppression=0.5,
-        pars={'dur_treatment': ss.constant(v=ss.days(7))},
-    )
+    product = tbsim.TPTTx(pars={
+        'p_sterilization': 0.5, 'p_suppression': 0.5,
+        'dur_treatment': ss.constant(v=ss.days(7)),
+    })
     itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
     sim.init()
@@ -664,7 +662,7 @@ def test_tpt_backward_compatible_defaults():
 def test_tpt_invalid_probabilities():
     """Raise error if p_sterilization + p_suppression > 1."""
     with pytest.raises(ValueError, match="must be <= 1.0"):
-        tbsim.TPTTx(p_sterilization=0.6, p_suppression=0.6)
+        tbsim.TPTTx(pars={'p_sterilization': 0.6, 'p_suppression': 0.6})
 
 
 def test_tpt_mechanism_via_pars_dict():
@@ -672,7 +670,3 @@ def test_tpt_mechanism_via_pars_dict():
     product = tbsim.TPTTx(pars={'p_sterilization': 0.7, 'p_suppression': 0.3})
     assert np.isclose(product.pars.p_sterilization, 0.7)
     assert np.isclose(product.pars.p_suppression, 0.3)
-
-    # Also works via constructor args (existing path)
-    product2 = tbsim.TPTTx(p_sterilization=0.7, p_suppression=0.3)
-    assert np.isclose(product2.pars.p_sterilization, 0.7)
