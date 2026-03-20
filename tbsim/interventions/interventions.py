@@ -24,7 +24,7 @@ class TBProductRoutine(ss.Intervention):
     Args:
         product (ss.Vx): The vaccine/treatment product.
         coverage (ss.bernoulli): Fraction of eligible individuals who accept (applied once per person).
-        start / stop (ss.date): Campaign window.
+        start / stop (ss.date): Campaign window (defaults to sim start/stop if not provided).
         age_range (list or None): ``[min_age, max_age]`` filter, or ``None`` to skip.
         eligible_states (list or None): List of disease-state values (e.g. ``[TBS.INFECTION]``) to filter on,
             or ``None`` to skip.
@@ -37,8 +37,8 @@ class TBProductRoutine(ss.Intervention):
         super().__init__(**kwargs)
 
         self.define_pars(
-            start=ss.date('1900-01-01'),
-            stop=ss.date('2100-12-31'),
+            start=None,
+            stop=None,
             coverage=ss.bernoulli(p=0.5),
             age_range=None,
             eligible_states=None,
@@ -52,6 +52,15 @@ class TBProductRoutine(ss.Intervention):
             ss.BoolArr('initiated', default=False),
             ss.FloatArr('ti_initiated'),
         )
+        return
+
+    def init_pre(self, sim):
+        """Fill in start/stop from sim timeline if not explicitly set."""
+        if self.pars.start is None:
+            self.pars.start = sim.t.start
+        if self.pars.stop is None:
+            self.pars.stop = sim.t.stop
+        super().init_pre(sim)
         return
 
     def check_eligibility(self):
