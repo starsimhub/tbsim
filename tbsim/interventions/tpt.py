@@ -56,6 +56,11 @@ class TPTTx(ss.Product):
         """Initialize TPT product with mechanism probabilities and efficacy parameters."""
         super().__init__(**kwargs)
 
+        # Allow mechanism probabilities via pars dict or constructor args
+        pars = dict(pars) if pars else {}
+        p_sterilization = pars.pop('p_sterilization', p_sterilization)
+        p_suppression   = pars.pop('p_suppression', p_suppression)
+
         # Validate mechanism probabilities
         p_neither = 1.0 - p_sterilization - p_suppression
         if p_neither < -1e-10:
@@ -80,7 +85,7 @@ class TPTTx(ss.Product):
         self.define_states(
             ss.IntArr('tpt_mechanism', default=self.MECH_NONE),
             ss.BoolArr('tpt_protected', default=False),
-            ss.BoolArr('tpt_sterilized', default=False),
+            ss.BoolArr('tpt_resolved', default=False),
             ss.FloatArr('ti_protection_starts'),
             ss.FloatArr('ti_protection_expires'),
             ss.FloatArr('tpt_activation_modifier_applied'),
@@ -120,7 +125,8 @@ class TPTTx(ss.Product):
         mechanism = self.pars.mechanism_dist.rvs(uids)
         self.tpt_mechanism[uids] = mechanism
 
-        # Schedule treatment duration for all agents
+        # Schedule treatment duration for all agents (ti_protection_starts is used
+        # by update_roster to detect treatment completion, regardless of mechanism)
         dur_tx = self.pars.dur_treatment.rvs(uids)
         self.ti_protection_starts[uids] = self.ti + dur_tx
 
@@ -147,7 +153,7 @@ class TPTTx(ss.Product):
         Also expires protection for suppression agents past their window.
         """
         # Find agents whose treatment just completed
-        not_yet_resolved = (~self.tpt_protected & ~self.tpt_sterilized).uids
+        not_yet_resolved = (~self.tpt_protected & ~self.tpt_resolved).uids
         if len(not_yet_resolved) > 0:
             starts = self.ti_protection_starts[not_yet_resolved]
             ready = not_yet_resolved[~np.isnan(starts) & (self.ti >= starts)]
@@ -165,6 +171,11 @@ class TPTTx(ss.Product):
                 if len(suppress_uids) > 0:
                     self.tpt_protected[suppress_uids] = True
 
+                # Neither: mark as resolved so they aren't re-checked each step
+                neither_uids = ready[mechs == self.MECH_NONE]
+                if len(neither_uids) > 0:
+                    self.tpt_resolved[neither_uids] = True
+
         # Expire protection for suppression agents
         protected_uids = self.tpt_protected.uids
         if len(protected_uids) > 0:
@@ -181,7 +192,7 @@ class TPTTx(ss.Product):
         # Only sterilize agents still latently infected
         still_infected = uids[tb.state[uids] == TBS.INFECTION]
         if len(still_infected) == 0:
-            self.tpt_sterilized[uids] = True  # Mark as resolved even if no effect
+            self.tpt_resolved[uids] = True  # Mark as resolved even if no effect
             return
 
         # Clear infection (same pattern as TxDelivery.step_start_treatment)
@@ -192,7 +203,7 @@ class TPTTx(ss.Product):
         tb.infected[still_infected] = False
         tb.susceptible[still_infected] = True
 
-        self.tpt_sterilized[uids] = True
+        self.tpt_resolved[uids] = True
         return
 
     def apply_protection(self):

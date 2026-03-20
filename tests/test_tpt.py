@@ -519,7 +519,7 @@ def test_tpt_sterilization_clears_infection():
 
     product = tbsim.TPTTx(
         p_sterilization=1.0, p_suppression=0.0,
-        pars={'dur_treatment': ss.constant(v=ss.days(7))},
+        pars={'dur_treatment': ss.constant(v=ss.days(0))},  # Instant treatment
     )
     itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
     sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
@@ -528,20 +528,25 @@ def test_tpt_sterilization_clears_infection():
     tpt = sim.interventions['tptsimple']
     tb_disease = sim.diseases.tb
 
-    # Run a few steps to initiate TPT and complete treatment
+    # Run steps to initiate TPT and resolve treatment completion
     for _ in range(5):
         tpt.step()
 
     # Agents who were in INFECTION and got sterilized should now be CLEARED
-    sterilized = tpt.product.tpt_sterilized.uids
-    if len(sterilized) > 0:
-        states = np.asarray(tb_disease.state[sterilized])
-        # Sterilized agents should be CLEARED (or may have been reinfected/progressed)
-        n_cleared = np.count_nonzero(states == tbsim.TBS.CLEARED)
-        assert n_cleared > 0, "Some sterilized agents should be in CLEARED state"
-        # None should be protected (suppression)
-        assert tpt.product.tpt_protected.count() == 0, \
-            "No agents should be in suppression protection with p_suppression=0"
+    resolved = tpt.product.tpt_resolved.uids
+    assert len(resolved) > 0, "Some agents should have been resolved"
+
+    # Check that sterilized agents with mechanism=STERILIZE are CLEARED
+    sterilize_mechs = tpt.product.tpt_mechanism[resolved] == tbsim.TPTTx.MECH_STERILIZE
+    sterilized = resolved[sterilize_mechs]
+    assert len(sterilized) > 0, "Some agents should have sterilization mechanism"
+    states = np.asarray(tb_disease.state[sterilized])
+    n_cleared = np.count_nonzero(states == tbsim.TBS.CLEARED)
+    assert n_cleared > 0, "Some sterilized agents should be in CLEARED state"
+
+    # None should be protected (suppression)
+    assert tpt.product.tpt_protected.count() == 0, \
+        "No agents should be in suppression protection with p_suppression=0"
 
 
 def test_tpt_suppression_applies_modifiers():
@@ -574,7 +579,7 @@ def test_tpt_suppression_applies_modifiers():
         assert np.any(current_activation[protected] < initial_activation[protected]), \
             "Suppression should reduce activation risk for protected agents"
     # No sterilized agents
-    assert tpt.product.tpt_sterilized.count() == 0
+    assert tpt.product.tpt_resolved.count() == 0
 
 
 def test_tpt_neither_gets_no_benefit():
@@ -597,7 +602,7 @@ def test_tpt_neither_gets_no_benefit():
 
     # No one should be protected or sterilized
     assert tpt.product.tpt_protected.count() == 0
-    assert tpt.product.tpt_sterilized.count() == 0
+    assert tpt.product.tpt_resolved.count() == 0
 
 
 def test_tpt_mechanisms_mutually_exclusive():
@@ -624,7 +629,7 @@ def test_tpt_mechanisms_mutually_exclusive():
     assert np.all(np.isin(initiated, [1, 2])), "Mechanisms should be 0, 1, or 2"
 
     # No agent should be both sterilized and protected
-    both = tpt.product.tpt_sterilized.uids.intersect(tpt.product.tpt_protected.uids)
+    both = tpt.product.tpt_resolved.uids.intersect(tpt.product.tpt_protected.uids)
     assert len(both) == 0, "No agent should have both sterilization and suppression"
 
 
@@ -653,10 +658,21 @@ def test_tpt_backward_compatible_defaults():
         assert np.all(mechs == tbsim.TPTTx.MECH_SUPPRESS), \
             "Default should assign all agents to suppression"
     # No sterilized agents
-    assert tpt.product.tpt_sterilized.count() == 0
+    assert tpt.product.tpt_resolved.count() == 0
 
 
 def test_tpt_invalid_probabilities():
     """Raise error if p_sterilization + p_suppression > 1."""
     with pytest.raises(ValueError, match="must be <= 1.0"):
         tbsim.TPTTx(p_sterilization=0.6, p_suppression=0.6)
+
+
+def test_tpt_mechanism_via_pars_dict():
+    """Mechanism probabilities can be passed via pars dict."""
+    product = tbsim.TPTTx(pars={'p_sterilization': 0.7, 'p_suppression': 0.3})
+    assert np.isclose(product.pars.p_sterilization, 0.7)
+    assert np.isclose(product.pars.p_suppression, 0.3)
+
+    # Also works via constructor args (existing path)
+    product2 = tbsim.TPTTx(p_sterilization=0.7, p_suppression=0.3)
+    assert np.isclose(product2.pars.p_sterilization, 0.7)
