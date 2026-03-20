@@ -95,24 +95,23 @@ class TBProductRoutine(ss.Intervention):
         Routine delivery step:
 
         1. Check date window.
-        2. Product handles internal phase transitions (``update_roster``).
-        3. Find and deliver to newly eligible agents.
-        4. Product applies ``rr_*`` modifiers for all currently protected.
+        2. Product handles internal phase transitions (``update_roster``) - even outside of date window
+        3. Find and deliver to newly eligible agents - only during date window
+        4. Product applies ``rr_*`` modifiers for all currently protected - even outside of date window
         """
         now = self.sim.now
         now_date = now.date() if hasattr(now, 'date') else now
-        if now_date < self.pars.start.date() or now_date > self.pars.stop.date():
-            return
-
+        
         # Product-internal transitions (expire protection, complete treatment, etc.)
         self.product.update_roster()
 
-        # Deliver to newly eligible
-        eligible = self.check_eligibility()
-        if len(eligible) > 0:
-            self.initiated[eligible] = True
-            self.ti_initiated[eligible] = self.ti
-            self.product.administer(self.sim.people, eligible)
+        # Deliver to newly eligible - only during date window
+        if now_date >= self.pars.start.date() and now_date <= self.pars.stop.date():
+            eligible = self.check_eligibility()
+            if len(eligible) > 0:
+                self.initiated[eligible] = True
+                self.ti_initiated[eligible] = self.ti
+                self.product.administer(self.sim.people, eligible)
 
         # Apply modifiers for all currently protected
         self.product.apply_protection()
