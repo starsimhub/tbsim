@@ -63,8 +63,8 @@ class TPTTx(ss.Product):
             dur_treatment=ss.constant(v=ss.months(3)),
             dur_protection=ss.constant(v=ss.years(2)),
             activation_modifier=ss.uniform(0.3, 0.5),
-            clearance_modifier=ss.uniform(1.2, 1.4),
-            death_modifier=ss.uniform(0.1, 0.3),
+            clearance_modifier=ss.uniform(1.0, 1.0),
+            death_modifier=ss.uniform(1.0, 1.0),
             exclude_on_treatment=True,
         )
         self.update_pars(pars)
