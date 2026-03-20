@@ -505,3 +505,158 @@ def test_tpt_cascade_triage():
     if n_contact_screened > 0:
         assert (n_tpt + n_contact_positive) > 0, \
             f"Screened {n_contact_screened} contacts but none got TPT or treatment"
+
+
+# ---------------------------------------------------------------------------
+# Sterilization / suppression mechanism tests
+# ---------------------------------------------------------------------------
+
+def test_tpt_sterilization_clears_infection():
+    """Agents with sterilization mechanism move from INFECTION → CLEARED after treatment."""
+    nagents = 200
+    pop, tb, net, pars = make_modules(agents=nagents)
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+
+    product = tbsim.TPTTx(
+        p_sterilization=1.0, p_suppression=0.0,
+        pars={'dur_treatment': ss.constant(v=ss.days(7))},
+    )
+    itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.init()
+
+    tpt = sim.interventions['tptsimple']
+    tb_disease = sim.diseases.tb
+
+    # Run a few steps to initiate TPT and complete treatment
+    for _ in range(5):
+        tpt.step()
+
+    # Agents who were in INFECTION and got sterilized should now be CLEARED
+    sterilized = tpt.product.tpt_sterilized.uids
+    if len(sterilized) > 0:
+        states = np.asarray(tb_disease.state[sterilized])
+        # Sterilized agents should be CLEARED (or may have been reinfected/progressed)
+        n_cleared = np.count_nonzero(states == tbsim.TBS.CLEARED)
+        assert n_cleared > 0, "Some sterilized agents should be in CLEARED state"
+        # None should be protected (suppression)
+        assert tpt.product.tpt_protected.count() == 0, \
+            "No agents should be in suppression protection with p_suppression=0"
+
+
+def test_tpt_suppression_applies_modifiers():
+    """Agents with suppression mechanism get rr_* modifiers (existing behavior)."""
+    nagents = 200
+    pop, tb, net, pars = make_modules(agents=nagents)
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+
+    product = tbsim.TPTTx(
+        p_sterilization=0.0, p_suppression=1.0,
+        pars={
+            'dur_treatment': ss.constant(v=ss.days(0)),
+            'dur_protection': ss.constant(v=ss.years(10)),
+        },
+    )
+    itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.init()
+
+    tb_disease = sim.diseases.tb
+    initial_activation = np.array(tb_disease.rr_activation).copy()
+
+    tpt = sim.interventions['tptsimple']
+    tpt.step()
+    tpt.step()
+
+    current_activation = np.array(tb_disease.rr_activation)
+    protected = tpt.product.tpt_protected.uids
+    if len(protected) > 0:
+        assert np.any(current_activation[protected] < initial_activation[protected]), \
+            "Suppression should reduce activation risk for protected agents"
+    # No sterilized agents
+    assert tpt.product.tpt_sterilized.count() == 0
+
+
+def test_tpt_neither_gets_no_benefit():
+    """Agents with mechanism=NONE stay in INFECTION with no modifiers."""
+    nagents = 200
+    pop, tb, net, pars = make_modules(agents=nagents)
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+
+    product = tbsim.TPTTx(
+        p_sterilization=0.0, p_suppression=0.0,
+        pars={'dur_treatment': ss.constant(v=ss.days(7))},
+    )
+    itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.init()
+
+    tpt = sim.interventions['tptsimple']
+    for _ in range(5):
+        tpt.step()
+
+    # No one should be protected or sterilized
+    assert tpt.product.tpt_protected.count() == 0
+    assert tpt.product.tpt_sterilized.count() == 0
+
+
+def test_tpt_mechanisms_mutually_exclusive():
+    """No agent has both sterilization and suppression."""
+    nagents = 200
+    pop, tb, net, pars = make_modules(agents=nagents)
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+
+    product = tbsim.TPTTx(
+        p_sterilization=0.5, p_suppression=0.5,
+        pars={'dur_treatment': ss.constant(v=ss.days(7))},
+    )
+    itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.init()
+
+    tpt = sim.interventions['tptsimple']
+    for _ in range(5):
+        tpt.step()
+
+    # Check that mechanisms are 0, 1, or 2 only
+    mechs = np.asarray(tpt.product.tpt_mechanism)
+    initiated = mechs[mechs != 0]
+    assert np.all(np.isin(initiated, [1, 2])), "Mechanisms should be 0, 1, or 2"
+
+    # No agent should be both sterilized and protected
+    both = tpt.product.tpt_sterilized.uids.intersect(tpt.product.tpt_protected.uids)
+    assert len(both) == 0, "No agent should have both sterilization and suppression"
+
+
+def test_tpt_backward_compatible_defaults():
+    """Default params (p_sterilization=0, p_suppression=1) produce suppression-only behavior."""
+    nagents = 100
+    pop, tb, net, pars = make_modules(agents=nagents)
+    pop = ss.People(n_agents=nagents, age_data=age_data)
+
+    product = tbsim.TPTTx(pars={
+        'dur_treatment': ss.constant(v=ss.days(0)),
+        'dur_protection': ss.constant(v=ss.years(10)),
+    })
+    itv = tbsim.TPTSimple(product=product, pars={'coverage': 1.0})
+    sim = ss.Sim(people=pop, diseases=tb, interventions=itv, networks=net, pars=pars)
+    sim.init()
+
+    tpt = sim.interventions['tptsimple']
+    tpt.step()
+    tpt.step()
+
+    # All initiated agents should have suppression mechanism
+    initiated = tpt.initiated.uids
+    if len(initiated) > 0:
+        mechs = np.asarray(tpt.product.tpt_mechanism[initiated])
+        assert np.all(mechs == tbsim.TPTTx.MECH_SUPPRESS), \
+            "Default should assign all agents to suppression"
+    # No sterilized agents
+    assert tpt.product.tpt_sterilized.count() == 0
+
+
+def test_tpt_invalid_probabilities():
+    """Raise error if p_sterilization + p_suppression > 1."""
+    with pytest.raises(ValueError, match="must be <= 1.0"):
+        tbsim.TPTTx(p_sterilization=0.6, p_suppression=0.6)
