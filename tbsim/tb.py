@@ -147,7 +147,7 @@ class TB(BaseTB):
             trans_asymp=0.82,                   # κ kappa: rel. transmissibility asymptomatic vs symptomatic
             rr_reinfection_rec=0.21,            # π pi: RR reinfection after NON_INFECTIOUS → CLEARED
             rr_reinfection_treat=3.15,          # ρ rho: RR reinfection after TREATMENT → CLEARED
-            rr_reinfection_cleared=1.0,         # RR reinfection after INFECTION → CLEARED (latent cleared)
+            rr_reinfection_cleared=1.0,         # RR reinfection after INFECTION → CLEARED (latent cleared); also applies to agents cleared via TPT sterilization
             dur_reinfection_protection=None,    # Distribution of protection duration; None = never wanes
             # --- From INFECTION (latent) ---
             inf_cle=ss.peryear(1.90),            # Clear infection (no active TB)

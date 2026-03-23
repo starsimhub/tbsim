@@ -39,8 +39,8 @@ def test_bcg_default_values():
 
     # Delivery pars on the intervention
     assert '0.5' in str(bcg.pars.coverage) or '0.50' in str(bcg.pars.coverage)
-    assert bcg.pars.start == ss.date('1900-01-01')
-    assert bcg.pars.stop == ss.date('2100-12-31')
+    assert bcg.pars.start == sim.pars.start
+    assert bcg.pars.stop == sim.pars.stop
     assert bcg.pars.age_range == [0, 5]
 
     # Biological pars on the product
