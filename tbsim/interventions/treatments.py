@@ -139,6 +139,7 @@ class TxDelivery(ss.Intervention):
             ss.FloatArr('ti_treatment_end'),
             ss.BoolArr('pending_success', default=False),
             ss.BoolArr('pending_failure', default=False),
+            ss.IntArr('prior_state', default=int(TBS.SUSCEPTIBLE)),
         )
         self.update_pars(**kwargs)
         product.name = f'{self.name}_product'
@@ -212,6 +213,7 @@ class TxDelivery(ss.Intervention):
             self._newly_treated = ss.uids()
             return
 
+        self.prior_state[active] = tb.state[active]
         tb.state[active] = TBS.TREATMENT
         tb.on_treatment[active] = True
         tb.results['new_notifications_15+'][tb.ti] += np.count_nonzero(self.sim.people.age[active] >= 15)
@@ -268,13 +270,13 @@ class TxDelivery(ss.Intervention):
         return
 
     def step_failures(self):
-        """ Handle failures: return to symptomatic and trigger re-care-seeking """
+        """ Handle failures: return to prior TB state and trigger re-care-seeking """
         tb = self.sim.get_tb()
         failure_uids = self._fail
         if len(failure_uids) == 0:
             return
 
-        tb.state[failure_uids] = TBS.SYMPTOMATIC
+        tb.state[failure_uids] = self.prior_state[failure_uids]
         tb.on_treatment[failure_uids] = False
         self.treatment_failure[failure_uids] = True
         self.pending_failure[failure_uids] = False
