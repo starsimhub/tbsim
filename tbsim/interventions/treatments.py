@@ -38,10 +38,12 @@ class Tx(ss.Product):
         if drug_type is not None:
             dp = drug_params[drug_type]
             efficacy = dp['cure_prob']
-            dur_treatment = dur_treatment or ss.constant(v=dp['duration'].days)
+            if dur_treatment is None:
+                dur_treatment = ss.constant(v=dp['duration'].days)
             adherence = dp['adherence_rate']
         else:
-            dur_treatment = dur_treatment or ss.constant(v=ss.days(180).days)
+            if dur_treatment is None:
+                dur_treatment = ss.constant(v=ss.days(180).days)
 
         self.define_pars(
             p_adherence = ss.bernoulli(adherence),
