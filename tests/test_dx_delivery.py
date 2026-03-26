@@ -72,6 +72,48 @@ def test_dx_delivery_cascade():
     assert sim.results.confirm.n_tested.sum() > 0
 
 
+def test_result_expiry_resets_state():
+    """With short result_validity, fewer agents are diagnosed at end of sim vs no expiry."""
+    dx_expiry = tbsim.DxDelivery(product=tbsim.Xpert(), result_state='diagnosed', result_validity=ss.days(30))
+    sim_expiry = make_sim(n_agents=500, interventions=dx_expiry)
+    sim_expiry.run()
+    n_diagnosed_expiry = sim_expiry.people.dxdelivery.diagnosed.count()
+
+    dx_persist = tbsim.DxDelivery(product=tbsim.Xpert(), result_state='diagnosed', result_validity=None)
+    sim_persist = make_sim(n_agents=500, interventions=dx_persist)
+    sim_persist.run()
+    n_diagnosed_persist = sim_persist.people.dxdelivery.diagnosed.count()
+
+    # With expiry, fewer agents should be diagnosed at end (most expired)
+    assert n_diagnosed_expiry < n_diagnosed_persist, \
+        f"Expected fewer diagnosed with expiry ({n_diagnosed_expiry}) vs persist ({n_diagnosed_persist})"
+
+
+def test_result_expiry_none_persists():
+    """result_validity=None preserves result state indefinitely (default behavior)."""
+    dx = tbsim.DxDelivery(product=tbsim.Xpert(), result_state='diagnosed', result_validity=None)
+    sim = make_sim(n_agents=500, interventions=dx)
+    sim.run()
+
+    # Some agents should still be diagnosed at the end
+    assert sim.people.dxdelivery.diagnosed.count() > 0
+
+
+def test_result_expiry_re_eligible():
+    """Agents with expired results become eligible for re-testing."""
+    dx = tbsim.DxDelivery(
+        product=tbsim.Xpert(),
+        result_state='diagnosed',
+        result_validity=ss.days(30),
+    )
+    sim = make_sim(n_agents=500, interventions=dx)
+    sim.run()
+
+    # Over a long sim with short validity, agents should be tested multiple times
+    max_times = sim.people.dxdelivery.n_times_tested.values.max()
+    assert max_times > 1, "With short validity, agents should be re-tested after expiry"
+
+
 def test_dx_delivery_coverage():
     """DxDelivery with coverage < 1.0 tests fewer agents."""
     dx_full = tbsim.DxDelivery(product=tbsim.Xpert(), coverage=1.0)

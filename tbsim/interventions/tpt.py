@@ -1,9 +1,11 @@
 """
 Tuberculosis Preventive Therapy (TPT): Product + Delivery.
 
-``TPTTx``         — treatment product  (biological effect, per-agent state)
-``TPTSimple``     — simple delivery    (targets latently infected by default)
-``TPTHousehold``  — household contact tracing delivery
+``TPTTx``                    — treatment product  (biological effect, per-agent state)
+``TPTSimple``                — simple delivery    (targets latently infected by default)
+``TPTHousehold``             — household contact tracing delivery (legacy)
+``HouseholdContactTracing``  — identifies household contacts of new treatment cases
+``TPTDelivery``              — delivers TPT to screened contacts without active disease
 """
 
 import numpy as np
@@ -11,7 +13,7 @@ import starsim as ss
 from .interventions import TBProductRoutine
 from ..tb import TBS
 
-__all__ = ['TPTTx', 'TPTSimple', 'TPTHousehold']
+__all__ = ['TPTTx', 'TPTSimple', 'TPTHousehold', 'HouseholdContactTracing', 'TPTDelivery']
 
 
 # ---------------------------------------------------------------------------
@@ -20,38 +22,53 @@ __all__ = ['TPTTx', 'TPTSimple', 'TPTHousehold']
 
 class TPTTx(ss.Product):
     """
-    TPT treatment product.
+    TPT treatment product with sterilization and suppression mechanisms.
 
-    Models a two-phase intervention: a **treatment phase** (antibiotic course)
-    followed by a **protection phase** (residual risk reduction via ``rr_*``
-    modifiers).  During treatment, no protection is applied; after treatment
-    completes, ``rr_activation``, ``rr_clearance``, and ``rr_death`` are
-    modified each step until protection expires.
+    TPT efficacy is modeled in two stages:
+
+    1. ``efficacy`` determines whether TPT works at all for a given agent.
+    2. Among efficacious agents, ``p_sterilize`` determines who gets
+       sterilization (infection cleared) vs suppression (risk reduction
+       via ``rr_*`` modifiers). These are mutually exclusive.
 
     Args:
         disease (str): Key of the disease module to target (default ``'tb'``).
+        efficacy (ss.bernoulli): Probability that TPT works (default 0.6).
+        p_sterilize (ss.bernoulli): Among efficacious agents, probability of
+            sterilization vs suppression (default 0.0 = all suppression).
         dur_treatment (ss.Dist): Duration of the antibiotic course (default 3 months).
         dur_protection (ss.Dist): Duration of post-treatment protection (default 2 years).
-        activation_modifier / clearance_modifier / death_modifier (ss.Dist): Per-individual risk-modifier distributions.
+        activation_modifier / clearance_modifier / death_modifier (ss.Dist):
+            Per-individual risk-modifier distributions (suppression only).
         exclude_on_treatment (bool): If True, skip agents currently on TB treatment (default True).
     """
 
+    # Mechanism constants
+    MECH_NONE = 0
+    MECH_STERILIZE = 1
+    MECH_SUPPRESS = 2
+
     def __init__(self, pars=None, **kwargs):
-        """Initialize TPT product with default treatment duration and efficacy parameters."""
+        """Initialize TPT product with mechanism probabilities and efficacy parameters."""
         super().__init__(**kwargs)
+
         self.define_pars(
             disease='tb',
+            efficacy=ss.bernoulli(p=0.6),
+            p_sterilize=ss.bernoulli(p=0.0),
             dur_treatment=ss.constant(v=ss.months(3)),
             dur_protection=ss.constant(v=ss.years(2)),
             activation_modifier=ss.uniform(0.3, 0.5),
-            clearance_modifier=ss.uniform(1.2, 1.4),
-            death_modifier=ss.uniform(0.1, 0.3),
+            clearance_modifier=ss.uniform(1.0, 1.0),
+            death_modifier=ss.uniform(1.0, 1.0),
             exclude_on_treatment=True,
         )
         self.update_pars(pars)
 
         self.define_states(
+            ss.IntArr('tpt_mechanism', default=self.MECH_NONE),
             ss.BoolArr('tpt_protected', default=False),
+            ss.BoolArr('tpt_resolved', default=False),
             ss.FloatArr('ti_protection_starts'),
             ss.FloatArr('ti_protection_expires'),
             ss.FloatArr('tpt_activation_modifier_applied'),
@@ -64,9 +81,9 @@ class TPTTx(ss.Product):
         """
         Start TPT for *uids*.
 
-        Filters out ineligible agents (already on TB treatment, already
-        protected), then samples per-agent modifiers and schedules the
-        protection window.
+        Filters out ineligible agents, rolls mechanism assignment
+        (sterilization / suppression / neither), schedules treatment
+        duration, and samples rr_* modifiers for suppression agents.
 
         Returns:
             ss.uids: UIDs of agents who actually started TPT.
@@ -79,39 +96,72 @@ class TPTTx(ss.Product):
             tb = self.sim.diseases[self.pars.disease]
             uids = uids[~tb.on_treatment[uids]]
 
-        # Skip agents already protected (don't restart their clock)
+        # Skip agents already protected or in treatment phase (don't restart their clock)
         uids = uids[~self.tpt_protected[uids]]
+        already_initiated = ~np.isnan(self.ti_protection_starts[uids])
+        uids = uids[~already_initiated]
 
         if len(uids) == 0:
             return ss.uids()
 
+        # Draw 1: is TPT effective?
+        effective, ineffective = self.pars.efficacy.filter(uids, both=True)
+        self.tpt_mechanism[ineffective] = self.MECH_NONE
+
+        # Draw 2: among effective agents, sterilization or suppression?
+        sterilize, suppress = self.pars.p_sterilize.filter(effective, both=True)
+        self.tpt_mechanism[sterilize] = self.MECH_STERILIZE
+        self.tpt_mechanism[suppress]  = self.MECH_SUPPRESS
+
+        # Schedule treatment duration for all agents (ti_protection_starts is used
+        # by update_roster to detect treatment completion, regardless of mechanism)
         dur_tx = self.pars.dur_treatment.rvs(uids)
-        dur_prot = self.pars.dur_protection.rvs(uids)
-
         self.ti_protection_starts[uids] = self.ti + dur_tx
-        self.ti_protection_expires[uids] = self.ti + dur_tx + dur_prot
-
-        self.tpt_activation_modifier_applied[uids] = self.pars.activation_modifier.rvs(uids)
-        self.tpt_clearance_modifier_applied[uids] = self.pars.clearance_modifier.rvs(uids)
-        self.tpt_death_modifier_applied[uids] = self.pars.death_modifier.rvs(uids)
+        if len(suppress) > 0:
+            dur_prot = self.pars.dur_protection.rvs(suppress)
+            self.ti_protection_expires[suppress] = self.ti_protection_starts[suppress] + dur_prot
+            self.tpt_activation_modifier_applied[suppress] = self.pars.activation_modifier.rvs(suppress)
+            self.tpt_clearance_modifier_applied[suppress] = self.pars.clearance_modifier.rvs(suppress)
+            self.tpt_death_modifier_applied[suppress] = self.pars.death_modifier.rvs(suppress)
 
         return uids
 
     def update_roster(self):
         """
-        Start protection for agents whose treatment completed;
-        expire protection for agents past their expiry time.
-        """
-        # Start protection for agents whose treatment just completed
-        not_yet_protected = (~self.tpt_protected).uids
-        if len(not_yet_protected) > 0:
-            starts = self.ti_protection_starts[not_yet_protected]
-            ready = not_yet_protected[
-                ~np.isnan(starts) & (self.ti >= starts)
-            ]
-            self.tpt_protected[ready] = True
+        Handle treatment completion by mechanism:
 
-        # Expire protection
+        - **Sterilization**: clear infection (INFECTION → CLEARED) if agent
+          is still latently infected.
+        - **Suppression**: start rr_* protection phase.
+        - **Neither**: no action.
+
+        Also expires protection for suppression agents past their window.
+        """
+        # Find agents whose treatment just completed
+        not_yet_resolved = (~self.tpt_protected & ~self.tpt_resolved).uids
+        if len(not_yet_resolved) > 0:
+            starts = self.ti_protection_starts[not_yet_resolved]
+            ready = not_yet_resolved[~np.isnan(starts) & (self.ti >= starts)]
+
+            if len(ready) > 0:
+                mechs = self.tpt_mechanism[ready]
+
+                # Sterilization: clear infection if still in INFECTION state
+                sterilize_uids = ready[mechs == self.MECH_STERILIZE]
+                if len(sterilize_uids) > 0:
+                    self._apply_sterilization(sterilize_uids)
+
+                # Suppression: start protection phase
+                suppress_uids = ready[mechs == self.MECH_SUPPRESS]
+                if len(suppress_uids) > 0:
+                    self.tpt_protected[suppress_uids] = True
+
+                # Neither: mark as resolved so they aren't re-checked each step
+                neither_uids = ready[mechs == self.MECH_NONE]
+                if len(neither_uids) > 0:
+                    self.tpt_resolved[neither_uids] = True
+
+        # Expire protection for suppression agents
         protected_uids = self.tpt_protected.uids
         if len(protected_uids) > 0:
             expired = protected_uids[
@@ -120,8 +170,29 @@ class TPTTx(ss.Product):
             self.tpt_protected[expired] = False
         return
 
+    def _apply_sterilization(self, uids):
+        """Clear infection for sterilization agents still in INFECTION state."""
+        tb = self.sim.diseases[self.pars.disease]
+
+        # Only sterilize agents still latently infected
+        still_infected = uids[tb.state[uids] == TBS.INFECTION]
+        if len(still_infected) == 0:
+            self.tpt_resolved[uids] = True  # Mark as resolved even if no effect
+            return
+
+        # Clear infection (same pattern as TxDelivery.step_start_treatment)
+        tb.state[still_infected] = TBS.CLEARED
+        tb.rr_reinfection[still_infected] = tb.pars.rr_reinfection_cleared
+        if tb.pars.dur_reinfection_protection is not None:
+            tb.ti_rr_reinfection_wane[still_infected] = self.ti + tb.pars.dur_reinfection_protection.rvs(still_infected)
+        tb.infected[still_infected] = False
+        tb.susceptible[still_infected] = True
+
+        self.tpt_resolved[uids] = True
+        return
+
     def apply_protection(self):
-        """Multiply ``rr_*`` arrays for all currently protected agents."""
+        """Multiply ``rr_*`` arrays for all currently protected (suppression) agents."""
         protected = self.tpt_protected.uids
         if len(protected) > 0:
             tb = self.sim.diseases[self.pars.disease]
@@ -272,4 +343,194 @@ class TPTHousehold(TBProductRoutine):
     def shrink(self):
         """ Delete link to household net """
         self.hh_net = None
+        return
+
+
+# ---------------------------------------------------------------------------
+# Composable household contact tracing + TPT delivery
+# ---------------------------------------------------------------------------
+
+class HouseholdContactTracing(ss.Intervention):
+    """
+    Identifies household contacts of agents who newly start TB treatment.
+
+    Sets ``contact_identified=True`` on household members of followed-up
+    index cases. Downstream interventions (e.g. ``DxDelivery`` for screening,
+    ``TPTDelivery`` for preventive therapy) read this flag.
+
+    Requires a household network with ``household_ids`` (e.g. ``ss.HouseholdNet``).
+
+    Args:
+        coverage (float): Probability that a given index case's household is
+            followed up (per-index-case Bernoulli). Default 0.8.
+        disease (str): Key of the TB disease module. Default ``'tb'``.
+    """
+
+    def __init__(self, coverage=0.8, disease='tb', **kwargs):
+        super().__init__(**kwargs)
+        self.disease = disease
+        self.define_pars(
+            coverage = ss.bernoulli(p=coverage),
+        )
+        self.define_states(
+            ss.BoolArr('prev_on_treatment', default=False),
+            ss.BoolArr('contact_identified', default=False),
+            ss.FloatArr('ti_contact_identified', default=np.nan),
+        )
+        self.hh_net = None
+        return
+
+    def find_household_net(self):
+        """Find the network that has ``household_ids``."""
+        for net in self.sim.networks.values():
+            if hasattr(net, 'household_ids'):
+                return net
+        raise ValueError("No household network with household_ids found in sim")
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('n_contacts_identified', dtype=int),
+            ss.Result('n_index_followed_up', dtype=int),
+        )
+        return
+
+    def step(self):
+        """Detect new treatment starts, trace household contacts, set flags."""
+        tb = self.sim.diseases[self.disease]
+        if self.hh_net is None:
+            self.hh_net = self.find_household_net()
+        hh_net = self.hh_net
+
+        # 1. Detect NEW treatment starts (on_treatment: False → True)
+        newly_on_treatment = (tb.on_treatment & ~self.prev_on_treatment).uids
+        self.prev_on_treatment[:] = tb.on_treatment
+
+        self._n_followed = 0
+        self._n_contacts = 0
+
+        if len(newly_on_treatment) == 0:
+            return
+
+        # 2. Coverage: per index case (does health system follow up?)
+        followed_up = self.pars.coverage.filter(newly_on_treatment)
+        if len(followed_up) == 0:
+            return
+        self._n_followed = len(followed_up)
+
+        # 3. Find their household IDs
+        hhids = np.asarray(hh_net.household_ids[followed_up])
+        target_hhids = np.unique(hhids[~np.isnan(hhids)])
+
+        if len(target_hhids) == 0:
+            return
+
+        # 4. Find household contacts (excluding index cases)
+        all_hh = np.isin(np.asarray(hh_net.household_ids), target_hhids)
+        contacts = ss.uids(all_hh)
+        contacts = contacts.remove(followed_up)
+
+        # 5. Filter to alive agents only
+        contacts = contacts.intersect(self.sim.people.alive.uids)
+
+        if len(contacts) == 0:
+            return
+
+        # 6. Set contact_identified flag
+        self.contact_identified[contacts] = True
+        self.ti_contact_identified[contacts] = self.ti
+        self._n_contacts = len(contacts)
+        return
+
+    def update_results(self):
+        self.results.n_contacts_identified[self.ti] = self._n_contacts
+        self.results.n_index_followed_up[self.ti] = self._n_followed
+        return
+
+    def shrink(self):
+        self.hh_net = None
+        return
+
+
+class TPTDelivery(ss.Intervention):
+    """
+    Delivers TPT to household contacts who were screened and found NOT to
+    have active disease.
+
+    Reads flags from ``HouseholdContactTracing`` (``contact_identified``) and
+    a screening ``DxDelivery`` (``tested`` and result state) to determine
+    eligibility: contacts who were identified, screened, and not diagnosed
+    with active TB.
+
+    Args:
+        product (TPTTx): The TPT treatment product. Created automatically if not provided.
+        contact_tracing (str): Name of the ``HouseholdContactTracing`` intervention.
+            Default ``'householdcontacttracing'``.
+        contact_screen (str): Name of the screening ``DxDelivery`` intervention.
+            Default ``'contact_screen'``.
+        result_state (str): The result state name on the screening DxDelivery
+            that indicates a positive (active TB) result. Default ``'diagnosed'``.
+    """
+
+    def __init__(self, product=None, contact_tracing='householdcontacttracing',
+                 contact_screen='contact_screen', result_state='diagnosed', **kwargs):
+        super().__init__(**kwargs)
+        self.product = product if product is not None else TPTTx()
+        self._ct_name = contact_tracing
+        self._cs_name = contact_screen
+        self._result_state = result_state
+        self._ct = None
+        self._cs = None
+        self.product.name = f'{self.name}_product'
+        return
+
+    def init_post(self):
+        super().init_post()
+        # Resolve references to other interventions
+        self._ct = self.sim.interventions[self._ct_name]
+        self._cs = self.sim.interventions[self._cs_name]
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('n_tpt_initiated', dtype=int),
+            ss.Result('n_protected', dtype=int),
+        )
+        return
+
+    def _get_eligible(self):
+        """Get contacts who were identified, screened, and not diagnosed with active TB."""
+        ct = self._ct
+        cs = self._cs
+        ppl = self.sim.people
+
+        # Must be: contact_identified AND screened (tested) AND NOT diagnosed AND alive
+        result_arr = cs[self._result_state]
+        eligible = (ct.contact_identified & cs.tested & ~result_arr & ppl.alive).uids
+        return eligible
+
+    def step(self):
+        """Deliver TPT to eligible contacts; manage product lifecycle."""
+        # Product-internal transitions (expire protection, complete treatment)
+        self.product.update_roster()
+
+        # Find and deliver to eligible contacts
+        eligible = self._get_eligible()
+        self._n_initiated = 0
+        if len(eligible) > 0:
+            started = self.product.administer(self.sim.people, eligible)
+            self._n_initiated = len(started)
+
+        # Apply rr_* modifiers for all currently protected
+        self.product.apply_protection()
+        return
+
+    def update_results(self):
+        self.results.n_tpt_initiated[self.ti] = self._n_initiated
+        self.results.n_protected[self.ti] = np.count_nonzero(self.product.tpt_protected)
+        return
+
+    def shrink(self):
+        self._ct = None
+        self._cs = None
         return

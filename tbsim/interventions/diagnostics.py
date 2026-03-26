@@ -157,12 +157,13 @@ class DxDelivery(ss.Intervention):
     """
 
     def __init__(self, product, coverage=1.0, eligibility=None, result_state='diagnosed',
-                 care_seeking_multiplier=1.0, **kwargs):
+                 care_seeking_multiplier=1.0, result_validity=None, **kwargs):
         super().__init__()
         self.product = product
         self.eligibility = eligibility
         self.result_state = result_state
         self.care_seeking_multiplier_value = care_seeking_multiplier
+        self.result_validity = result_validity
 
         self.define_pars(
             p_coverage = ss.bernoulli(p=coverage)
@@ -176,6 +177,7 @@ class DxDelivery(ss.Intervention):
             ss.BoolState('test_result', default=False),
             ss.FloatArr('care_seeking_multiplier', default=1.0),
             ss.BoolState('multiplier_applied', default=False),
+            ss.FloatArr('ti_result_set', default=np.nan),
         )
         self.update_pars(**kwargs)
         product.name = f'{self.name}_product'
@@ -205,10 +207,30 @@ class DxDelivery(ss.Intervention):
     
     def step(self):
         """ Main step method: see submethods for details. """
+        self.step_expire_results()  # Expire stale positive results
         self.step_select_eligible() # Coverage filter
         self.step_administer() # Administer diagnostic product
         self.step_update_states() # Update states based on results
         self.step_false_negatives() # Handle false negatives
+        return
+
+    def step_expire_results(self):
+        """ Reset result states that have exceeded the validity window """
+        if self.result_validity is None:
+            return
+
+        result_arr = self[self.result_state]
+        positive_uids = result_arr.uids
+        if len(positive_uids) == 0:
+            return
+
+        # Convert validity from days to timesteps
+        validity_steps = float(self.result_validity) / self.sim.t.dt.days
+        ti_set = self.ti_result_set[positive_uids]
+        expired = positive_uids[~np.isnan(ti_set) & (self.ti >= ti_set + validity_steps)]
+        if len(expired) > 0:
+            result_arr[expired] = False
+            self.tested[expired] = False
         return
     
     def step_select_eligible(self):
@@ -230,13 +252,14 @@ class DxDelivery(ss.Intervention):
         return results
     
     def step_update_states(self):
-        """ Update states associated with """
+        """ Update states associated with diagnostic results """
         selected = self._selected
         pos_uids = self._pos
 
-        # Set result state
+        # Set result state and record when it was set
         result_arr = self[self.result_state]
         result_arr[pos_uids] = True
+        self.ti_result_set[pos_uids] = self.ti
 
         # Update tracking states
         self.tested[selected] = True
