@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 
 __all__ = ['HouseholdNet', 'plot_household_structure']
 
+_ = None
+
 
 class HouseholdNet(ss.Network):
     """
