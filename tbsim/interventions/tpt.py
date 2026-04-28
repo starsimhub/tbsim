@@ -322,7 +322,7 @@ class TPTHousehold(TBProductRoutine):
 
         # 4. Find household contacts (excluding index cases)
         all_hh = np.isin(np.asarray(hh_net.household_ids), target_hhids)
-        contacts = ss.uids(all_hh)
+        contacts = ss.uids(np.where(all_hh)[0]) 
         contacts = contacts.remove(followed_up)
 
         # 5. Age filter (if set)
@@ -397,6 +397,9 @@ class HouseholdContactTracing(ss.Intervention):
 
     def step(self):
         """Detect new treatment starts, trace household contacts, set flags."""
+        #0. Reset contact_identified flags each step (only captures new contacts each step - otherwise they get retested for eternity...)
+        self.contact_identified[:] = False
+
         tb = self.sim.diseases[self.disease]
         if self.hh_net is None:
             self.hh_net = self.find_household_net()
@@ -427,7 +430,7 @@ class HouseholdContactTracing(ss.Intervention):
 
         # 4. Find household contacts (excluding index cases)
         all_hh = np.isin(np.asarray(hh_net.household_ids), target_hhids)
-        contacts = ss.uids(all_hh)
+        contacts = ss.uids(np.where(all_hh)[0])
         contacts = contacts.remove(followed_up)
 
         # 5. Filter to alive agents only
