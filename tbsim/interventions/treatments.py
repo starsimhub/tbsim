@@ -23,17 +23,22 @@ drug_params = dict(
 
 class Tx(ss.Product):
     """
-    TB treatment product that encapsulates drug efficacy, duration, and adherence.
+    TB treatment product that encapsulates drug efficacy, duration, adherence, and relapse.
 
     Args:
         efficacy: Probability of cure given adherence (0-1). Default 0.85.
         dur_treatment: Treatment duration distribution. Default 180 days.
         adherence: Probability of completing the full course (0-1). Default 0.85.
+        p_relapse: Probability that a successfully cured agent relapses to active TB.
+            Default 0.05 (matches drug_params['dots']['relapse_rate']).
+        dur_relapse: Distribution for time-to-relapse (days), measured from the
+            end of successful treatment. Default constant 1.5 years.
         drug_type: If provided (e.g. 'dots', 'first_line_combo'), overrides
-            efficacy, dur_treatment, and adherence with drug-specific values.
+            efficacy, dur_treatment, adherence, and p_relapse with drug-specific values.
     """
 
-    def __init__(self, efficacy=0.85, dur_treatment=None, adherence=0.85, drug_type=None, **kwargs):
+    def __init__(self, efficacy=0.85, dur_treatment=None, adherence=0.85,
+                 p_relapse=0.05, dur_relapse=None, drug_type=None, **kwargs):
         super().__init__()
         if drug_type is not None:
             dp = drug_params[drug_type]
@@ -41,14 +46,20 @@ class Tx(ss.Product):
             if dur_treatment is None:
                 dur_treatment = ss.constant(v=dp['duration'].days)
             adherence = dp['adherence_rate']
+            p_relapse = dp['relapse_rate']
         else:
             if dur_treatment is None:
                 dur_treatment = ss.constant(v=ss.days(180).days)
 
+        if dur_relapse is None:
+            dur_relapse = ss.constant(v=ss.years(1.5).days)
+
         self.define_pars(
             p_adherence = ss.bernoulli(adherence),
             p_success = ss.bernoulli(efficacy),
+            p_relapse = ss.bernoulli(p_relapse),
             dur_treatment = dur_treatment,
+            dur_relapse = dur_relapse,
         )
         self.update_pars(**kwargs)
         return
@@ -59,16 +70,19 @@ class Tx(ss.Product):
 
         First rolls adherence (will they complete the course?), then rolls
         cure probability for adherent agents. Non-adherent agents are failures.
+        Among successful agents, a subset is pre-rolled for future relapse.
 
         Returns:
-            dict with 'success' and 'failure' UIDs.
+            dict with 'success', 'failure', and 'relapse' UIDs.
+            'relapse' is a subset of 'success'.
         """
         # TODO: non-adherent agents currently get zero efficacy; consider partial
         # efficacy for incomplete courses (e.g. scaled by fraction of course completed)
         adherent, non_adherent = self.pars.p_adherence.filter(uids, both=True)
         success_uids, adherent_fail = self.pars.p_success.filter(adherent, both=True)
         failure_uids = ss.uids.cat([non_adherent, adherent_fail])
-        return {'success': success_uids, 'failure': failure_uids}
+        relapse_uids = self.pars.p_relapse.filter(success_uids)
+        return {'success': success_uids, 'failure': failure_uids, 'relapse': relapse_uids}
 
 
 class TxMulti(ProductMulti):
@@ -141,6 +155,8 @@ class TxDelivery(ss.Intervention):
             ss.FloatArr('ti_treatment_end'),
             ss.BoolArr('pending_success', default=False),
             ss.BoolArr('pending_failure', default=False),
+            ss.BoolArr('pending_relapse', default=False),
+            ss.FloatArr('ti_relapse'),
             ss.IntArr('prior_state', default=int(TBS.SUSCEPTIBLE)),
         )
         self.update_pars(**kwargs)
@@ -170,8 +186,10 @@ class TxDelivery(ss.Intervention):
             ss.Result('n_treated', dtype=int),
             ss.Result('n_success', dtype=int),
             ss.Result('n_failure', dtype=int),
+            ss.Result('n_relapsed', dtype=int),
             ss.Result('cum_success', dtype=int),
             ss.Result('cum_failure', dtype=int),
+            ss.Result('cum_relapsed', dtype=int),
         )
         return
 
@@ -182,6 +200,7 @@ class TxDelivery(ss.Intervention):
         self.step_check_completion()   # Check if any on-treatment agents have completed
         self.step_success()            # Handle completed successes
         self.step_failures()           # Handle completed failures
+        self.step_relapses()           # Trigger relapses scheduled at earlier steps
         return
 
     def step_eligibility(self):
@@ -218,6 +237,9 @@ class TxDelivery(ss.Intervention):
         self.prior_state[active] = tb.state[active]
         tb.state[active] = TBS.TREATMENT
         tb.on_treatment[active] = True
+        # Clear any stale relapse schedule from a prior treatment cycle.
+        # The new cycle will roll a fresh schedule below if the agent is selected.
+        self.pending_relapse[active] = False
         tb.results['new_notifications_15+'][tb.ti] += np.count_nonzero(self.sim.people.age[active] >= 15)
 
         # Record treatment timing (convert dur from days to timesteps)
@@ -231,6 +253,16 @@ class TxDelivery(ss.Intervention):
         outcomes = self.product.administer(self.sim, active)
         self.pending_success[outcomes.get('success', ss.uids())] = True
         self.pending_failure[outcomes.get('failure', ss.uids())] = True
+
+        # Pre-roll relapses (subset of successes). Schedule the relapse time now;
+        # the actual transition back to SYMPTOMATIC is resolved in step_relapses().
+        relapse_uids = outcomes.get('relapse', ss.uids())
+        if len(relapse_uids):
+            self.pending_relapse[relapse_uids] = True
+            relapse_days = self.product.pars.dur_relapse.rvs(relapse_uids)
+            relapse_steps = relapse_days / self.sim.t.dt.days
+            # Relapse clock starts when treatment ends (not when it began)
+            self.ti_relapse[relapse_uids] = self.ti_treatment_end[relapse_uids] + relapse_steps
 
         self._newly_treated = active
         return
@@ -294,23 +326,73 @@ class TxDelivery(ss.Intervention):
             self._dx.care_seeking_multiplier[failure_uids] *= self.reseek_multiplier
         return
 
+    def step_relapses(self):
+        """
+        Trigger relapses for agents whose scheduled relapse time has arrived.
+
+        Eligible pre-states: CLEARED (no active disease), INFECTION (latently
+        reinfected, no active disease yet), NON_INFECTIOUS (early active TB).
+        Agents in ASYMPTOMATIC, SYMPTOMATIC, or TREATMENT are silently dropped
+        - they're already on an active disease trajectory (or being treated),
+        and forcing a state change would corrupt counters or pull them out of
+        an active treatment course.
+
+        Relapsing agents return to SYMPTOMATIC active TB and have their diagnosed
+        flag reset so they can be re-detected and re-treated.
+        """
+        tb = self.sim.get_tb()
+        pending = self.pending_relapse.uids
+        if len(pending) == 0:
+            self._relapsed = ss.uids()
+            return
+
+        due = pending[(self.ti >= self.ti_relapse[pending]) & self.sim.people.alive[pending]]
+        if len(due) == 0:
+            self._relapsed = ss.uids()
+            return
+
+        # Always clear the schedule for due agents, whether or not they actually relapse.
+        # Otherwise stale schedules would re-fire on subsequent steps.
+        eligible_states = [TBS.CLEARED, TBS.INFECTION, TBS.NON_INFECTIOUS]
+        relapsing = due[np.isin(tb.state[due], eligible_states)]
+        self.pending_relapse[due] = False
+
+        if len(relapsing) == 0:
+            self._relapsed = ss.uids()
+            return
+
+        tb.state[relapsing] = TBS.SYMPTOMATIC
+        tb.infected[relapsing] = True
+        tb.susceptible[relapsing] = False
+
+        # Reset diagnosed flag so they can be re-detected by DxDelivery and re-treated
+        if self._dx is not None:
+            self._dx.diagnosed[relapsing] = False
+            self._dx.tested[relapsing] = False
+
+        self._relapsed = relapsing
+        return
+
     def update_results(self):
         self.results.n_treated[self.ti] = len(self._newly_treated)
         self.results.n_success[self.ti] = len(self._success)
         self.results.n_failure[self.ti] = len(self._fail)
+        self.results.n_relapsed[self.ti] = len(getattr(self, '_relapsed', ss.uids()))
         return
 
     def finalize_results(self):
         super().finalize_results()
         self.results.cum_success[:] = np.cumsum(self.results.n_success)
         self.results.cum_failure[:] = np.cumsum(self.results.n_failure)
+        self.results.cum_relapsed[:] = np.cumsum(self.results.n_relapsed)
         return
-    
+
     def shrink(self):
         """ Remove temporary results """
         self._elig_uids = None
         self._newly_treated = None
         self._success = None
         self._fail = None
+        self._relapsed = None
         self._dx = None
         return
