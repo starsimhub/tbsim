@@ -308,41 +308,50 @@ class Immigration(ss.Demographics):
         """
         Assign new arrivals to existing households.
 
-        Searches the simulation's networks for the first one that exposes an
-        ``hhid`` array, then randomly assigns each immigrant to one of the
-        existing household IDs. If no households exist yet, each immigrant is
-        placed in its own singleton household.
+        Searches the simulation's networks for the first one that exposes either
+        a ``hhid`` array (legacy) or ``household_ids`` array (current Starsim),
+        then randomly assigns each immigrant to one of the existing household IDs.
+        If no households exist yet, each immigrant is placed in its own singleton
+        household.
 
         Parameters
         ----------
         new_uids : array-like
             UIDs of the agents to assign.
         """
-        # Find the first network with an hhid array
+        # Find the first network with a household id array
         hh_net = None
+        hh_attr = None
         for net in self.sim.networks.values():
-            hhid = getattr(net, 'hhid', None)
-            if isinstance(hhid, (np.ndarray, ss.BaseArr)):
+            for attr in ['hhid', 'household_ids']:
+                hh_arr = getattr(net, attr, None)
+                if isinstance(hh_arr, (np.ndarray, ss.BaseArr)):
+                    hh_net = net
+                    hh_attr = attr
+                    break
+            if hh_net is not None:
                 hh_net = net
                 break
-        
+
         if hh_net is None:
             return
-        
-        # NOTE: simple assignment to existing households
-        existing_hhids = np.unique(hh_net.hhid[hh_net.hhid >= 0])
-        
-        if len(existing_hhids) > 0:
+
+        hh_arr = getattr(hh_net, hh_attr)
+        hh_vals = np.asarray(hh_arr, dtype=float)
+        valid = np.isfinite(hh_vals) & (hh_vals >= 0)
+        existing_hhids = np.unique(hh_vals[valid]).astype(int)
+
+        if len(existing_hhids):
             u = self._dist_hhu.rvs(len(new_uids))
             idx = np.floor(u * len(existing_hhids)).astype(int)
             idx = np.clip(idx, 0, len(existing_hhids) - 1)
             assigned_hhids = existing_hhids[idx]
-            hh_net.hhid[new_uids] = assigned_hhids
+            hh_arr[new_uids] = assigned_hhids
             self.hhid[new_uids] = assigned_hhids
         else:
-            for i, uid in enumerate(new_uids):
-                hh_net.hhid[uid] = i
-                self.hhid[uid] = i
+            assigned_hhids = np.arange(len(new_uids), dtype=int)
+            hh_arr[new_uids] = assigned_hhids
+            self.hhid[new_uids] = assigned_hhids
     
     def update_results(self):
         """Update results tracking."""
