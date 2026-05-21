@@ -13,8 +13,9 @@ import numpy as np
 import sciris as sc
 import starsim as ss
 import matplotlib.pyplot as plt
+import networkx as nx
 
-__all__ = ['plot']
+__all__ = ['plot', 'plot_household']
 
 
 def plot(results, select=None, title='', filename=None, n_cols=None, row_height=1.5, style=None, show=True):
@@ -107,8 +108,8 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
                     all_labels.append(scen)
                     seen.add(scen)
 
-            ax.set_title(metric_label, fontsize=10, fontweight='light')
-            ax.set_xlabel('Time', fontsize=6)
+            ax.set_title(metric_label, fontsize=12, fontweight='light')
+            ax.set_xlabel('Time', fontsize=7)
             ax.tick_params(axis='both', labelsize=6)
             ax.grid(True, color='gray', alpha=0.25, linestyle='--', linewidth=0.2)
             if all_x_min is not None and all_x_max is not None:
@@ -118,11 +119,11 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
             fig.delaxes(ax)
 
         if all_handles:
-            leg = fig.legend(all_handles, all_labels, loc='upper left', fontsize=7, frameon=True, fancybox=True)
+            leg = fig.legend(all_handles, all_labels, loc='upper left', fontsize=8, frameon=True, fancybox=True)
             leg.get_frame().set_alpha(0.9)
 
         if title:
-            fig.suptitle(title, fontsize=12)
+            fig.suptitle(title, fontsize=13)
 
         plt.tight_layout(pad=2.0)
 
@@ -289,3 +290,323 @@ def _safe_min_max(x):
         return np.nanmin(a), np.nanmax(a)
     except (TypeError, ValueError):
         return None, None
+
+
+def _households_from_input(households_or_network, return_network=False):
+    """Normalize household input to a list of UID lists."""
+    # Case 1: explicit list of households
+    if isinstance(households_or_network, (list, tuple)):
+        households = [list(hh) for hh in households_or_network if len(hh)]
+        if households:
+            return (households, None) if return_network else households
+
+    # Case 2: Sim passed in
+    if isinstance(households_or_network, ss.Sim):
+        sim = households_or_network
+        hh_net = None
+        for net in sim.networks.values():
+            if hasattr(net, 'household_ids') or hasattr(net, 'hhs'):
+                hh_net = net
+                break
+        if hh_net is None:
+            raise ValueError('No household network found in provided sim')
+    else:
+        hh_net = households_or_network
+
+    # Case 3: Household network with household_ids
+    if hasattr(hh_net, 'household_ids'):
+        hh_state = hh_net.household_ids
+        hh_arr = np.asarray(hh_state, dtype=float)
+        valid = np.isfinite(hh_arr) & (hh_arr >= 0)
+        if not np.any(valid):
+            return ([], hh_net) if return_network else []
+        hh_ids = np.unique(hh_arr[valid]).astype(int)
+        households = [list(np.asarray((hh_state == hhid).uids, dtype=int)) for hhid in hh_ids]
+        households = [hh for hh in households if len(hh)]
+        return (households, hh_net) if return_network else households
+
+    # Case 4: tbsim HouseholdNet with hhs list
+    if hasattr(hh_net, 'hhs'):
+        households = [list(hh) for hh in hh_net.hhs if len(hh)]
+        return (households, hh_net) if return_network else households
+
+    raise TypeError(
+        'households_or_network must be one of: list of households, ss.Sim, '
+        'or household network with household_ids/hhs'
+    )
+
+
+def plot_household(
+    households_or_network,
+    title='Household Network Structure',
+    figsize=(12, 8),
+    max_households=30,
+    edge_mode='auto',
+    layout='ring',
+    layout_seed=123,
+    show_labels=False,
+    show=True,
+    filename=None,
+):
+    """
+    Plot the structure of households and intra-household connections.
+
+    This function creates a network visualization where:
+    - Nodes represent individual agents
+    - Edges represent household connections (actual network edges by default)
+    - Different colors represent different households
+    - Node size is proportional to household size
+
+    Args:
+        households_or_network: one of:
+            - list of households (each household is a list/array of UIDs)
+            - an ``ss.Sim`` with a network exposing ``household_ids``
+            - a household network exposing ``household_ids`` or ``hhs``
+        title (str): Title for the plot
+        figsize (tuple): Figure size (width, height)
+        max_households (int/None): maximum households to render (largest first).
+            Use None to render all (can be very dense for large sims).
+        edge_mode (str): one of ``'auto'``, ``'actual'``, ``'complete'``.
+            - ``'actual'``: draw true edges from the network object
+            - ``'complete'``: reconstruct full within-household cliques
+            - ``'auto'`` (default): use ``'actual'`` for sim/network input and
+              ``'complete'`` for explicit household-list input
+        layout (str): one of ``'ring'``, ``'grid'``, ``'spring'``, ``'kamada'``.
+            - ``'ring'``: household-clustered circular layout (legacy style)
+            - ``'grid'``: household clusters arranged in rows/columns
+            - ``'spring'``: force-directed layout (less donut-like)
+            - ``'kamada'``: Kamada-Kawai layout (compact force-directed)
+        layout_seed (int): random seed used for ``layout='spring'``.
+        show_labels (bool): whether to draw UID labels inside nodes.
+            Defaults to False for cleaner household figures.
+        show (bool): call ``plt.show()``.
+        filename (str/path/None): optional path to save figure.
+
+    Returns:
+        networkx.Graph: The NetworkX graph object for further analysis
+    """
+    households, hh_net = _households_from_input(households_or_network, return_network=True)
+    if len(households) == 0:
+        raise ValueError('No households available to plot')
+
+    if edge_mode not in ['auto', 'actual', 'complete']:
+        raise ValueError(f"edge_mode must be one of ['auto', 'actual', 'complete'], not {edge_mode!r}")
+    if layout not in ['ring', 'grid', 'spring', 'kamada']:
+        raise ValueError(f"layout must be one of ['ring', 'grid', 'spring', 'kamada'], not {layout!r}")
+
+    has_network_edges = (
+        hh_net is not None and
+        hasattr(hh_net, 'edges') and
+        hasattr(hh_net.edges, 'p1') and
+        hasattr(hh_net.edges, 'p2')
+    )
+
+    if edge_mode == 'auto':
+        use_actual_edges = has_network_edges
+    elif edge_mode == 'actual':
+        if not has_network_edges:
+            raise ValueError("edge_mode='actual' requires a sim/network input with edge arrays")
+        use_actual_edges = True
+    else:
+        use_actual_edges = False
+
+    # For readability, cap rendered households (largest first)
+    if max_households is not None and len(households) > max_households:
+        households = sorted(households, key=len, reverse=True)[:max_households]
+
+    # Create NetworkX graph
+    G = nx.Graph()
+
+    # Add all agents as nodes
+    all_agents = [agent for hh in households for agent in hh]
+    G.add_nodes_from(all_agents)
+
+    # Add household membership as node attributes
+    node_to_hh = {}
+    for hh_idx, household in enumerate(households):
+        for agent in household:
+            G.nodes[agent]['household'] = hh_idx
+            G.nodes[agent]['household_size'] = len(household)
+            node_to_hh[int(agent)] = hh_idx
+
+    # Add edges within households
+    edges_by_hh = {hh_idx: [] for hh_idx in range(len(households))}
+    if use_actual_edges:
+        p1 = np.asarray(hh_net.edges.p1, dtype=int)
+        p2 = np.asarray(hh_net.edges.p2, dtype=int)
+        for a, b in zip(p1, p2):
+            ha = node_to_hh.get(int(a), None)
+            hb = node_to_hh.get(int(b), None)
+            if ha is None or hb is None:
+                continue
+            if ha == hb:
+                edges_by_hh[ha].append((int(a), int(b)))
+    else:
+        for hh_idx, household in enumerate(households):
+            if len(household) > 1:
+                for i in range(len(household)):
+                    for j in range(i + 1, len(household)):
+                        edges_by_hh[hh_idx].append((household[i], household[j]))
+
+    for hh_idx, hh_edges in edges_by_hh.items():
+        if len(hh_edges):
+            G.add_edges_from(hh_edges, household=hh_idx)
+
+    # Create plot
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Generate colors for households (continuous map gives many distinct colors)
+    cmap = plt.colormaps.get_cmap('gist_ncar')
+    household_colors = cmap(np.linspace(0.02, 0.98, len(households)))
+
+    # Create layout positions
+    if layout == 'ring':
+        pos = {}
+        if len(households) == 1:
+            # Single household - use circular layout
+            pos = nx.circular_layout(G)
+        else:
+            # Multiple households - arrange in circle with internal clustering
+            household_angles = np.linspace(0, 2*np.pi, len(households), endpoint=False)
+
+            for hh_idx, household in enumerate(households):
+                # Base position for this household
+                base_radius = 3.0
+                hh_x = base_radius * np.cos(household_angles[hh_idx])
+                hh_y = base_radius * np.sin(household_angles[hh_idx])
+
+                if len(household) == 1:
+                    pos[household[0]] = (hh_x, hh_y)
+                else:
+                    # Arrange household members in a small circle
+                    agent_angles = np.linspace(0, 2*np.pi, len(household), endpoint=False)
+                    inner_radius = 0.3 + 0.1 * len(household)
+
+                    for agent_idx, agent in enumerate(household):
+                        pos[agent] = (hh_x + inner_radius * np.cos(agent_angles[agent_idx]),
+                                      hh_y + inner_radius * np.sin(agent_angles[agent_idx]))
+    elif layout == 'grid':
+        pos = {}
+        n_hh = len(households)
+        n_cols = max(1, int(np.ceil(np.sqrt(n_hh))))
+        x_spacing = 3.0
+        y_spacing = 3.0
+
+        for hh_idx, household in enumerate(households):
+            row = hh_idx // n_cols
+            col = hh_idx % n_cols
+            hh_x = col * x_spacing
+            hh_y = -row * y_spacing
+
+            if len(household) == 1:
+                pos[household[0]] = (hh_x, hh_y)
+            else:
+                agent_angles = np.linspace(0, 2*np.pi, len(household), endpoint=False)
+                inner_radius = 0.25 + 0.08 * np.sqrt(len(household))
+                for agent_idx, agent in enumerate(household):
+                    pos[agent] = (hh_x + inner_radius * np.cos(agent_angles[agent_idx]),
+                                  hh_y + inner_radius * np.sin(agent_angles[agent_idx]))
+
+        if len(pos):
+            xs = np.array([xy[0] for xy in pos.values()])
+            ys = np.array([xy[1] for xy in pos.values()])
+            x0 = 0.5 * (xs.min() + xs.max())
+            y0 = 0.5 * (ys.min() + ys.max())
+            for k in pos.keys():
+                x, y = pos[k]
+                pos[k] = (x - x0, y - y0)
+    elif layout == 'spring':
+        pos = nx.spring_layout(G, seed=int(layout_seed))
+    else:
+        pos = nx.kamada_kawai_layout(G)
+
+    # Draw network by household
+    for hh_idx, household in enumerate(households):
+        # Node sizes proportional to household size
+        node_sizes = [80 + 12 * len(household) for _ in household]
+
+        # Draw nodes for this household
+        node_positions = {node: pos[node] for node in household}
+        nx.draw_networkx_nodes(
+            G,
+            node_positions,
+            nodelist=household,
+            node_color=[household_colors[hh_idx]] * len(household),
+            node_size=node_sizes,
+            alpha=0.8,
+            edgecolors='black',
+            linewidths=0.8,
+            ax=ax,
+        )
+
+        # Draw edges for this household
+        household_edges = edges_by_hh[hh_idx]
+        if household_edges:
+            nx.draw_networkx_edges(
+                G,
+                pos,
+                edgelist=household_edges,
+                edge_color=household_colors[hh_idx],
+                width=1.0,
+                alpha=0.6,
+                ax=ax,
+            )
+
+    # Draw labels (optional; defaults off to avoid clutter)
+    if show_labels and len(all_agents) <= 200:
+        nx.draw_networkx_labels(G, pos, font_size=6, font_weight='normal', font_color='black', ax=ax)
+
+    # Add axis limits with padding so edge nodes/labels aren't clipped
+    if len(pos):
+        xs = np.array([xy[0] for xy in pos.values()])
+        ys = np.array([xy[1] for xy in pos.values()])
+        dx = xs.max() - xs.min()
+        dy = ys.max() - ys.min()
+        pad_x = max(0.5, 0.08 * dx)
+        pad_y = max(0.5, 0.08 * dy)
+        ax.set_xlim(xs.min() - pad_x, xs.max() + pad_x)
+        ax.set_ylim(ys.min() - pad_y, ys.max() + pad_y)
+
+    # Create legend
+    legend_elements = []
+    for hh_idx, household in enumerate(households):
+        legend_elements.append(plt.Line2D(
+            [0], [0], marker='o', color='w',
+            markerfacecolor=household_colors[hh_idx],
+            markersize=8, alpha=0.8, markeredgecolor='black',
+            label=f'Household {hh_idx + 1} (n={len(household)})'
+        ))
+
+    total_agents = len(all_agents)
+    total_edges = G.number_of_edges()
+    avg_household_size = np.mean([len(hh) for hh in households])
+    edge_mode_label = 'actual' if use_actual_edges else 'complete'
+    stats_summary = (
+        f'Network Statistics | agents: {total_agents} | households: {len(households)} | '
+        f'edges: {total_edges} | edge mode: {edge_mode_label} | avg household size: {avg_household_size:.1f}'
+    )
+
+    if len(households) <= 25:
+        ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1.02, 1))
+    fig.suptitle(title, fontsize=14, fontweight='bold')
+    fig.text(0.02, 0.015, stats_summary, ha='left', va='bottom', fontsize=8)
+    ax.axis('off')
+    fig.tight_layout(rect=(0.02, 0.06, 0.98, 0.95))
+
+    if filename is not None:
+        fig.savefig(filename, dpi=200, bbox_inches='tight', pad_inches=0.25)
+    if show:
+        plt.show()
+
+    # Print network statistics
+
+    print('Network Statistics:')
+    print(f'  Total agents: {total_agents}')
+    print(f'  Total households: {len(households)}')
+    print(f'  Total edges: {total_edges}')
+    print(f'  Edge mode: {edge_mode_label}')
+    print(f'  Average household size: {avg_household_size:.1f}')
+    if len(households) <= 30:
+        print(f'  Household sizes: {[len(hh) for hh in households]}')
+
+    return G
