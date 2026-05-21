@@ -352,7 +352,55 @@ class Immigration(ss.Demographics):
             assigned_hhids = np.arange(len(new_uids), dtype=int)
             hh_arr[new_uids] = assigned_hhids
             self.hhid[new_uids] = assigned_hhids
-    
+        self._connect_immigrants_to_households(hh_net=hh_net, hh_arr=hh_arr, new_uids=new_uids, assigned_hhids=assigned_hhids)
+        return
+
+    @staticmethod
+    def _has_edge_struct(net):
+        """Return True if network exposes a writable edge structure."""
+        edges = getattr(net, 'edges', None)
+        has_edges = edges is not None and hasattr(edges, 'p1') and hasattr(edges, 'p2')
+        return bool(has_edges)
+
+    def _connect_immigrants_to_households(self, hh_net, hh_arr, new_uids, assigned_hhids):
+        """Add household-network edges for newly assigned immigrants."""
+        if not self._has_edge_struct(hh_net):
+            return
+
+        hh_vals = np.asarray(hh_arr, dtype=float)
+        p1_existing = np.asarray(hh_net.edges.p1, dtype=int)
+        p2_existing = np.asarray(hh_net.edges.p2, dtype=int)
+        existing_pairs = {
+            (int(min(a, b)), int(max(a, b)))
+            for a, b in zip(p1_existing, p2_existing)
+            if a != b
+        }
+
+        assigned_hhids = np.asarray(assigned_hhids, dtype=int)
+        pairs = set()
+        for hhid in np.unique(assigned_hhids):
+            if isinstance(hh_arr, ss.BaseArr):
+                members = np.asarray((hh_arr == hhid).uids, dtype=int)
+            else:
+                members = np.where(hh_vals == hhid)[0].astype(int)
+            if len(members) < 2:
+                continue
+
+            newcomers = np.asarray(new_uids[assigned_hhids == hhid], dtype=int)
+            for u in newcomers:
+                for v in members:
+                    if u == v:
+                        continue
+                    a, b = (u, v) if u < v else (v, u)
+                    if (a, b) not in existing_pairs:
+                        pairs.add((a, b))
+
+        if len(pairs):
+            p1 = np.fromiter((a for a, _ in sorted(pairs)), dtype=int)
+            p2 = np.fromiter((b for _, b in sorted(pairs)), dtype=int)
+            hh_net.append(p1=ss.uids(p1), p2=ss.uids(p2), beta=np.ones(len(p1), dtype=float))
+        return
+
     def update_results(self):
         """Update results tracking."""
         super().update_results()
