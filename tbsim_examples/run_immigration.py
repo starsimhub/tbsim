@@ -1,12 +1,7 @@
 """
 Run TB with ongoing immigration and optional TPT / DOTS interventions.
-
-Uses the same scenario-dict pattern as ``run_tb_interventions.py``: each
-scenario is a dict of optional component overrides (``immigration``,
-``tptintervention``, ``dotsintervention``, ``tbpars``), and ``build_sim``
-assembles a fully configured ``tbsim.Sim`` from them. ``run_scenarios``
-runs all scenarios together as a single ``MultiSim`` so they can be
-compared on one figure.
+Includes Households module.
+Generate Multisim plots (tbsim.plot)
 """
 
 import numpy as np
