@@ -77,8 +77,15 @@ class Immigration(ss.Demographics):
             Mapping of ``{lower_age_bound: probability}`` defining the age-bin
             sampling distribution. Probabilities are normalized automatically.
             Weights must be finite and non-negative, with strictly positive
-            total mass. If ``None``, a default distribution spanning 0-85
-            years is used.
+            total mass. If ``None`` and ``age_data`` is also ``None``, a default
+            distribution spanning 0-85 years is used. Ignored when ``age_data``
+            is provided.
+        age_data : array, Series, DataFrame, str, or None
+            Starsim-compatible age histogram for immigrant ages (same formats as
+            ``ss.People(age_data=...)``): DataFrame with ``age`` and ``value``
+            columns, a Series indexed by age, an ``Nx2`` array, or a CSV path.
+            Uses ``ss.People.get_age_dist()`` / ``ss.histogram`` sampling. Takes
+            precedence over ``age_distribution`` when both are set.
         tb_state_distribution : dict
             Mapping of ``{TBS state name: probability}`` for the TB state
             assigned to each new arrival. Keys must be valid ``TBS`` member
@@ -125,6 +132,7 @@ class Immigration(ss.Demographics):
             immigration_rate=ss.freqperyear(10),
             rel_immigration=1.0,
             age_distribution=None,
+            age_data=None,
             tb_state_distribution=dict(
                 SUSCEPTIBLE=0.6517,
                 INFECTION=0.33,
@@ -143,6 +151,7 @@ class Immigration(ss.Demographics):
         self._dist_ageu = ss.random(name='imm_ageu')
         self._dist_tbstate = ss.choice(name='imm_tbstate', a=[-1], p=[1.0])
         self._dist_hhu = ss.random(name='imm_hhu')
+        self._dist_age = None
         self._age_lows = None
         self._age_highs = None
 
@@ -175,21 +184,22 @@ class Immigration(ss.Demographics):
         """
         Configure stochastic samplers using simulation-level information.
 
-        - If ``age_distribution`` is ``None``, installs a default 0-85 year
-          age profile with 6 bins.
-        - Builds ``_age_lows`` and ``_age_highs`` from the sorted keys of
-          ``age_distribution``; the top bin's upper bound is fixed at 85 years.
-        - Normalizes the age-bin weights to a probability simplex and writes
-          them into ``_dist_agebin``.
+        - If ``age_data`` is set, configures ``_dist_age`` via
+          ``ss.People.get_age_dist()`` (Starsim ``ss.histogram`` sampling).
+        - Otherwise, if ``age_distribution`` is ``None``, installs a default
+          0-85 year profile with 6 bins.
+        - For dict ``age_distribution``, builds ``_age_lows`` / ``_age_highs``
+          (top bin upper bound fixed at 85 years) and ``_dist_agebin``.
         - Configures ``_dist_tbstate`` over the integer ``TBS`` codes named in
           ``tb_state_distribution`` (already validated/normalized in ``__init__``).
         """
         super().init_pre(sim)
-        if self.pars.age_distribution is None:
+        self._configure_age_sampling()
+        if self._dist_age is None and self.pars.age_distribution is None:
             self.pars.age_distribution = {0: 0.15, 5: 0.20, 15: 0.25, 30: 0.20, 50: 0.15, 65: 0.05}
 
         ad = self.pars.age_distribution
-        if isinstance(ad, dict) and len(ad):
+        if isinstance(ad, dict) and len(ad) and self._dist_age is None:
             keys = np.array(sorted(ad.keys()), dtype=float)
             probs = np.array([ad[k] for k in keys], dtype=float)
             if np.any(~np.isfinite(keys)):
@@ -210,6 +220,23 @@ class Immigration(ss.Demographics):
         dist = self.pars.tb_state_distribution
         self._dist_tbstate.pars.a = np.array([int(getattr(TBS, k)) for k in dist], dtype=int)
         self._dist_tbstate.pars.p = np.array(list(dist.values()), dtype=float)
+        return
+
+    def _configure_age_sampling(self):
+        """
+        Configure age sampling from ``age_data`` (Starsim histogram) or ``age_distribution`` (dict bins).
+
+        When ``age_data`` is provided, builds ``_dist_age`` via ``ss.People.get_age_dist()`` and clears
+        the dict-bin path. Otherwise leaves dict-bin configuration to the remainder of ``init_pre()``.
+        """
+        age_data = self.pars.age_data
+        if age_data is None:
+            return
+        if self.pars.age_distribution is not None:
+            warnings.warn('age_data is set; ignoring age_distribution', stacklevel=2)
+        self._dist_age = ss.People.get_age_dist(age_data)
+        self._age_lows = None
+        self._age_highs = None
         return
 
     def init_results(self):
@@ -276,6 +303,8 @@ class Immigration(ss.Demographics):
         """
         if n <= 0:
             return np.empty(0, dtype=float)
+        if self._dist_age is not None:
+            return np.asarray(self._dist_age.rvs(n), dtype=float)
         if self._age_lows is None or self._age_highs is None:
             return self._dist_ageu.rvs(n) * 85.0
         bin_idx = self._dist_agebin.rvs(n).astype(int)
