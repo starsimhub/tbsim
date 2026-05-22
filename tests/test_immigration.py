@@ -125,6 +125,32 @@ def poisson_count_tolerance(expected):
     return 3.0 * np.sqrt(max(expected, 1.0))
 
 
+def assert_immigrant_age_bins_match(sim, age_spec, spec_type):
+    """Check immigrant age-bin proportions against dict or age_data configuration."""
+    imm = get_imm(sim)
+    immigrant_uids = imm.is_immigrant.uids
+    n_imm = len(immigrant_uids)
+    assert n_imm >= 200, f'Expected enough immigrants for age-bin test, got {n_imm}'
+
+    ages = np.asarray(imm.age_at_immigration[immigrant_uids], dtype=float)
+    if spec_type == 'dict':
+        observed, expected = immigrant_age_bin_proportions(ages, age_spec)
+    elif spec_type == 'age_data':
+        assert imm._dist_age is not None, 'Expected age_data path to configure _dist_age histogram'
+        bin_edges, expected = age_data_bin_edges(age_spec)
+        observed, expected = immigrant_age_bin_proportions_from_edges(ages, bin_edges, expected)
+    else:
+        raise ValueError(f'Unknown age spec type: {spec_type}')
+
+    per_bin_tol = 3.0 * np.sqrt(expected * (1.0 - expected) / n_imm)
+    max_tol = max(0.08, float(np.max(per_bin_tol)))
+    max_diff = float(np.max(np.abs(observed - expected)))
+    assert max_diff <= max_tol, (
+        f'Age-bin proportions differ by up to {max_diff:.3f} (tol {max_tol:.3f}); '
+        f'observed {observed.round(3).tolist()}, expected {expected.round(3).tolist()}'
+    )
+
+
 def assert_immigrants_have_household_edges(sim):
     """Check immigrants received household IDs and at least one household edge each."""
     imm = get_imm(sim)
@@ -222,36 +248,23 @@ def test_immigration_arrivals_match_rate():
     )
 
 
-def test_immigrant_age_data_matches_config():
-    """Immigrant ages match Starsim age_data histogram bins (ss.People.get_age_dist)."""
-    age_data = pd.DataFrame({'age': [0, 15, 30], 'value': [0.50, 0.30, 0.20]})
+@pytest.mark.parametrize('age_spec,spec_type', [
+    ({0: 0.50, 15: 0.30, 30: 0.20}, 'dict'),
+    (pd.DataFrame({'age': [0, 15, 30], 'value': [0.50, 0.30, 0.20]}), 'age_data'),
+], ids=['age_distribution', 'age_data'])
+def test_immigrant_age_bins_match_config(age_spec, spec_type):
+    """Immigrant ages match configured bins for dict age_distribution and Starsim age_data."""
+    kwargs = dict(age_distribution=age_spec) if spec_type == 'dict' else dict(age_data=age_spec)
     sim = make_sim(
         n_agents=80,
         immigration_rate=400,
-        age_data=age_data,
         beta=0.0,
         start=ss.date('2000-01-01'),
         stop=ss.date('2003-01-01'),
+        **kwargs,
     )
     sim.run()
-
-    imm = get_imm(sim)
-    immigrant_uids = imm.is_immigrant.uids
-    n_imm = len(immigrant_uids)
-    assert n_imm >= 200, f'Expected enough immigrants for age_data test, got {n_imm}'
-    assert imm._dist_age is not None, 'Expected age_data path to configure _dist_age histogram'
-
-    ages = np.asarray(imm.age_at_immigration[immigrant_uids], dtype=float)
-    bin_edges, expected = age_data_bin_edges(age_data)
-    observed, expected = immigrant_age_bin_proportions_from_edges(ages, bin_edges, expected)
-    per_bin_tol = 3.0 * np.sqrt(expected * (1.0 - expected) / n_imm)
-    max_tol = max(0.08, float(np.max(per_bin_tol)))
-    max_diff = float(np.max(np.abs(observed - expected)))
-
-    assert max_diff <= max_tol, (
-        f'age_data bin proportions differ by up to {max_diff:.3f} (tol {max_tol:.3f}); '
-        f'observed {observed.round(3).tolist()}, expected {expected.round(3).tolist()}'
-    )
+    assert_immigrant_age_bins_match(sim, age_spec, spec_type)
 
 
 def test_age_data_overrides_age_distribution():
@@ -274,49 +287,6 @@ def test_age_data_overrides_age_distribution():
     ages = np.asarray(imm.age_at_immigration[imm.is_immigrant.uids], dtype=float)
     assert len(ages) > 50, 'Expected enough immigrants to check age_data precedence'
     assert np.nanmax(ages) < 50, 'age_data should restrict immigrants to the [0, 40) histogram bin, not age_distribution seniors'
-
-
-def test_immigrant_age_distribution_matches_config():
-    """Immigrant ages fall into configured age bins at the expected proportions."""
-    age_distribution = {0: 0.50, 15: 0.30, 30: 0.20}
-    sim = make_sim(
-        n_agents=80,
-        immigration_rate=400,
-        age_distribution=age_distribution,
-        beta=0.0,
-        start=ss.date('2000-01-01'),
-        stop=ss.date('2003-01-01'),
-    )
-    sim.run()
-
-    imm = get_imm(sim)
-    immigrant_uids = imm.is_immigrant.uids
-    n_imm = len(immigrant_uids)
-    assert n_imm >= 200, f'Expected enough immigrants for age-bin test, got {n_imm}'
-
-    ages = np.asarray(imm.age_at_immigration[immigrant_uids], dtype=float)
-    observed, expected = immigrant_age_bin_proportions(ages, age_distribution)
-    # Per-bin 3σ bound; floor 0.08 avoids flaky small-n edge cases (Starsim style guide).
-    per_bin_tol = 3.0 * np.sqrt(expected * (1.0 - expected) / n_imm)
-    max_tol = max(0.08, float(np.max(per_bin_tol)))
-    max_diff = float(np.max(np.abs(observed - expected)))
-
-    assert max_diff <= max_tol, (
-        f'Age-bin proportions differ by up to {max_diff:.3f} (tol {max_tol:.3f}); '
-        f'observed {observed.round(3).tolist()}, expected {expected.round(3).tolist()}'
-    )
-
-
-def test_migration_runs_with_tb():
-    """Immigration runs with the base TB disease module."""
-    sim = make_sim(n_agents=200, immigration_rate=300, beta=0.0)
-    sim.run()
-    imm = get_imm(sim)
-    tb = tbsim.get_tb(sim)
-
-    assert isinstance(tb, tbsim.TB), 'Expected base TB module in this scenario'
-    assert int(np.sum(imm.results.n_immigrants[:])) > 0, 'Expected immigration results with TB'
-    assert len(imm.is_immigrant.uids) > 0, 'Expected at least one flagged immigrant'
 
 
 def test_migration_runs_with_tbacute():
@@ -381,7 +351,7 @@ def test_immigration_rejects_invalid_age_distribution():
 
 
 def test_immigration_exported_and_runs():
-    """Immigration is exported and updates population/results during run."""
+    """Immigration is exported, runs with TB, and updates population/results."""
     assert hasattr(tbsim, 'Immigration')
 
     sim = make_sim(n_agents=250, immigration_rate=240)
@@ -389,7 +359,9 @@ def test_immigration_exported_and_runs():
     sim.run()
 
     imm = get_imm(sim)
+    tb = tbsim.get_tb(sim)
     n_added = int(np.sum(imm.results.n_immigrants[:]))
+    assert isinstance(tb, tbsim.TB), 'Expected base TB module in this scenario'
     assert n_added > 0, 'Expected at least one immigrant in this scenario'
     assert len(sim.people) == n0 + n_added, 'Population should increase by total immigrants when no other demographics are active'
     assert np.count_nonzero(np.asarray(imm.is_immigrant)) == n_added, 'is_immigrant flags should match total arrivals'
@@ -413,13 +385,6 @@ def test_imported_tb_states_are_consistent():
     assert np.all(tb.infected[new_uids]), 'INFECTION imports should be marked infected'
     assert not np.any(tb.susceptible[new_uids]), 'INFECTION imports should not be marked susceptible'
     assert np.all(np.isneginf(tb.ti_infected[new_uids])), 'Imported TB should not be counted as model incident infection'
-
-
-def test_immigration_assigns_households_when_network_present():
-    """Immigrants are assigned household IDs and household edges."""
-    sim = make_sim(n_agents=180, immigration_rate=800, use_households=True)
-    sim.run()
-    assert_immigrants_have_household_edges(sim)
 
 
 def test_immigration_does_not_break_calibration():
