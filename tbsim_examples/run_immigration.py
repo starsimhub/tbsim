@@ -1,16 +1,15 @@
-"""
-Run TB with ongoing immigration and optional TPT / DOTS interventions.
-Includes Households module.
-Generate Multisim plots (tbsim.plot)
-"""
 
+
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import numpy as np
+import pandas as pd
 import sciris as sc
 import starsim as ss
 import tbsim
 
 
-# Module-level defaults (override per scenario via ``spars``/``tbpars``)
 DEFAULT_SPARS = dict(
     n_agents=2_000,
     start=ss.date('2000-01-01'),
@@ -27,6 +26,7 @@ DEFAULT_TBPARS = dict(
 
 DEFAULT_IMMIGRATION_PARS = dict(
     immigration_rate=ss.freqperyear(200),
+    rel_immigration=1.0,
     tb_state_distribution=dict(
         SUSCEPTIBLE=0.85,
         INFECTION=0.13,
@@ -34,6 +34,12 @@ DEFAULT_IMMIGRATION_PARS = dict(
         SYMPTOMATIC=0.01,
     ),
 )
+
+# Starsim-style age histogram (counts need not sum to 1; Immigration normalizes)
+DEMO_AGE_DATA = pd.DataFrame({
+    'age': [0, 5, 15, 30, 50, 65],
+    'value': [240, 320, 500, 440, 300, 100],
+})
 
 
 def _make_household_dhs_data(n_agents, rand_seed):
@@ -51,42 +57,35 @@ def _make_household_dhs_data(n_agents, rand_seed):
     return sc.dataframe(hh_id=hh_id, ages=ages)
 
 
+def get_imm(sim):
+    """Return the Immigration demographics module."""
+    for dem in sim.demographics.values():
+        if isinstance(dem, tbsim.Immigration):
+            return dem
+    return None
+
+
 def build_sim(scenario=None, spars=None):
-
+    """Build a ``tbsim.Sim`` from a scenario dict (see ``get_scenarios()``)."""
     scenario = scenario or {}
-
     spars = sc.objdict({**DEFAULT_SPARS, **(spars or {})})
     tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})}
+    use_acute = bool(scenario.get('use_acute', False))
 
-    # Demographics: always include births/deaths; immigration is optional
     demographics = [ss.Births(), ss.Deaths()]
     imm_pars = scenario.get('immigration')
     if imm_pars is not None:
-        merged_imm = {**DEFAULT_IMMIGRATION_PARS, **imm_pars}
-        demographics.append(tbsim.Immigration(pars=merged_imm))
+        demographics.append(tbsim.Immigration(pars={**DEFAULT_IMMIGRATION_PARS, **imm_pars}))
 
-    # Interventions: TPT (single dict or list)
     interventions = []
     tpt_params = scenario.get('tptintervention')
     if tpt_params:
-        if isinstance(tpt_params, dict):
-            interventions.append(tbsim.TPTSimple(pars=tpt_params))
-        elif isinstance(tpt_params, list):
-            for i, params in enumerate(tpt_params):
-                params['name'] = f'TPT_{i}'
-                interventions.append(tbsim.TPTSimple(pars=params))
+        items = tpt_params if isinstance(tpt_params, list) else [tpt_params]
+        for i, params in enumerate(items):
+            p = dict(params)
+            p.setdefault('name', f'TPT_{i}')
+            interventions.append(tbsim.TPTSimple(pars=p))
 
-    # DOTS treatment cascade: HSB -> DxDelivery(Xpert) -> TxDelivery(DOTS).
-    # TxDelivery's default eligibility is "diagnosed & active TB", so an upstream
-    # health-seeking + diagnostic step is required for anyone to get treated.
-    dots_params = scenario.get('dotsintervention')
-    if dots_params is not None:
-        dx_coverage = dots_params.get('coverage', 0.8)
-        interventions.append(tbsim.HealthSeekingBehavior())
-        interventions.append(tbsim.DxDelivery(product=tbsim.Xpert(), coverage=dx_coverage))
-        interventions.append(tbsim.TxDelivery(product=tbsim.DOTS()))
-
-    # Networks: random community contacts + DHS-derived household network
     dhs_data = _make_household_dhs_data(n_agents=spars.n_agents, rand_seed=spars.rand_seed)
     networks = [
         ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0)),
@@ -97,6 +96,7 @@ def build_sim(scenario=None, spars=None):
         label=scenario.get('name', 'scenario'),
         sim_pars=spars,
         tb_pars=tbpars,
+        tb_model='acute' if use_acute else 'default',
         networks=networks,
         demographics=demographics,
         interventions=interventions,
@@ -104,92 +104,89 @@ def build_sim(scenario=None, spars=None):
 
 
 def get_scenarios():
-    """Define scenarios for evaluating immigration x TPT combinations."""
+    tpt_window = dict(coverage=0.7, start=ss.date('2001-01-01'), stop=ss.date('2005-01-01'))
     return {
         'Baseline': {
             'name': 'Baseline',
         },
-        'Immigration only': {
-            'name': 'Immigration only',
+        'Immigration (defaults)': {
+            'name': 'Immigration (defaults)',
             'immigration': {},
+        },
+        'Immigration + age_distribution': {
+            'name': 'Immigration + age_distribution',
+            'immigration': dict(
+                immigration_rate=ss.freqperyear(220),
+                age_distribution={0: 0.15, 5: 0.20, 15: 0.30, 30: 0.20, 50: 0.10, 65: 0.05},
+            ),
+        },
+        'Immigration + age_data': {
+            'name': 'Immigration + age_data',
+            'immigration': dict(
+                immigration_rate=ss.freqperyear(220),
+                age_data=DEMO_AGE_DATA,
+            ),
+        },
+        'Immigration + latent-heavy imports': {
+            'name': 'Immigration + latent-heavy imports',
+            'immigration': dict(
+                tb_state_distribution=dict(SUSCEPTIBLE=0.55, INFECTION=0.40, ASYMPTOMATIC=0.05),
+            ),
         },
         'TPT only': {
             'name': 'TPT only',
-            'tptintervention': dict(
-                coverage=0.7,
-                start=ss.date('2001-01-01'),
-                stop=ss.date('2005-01-01'),
-            ),
+            'tptintervention': tpt_window,
         },
         'Immigration + TPT': {
             'name': 'Immigration + TPT',
-            'immigration': {},
-            'tptintervention': dict(
-                coverage=0.7,
-                start=ss.date('2001-01-01'),
-                stop=ss.date('2005-01-01'),
+            'immigration': dict(
+                tb_state_distribution=dict(SUSCEPTIBLE=0.55, INFECTION=0.40, ASYMPTOMATIC=0.05),
             ),
+            'tptintervention': tpt_window,
         },
-        'Immigration + TPT + DOTS': {
-            'name': 'Immigration + TPT + DOTS',
-            'immigration': {},
-            'tptintervention': dict(
-                coverage=0.7,
-                start=ss.date('2001-01-01'),
-                stop=ss.date('2005-01-01'),
+        'Immigration + TBAcute (ACUTE imports)': {
+            'name': 'Immigration + TBAcute (ACUTE imports)',
+            'use_acute': True,
+            'immigration': dict(
+                tb_state_distribution=dict(
+                    SUSCEPTIBLE=0.70,
+                    INFECTION=0.15,
+                    ACUTE=0.10,
+                    ASYMPTOMATIC=0.05,
+                ),
             ),
-            'dotsintervention': dict(coverage=0.8),
         },
     }
 
 
 def _print_scenario_summary(sim):
-    """Print a one-line summary of an immigration/TPT scenario sim."""
+    """Print one-line summary of immigration, households, and optional interventions."""
     tb_mod = tbsim.get_tb(sim)
-    n_imm = int(sim.results.immigration.n_immigrants.sum()) if 'immigration' in sim.results else 0
-    n_imm_current = 0
+    imm = get_imm(sim)
+    n_imm = int(sim.results.immigration.n_immigrants.sum()) if imm is not None else 0
+    n_imm_current = len(imm.is_immigrant.uids) if imm is not None else 0
     n_hh_assigned = 0
-    if 'immigration' in sim.demographics:
-        imm = sim.demographics.immigration
-        immigrant_uids = imm.is_immigrant.uids
-        n_imm_current = len(immigrant_uids)
-        n_hh_assigned = int(np.count_nonzero(imm.hhid[immigrant_uids] >= 0))
-    if 'tptsimple' in sim.results:
-        tpt_r = sim.results.tptsimple
-        n_tpt_init = int(tpt_r.n_newly_initiated.sum())
-        n_tpt_protected = int(tpt_r.n_protected[-1])
-    else:
-        n_tpt_init = 0
-        n_tpt_protected = 0
-    if 'txdelivery' in sim.results:
-        tx_r = sim.results.txdelivery
-        n_dots_treated = int(tx_r.n_treated.sum())
-        n_dots_cured = int(tx_r.cum_success[-1])
-    else:
-        n_dots_treated = 0
-        n_dots_cured = 0
+    mean_age_imm = np.nan
+    if imm is not None and n_imm_current:
+        uids = imm.is_immigrant.uids
+        n_hh_assigned = int(np.count_nonzero(imm.hhid[uids] >= 0))
+        mean_age_imm = float(np.nanmean(imm.age_at_immigration[uids]))
+    n_tpt_init = int(sim.results.tptsimple.n_newly_initiated.sum()) if 'tptsimple' in sim.results else 0
+    n_tpt_protected = int(sim.results.tptsimple.n_protected[-1]) if 'tptsimple' in sim.results else 0
     print(
         f'{sim.label}: '
         f'final_pop={len(sim.people)} '
         f'total_immigrants={n_imm} current_immigrants={n_imm_current} '
-        f'hh_assigned={n_hh_assigned} '
+        f'mean_age_at_immigration={mean_age_imm:.1f} hh_assigned={n_hh_assigned} '
         f'tpt_initiated={n_tpt_init} tpt_protected={n_tpt_protected} '
-        f'dots_treated={n_dots_treated} dots_cured={n_dots_cured} '
         f'final_infectious={int(tb_mod.results.n_infectious[-1])}'
     )
 
 
-def run_scenarios(
-    do_plot=True,
-    savefig=True,
-    fig_path='tbsim_examples/figures/immigration_multisim.png',
-    hh_fig_prefix='tbsim_examples/figures/households',
-):
-    """Run all scenarios as a single MultiSim and optionally plot results."""
+def run_scenarios(do_plot=False, savefig=False, fig_path='tbsim_examples/figures/immigration_multisim.png'):
+    """Run all scenarios as a MultiSim; optionally plot aggregate results."""
     scenarios = get_scenarios()
-    sims = [build_sim(scenario=s) for s in scenarios.values()]
-
-    msim = ss.MultiSim(sims=sims)
+    msim = ss.MultiSim(sims=[build_sim(scenario=s) for s in scenarios.values()])
     msim.run()
 
     for sim in msim.sims:
@@ -198,20 +195,12 @@ def run_scenarios(
     if do_plot or savefig:
         if savefig:
             fig_path = sc.makefilepath(fig_path, makedirs=True)
-        # Keep the broad set of model outputs, but drop panels that are flat at
-        # zero across every scenario (interventions that never fire in this demo,
-        # or cumulative diagnostic/treatment outcomes with no successes).
         tbsim.plot(
             msim,
-            title='TB: immigration x TPT x DOTS scenarios',
+            title='TB: Immigration features x TPT',
             select=[
                 '~None',
-                '~cum_negative', '~cum_relapsed', '~cum_success',
-                '~n_diagnosed',  '~n_negative',   '~n_positive',
-                '~n_test_result',
-                '~n_relapsed',   '~n_success',    '~n_tb_treatment_success',
                 '~n_multiplier_applied',
-                '~sought_care',
                 '~ACUTE', '~acute', '~deaths',
             ],
             n_cols=6,
@@ -219,22 +208,8 @@ def run_scenarios(
             filename=fig_path if savefig else None,
             show=do_plot,
         )
-
-        # for sim in msim.sims:
-        #     hh_file = None
-        #     if savefig:
-        #         hh_file = sc.makefilepath(f'{hh_fig_prefix}_{sim.label}.png', makedirs=True)
-        #     tbsim.plot_household(
-        #         sim,
-        #         title=f'Household structure: {sim.label} \n(top 25 households sizes)',
-        #         max_households=25,
-        #         show=do_plot,
-        #         filename=hh_file,
-        #         show_labels=True,
-        #     )
-
     return msim
 
 
 if __name__ == '__main__':
-    run_scenarios(do_plot=True)
+    run_scenarios(do_plot=True, savefig=True)
