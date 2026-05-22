@@ -198,12 +198,24 @@ def run_scenarios(
     if do_plot or savefig:
         if savefig:
             fig_path = sc.makefilepath(fig_path, makedirs=True)
+        # Keep the broad set of model outputs, but drop panels that are flat at
+        # zero across every scenario (interventions that never fire in this demo,
+        # or cumulative diagnostic/treatment outcomes with no successes).
         tbsim.plot(
             msim,
             title='TB: immigration x TPT x DOTS scenarios',
-            select=['~acute', '~None'],
+            select=[
+                '~None',
+                '~cum_negative', '~cum_relapsed', '~cum_success',
+                '~n_diagnosed',  '~n_negative',   '~n_positive',
+                '~n_test_result',
+                '~n_relapsed',   '~n_success',    '~n_tb_treatment_success',
+                '~n_multiplier_applied',
+                '~sought_care',
+                '~ACUTE', '~acute',
+            ],
             n_cols=6,
-            row_height=1.5,
+            row_height=1.6,
             filename=fig_path if savefig else None,
             show=do_plot,
         )
