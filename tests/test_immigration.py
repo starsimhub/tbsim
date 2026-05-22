@@ -26,6 +26,15 @@ def make_household_dhs_data(n_agents=300, rand_seed=2):
     return sc.dataframe(hh_id=hh_id, ages=ages)
 
 
+def make_imm(rate=200, **pars):
+    """Build an Immigration module with compact defaults."""
+    return tbsim.Immigration(pars=dict(
+        immigration_rate=ss.freqperyear(rate),
+        tb_state_distribution=pars.pop('tb_state_distribution', dict(SUSCEPTIBLE=0.9, INFECTION=0.08, ASYMPTOMATIC=0.02)),
+        **pars,
+    ))
+
+
 def make_sim(
     n_agents=300,
     immigration_rate=200,
@@ -36,26 +45,21 @@ def make_sim(
     beta=0.05,
     use_acute=False,
     use_households=False,
+    demographics=None,
+    interventions=None,
     start=None,
     stop=None,
 ):
     """Create a small TB simulation with immigration enabled."""
     tb_pars = dict(init_prev=ss.bernoulli(0.02), beta=ss.peryear(beta))
     tb = tbsim.TBAcute(pars=tb_pars) if use_acute else tbsim.TB(pars=tb_pars)
-    imm_pars = dict(
-        immigration_rate=ss.freqperyear(immigration_rate),
-        rel_immigration=rel_immigration,
-        tb_state_distribution=tb_state_distribution or dict(
-            SUSCEPTIBLE=0.9,
-            INFECTION=0.08,
-            ASYMPTOMATIC=0.02,
-        ),
-    )
-    if age_distribution is not None:
-        imm_pars['age_distribution'] = age_distribution
-    if age_data is not None:
-        imm_pars['age_data'] = age_data
-    imm = tbsim.Immigration(pars=imm_pars)
+    if demographics is None:
+        imm_kw = dict(rel_immigration=rel_immigration, tb_state_distribution=tb_state_distribution)
+        if age_distribution is not None:
+            imm_kw['age_distribution'] = age_distribution
+        if age_data is not None:
+            imm_kw['age_data'] = age_data
+        demographics = [make_imm(immigration_rate, **{k: v for k, v in imm_kw.items() if v is not None})]
     networks = [ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=4), dur=0))]
     if use_households:
         dhs_data = make_household_dhs_data(n_agents=n_agents, rand_seed=2)
@@ -70,7 +74,8 @@ def make_sim(
         verbose=0,
         diseases=tb,
         networks=networks,
-        demographics=[imm],
+        demographics=demographics,
+        interventions=interventions or [],
     )
     return sim
 
@@ -167,19 +172,16 @@ def assert_immigrants_have_household_edges(sim):
         np.add.at(deg, p1, 1)
         np.add.at(deg, p2, 1)
     assert np.all(deg[np.asarray(immigrant_uids, dtype=int)] > 0), 'Expected each immigrant to have at least one household edge'
+    if p1.size:
+        assert not np.any(p1 == p2), 'Household network should not contain self-edges'
+        undirected = np.sort(np.vstack([p1, p2]), axis=0).T
+        assert len(undirected) == len({(int(a), int(b)) for a, b in undirected}), 'Household edges should be unique undirected pairs'
 
 
 def make_treatment_sim(n_agents=400, immigration_rate=400, beta=0.06):
     """Create a TBsim simulation with immigration and active-TB treatment."""
-    imm = tbsim.Immigration(pars=dict(
-        immigration_rate=ss.freqperyear(immigration_rate),
-        tb_state_distribution=dict(
-            SUSCEPTIBLE=0.70,
-            INFECTION=0.10,
-            NON_INFECTIOUS=0.05,
-            ASYMPTOMATIC=0.10,
-            SYMPTOMATIC=0.05,
-        ),
+    imm = make_imm(immigration_rate, tb_state_distribution=dict(
+        SUSCEPTIBLE=0.70, INFECTION=0.10, NON_INFECTIOUS=0.05, ASYMPTOMATIC=0.10, SYMPTOMATIC=0.05,
     ))
 
     tx = tbsim.TxDelivery(
@@ -218,6 +220,58 @@ def get_imm(sim):
         if isinstance(dem, tbsim.Immigration):
             return dem
     raise RuntimeError('Immigration module not found')
+
+
+def assert_immigration_smoke(sim):
+    """Expect a completed run to have added immigrants."""
+    imm = get_imm(sim)
+    assert int(np.sum(imm.results.n_immigrants[:])) > 0, 'Expected positive per-step immigration counts'
+    assert len(imm.is_immigrant.uids) > 0, 'Expected at least one flagged immigrant'
+
+
+def assert_explicit_demographics_integration(sim):
+    """Explicit Births + Deaths + Immigration list runs and immigration is active."""
+    assert any(isinstance(d, ss.Births) for d in sim.demographics.values()), 'Expected Births in demographics list'
+    assert any(isinstance(d, ss.Deaths) for d in sim.demographics.values()), 'Expected Deaths in demographics list'
+    assert any(isinstance(d, tbsim.Immigration) for d in sim.demographics.values()), 'Expected Immigration in demographics list'
+    assert_immigration_smoke(sim)
+
+
+def assert_tpt_integration(sim):
+    """Immigration coexists with TPT; both modules run without blocking arrivals."""
+    assert any(isinstance(i, tbsim.TPTSimple) for i in sim.interventions.values()), 'Expected TPTSimple intervention'
+    tpt = next(i for i in sim.interventions.values() if isinstance(i, tbsim.TPTSimple))
+    assert hasattr(tpt, 'results'), 'Expected TPT result channels after run'
+    assert_immigration_smoke(sim)
+
+
+def assert_immigrant_tb_bin_proportions(sim, tb_state_distribution, min_immigrants=200):
+    """Immigrant entry TB states match configured tb_state_distribution within tolerance."""
+    imm = get_imm(sim)
+    immigrant_uids = imm.is_immigrant.uids
+    n_imm = len(immigrant_uids)
+    assert n_imm >= min_immigrants, f'Expected enough immigrants for TB-state test, got {n_imm}'
+
+    dist = {k: float(v) for k, v in tb_state_distribution.items() if v}
+    total = sum(dist.values())
+    expected = {k: v / total for k, v in dist.items()}
+    codes = {k: int(getattr(tbsim.TBS, k)) for k in expected}
+    entry = np.asarray(imm.immigration_tb_status[immigrant_uids], dtype=int)
+
+    observed = []
+    exp_props = []
+    for name, prop in expected.items():
+        observed.append(np.mean(entry == codes[name]))
+        exp_props.append(prop)
+    observed = np.asarray(observed)
+    exp_props = np.asarray(exp_props)
+    per_bin_tol = 3.0 * np.sqrt(exp_props * (1.0 - exp_props) / n_imm)
+    max_tol = max(0.08, float(np.max(per_bin_tol)))
+    max_diff = float(np.max(np.abs(observed - exp_props)))
+    assert max_diff <= max_tol, (
+        f'TB-state proportions differ by up to {max_diff:.3f} (tol {max_tol:.3f}); '
+        f'observed {observed.round(3).tolist()}, expected {exp_props.round(3).tolist()}'
+    )
 
 
 def extract_n_infectious(sim):
@@ -310,6 +364,62 @@ def test_migration_runs_with_tbacute():
     entry_states = np.asarray(imm.immigration_tb_status[immigrant_uids], dtype=int)
     assert np.all(entry_states == int(tbsim.TBS.ACUTE)), 'Expected ACUTE at entry for ACUTE-only import distribution'
     assert np.any(tb.infected[immigrant_uids]), 'Expected at least some immigrants to remain infected after progression'
+
+
+def test_acute_imports_require_tbacute():
+    """ACUTE imports with base TB must fail at step time."""
+    sim = make_sim(immigration_rate=500, tb_state_distribution=dict(ACUTE=1.0), beta=0.0)
+    sim.init()
+    with pytest.raises(ValueError, match='not TBAcute'):
+        get_imm(sim).step()
+
+
+@pytest.mark.parametrize('demographics,interventions,assert_fn,tb_state_distribution', [
+    pytest.param(
+        lambda: [ss.Births(), ss.Deaths(), make_imm(300)],
+        [],
+        assert_explicit_demographics_integration,
+        None,
+        id='explicit_demographics_list',
+    ),
+    pytest.param(
+        None,
+        [tbsim.TPTSimple(pars=dict(coverage=0.5))],
+        assert_tpt_integration,
+        dict(INFECTION=0.4, SUSCEPTIBLE=0.6),
+        id='with_tpt',
+    ),
+])
+def test_migration_compatibility_smoke(demographics, interventions, assert_fn, tb_state_distribution):
+    """Immigration runs with explicit demographics list and with TPT (plan integration smokes)."""
+    dems = demographics() if callable(demographics) else demographics
+    sim = make_sim(
+        n_agents=200,
+        immigration_rate=400,
+        demographics=dems,
+        interventions=interventions,
+        tb_state_distribution=tb_state_distribution,
+        beta=0.0,
+        start=ss.date('2000-01-01'),
+        stop=ss.date('2003-01-01'),
+    )
+    sim.run()
+    assert_fn(sim)
+
+
+def test_immigrant_tb_states_match_config():
+    """Immigrant entry TB states match configured tb_state_distribution within tolerance."""
+    tb_state_distribution = dict(INFECTION=0.40, SUSCEPTIBLE=0.60)
+    sim = make_sim(
+        n_agents=100,
+        immigration_rate=500,
+        tb_state_distribution=tb_state_distribution,
+        beta=0.0,
+        start=ss.date('2000-01-01'),
+        stop=ss.date('2003-01-01'),
+    )
+    sim.run()
+    assert_immigrant_tb_bin_proportions(sim, tb_state_distribution)
 
 
 def test_immigrants_are_assigned_households_and_edges():
