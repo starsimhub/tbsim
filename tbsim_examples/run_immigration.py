@@ -212,7 +212,7 @@ def run_scenarios(
                 '~n_relapsed',   '~n_success',    '~n_tb_treatment_success',
                 '~n_multiplier_applied',
                 '~sought_care',
-                '~ACUTE', '~acute',
+                '~ACUTE', '~acute', '~deaths',
             ],
             n_cols=6,
             row_height=1.6,
