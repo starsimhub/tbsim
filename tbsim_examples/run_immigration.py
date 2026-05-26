@@ -87,37 +87,6 @@ def build_sim(scenario=None, spars=None):
         interventions=interventions,
     )
 
-def get_scenarios():
-    return {
-        'Baseline': {
-            'name': 'Baseline',
-        },
-        'Immigration (defaults)': {
-            'name': 'Immigration (defaults)',
-            'immigration': {},
-        },
-        'Immigration + age_distribution': {
-            'name': 'Immigration + age_distribution',
-            'immigration': dict(
-                immigration_rate=ss.freqperyear(220),
-                age_distribution={0: 0.15, 5: 0.20, 15: 0.30, 30: 0.20, 50: 0.10, 65: 0.05},
-            ),
-        },
-        'Immigration + age_data': {
-            'name': 'Immigration + age_data',
-            'immigration': dict(
-                immigration_rate=ss.freqperyear(220),
-                age_data=DEMO_AGE_DATA,
-            ),
-        },
-        'Immigration + latent-heavy imports': {
-            'name': 'Immigration + latent-heavy imports',
-            'immigration': dict(
-                tb_state_distribution=dict(SUSCEPTIBLE=0.55, INFECTION=0.40, ASYMPTOMATIC=0.05),
-            ),
-        },
-    }
-
 
 def generate_scenario_profiles(profilers, csv_path='immigration_scenario_profiles.csv'):
     summary_rows = []
@@ -150,7 +119,6 @@ def generate_scenario_profiles(profilers, csv_path='immigration_scenario_profile
         csv_path = sc.makefilepath(csv_path, makedirs=True)
         profiles.to_csv(csv_path, index=False)
     return profiles
-
 
 
 def run_scenarios(do_plot=False, savefig=False, profile=False, save_profiles=True, 
@@ -198,6 +166,31 @@ def run_scenarios(do_plot=False, savefig=False, profile=False, save_profiles=Tru
         )
     return msim, profiles
 
+
+def get_scenarios():
+    return {
+        'Baseline': {
+            'name': 'Baseline',
+        },
+        'Immigration (defaults)': {
+            'name': 'Immigration (defaults)',
+            'immigration': {},
+        },
+        'Immigration + age_distribution': {
+            'name': 'Immigration + age_distribution',
+            'immigration': dict(
+                immigration_rate=ss.freqperyear(120),
+                age_distribution={0: 0.15, 5: 0.20, 15: 0.30, 30: 0.20, 50: 0.10, 65: 0.05},
+            ),
+        },
+        'Immigration + age_data': {
+            'name': 'Immigration + age_data',
+            'immigration': dict(
+                immigration_rate=ss.freqperyear(120),
+                age_data=DEMO_AGE_DATA,
+            ),
+        },
+    }
 
 if __name__ == '__main__':
     print('Running scenarios...')
