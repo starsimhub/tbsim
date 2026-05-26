@@ -1,9 +1,4 @@
-"""TB migration modules and composition helpers.
-
-This module is the home for migration-related demographics in TBsim. Term 1
-implements immigration as an exogenous inflow process; Term 2 is reserved for
-emigration and full net-migration behavior.
-"""
+"""Exogenous immigration for TBsim (Term 1). See ``docs/immigration.md`` for the full guide."""
 
 import warnings
 import numpy as np
@@ -16,132 +11,66 @@ __all__ = ['Immigration']
 
 class Immigration(ss.Demographics):
     """
-    Stochastic exogenous-entry operator for TB state-space simulations.
-    Demographic module that adds new immigrants to the population each timestep.
+    Exogenous immigration as a Poisson arrival process with TB entry states.
 
-    Arrivals are Poisson-distributed at the specified rate, assigned ages drawn
-    from a configurable age distribution, and seeded into the TB state machine
-    according to a user-supplied prevalence distribution. Requires either
-    ``TB`` or ``TBAcute`` to be present in the simulation.
+    Each step draws ``N ~ Poisson(λ)`` newcomer agents, where
+    ``λ = immigration_rate.to_events(self.t.dt)``. New agents
+    receive sampled ages, a ``TBS`` entry state from ``tb_state_distribution``,
+    and optional placement in a household network. Imported infection is
+    exogenous: ``ti_infected`` is set to ``-inf`` so arrivals do not count as
+    model-generated incidence.
 
-    This module defines a marked point process over simulation time and applies
-    it as a demographic inflow to the agent system. At each model step ``t``:
+    Requires ``TB`` or ``TBAcute`` in the simulation. ``TBS.DEAD`` cannot be
+    used in ``tb_state_distribution``. Household assignment skips agents who are
+    not ``people.alive`` or are in ``TBS.DEAD``.
 
-    1. Arrival count is sampled as
-       ``N_t ~ Poisson(lambda_t)``, with
-       ``lambda_t = rel_immigration * immigration_rate.to_events(dt_t)``.
-    2. ``N_t`` agents are appended to the population.
-    3. Each new agent receives:
-       - an age sampled from a piecewise-uniform mixture induced by
-         ``age_distribution``,
-       - a TB state sampled from ``tb_state_distribution`` on the ``TBS`` state set,
-       - a household assignment (if a compatible household-ID array is found).
-    4. TB-derived flags/states needed for imported-agent consistency are made
-       internally consistent with the sampled TB state. The full set updated in
-       ``_init_tb_states`` is:
-       ``state``, ``infected``, ``susceptible``, ``ever_infected``,
-       ``on_treatment``, ``ti_infected``, ``rr_reinfection``,
-       ``ti_rr_reinfection_wane``, ``rel_sus``, and ``rel_trans``.
+    Args (pars):
+        immigration_rate (ss.freq/float): Mean arrivals per year (default
+            ``ss.freqperyear(10)``). Scalars are coerced to ``ss.freqperyear``.
+            Must be an event frequency (``ss.freq...``), not e.g. ``ss.peryear``.
+        age_distribution (dict/None): ``{lower_age_bound: weight}`` for
+            piecewise-uniform entry ages. Ignored if ``age_data`` is set.
+        age_data (DataFrame/Series/array/str/None): Starsim age histogram (same
+            formats as ``ss.People(age_data=...)``).
+        tb_state_distribution (dict): ``{TBS name: weight}`` for entry TB state.
+            Weights are normalized; ``TBS.DEAD`` is not allowed.
 
-    The inflow is explicitly *exogenous* with respect to local infection hazard:
-    every imported agent is stamped with ``ti_infected = -np.inf`` so imported
-    infected cases are not counted as model-generated incident infections
-    (susceptible imports are unaffected by this assignment in practice).
+    Attributes:
+        hhid (IntArr): Assigned household ID, or -1 if unset.
+        is_immigrant (BoolState): True for agents added by this module.
+        immigration_time (FloatArr): Step index at entry.
+        age_at_immigration (FloatArr): Age at entry (years).
+        immigration_tb_status (IntArr): ``TBS`` code at entry.
+        results['n_immigrants'] (Result): Arrival count each step.
 
-    Mathematical objects:
-        - Arrival intensity: ``lambda_t in R_{>=0}``
-        - Age-bin index: ``B_i ~ Categorical(p_age)``
-        - Age within bin: ``U_i ~ Uniform(0,1)``,
-          ``A_i = L_{B_i} + U_i * (H_{B_i} - L_{B_i})``
-        - TB state: ``S_i ~ Categorical(p_tb)`` over ``TBS`` codes
+    **Example**::
 
-    Compatibility constraints:
-        - Requires disease module instance of ``TB`` or ``TBAcute``.
-        - If ``ACUTE`` has non-zero mass in ``tb_state_distribution``, the active
-          disease module must be ``TBAcute``.
+        import starsim as ss
+        import tbsim
 
-    Parameters
-    ----------
-    pars : dict, optional
-        Parameter overrides. Supported keys:
-
-        immigration_rate : ss.freq or float
-            Mean number of arrivals per year (default: ``ss.freqperyear(10)``).
-            An event-rate type (``ss.freqperyear``, etc.) is preferred; bare
-            scalars are coerced to ``ss.freqperyear``. Passing a non-event
-            ``ss.Rate`` subclass raises ``ValueError``.
-        rel_immigration : float
-            Scalar multiplier applied to ``immigration_rate`` (default: 1.0).
-            Useful for scenario scaling without changing the base rate.
-        age_distribution : dict or None
-            Mapping of ``{lower_age_bound: probability}`` defining the age-bin
-            sampling distribution. Probabilities are normalized automatically.
-            Weights must be finite and non-negative, with strictly positive
-            total mass. If ``None`` and ``age_data`` is also ``None``, a default
-            distribution spanning 0-85 years is used. Ignored when ``age_data``
-            is provided.
-        age_data : array, Series, DataFrame, str, or None
-            Starsim-compatible age histogram for immigrant ages (same formats as
-            ``ss.People(age_data=...)``): DataFrame with ``age`` and ``value``
-            columns, a Series indexed by age, an ``Nx2`` array, or a CSV path.
-            Uses ``ss.People.get_age_dist()`` / ``ss.histogram`` sampling. Takes
-            precedence over ``age_distribution`` when both are set.
-        tb_state_distribution : dict
-            Mapping of ``{TBS state name: probability}`` for the TB state
-            assigned to each new arrival. Keys must be valid ``TBS`` member
-            names. Values must be finite and non-negative, and are normalized
-            automatically; a warning is raised if they sum to more than 1.
-
-    Agent-level states introduced by the module:
-        hhid (ss.IntArr): Assigned household ID (module copy), ``-1`` if unset.
-        is_immigrant (ss.BoolState): Indicator for module-origin agents.
-        immigration_time (ss.FloatArr): Immigration step index.
-        age_at_immigration (ss.FloatArr): Entry age (years).
-        immigration_tb_status (ss.IntArr): TB state code at entry.
-
-    Result channels:
-        n_immigrants (ss.Result): Per-step arrival count ``N_t``.
-
-    Implementation invariants:
-        - ``n_immigrants == len(new_uids)`` whenever ``step()`` returns non-empty.
-        - For immigrants ``u``, ``immigration_tb_status[u] == tb.state[u]`` at entry.
-        - For every imported agent ``u``, ``tb.ti_infected[u] = -np.inf``
-          (regardless of whether the sampled state is infected or susceptible).
-        - For every imported agent ``u``, ``is_immigrant[u] = True``,
-          ``immigration_time[u] = self.ti``, and ``age_at_immigration[u] = age[u]``.
-        - If a household network with writable edge arrays is present, each
-          immigrant is connected by undirected edges to all other members of
-          their assigned household after assignment (including other newcomers
-          assigned to the same household); only pairs not already present are
-          appended.
-        - Household assignment is uniform over the set of existing household IDs;
-          if no households exist yet (no finite, non-negative IDs in the
-          network's household array), the ``N_t`` immigrants are assigned the
-          batch-local IDs ``0..N_t-1`` (one singleton household each).
-
-    Example:
-        sim = tbsim.Sim(
-            demographics=[tbsim.Immigration(pars=dict(immigration_rate=ss.freqperyear(500)))],
+        sim = ss.Sim(
+            diseases=tbsim.TB(),
+            demographics=[tbsim.Immigration(pars=dict(immigration_rate=ss.freqperyear(200)))],
         )
         sim.run()
     """
 
     def __init__(self, pars=None, **kwargs):
+        """Define parameters, RNGs, and per-agent immigration states."""
         super().__init__()
         self.define_pars(
-            immigration_rate=ss.freqperyear(10),
-            rel_immigration=1.0,
-            age_distribution=None,
-            age_data=None,
-            tb_state_distribution=dict(
-                SUSCEPTIBLE=0.6517,
-                INFECTION=0.33,
-                CLEARED=0.007,
-                NON_INFECTIOUS=0.0008,
-                ASYMPTOMATIC=0.0015,
-                SYMPTOMATIC=0.0010,
-                TREATMENT=0.0,
-            ),
+            immigration_rate=ss.freqperyear(10),    # Default annual arrival rate of 10 immigrants
+            age_distribution=None,                  # Default age distribution (see below)
+            age_data=None,                          # Default age data (see below)  
+            tb_state_distribution={                 # Default TB state distribution (see below)
+                TBS.SUSCEPTIBLE.name: 0.6517,
+                TBS.INFECTION.name: 0.33,
+                TBS.CLEARED.name: 0.007,
+                TBS.NON_INFECTIOUS.name: 0.0008,
+                TBS.ASYMPTOMATIC.name: 0.0015,
+                TBS.SYMPTOMATIC.name: 0.0010,
+                TBS.TREATMENT.name: 0.0,
+            },
         )
         self.update_pars(pars, **kwargs)
         self.pars.tb_state_distribution = self._validate_tb_state_distribution(self.pars.tb_state_distribution)
@@ -166,14 +95,7 @@ class Immigration(ss.Demographics):
         return
 
     def init_post(self):
-        """
-        Resolve the TB disease module after the simulation is assembled.
-
-        Scans ``self.sim.diseases`` and caches the key of the first module that
-        is an instance of ``TB`` or ``TBAcute``. Raises ``RuntimeError`` if no
-        compatible disease module is present, because subsequent state writes
-        in ``_init_tb_states`` depend on this handle.
-        """
+        """Resolve the ``TB`` or ``TBAcute`` module after the sim is assembled."""
         super().init_post()
         self._tb_name = next((k for k, d in self.sim.diseases.items() if isinstance(d, (TB, TBAcute))), None)
         if self._tb_name is None:
@@ -181,54 +103,42 @@ class Immigration(ss.Demographics):
         return
 
     def init_pre(self, sim):
-        """
-        Configure stochastic samplers using simulation-level information.
+        """Configure age-bin and ``TBS`` entry samplers from ``pars``.
 
-        - If ``age_data`` is set, configures ``_dist_age`` via
-          ``ss.People.get_age_dist()`` (Starsim ``ss.histogram`` sampling).
-        - Otherwise, if ``age_distribution`` is ``None``, installs a default
-          0-85 year profile with 6 bins.
-        - For dict ``age_distribution``, builds ``_age_lows`` / ``_age_highs``
-          (top bin upper bound fixed at 85 years) and ``_dist_agebin``.
-        - Configures ``_dist_tbstate`` over the integer ``TBS`` codes named in
-          ``tb_state_distribution`` (already validated/normalized in ``__init__``).
+        Args:
+            sim (ss.Sim): Simulation being initialized.
         """
         super().init_pre(sim)
         self._configure_age_sampling()
         if self._dist_age is None and self.pars.age_distribution is None:
             self.pars.age_distribution = {0: 0.15, 5: 0.20, 15: 0.25, 30: 0.20, 50: 0.15, 65: 0.05}
 
-        ad = self.pars.age_distribution
-        if isinstance(ad, dict) and len(ad) and self._dist_age is None:
-            keys = np.array(sorted(ad.keys()), dtype=float)
-            probs = np.array([ad[k] for k in keys], dtype=float)
-            if np.any(~np.isfinite(keys)):
+        age_bins = self.pars.age_distribution
+        if isinstance(age_bins, dict) and len(age_bins) and self._dist_age is None:
+            bin_edges = np.array(sorted(age_bins.keys()), dtype=float)
+            bin_weights = np.array([age_bins[k] for k in bin_edges], dtype=float)
+            if np.any(~np.isfinite(bin_edges)):
                 raise ValueError('age_distribution keys must be finite age-bin lower bounds')
-            if np.any(~np.isfinite(probs)):
+            if np.any(~np.isfinite(bin_weights)):
                 raise ValueError('age_distribution weights must be finite')
-            if np.any(probs < 0):
+            if np.any(bin_weights < 0):
                 raise ValueError('age_distribution weights must be non-negative')
-            total = probs.sum()
-            if total <= 0:
+            weight_sum = bin_weights.sum()
+            if weight_sum <= 0:
                 raise ValueError('age_distribution must include at least one positive weight')
-            probs = probs / total
-            self._age_lows = keys
-            self._age_highs = np.r_[keys[1:], 85.0]
-            self._dist_agebin.pars.a = np.arange(len(keys), dtype=int)
-            self._dist_agebin.pars.p = probs
+            bin_weights = bin_weights / weight_sum
+            self._age_lows = bin_edges
+            self._age_highs = np.r_[bin_edges[1:], 85.0]
+            self._dist_agebin.pars.a = np.arange(len(bin_edges), dtype=int)
+            self._dist_agebin.pars.p = bin_weights
 
-        dist = self.pars.tb_state_distribution
-        self._dist_tbstate.pars.a = np.array([int(getattr(TBS, k)) for k in dist], dtype=int)
-        self._dist_tbstate.pars.p = np.array(list(dist.values()), dtype=float)
+        tb_entry_weights = self.pars.tb_state_distribution
+        self._dist_tbstate.pars.a = np.array([int(TBS[state_name]) for state_name in tb_entry_weights], dtype=int)
+        self._dist_tbstate.pars.p = np.array(list(tb_entry_weights.values()), dtype=float)
         return
 
     def _configure_age_sampling(self):
-        """
-        Configure age sampling from ``age_data`` (Starsim histogram) or ``age_distribution`` (dict bins).
-
-        When ``age_data`` is provided, builds ``_dist_age`` via ``ss.People.get_age_dist()`` and clears
-        the dict-bin path. Otherwise leaves dict-bin configuration to the remainder of ``init_pre()``.
-        """
+        """Build ``_dist_age`` from ``pars.age_data`` when provided."""
         age_data = self.pars.age_data
         if age_data is None:
             return
@@ -240,66 +150,44 @@ class Immigration(ss.Demographics):
         return
 
     def init_results(self):
-        """Initialize per-step immigration result channels."""
+        """Register the per-step ``n_immigrants`` result channel."""
         super().init_results()
         self.define_results(ss.Result('n_immigrants', dtype=int, label='Number of immigrants'))
         return
 
     def expected_immigrants_per_timestep(self):
-        """
-        Compute the Poisson intensity for the current timestep.
-
-        Resolves ``immigration_rate`` to an ``ss.freq`` (coercing bare scalars
-        via ``ss.freqperyear``), applies ``rel_immigration`` as a multiplicative
-        scaler, then converts to expected events over the current step duration
-        ``self.sim.t.dt`` using ``rate.to_events(dt)``. Non-finite or negative
-        values are clamped to zero so the downstream ``ss.poisson`` draw is
-        always well-defined.
+        """Return the Poisson mean for the current step.
+        Non-finite or negative values are clamped to zero.
 
         Returns:
-            lam (float): Expected arrivals during the current timestep.
+            expected_arrivals (float): Expected number of immigrants this step.
         """
-        r = self.pars.immigration_rate
-        if r is None:
+        rate_spec = self.pars.immigration_rate
+        if rate_spec is None:
             return 0.0
-        if isinstance(r, ss.Rate):
-            if not isinstance(r, ss.freq):
+        if isinstance(rate_spec, ss.Rate):
+            if not isinstance(rate_spec, ss.freq):
                 raise ValueError('immigration_rate must be an event rate (ss.freq...), e.g. ss.freqperyear(1000)')
-            rate = r
+            annual_rate = rate_spec
         else:
-            rate = ss.freqperyear(float(r))
-        rate = rate * float(self.pars.rel_immigration)
-        dt = getattr(self.sim.t, 'dt', getattr(self.sim, 'dt', None))
-        dt_dur = dt if isinstance(dt, ss.dur) else ss.dur(dt)
-        lam = float(rate.to_events(dt_dur))
-        if not np.isfinite(lam) or lam < 0:
-            lam = 0.0
-        return lam
+            annual_rate = ss.freqperyear(float(rate_spec))
+        expected_arrivals = float(annual_rate.to_events(self.t.dt))
+        if not np.isfinite(expected_arrivals) or expected_arrivals < 0:
+            expected_arrivals = 0.0
+        return expected_arrivals
 
     def _lam_per_timestep(self, module):
-        """
-        Callback bound to ``ss.poisson(lam=...)``.
-
-        Starsim invokes this each timestep with the owning module instance,
-        allowing the Poisson rate to track dynamic changes to
-        ``immigration_rate``, ``rel_immigration``, or ``sim.t.dt``.
-        """
+        """Poisson rate callback for ``_dist_n`` (called each step)."""
         return module.expected_immigrants_per_timestep()
 
     def _sample_ages(self, n):
-        """
-        Sample ages (in years) for ``n`` immigrants.
+        """Sample entry ages for ``n`` immigrants (years).
 
-        Two-stage sampling: a bin index ``B_i`` is drawn from ``_dist_agebin``
-        with probabilities given by the configured ``age_distribution``, then
-        an in-bin position ``U_i ~ Uniform(0,1)`` is drawn from ``_dist_ageu``
-        to yield ``A_i = L_{B_i} + U_i * (H_{B_i} - L_{B_i})``.
-
-        If no bin structure has been configured (``_age_lows`` is ``None``),
-        falls back to ``Uniform(0, 85)`` years.
+        Args:
+            n (int): Number of ages to draw.
 
         Returns:
-            ages (np.ndarray): Float ages of length ``n`` (empty if ``n <= 0``).
+            ages (ndarray): Length-``n`` float array of ages.
         """
         if n <= 0:
             return np.empty(0, dtype=float)
@@ -307,256 +195,164 @@ class Immigration(ss.Demographics):
             return np.asarray(self._dist_age.rvs(n), dtype=float)
         if self._age_lows is None or self._age_highs is None:
             return self._dist_ageu.rvs(n) * 85.0
-        bin_idx = self._dist_agebin.rvs(n).astype(int)
-        u = self._dist_ageu.rvs(n)
-        lo = self._age_lows[bin_idx]
-        hi = self._age_highs[bin_idx]
-        return lo + u * (hi - lo)
-
-    def _get_immigrant_characteristics(self, n_immigrants):
-        """
-        Generate characteristics for new immigrants before population growth.
-
-        Currently only age is sampled here. TB state is sampled after
-        ``people.grow()`` because it must be written directly to TB module arrays
-        for the newly allocated UIDs.
-        """
-        if n_immigrants == 0:
-            return {}
-        return {'ages': self._sample_ages(n_immigrants)}
+        age_bin = self._dist_agebin.rvs(n).astype(int)
+        within_bin = self._dist_ageu.rvs(n)
+        bin_lower = self._age_lows[age_bin]
+        bin_upper = self._age_highs[age_bin]
+        return bin_lower + within_bin * (bin_upper - bin_lower)
 
     def _init_tb_states(self, new_uids):
-        """
-        Seed TB state and imported-agent consistency fields for new arrivals.
+        """Seed TB state and consistency fields for new arrivals.
 
-        For each UID in ``new_uids``, samples a ``TBS`` state from
-        ``_dist_tbstate`` and writes the TB fields needed for a consistent
-        imported state:
-
-        - ``tb.state`` is set to the sampled code.
-        - ``tb.infected`` is ``True`` for any state outside
-          ``{SUSCEPTIBLE, CLEARED, DEAD}`` (note: ``DEAD`` imports therefore
-          have both ``infected = False`` and ``susceptible = False``).
-        - ``tb.susceptible`` is ``True`` for ``SUSCEPTIBLE`` and ``CLEARED``.
-        - ``tb.ever_infected`` is ``True`` for any state other than
-          ``SUSCEPTIBLE``.
-        - ``tb.on_treatment`` is ``True`` for ``TREATMENT``.
-        - ``tb.ti_infected`` is set to ``-np.inf`` for all imports, so imported
-          cases are not classified as model-generated incident infections.
-        - ``tb.rr_reinfection`` is reset to 1.0, then overridden with
-          ``tb.pars.rr_reinfection_cleared`` for ``CLEARED`` imports.
-        - ``tb.ti_rr_reinfection_wane`` is set to ``np.inf``.
-        - ``tb.rel_sus`` is 1.0 for non-cleared imports, mirroring
-          ``rr_reinfection`` for ``CLEARED`` imports.
-        - ``tb.rel_trans`` is 1.0 by default, ``tb.pars.trans_asymp`` for
-          ``ASYMPTOMATIC``, ``tb.pars.trans_acute`` for ``ACUTE`` (only when
-          the disease module is ``TBAcute``), and 0.0 for ``DEAD``.
-
-        Raises:
-            ValueError: If ``tb_state_distribution`` assigns positive mass to
-                ``ACUTE`` (i.e., ``ACUTE`` survives zero-weight pruning in the
-                validator) while the active disease module is a base ``TB``,
-                not ``TBAcute``.
+        Uses ``TBS.non_infected_states()`` and ``TBS.susceptible_states()`` like
+        ``TB``. Sets ``ti_infected`` to ``-inf`` for all imports.
 
         Args:
-            new_uids (array-like): UIDs of agents just appended to the population.
+            new_uids (array-like): UIDs of agents just added to the population.
 
         Returns:
-            sampled (np.ndarray): Integer ``TBS`` codes assigned to each UID,
-                aligned with ``new_uids``.
+            entry_states (ndarray): Sampled ``TBS`` integer codes.
         """
         tb = self.sim.diseases[self._tb_name]
-        state_vals = np.asarray(self._dist_tbstate.pars.a).astype(int)
-        if int(TBS.ACUTE) in set(map(int, state_vals)) and not isinstance(tb, TBAcute):
-            raise ValueError('tb_state_distribution includes ACUTE but TB module is not TBAcute')
+        entry_state_codes = np.asarray(self._dist_tbstate.pars.a, dtype=int)
+        if TBS.ACUTE in entry_state_codes and not isinstance(tb, TBAcute):
+            raise ValueError(f'tb_state_distribution includes {TBS.ACUTE.name} but TB module is not TBAcute')
 
-        sampled = self._dist_tbstate.rvs(len(new_uids)).astype(int)
-        tb.state[new_uids] = sampled
-        non_infected_states = np.array([int(TBS.SUSCEPTIBLE), int(TBS.CLEARED), int(TBS.DEAD)])
-        is_inf = ~np.isin(sampled, non_infected_states)
-        tb.infected[new_uids] = is_inf
-        tb.susceptible[new_uids] = np.isin(sampled, [int(TBS.SUSCEPTIBLE), int(TBS.CLEARED)])
-        tb.ever_infected[new_uids] = sampled != int(TBS.SUSCEPTIBLE)
-        tb.on_treatment[new_uids] = sampled == int(TBS.TREATMENT)
+        entry_states = self._dist_tbstate.rvs(len(new_uids)).astype(int)
+        tb.state[new_uids] = entry_states
+        tb.infected[new_uids] = ~np.isin(entry_states, TBS.non_infected_states())
+        tb.susceptible[new_uids] = np.isin(entry_states, TBS.susceptible_states())
+        tb.ever_infected[new_uids] = entry_states != TBS.SUSCEPTIBLE
+        tb.on_treatment[new_uids] = entry_states == TBS.TREATMENT
         tb.ti_infected[new_uids] = -np.inf
         tb.rr_reinfection[new_uids] = 1.0
         tb.ti_rr_reinfection_wane[new_uids] = np.inf
-        cleared = sampled == int(TBS.CLEARED)
-        if np.any(cleared):
-            tb.rr_reinfection[new_uids[cleared]] = float(tb.pars.rr_reinfection_cleared)
+        is_cleared = entry_states == TBS.CLEARED
+        if np.any(is_cleared):
+            tb.rr_reinfection[new_uids[is_cleared]] = float(tb.pars.rr_reinfection_cleared)
         tb.rel_sus[new_uids] = 1.0
-        tb.rel_sus[new_uids[cleared]] = tb.rr_reinfection[new_uids[cleared]]
+        tb.rel_sus[new_uids[is_cleared]] = tb.rr_reinfection[new_uids[is_cleared]]
         tb.rel_trans[new_uids] = 1.0
-        tb.rel_trans[new_uids[sampled == int(TBS.ASYMPTOMATIC)]] = float(tb.pars.trans_asymp)
+        tb.rel_trans[new_uids[entry_states == TBS.ASYMPTOMATIC]] = float(tb.pars.trans_asymp)
         if isinstance(tb, TBAcute):
-            tb.rel_trans[new_uids[sampled == int(TBS.ACUTE)]] = float(tb.pars.trans_acute)
-        tb.rel_trans[new_uids[sampled == int(TBS.DEAD)]] = 0.0
-        return sampled
+            tb.rel_trans[new_uids[entry_states == TBS.ACUTE]] = float(tb.pars.trans_acute)
+        return entry_states
 
     def step(self):
-        """
-        Execute one immigration event cycle for the current timestep.
+        """Add immigrants for the current timestep.
 
-        Sequence:
-
-        1. Draw arrival count ``N_t = self._dist_n.rvs(1)[0]``.
-        2. If ``N_t == 0``, reset ``self.n_immigrants`` and return ``[]``.
-        3. Sample arrival characteristics (ages) via
-           ``_get_immigrant_characteristics``.
-        4. Grow the population (``self.sim.people.grow(N_t)``) and write ages.
-        5. Seed TB states for the new UIDs via ``_init_tb_states`` and record
-           the sampled codes in ``immigration_tb_status``.
-        6. Assign new agents to households (and household edges, if available)
-           via ``assign_immigrants_to_households``.
-        7. Mark ``is_immigrant``, ``immigration_time`` (current step index),
-           and ``age_at_immigration``.
-        8. Cache ``self.n_immigrants`` for ``update_results``.
+        Draws ``N ~ Poisson(λ)``, grows the population, seeds TB and household
+        state, and flags audit fields on new agents.
 
         Returns:
-            new_uids: UIDs of newly added agents, or ``[]`` if ``N_t == 0``.
+            new_uids (list): UIDs of agents added this step, or ``[]`` if ``N=0``.
         """
-        n_immigrants = int(self._dist_n.rvs(1)[0])
-        if n_immigrants == 0:
+        n_arrivals = int(self._dist_n.rvs(1)[0])
+        if n_arrivals == 0:
             self.n_immigrants = 0
             return []
-        characteristics = self._get_immigrant_characteristics(n_immigrants)
-        new_uids = self.sim.people.grow(n_immigrants)
-        self.sim.people.age[new_uids] = characteristics['ages']
+        arrival_ages = self._sample_ages(n_arrivals)
+        new_uids = self.sim.people.grow(n_arrivals)
+        self.sim.people.age[new_uids] = arrival_ages
         self.immigration_tb_status[new_uids] = self._init_tb_states(new_uids)
         self.assign_immigrants_to_households(new_uids)
         self.is_immigrant[new_uids] = True
         self.immigration_time[new_uids] = float(self.ti)
         self.age_at_immigration[new_uids] = self.sim.people.age[new_uids]
-        self.n_immigrants = n_immigrants
+        self.n_immigrants = n_arrivals
         return new_uids
 
     def assign_immigrants_to_households(self, new_uids):
-        """
-        Assign new arrivals to households and insert household edges.
+        """Assign household IDs and append missing household-network edges.
 
-        Searches ``self.sim.networks`` for the first network exposing a
-        household-ID attribute. Attribute lookup is order-sensitive: ``hhid``
-        (legacy convention) is checked before ``household_ids`` (current
-        Starsim ``HouseholdNet``); the first match wins.
-
-        Then:
-
-        - If at least one valid (finite and ``>= 0``) household ID exists in
-          that array, each immigrant is assigned uniformly at random from the
-          set of distinct existing IDs using ``_dist_hhu`` (a single
-          ``Uniform(0,1)`` draw per immigrant, mapped to a household index via
-          ``floor(u * n_hh)``).
-        - If no valid IDs exist, the ``N_t`` immigrants are assigned the
-          batch-local IDs ``0..N_t-1`` (one singleton household each); no
-          attempt is made to avoid collisions with IDs that may appear in
-          subsequent timesteps.
-
-        The assigned IDs are written both to the network's household array and
-        to the module-local ``self.hhid``. Finally,
-        ``_connect_immigrants_to_households`` is called to append undirected
-        household-network edges between each newcomer and all other members of
-        the same household after assignment (including other newcomers assigned
-        to that household), only for pairs not already present in ``hh_net.edges``.
-
-        If no compatible household network is found, this method is a no-op.
+        Looks for ``hhid`` or ``household_ids`` on the first compatible network.
+        Assignment pools only households with at least one alive, non-``TBS.DEAD``
+        member. If none exist, each arrival gets a singleton household ID.
 
         Args:
-            new_uids (array-like): UIDs of the agents to assign.
+            new_uids (array-like): UIDs of agents just added to the population.
         """
-        hh_net = None
-        hh_attr = None
+        household_net = None
+        household_id_attr = None
         for net in self.sim.networks.values():
             for attr in ['hhid', 'household_ids']:
-                hh_arr = getattr(net, attr, None)
-                if isinstance(hh_arr, (np.ndarray, ss.BaseArr)):
-                    hh_net = net
-                    hh_attr = attr
+                household_ids = getattr(net, attr, None)
+                if isinstance(household_ids, (np.ndarray, ss.BaseArr)):
+                    household_net = net
+                    household_id_attr = attr
                     break
-            if hh_net is not None:
+            if household_net is not None:
                 break
-        if hh_net is None:
+        if household_net is None:
             return
-        hh_arr = getattr(hh_net, hh_attr)
-        hh_vals = np.asarray(hh_arr, dtype=float)
-        valid = np.isfinite(hh_vals) & (hh_vals >= 0)
-        existing_hhids = np.unique(hh_vals[valid]).astype(int)
-        if len(existing_hhids):
-            u = self._dist_hhu.rvs(len(new_uids))
-            idx = np.floor(u * len(existing_hhids)).astype(int)
-            idx = np.clip(idx, 0, len(existing_hhids) - 1)
-            assigned_hhids = existing_hhids[idx]
+
+        household_ids = getattr(household_net, household_id_attr)
+        tb = self.sim.diseases[self._tb_name]
+        household_ids_arr = np.asarray(household_ids, dtype=float)
+        has_household_id = np.isfinite(household_ids_arr) & (household_ids_arr >= 0)
+        is_active = np.asarray(self.sim.people.alive) & (np.asarray(tb.state) != TBS.DEAD)
+        occupied_household_ids = np.unique(household_ids_arr[has_household_id & is_active]).astype(int)
+
+        if len(occupied_household_ids):
+            household_draw = self._dist_hhu.rvs(len(new_uids))
+            household_idx = np.floor(household_draw * len(occupied_household_ids)).astype(int)
+            household_idx = np.clip(household_idx, 0, len(occupied_household_ids) - 1)
+            assigned_household_ids = occupied_household_ids[household_idx]
         else:
-            assigned_hhids = np.arange(len(new_uids), dtype=int)
-        hh_arr[new_uids] = assigned_hhids
-        self.hhid[new_uids] = assigned_hhids
-        self._connect_immigrants_to_households(hh_net=hh_net, hh_arr=hh_arr, new_uids=new_uids, assigned_hhids=assigned_hhids)
+            assigned_household_ids = np.arange(len(new_uids), dtype=int)
+
+        household_ids[new_uids] = assigned_household_ids
+        self.hhid[new_uids] = assigned_household_ids
+        self._connect_immigrants_to_households(
+            household_net=household_net,
+            household_ids=household_ids,
+            new_uids=new_uids,
+            assigned_household_ids=assigned_household_ids,
+        )
         return
 
     @staticmethod
     def _has_edge_struct(net):
-        """Return True if ``net`` exposes ``edges.p1`` and ``edges.p2`` arrays."""
+        """Return whether ``net`` exposes ``edges.p1`` and ``edges.p2``."""
         edges = getattr(net, 'edges', None)
         return bool(edges is not None and hasattr(edges, 'p1') and hasattr(edges, 'p2'))
 
-    def _connect_immigrants_to_households(self, hh_net, hh_arr, new_uids, assigned_hhids):
-        """
-        Append household-network edges for newly assigned immigrants.
-
-        For each household ID assigned to any newcomer, retrieves the household
-        membership after assignment (UID-safe via ``(hh_arr == hhid).uids``
-        when ``hh_arr`` is an ``ss.BaseArr``, otherwise positional
-        ``np.where``), and generates undirected ``(min(u,v), max(u,v))`` pairs
-        between each newcomer and every other member of the same household.
-        This includes newcomer-newcomer pairs when multiple immigrants are
-        assigned to the same household. Pairs that are already present in
-        ``hh_net.edges`` are skipped, and within-batch deduplication is done
-        via a ``set``. New edges are appended with ``beta=1.0``.
-
-        No-op if ``hh_net`` does not expose ``edges.p1``/``edges.p2`` (as
-        checked by ``_has_edge_struct``); callers must also ensure the network
-        supports ``hh_net.append(p1=..., p2=..., beta=...)`` for the new edges
-        to be persisted.
-
-        Complexity per household with ``k`` members and ``n_new`` newcomers is
-        ``O(k * n_new)`` before deduplication.
-        """
-        if not self._has_edge_struct(hh_net):
+    def _connect_immigrants_to_households(self, household_net, household_ids, new_uids, assigned_household_ids):
+        """Append undirected edges between newcomers and active household members."""
+        if not self._has_edge_struct(household_net):
             return
-        hh_vals = np.asarray(hh_arr, dtype=float)
-        p1_existing = np.asarray(hh_net.edges.p1, dtype=int)
-        p2_existing = np.asarray(hh_net.edges.p2, dtype=int)
-        existing_pairs = {(int(min(a, b)), int(max(a, b))) for a, b in zip(p1_existing, p2_existing) if a != b}
-        assigned_hhids = np.asarray(assigned_hhids, dtype=int)
-        pairs = set()
-        for hhid in np.unique(assigned_hhids):
-            if isinstance(hh_arr, ss.BaseArr):
-                members = np.asarray((hh_arr == hhid).uids, dtype=int)
+        tb = self.sim.diseases[self._tb_name]
+        household_ids_arr = np.asarray(household_ids, dtype=float)
+        edge_p1 = np.asarray(household_net.edges.p1, dtype=int)
+        edge_p2 = np.asarray(household_net.edges.p2, dtype=int)
+        existing_edge_pairs = {(int(min(a, b)), int(max(a, b))) for a, b in zip(edge_p1, edge_p2) if a != b}
+        assigned_household_ids = np.asarray(assigned_household_ids, dtype=int)
+        new_edge_pairs = set()
+        for household_id in np.unique(assigned_household_ids):
+            if isinstance(household_ids, ss.BaseArr):
+                member_uids = np.asarray((household_ids == household_id).uids, dtype=int)
             else:
-                members = np.where(hh_vals == hhid)[0].astype(int)
-            if len(members) < 2:
+                member_uids = np.where(household_ids_arr == household_id)[0].astype(int)
+            is_active_member = np.asarray(self.sim.people.alive[member_uids]) & (tb.state[member_uids] != TBS.DEAD)
+            member_uids = member_uids[is_active_member]
+            if len(member_uids) < 2:
                 continue
-            newcomers = np.asarray(new_uids[assigned_hhids == hhid], dtype=int)
-            for u in newcomers:
-                for v in members:
-                    if u == v:
+            immigrant_uids = np.asarray(new_uids[assigned_household_ids == household_id], dtype=int)
+            for immigrant_uid in immigrant_uids:
+                for member_uid in member_uids:
+                    if immigrant_uid == member_uid:
                         continue
-                    a, b = (u, v) if u < v else (v, u)
-                    if (a, b) not in existing_pairs:
-                        pairs.add((a, b))
-        if len(pairs):
-            p1 = np.fromiter((a for a, _ in sorted(pairs)), dtype=int)
-            p2 = np.fromiter((b for _, b in sorted(pairs)), dtype=int)
-            hh_net.append(p1=ss.uids(p1), p2=ss.uids(p2), beta=np.ones(len(p1), dtype=float))
+                    uid_lo, uid_hi = (immigrant_uid, member_uid) if immigrant_uid < member_uid else (member_uid, immigrant_uid)
+                    if (uid_lo, uid_hi) not in existing_edge_pairs:
+                        new_edge_pairs.add((uid_lo, uid_hi))
+        if len(new_edge_pairs):
+            new_p1 = np.fromiter((lo for lo, _ in sorted(new_edge_pairs)), dtype=int)
+            new_p2 = np.fromiter((hi for _, hi in sorted(new_edge_pairs)), dtype=int)
+            household_net.append(p1=ss.uids(new_p1), p2=ss.uids(new_p2), beta=np.ones(len(new_p1), dtype=float))
         return
 
     def update_results(self):
-        """
-        Write the current-timestep arrival count to ``results.n_immigrants``.
-
-        Silent no-op if ``self.results`` has not yet been initialized as an
-        ``ss.Results`` instance (e.g., when the module is constructed but the
-        sim hasn't been run).
-        """
+        """Write ``results.n_immigrants[self.ti]`` from the last ``step()``."""
         super().update_results()
         if isinstance(getattr(self, 'results', None), ss.Results):
             self.results['n_immigrants'][self.ti] = int(self.n_immigrants)
@@ -564,38 +360,29 @@ class Immigration(ss.Demographics):
 
     @staticmethod
     def _validate_tb_state_distribution(tb_state_distribution):
-        """
-        Validate ``tb_state_distribution`` and normalize it to a probability simplex.
+        """Validate and normalize ``tb_state_distribution`` to ``TBS`` weights.
 
-        Drops zero-weight entries, then enforces:
+        Args:
+            tb_state_distribution (dict): ``{TBS name: weight}``; zero weights dropped.
 
-        - non-empty mapping after dropping zeros,
-        - every key is a valid ``TBS`` member name,
-        - finite, non-negative weights,
-        - strictly positive total mass.
-
-        If the total exceeds 1, a warning is emitted but normalization
-        proceeds. Returns a new dict ``{name: w / total}`` with weights
-        summing to 1.
-
-        Raises:
-            ValueError: empty, all-zero, non-finite, or negative weights.
-            KeyError: unknown ``TBS`` state name.
+        Returns:
+            weights_by_state (dict): Normalized weights summing to 1.
         """
         if not tb_state_distribution:
             raise ValueError('tb_state_distribution must be provided')
-        dist = {k: float(v) for k, v in dict(tb_state_distribution).items() if v}
-        for k, v in dist.items():
-            if k not in TBS.__members__:
-                raise KeyError(f'Unknown TB state "{k}" in tb_state_distribution')
-            if not np.isfinite(v):
-                raise ValueError(f'tb_state_distribution["{k}"] must be finite ({v})')
-            if v < 0:
-                raise ValueError(f'tb_state_distribution["{k}"] is negative ({v})')
-        total = sum(dist.values())
-        if total <= 0:
+        weights_by_state = {k: float(v) for k, v in dict(tb_state_distribution).items() if v}
+        if TBS.DEAD.name in weights_by_state:
+            raise ValueError(f'tb_state_distribution cannot include {TBS.DEAD.name}; immigrants must enter alive')
+        for state_name, weight in weights_by_state.items():
+            if state_name not in TBS._member_names_:
+                raise KeyError(f'Unknown TB state "{state_name}" in tb_state_distribution (expected a {TBS.__name__} name)')
+            if not np.isfinite(weight):
+                raise ValueError(f'tb_state_distribution["{state_name}"] must be finite ({weight})')
+            if weight < 0:
+                raise ValueError(f'tb_state_distribution["{state_name}"] is negative ({weight})')
+        weight_sum = sum(weights_by_state.values())
+        if weight_sum <= 0:
             raise ValueError('tb_state_distribution must include at least one positive probability')
-        if total > 1.0:
-            warnings.warn(f'tb_state_distribution sums to {total:.6g} (>1); normalizing automatically')
-        return {k: v / total for k, v in dist.items()}
-
+        if weight_sum > 1.0:
+            warnings.warn(f'tb_state_distribution sums to {weight_sum:.6g} (>1); normalizing automatically')
+        return {k: v / weight_sum for k, v in weights_by_state.items()}
