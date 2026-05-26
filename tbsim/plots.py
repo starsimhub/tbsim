@@ -64,7 +64,9 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
     n_rows, n_cols  = sc.getrowscols(len(metrics), ncols=n_cols)
 
     with ss.style(style):
-        fig, axs = plt.subplots(n_rows, n_cols, figsize=(4.0 * n_cols, row_height * n_rows + 1))
+        # Reserve vertical space for the figure title (always expected).
+        fig_title_top = 0.90
+        fig, axs = plt.subplots(n_rows, n_cols, figsize=(4.0 * n_cols, row_height * n_rows + 0.5))
         axs = np.array(axs).flatten()
 
         all_x_min = all_x_max = None
@@ -89,6 +91,7 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
         for i, metric in enumerate(metrics):
             ax = axs[i]
             metric_label = metric
+            metric_x = None
             for flat in flat_results.values():
                 result = flat.get(metric)
                 if result is not None:
@@ -102,14 +105,17 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
                 x, y = _as_1d_xy(flat.get(metric))
                 if x is None:
                     continue
+                if metric_x is None:
+                    metric_x = x
                 line, = ax.plot(x, y, lw=1.2, label=scen, color=_cm(j), alpha=0.85, zorder=10 if j == 0 else 5)
                 if scen not in seen:
                     all_handles.append(line)
                     all_labels.append(scen)
                     seen.add(scen)
 
-            ax.set_title(metric_label, fontsize=12, fontweight='light')
-            ax.set_xlabel('Time', fontsize=7)
+            ax.set_title(metric_label, fontsize=10, fontweight='normal')
+            is_bottom = i // n_cols == n_rows - 1
+            _format_x_axis(ax, metric_x, show_xlabel=is_bottom)
             ax.tick_params(axis='both', labelsize=6)
             ax.grid(True, color='gray', alpha=0.25, linestyle='--', linewidth=0.2)
             if all_x_min is not None and all_x_max is not None:
@@ -119,14 +125,17 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
             fig.delaxes(ax)
 
         if all_handles:
-            leg = fig.legend(all_handles, all_labels, loc='upper left', fontsize=8, frameon=True, fancybox=True)
-            leg.get_frame().set_alpha(0.9)
+            fig.legend(
+                all_handles,
+                all_labels,
+                loc='upper right',
+                ncol=2,
+                fontsize=10,
+            )
 
+        plt.tight_layout(pad=1.2, rect=[0, 0, 1, fig_title_top])
         if title:
-            fig.suptitle(title, fontsize=13)
-
-        plt.tight_layout(pad=2.0)
-
+            fig.suptitle(title, fontsize=16, x=0.02, ha='left', y=0.97)
         if filename:
             filepath = sc.makefilepath(filename, makedirs=True)
             sc.savefig(filepath, fig=fig)
@@ -135,6 +144,55 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
             plt.show()
 
     return fig
+
+
+def _format_x_axis(ax, x, show_xlabel=True, max_ticks=4):
+    """Use a small number of readable x ticks, especially for date-like axes."""
+    ax.set_xlabel('Time' if show_xlabel else '', fontsize=7)
+    if x is None:
+        return
+
+    x = np.asarray(x).ravel()
+    if len(x) == 0:
+        return
+
+    n_ticks = min(max_ticks, len(x))
+    tick_idx = np.unique(np.linspace(0, len(x) - 1, n_ticks, dtype=int))
+    ticks = x[tick_idx]
+    if _is_date_like(ticks):
+        labels = [_date_label(t) for t in ticks]
+        if len(set(labels)) < len(labels):
+            labels = [_date_label(t, include_month=True) for t in ticks]
+        ax.set_xticks(ticks)
+        ax.set_xticklabels(labels, rotation=0, ha='center')
+    else:
+        ax.set_xticks(ticks)
+
+    ax.tick_params(axis='x', labelsize=6)
+    return
+
+
+def _is_date_like(x):
+    """Return whether an array contains Starsim/Python/date-like objects."""
+    arr = np.asarray(x).ravel()
+    if arr.size == 0:
+        return False
+    if np.issubdtype(arr.dtype, np.datetime64):
+        return True
+    sample = arr[0]
+    return all(hasattr(sample, attr) for attr in ('year', 'month', 'day'))
+
+
+def _date_label(x, include_month=False):
+    """Format Starsim/Python/date-like objects compactly for small subplots."""
+    if isinstance(x, np.datetime64):
+        x = str(x)
+        return x[:7] if include_month else x[:4]
+    year = getattr(x, 'year', None)
+    month = getattr(x, 'month', None)
+    if year is None:
+        return str(x)
+    return f'{year}-{int(month):02d}' if include_month and month is not None else f'{year}'
 
 
 def _rename_results(flat):
