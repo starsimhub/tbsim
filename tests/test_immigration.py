@@ -26,19 +26,23 @@ def make_household_dhs_data(n_agents=300, rand_seed=2):
     return sc.dataframe(hh_id=hh_id, ages=ages)
 
 
-def make_imm(rate=200, **pars):
+def make_imm(rate=200, dt=None, **pars):
     """Build an Immigration module with compact defaults."""
-    return tbsim.Immigration(pars=dict(
-        immigration_rate=ss.freqperyear(rate),
-        tb_state_distribution=pars.pop('tb_state_distribution', dict(SUSCEPTIBLE=0.9, INFECTION=0.08, ASYMPTOMATIC=0.02)),
-        **pars,
-    ))
+    kw = dict(
+        pars=dict(
+            immigration_rate=ss.freqperyear(rate),
+            tb_state_distribution=pars.pop('tb_state_distribution', dict(SUSCEPTIBLE=0.9, INFECTION=0.08, ASYMPTOMATIC=0.02)),
+            **pars,
+        ),
+    )
+    if dt is not None:
+        kw['dt'] = dt
+    return tbsim.Immigration(**kw)
 
 
 def make_sim(
     n_agents=300,
     immigration_rate=200,
-    rel_immigration=1.0,
     age_distribution=None,
     age_data=None,
     tb_state_distribution=None,
@@ -49,17 +53,23 @@ def make_sim(
     interventions=None,
     start=None,
     stop=None,
+    sim_dt=None,
+    disease_dt=None,
+    immigration_dt=None,
 ):
     """Create a small TB simulation with immigration enabled."""
     tb_pars = dict(init_prev=ss.bernoulli(0.02), beta=ss.peryear(beta))
-    tb = tbsim.TBAcute(pars=tb_pars) if use_acute else tbsim.TB(pars=tb_pars)
+    tb_kw = dict(pars=tb_pars)
+    if disease_dt is not None:
+        tb_kw['dt'] = disease_dt
+    tb = tbsim.TBAcute(**tb_kw) if use_acute else tbsim.TB(**tb_kw)
     if demographics is None:
-        imm_kw = dict(rel_immigration=rel_immigration, tb_state_distribution=tb_state_distribution)
+        imm_kw = dict(tb_state_distribution=tb_state_distribution)
         if age_distribution is not None:
             imm_kw['age_distribution'] = age_distribution
         if age_data is not None:
             imm_kw['age_data'] = age_data
-        demographics = [make_imm(immigration_rate, **{k: v for k, v in imm_kw.items() if v is not None})]
+        demographics = [make_imm(immigration_rate, dt=immigration_dt, **{k: v for k, v in imm_kw.items() if v is not None})]
     networks = [ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=4), dur=0))]
     if use_households:
         dhs_data = make_household_dhs_data(n_agents=n_agents, rand_seed=2)
@@ -69,7 +79,7 @@ def make_sim(
         n_agents=n_agents,
         start=start or ss.date('2000-01-01'),
         stop=stop or ss.date('2002-01-01'),
-        dt=ss.days(30),
+        dt=sim_dt or ss.days(30),
         rand_seed=2,
         verbose=0,
         diseases=tb,
@@ -302,6 +312,59 @@ def test_immigration_arrivals_match_rate():
     )
 
 
+@pytest.mark.parametrize(
+    'sim_dt,disease_dt,imm_dt',
+    [
+        (ss.days(30), None, None),
+        (ss.days(7), None, None),
+        (ss.days(14), ss.days(7), ss.days(30)),
+        (ss.days(30), ss.days(7), ss.days(30)),
+        (ss.days(14), ss.days(14), ss.days(7)),
+    ],
+    ids=['sim30_inherit', 'sim7_inherit', 'sim14_tb7_imm30', 'sim30_tb7_imm30', 'sim14_tb14_imm7'],
+)
+def test_immigration_runs_with_module_dts(sim_dt, disease_dt, imm_dt):
+    """Immigration uses each module's dt and runs under mixed sim/disease/immigration timesteps."""
+    rate = 120.0
+    start = ss.date('2000-01-01')
+    stop = ss.date('2004-01-01')
+    sim = make_sim(
+        n_agents=80,
+        immigration_rate=rate,
+        beta=0.0,
+        start=start,
+        stop=stop,
+        sim_dt=sim_dt,
+        disease_dt=disease_dt,
+        immigration_dt=imm_dt,
+    )
+    sim.run()
+
+    tb = tbsim.get_tb(sim)
+    imm = get_imm(sim)
+    want_tb_dt = disease_dt or sim_dt
+    want_imm_dt = imm_dt or sim_dt
+
+    assert tb.t.dt == want_tb_dt, f'Expected TB dt {want_tb_dt}, got {tb.t.dt}'
+    assert imm.t.dt == want_imm_dt, f'Expected Immigration dt {want_imm_dt}, got {imm.t.dt}'
+    assert sim.t.dt == sim_dt, f'Expected sim dt {sim_dt}, got {sim.t.dt}'
+
+    want_lam = float(ss.freqperyear(rate).to_events(imm.t.dt))
+    got_lam = imm.expected_immigrants_per_timestep()
+    assert abs(got_lam - want_lam) < 1e-12, (
+        f'Expected lam={want_lam} from rate.to_events(imm.t.dt), got {got_lam}'
+    )
+
+    total_imm = int(np.sum(imm.results.n_immigrants[:]))
+    n_years = float(stop - start)
+    expected = rate * n_years
+    tol = poisson_count_tolerance(expected)
+    assert total_imm > 0, 'Expected immigrants when mixing module timesteps'
+    assert abs(total_imm - expected) <= tol, (
+        f'Expected ~{expected:.0f} immigrants over {n_years:.0f} yr within ±{tol:.0f}, got {total_imm}'
+    )
+
+
 @pytest.mark.parametrize('age_spec,spec_type', [
     ({0: 0.50, 15: 0.30, 30: 0.20}, 'dict'),
     (pd.DataFrame({'age': [0, 15, 30], 'value': [0.50, 0.30, 0.20]}), 'age_data'),
@@ -441,6 +504,42 @@ def test_immigration_rejects_invalid_tb_state_distribution():
         tbsim.Immigration(pars=dict(tb_state_distribution=dict(SUSCEPTIBLE=-0.1)))
     with pytest.raises(ValueError, match='finite'):
         tbsim.Immigration(pars=dict(tb_state_distribution=dict(SUSCEPTIBLE=np.nan)))
+    with pytest.raises(ValueError, match='DEAD'):
+        tbsim.Immigration(pars=dict(tb_state_distribution=dict(SUSCEPTIBLE=0.5, DEAD=0.5)))
+
+
+def test_immigrants_are_alive_not_tb_dead():
+    """Imported agents are never TB DEAD at entry."""
+    sim = make_sim(n_agents=200, immigration_rate=400)
+    sim.run()
+    tb = tbsim.get_tb(sim)
+    immigrant_uids = get_imm(sim).is_immigrant.uids
+    assert len(immigrant_uids) > 0
+    assert np.all(tb.state[immigrant_uids] != tbsim.TBS.DEAD)
+    assert np.all(np.asarray(sim.people.alive[immigrant_uids], dtype=bool))
+
+
+def test_immigrant_household_edges_skip_dead_members():
+    """Household edges from immigration only connect immigrants to alive, non-TB-dead members."""
+    imm = make_imm(600)
+    sim = make_sim(
+        n_agents=200,
+        immigration_rate=600,
+        use_households=True,
+        demographics=[ss.Births(), ss.Deaths(pars=dict(death_rate=ss.peryear(0.08))), imm],
+    )
+    sim.run()
+    immigrant_uids = set(map(int, get_imm(sim).is_immigrant.uids))
+    assert len(immigrant_uids) > 0
+    hh = sim.networks.householdnet
+    tb = tbsim.get_tb(sim)
+    p1 = np.asarray(hh.edges.p1, dtype=int)
+    p2 = np.asarray(hh.edges.p2, dtype=int)
+    for a, b in zip(p1, p2):
+        if int(a) in immigrant_uids or int(b) in immigrant_uids:
+            for uid in (a, b):
+                assert bool(sim.people.alive[uid]), f'Immigrant edge ({a}, {b}) includes dead agent {uid}'
+                assert int(tb.state[uid]) != int(tbsim.TBS.DEAD), f'Immigrant edge ({a}, {b}) includes TB-dead agent {uid}'
 
 
 def test_immigration_rejects_invalid_age_distribution():
