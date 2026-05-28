@@ -8,8 +8,6 @@ import starsim as ss
 import tbsim
 import pytest
 
-sc.options(interactive=False)
-
 
 def make_sim(n_agents=1000, interventions=None, **kwargs):
     """Create and return a tbsim.Sim with HSB and optional interventions."""
@@ -48,5 +46,4 @@ def test_householdstats():
 
 
 if __name__ == '__main__':
-    sc.options(interactive=True)
     pytest.main(["-x", "-v", __file__])
