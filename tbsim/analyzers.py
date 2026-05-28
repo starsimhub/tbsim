@@ -724,7 +724,7 @@ class HouseholdStats(ss.Analyzer):
         return fig1, fig2, fig3
 
     @classmethod
-    def from_reps(cls, reps):
+    def from_multisim(cls, msim, name=None):
         """Return an averaged HouseholdStats by combining results across replicates.
 
         Averages time-series results and age-mixing matrices in-place on the first rep,
@@ -732,12 +732,15 @@ class HouseholdStats(ss.Analyzer):
         creates a separate copy of the sim (and its analyzers) for each replicate.
 
         Args:
-            reps (list): HouseholdStats instances from completed replicate sims.
 
         Returns:
-            The first rep, modified in-place with averaged/pooled values.
+            An object with the same structure as HousehouldStats, but with averaged/pooled values.
         """
-        az = reps[0]
+        if name is None:
+            name = cls.__name__.lower()
+        reps = [sim.analyzers[name] for sim in msim.sims]
+        az = sc.objdict()
+        az.results = sc.dcp(reps[0].results) # Copy dict structure
 
         # Average time-series results in-place (skip timevec — it holds dates, not values)
         for key in az.results.keys():
@@ -748,21 +751,22 @@ class HouseholdStats(ss.Analyzer):
         # Pool per-timestep household-size histograms across all reps
         az.hh_size_hists = [
             np.concatenate([rep.hh_size_hists[i] for rep in reps])
-            for i in range(len(az.hh_size_hists))
+            for i in range(len(reps[0].hh_size_hists))
         ]
 
-        # Average age-mixing matrices and population counts
-        def _avg(attr):
-            vals = [getattr(rep, attr) for rep in reps if getattr(rep, attr) is not None]
-            return np.mean(vals, axis=0) if vals else None
-
-        az.age_mixing_initial = _avg('age_mixing_initial')
-        az.age_mixing_final   = _avg('age_mixing_final')
-        az.age_counts_initial = _avg('age_counts_initial')
-        az.age_counts_final   = _avg('age_counts_final')
+        # Additional attributes that may not exist in all cases
+        attrs = ['age_mixing_initial', 'age_mixing_final', 'age_counts_initial', 'age_counts_final']
+        for attr in attrs:
+            try:
+                vals = [getattr(rep, attr) for rep in reps]
+                mean = np.mean(vals, axis=0)
+            except Exception as e:
+                print(f"Note: unable to calculate mean for {attr}, continuing... \n{e}")
+                mean = None
+            az[attr] = mean
 
         # Average matrix snapshots across all reps
-        all_years = set().union(*(rep.age_mixing_snapshots.keys() for rep in reps))
+        all_years = {y for rep in reps for y in rep.age_mixing_snapshots}
         az.age_mixing_snapshots = {}
         az.age_counts_snapshots = {}
         for yr in all_years:
@@ -776,16 +780,15 @@ class HouseholdStats(ss.Analyzer):
         return az
 
     @classmethod
-    def plot_from_multisim(cls, ms, name='householdstats', stop=None, **kwargs):
+    def plot_from_multisim(cls, msim, name=None, stop=None, **kwargs):
         """Plot averaged household statistics across all replicates in a MultiSim.
 
         Args:
-            ms: A starsim MultiSim whose sims each contain a HouseholdStats analyzer.
+            msim: A starsim MultiSim whose sims each contain a HouseholdStats analyzer.
             name (str): The analyzer's registered name (default 'householdstats').
             stop: Right x-axis limit for time-series panels (e.g. 2025).
         """
-        reps = [sim.analyzers[name] for sim in ms.sims]
-        az = cls.from_reps(reps)
+        az = cls.from_multisim(msim, name=name)
         return az.plot(stop=stop, **kwargs)
 
     def plot_stats(self, stop=None, **kwargs):
