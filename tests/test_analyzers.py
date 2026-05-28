@@ -24,6 +24,7 @@ def make_sim(n_agents=1000, interventions=None, **kwargs):
 def test_householdstats():
     """Test HouseholdStats: results, matrices, snapshots, and plots."""
     # Build sim with a HouseholdNet and the analyzer
+    np.random.seed(0)
     hh_ids = np.arange(50)
     ages = [sc.strjoin(np.random.randint(1, 70, np.random.randint(2, 6))) for _ in hh_ids]
     dhs = sc.dataframe(hh_id=hh_ids, ages=ages)

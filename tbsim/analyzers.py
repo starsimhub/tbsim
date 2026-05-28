@@ -667,19 +667,6 @@ class HouseholdStats(ss.Analyzer):
         mix = np.zeros((n_bins, n_bins), dtype=float)
         p1, p2 = net.edges.p1, net.edges.p2
         if len(p1) > 0:
-            alive_raw = ppl.alive.raw
-            p1_arr, p2_arr = np.asarray(p1), np.asarray(p2)
-            # Filter to alive-alive edges
-            alive_mask = alive_raw[p1_arr] & alive_raw[p2_arr]
-            p1_arr, p2_arr = p1_arr[alive_mask], p2_arr[alive_mask]
-            # Deduplicate: HouseholdNet.add_births() accumulates duplicate edges over time
-            if len(p1_arr) > 0:
-                pairs = np.stack([np.minimum(p1_arr, p2_arr), np.maximum(p1_arr, p2_arr)], axis=1)
-                _, unique_idx = np.unique(pairs, axis=0, return_index=True)
-                p1_arr, p2_arr = p1_arr[unique_idx], p2_arr[unique_idx]
-            p1 = ss.uids(p1_arr)
-            p2 = ss.uids(p2_arr)
-        if len(p1) > 0:
             bins_p1 = np.clip(np.digitize(ppl.age[p1], self.age_bins) - 1, 0, n_bins - 1)
             bins_p2 = np.clip(np.digitize(ppl.age[p2], self.age_bins) - 1, 0, n_bins - 1)
             np.add.at(mix, (bins_p1, bins_p2), 1)
