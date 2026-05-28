@@ -1,68 +1,52 @@
+"""
+Test TBsim analyzers
+"""
+
+import numpy as np
+import sciris as sc
+import starsim as ss
+import tbsim
 import pytest
-import pandas as pd
-from tbsim.analyzers import DwellTime
-import os
-from unittest.mock import patch
 
-@pytest.fixture
-def sample_data():
-    base_dir = os.path.dirname(__file__)
-    data_files = [
-        'data/HighDecliningLSHTM-01.csv',
-        # 'data/HighDecliningLSHTM-02.csv',
-        # 'data/LowFlatLSHTMAcute-01.csv',
-        'data/LowFlatLSHTMAcute-02.csv',
-        'data/LowFlatTBsim-01.csv',
-        # 'data/LowFlatTBsim-02.csv'
-    ]
-    dataframes = {
-        'LSHTM': [pd.read_csv(os.path.join(base_dir, file)) for file in data_files if 'HighDecliningLSHTM' in file],
-        'HTMAcute': [pd.read_csv(os.path.join(base_dir, file)) for file in data_files if 'LowFlatLSHTMAcute' in file],
-        'TBsim': [pd.read_csv(os.path.join(base_dir, file)) for file in data_files if 'LowFlatTBsim' in file]
-    }
-    return dataframes
+sc.options(interactive=False)
 
-@pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-@patch('matplotlib.pyplot.show')
-def test_histogram_with_kde(mock_show, sample_data, model_type):
-    for df in sample_data[model_type]:
-        dt = DwellTime(data=df)
-        dt.plot('histogram', subtitle="Test Histogram")
-        assert dt.data is not None
-        assert 'dwell_time' in dt.data.columns
 
-@pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-@patch('matplotlib.pyplot.show')
-def test_graph_state_transitions_curved(mock_show, sample_data, model_type):
-    for df in sample_data[model_type]:
-        dt = DwellTime(data=df)
-        dt.plot('network', states=['A', 'B'], subtitle="Test Curved Graph")
-        assert dt.data is not None
-        assert 'state_name' in dt.data.columns
+def make_sim(n_agents=1000, interventions=None, **kwargs):
+    """Create and return a tbsim.Sim with HSB and optional interventions."""
+    sim = tbsim.Sim(
+        n_agents=n_agents,
+        interventions=interventions,
+        sim_pars=dict(start='2000-01-01', stop='2005-12-31'),
+        tb_pars=dict(init_prev=0.30),
+        **kwargs
+    )
+    return sim
 
-@pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-@patch('matplotlib.pyplot.show')
-def test_plot_dwell_time_validation(mock_show, sample_data, model_type):
-    for df in sample_data[model_type]:
-        dt = DwellTime(data=df)
-        dt.plot('validation')
-        assert dt.data is not None
-        assert 'dwell_time' in dt.data.columns
 
-@pytest.mark.parametrize("model_type", ['LSHTM', 'HTMAcute', 'TBsim'])
-@patch('matplotlib.pyplot.show')
-def test_plot_kaplan_meier(mock_show, sample_data, model_type):
-    for df in sample_data[model_type]:
-        dt = DwellTime(data=df)
-        dt.plot('kaplan_meier', dwell_time_col='dwell_time')
-        assert dt.data is not None
-        assert 'dwell_time' in dt.data.columns
+def test_householdstats():
+    """Test HouseholdStats: results, matrices, snapshots, and plots."""
+    # Build sim with a HouseholdNet and the analyzer
+    hh_ids = np.arange(50)
+    ages = [sc.strjoin(np.random.randint(1, 70, np.random.randint(2, 6))) for _ in hh_ids]
+    dhs = sc.dataframe(hh_id=hh_ids, ages=ages)
+    net = ss.HouseholdNet(dhs_data=dhs, dynamic=False)
+    az = tbsim.HouseholdStats(save_at=['2001-01-01', '2004-01-01'])
+    sim = make_sim(analyzers=az, networks=net, copy_inputs=False)
+    sim.run()
 
-def test_plot_invalid_kind(sample_data):
-    df = sample_data['TBsim'][0]
-    dt = DwellTime(data=df)
-    with pytest.raises(ValueError, match="Unknown plot kind"):
-        dt.plot('nonexistent_kind')
+    # Documented results are present and sensible
+    n_bins = len(az.age_bins) - 1
+    assert (np.array(az.results['n_households']) > 0).all()
+    assert (np.array(az.results['max_hh_size']) >= np.array(az.results['mean_hh_size'])).all()
+    assert az.age_mixing_initial.shape == (n_bins, n_bins)
+    assert np.allclose(az.age_mixing_final, az.age_mixing_final.T)
+    assert az.age_mixing_snapshots and az.age_counts_snapshots
+
+    # Plot methods run
+    az.plot()
+    return
+
 
 if __name__ == '__main__':
-    pytest.main()
+    sc.options(interactive=True)
+    pytest.main(["-x", "-v", __file__])
