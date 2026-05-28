@@ -244,7 +244,7 @@ class TxDelivery(ss.Intervention):
 
         # Record treatment timing (convert dur from days to timesteps)
         dur_days = self.product.pars.dur_treatment.rvs(active)
-        dur_steps = dur_days / self.sim.t.dt.days
+        dur_steps = dur_days / self.dt.days
         self.ti_treatment_start[active] = self.ti
         self.ti_treatment_end[active] = self.ti + dur_steps
         self.n_times_treated[active] += 1
@@ -260,7 +260,7 @@ class TxDelivery(ss.Intervention):
         if len(relapse_uids):
             self.pending_relapse[relapse_uids] = True
             relapse_days = self.product.pars.dur_relapse.rvs(relapse_uids)
-            relapse_steps = relapse_days / self.sim.t.dt.days
+            relapse_steps = relapse_days / self.dt.days
             # Relapse clock starts when treatment ends (not when it began)
             self.ti_relapse[relapse_uids] = self.ti_treatment_end[relapse_uids] + relapse_steps
 
