@@ -739,8 +739,7 @@ class HouseholdStats(ss.Analyzer):
         if name is None:
             name = cls.__name__.lower()
         reps = [sim.analyzers[name] for sim in msim.sims]
-        az = sc.objdict()
-        az.results = sc.dcp(reps[0].results) # Copy dict structure
+        az = reps[0].copy()  # Create new object
 
         # Average time-series results in-place (skip timevec — it holds dates, not values)
         for key in az.results.keys():
@@ -754,7 +753,7 @@ class HouseholdStats(ss.Analyzer):
             for i in range(len(reps[0].hh_size_hists))
         ]
 
-        # Additional attributes that may not exist in all cases
+        # Additional attributes that may be None in some cases
         attrs = ['age_mixing_initial', 'age_mixing_final', 'age_counts_initial', 'age_counts_final']
         for attr in attrs:
             try:
@@ -763,7 +762,7 @@ class HouseholdStats(ss.Analyzer):
             except Exception as e:
                 print(f"Note: unable to calculate mean for {attr}, continuing... \n{e}")
                 mean = None
-            az[attr] = mean
+            setattr(az, attr, mean)
 
         # Average matrix snapshots across all reps
         all_years = {y for rep in reps for y in rep.age_mixing_snapshots}
