@@ -1,4 +1,12 @@
-# Direct copy of Alvaro Schwalb's ACF model, from:
+# Compartmental TB model (LSHTM ODE).
+#
+# State and parameter names are aligned with the agent-based tbsim.TB class.
+# CLEARED is split into three sub-states (CLEARED, RECOVERED, TREATED) so the
+# pathway-specific reinfection multiplier can be applied. Treatment dynamics
+# (theta, phi, delta) are off by default; enable explicitly to model a
+# post-treatment-era period.
+#
+# Originally adapted from Alvaro Schwalb's ACF model:
 # https://github.com/aschwalbc/ACF-VN/blob/main/scripts/02_fit.R#L64
 
 # Install dependencies if needed
@@ -11,70 +19,90 @@ if (!requireNamespace("ggplot2", quietly = TRUE)) {
 library(deSolve) # Solvers for ordinary differential equations
 library(ggplot2) # Plotting
 
-# Parameters
+# Parameters (aligned with tbsim.TB defaults; treatment off by default)
 parms = c(
-  beta = 9,        # Contact (per person/year) parameter
-  kappa = 0.75,     # Relative infectiousness
-  infcle = 1.83,    # Infected -> Cleared
-  infmin = 0.21,    # Infected -> Minimal
-  minrec = 0.16,    # Minimal -> Recovered
-  pi = 0.21,        # Protection from reinfection
-  minsub = 0.25,    # Minimal -> Subclinical
-  infsub = 0.07,    # Infected -> Subclinical
-  submin = 1.58,    # Subclinical -> Minimal
-  subcln = 0.77,    # Subclinical -> Clinical
-  clnsub = 0.53,    # Clinical -> Subclinical
-  mutb_ini = 0.3,   # TB mortality (Initial)
-  mutb_fin = 0.23,  # TB mortality (Final)
-  theta_ini = 0.44, # Diagnosis (Initial)
-  theta_fin = 0.9,  # Diagnosis (Final)
-  phi_ini = 0.69,   # Treatment failure (Initial)
-  phi_fin = 0.09,   # Treatment failure (Final)
-  rho = 3.25)       # Risk of reinfection
+  # Transmission
+  beta        = 9,    # Contact (per person/year). Different semantics than tbsim.TB beta.
+  trans_asymp = 0.82, # Relative infectiousness, ASYMPTOMATIC vs SYMPTOMATIC (formerly kappa)
+
+  # Reinfection multipliers on FOI for each cleared sub-state
+  rr_reinfection_cleared = 1.0,  # CLEARED   (cleared from latent INFECTION)
+  rr_reinfection_rec     = 0.21, # RECOVERED (recovered from NON_INFECTIOUS) — formerly pi
+  rr_reinfection_treat   = 3.15, # TREATED   (completed TREATMENT)            — formerly rho
+
+  # From INFECTION (latent)
+  inf_cle = 1.90, # INFECTION -> CLEARED
+  inf_non = 0.16, # INFECTION -> NON_INFECTIOUS
+  inf_asy = 0.06, # INFECTION -> ASYMPTOMATIC
+
+  # From NON_INFECTIOUS
+  non_rec = 0.18, # NON_INFECTIOUS -> RECOVERED
+  non_asy = 0.25, # NON_INFECTIOUS -> ASYMPTOMATIC
+
+  # From ASYMPTOMATIC
+  asy_non = 1.66, # ASYMPTOMATIC -> NON_INFECTIOUS
+  asy_sym = 0.88, # ASYMPTOMATIC -> SYMPTOMATIC
+
+  # From SYMPTOMATIC
+  sym_asy  = 0.54, # SYMPTOMATIC -> ASYMPTOMATIC
+  sym_dead = 0.34, # SYMPTOMATIC -> DEAD (constant)
+
+  # Treatment (off by default; set theta > 0 to enable)
+  theta = 0.0, # Diagnosis rate, SYMPTOMATIC -> TREATMENT
+  phi   = 0.0, # Treatment failure, TREATMENT -> SYMPTOMATIC
+  delta = 2)   # Treatment completion, TREATMENT -> TREATED (6-month duration)
 
 # Define the model
 ode <- function(parms, start_time = 1500, end_time = 2020) {
 
   # Static parameters
-  N <- 1e5 # Population size
-  mu <- 1/70 # Age expectancy adult
-  delta <- 2 # Treatment duration (6 months)
-
-  # Function parameters
-  forcer_mutb <- matrix(c(start_time, parms['mutb_ini'], 1999, parms['mutb_ini'], 2020, parms['mutb_fin']), ncol = 2, byrow = TRUE)
-  force_func_mutb <- approxfun(x = forcer_mutb[,1], y = forcer_mutb[,2], method = "linear", rule = 2)
-
-  forcer_theta <- matrix(c(start_time, parms['theta_ini'], 1999, parms['theta_ini'], 2020, parms['theta_fin']), ncol = 2, byrow = TRUE)
-  force_func_theta <- approxfun(x = forcer_theta[,1], y = forcer_theta[,2], method = "linear", rule = 2)
-
-  forcer_phi <- matrix(c(start_time, parms['phi_ini'], 1999, parms['phi_ini'], 2020, parms['phi_fin']), ncol = 2, byrow = TRUE)
-  force_func_phi <- approxfun(x = forcer_phi[,1], y = forcer_phi[,2], method = "linear", rule = 2)
+  N <- 1e5  # Population size (held constant)
+  mu <- 1/70 # Background mortality rate
 
   des <- function(time, state, parms) {
 
     with(as.list(c(state, parms)), {
 
-      dSUS = ((mu * N) + (force_func_mutb(time) * CLN)) - (((beta / N) * ((kappa * SUB) + CLN)) * SUS) - (mu * SUS)
-      dINF = (((beta / N) * ((kappa * SUB) + CLN)) * (SUS + CLE + (pi * REC) + (rho * TRE))) - (infcle * INF) - (infmin * INF) - (infsub * INF) - (mu * INF)
-      dCLE = (infcle * INF) - (((beta / N) * ((kappa * SUB) + CLN)) * CLE) - (mu * CLE)
-      dREC = (minrec * MIN) - (((beta / N) * ((kappa * SUB) + CLN)) * (pi * REC)) - (mu * REC)
-      dMIN = (infmin * INF) + (submin * SUB) - (minrec * MIN) - (minsub * MIN) - (mu * MIN)
-      dSUB = (infsub * INF) + (minsub * MIN) + (clnsub * CLN) - (submin * SUB) - (subcln * SUB) - (mu * SUB)
-      dCLN = (subcln * SUB) - (clnsub * CLN) - (force_func_theta(time) * CLN) + (force_func_phi(time) * TXT) - (force_func_mutb(time) * CLN) - (mu * CLN)
-      dTXT = (force_func_theta(time) * CLN) - (force_func_phi(time) * TXT) - (delta * TXT) - (mu * TXT)
-      dTRE = (delta * TXT) - (((beta / N) * ((kappa * SUB) + CLN)) * (rho * TRE)) - (mu * TRE)
+      foi <- (beta / N) * ((trans_asymp * ASYMPTOMATIC) + SYMPTOMATIC)
+
+      dSUSCEPTIBLE    <- (mu * N) + (sym_dead * SYMPTOMATIC) - (foi * SUSCEPTIBLE) - (mu * SUSCEPTIBLE)
+      dINFECTION      <- (foi * (SUSCEPTIBLE +
+                                 (rr_reinfection_cleared * CLEARED) +
+                                 (rr_reinfection_rec     * RECOVERED) +
+                                 (rr_reinfection_treat   * TREATED))) -
+                         ((inf_cle + inf_non + inf_asy + mu) * INFECTION)
+      dCLEARED        <- (inf_cle * INFECTION) - (foi * rr_reinfection_cleared * CLEARED) - (mu * CLEARED)
+      dRECOVERED      <- (non_rec * NON_INFECTIOUS) - (foi * rr_reinfection_rec * RECOVERED) - (mu * RECOVERED)
+      dNON_INFECTIOUS <- (inf_non * INFECTION) + (asy_non * ASYMPTOMATIC) -
+                         ((non_rec + non_asy + mu) * NON_INFECTIOUS)
+      dASYMPTOMATIC   <- (inf_asy * INFECTION) + (non_asy * NON_INFECTIOUS) + (sym_asy * SYMPTOMATIC) -
+                         ((asy_non + asy_sym + mu) * ASYMPTOMATIC)
+      dSYMPTOMATIC    <- (asy_sym * ASYMPTOMATIC) - (sym_asy * SYMPTOMATIC) -
+                         (theta * SYMPTOMATIC) + (phi * TREATMENT) -
+                         (sym_dead * SYMPTOMATIC) - (mu * SYMPTOMATIC)
+      dTREATMENT      <- (theta * SYMPTOMATIC) - (phi * TREATMENT) - (delta * TREATMENT) - (mu * TREATMENT)
+      dTREATED        <- (delta * TREATMENT) - (foi * rr_reinfection_treat * TREATED) - (mu * TREATED)
 
       return(list(c(
-        dSUS, dINF, dCLE, dREC, dMIN, dSUB, dCLN, dTXT, dTRE),
-        TBc   = (SUB + CLN), # TB prevalence (per 100k)
-        Mor   = (force_func_mutb(time) * CLN), # TB mortality (per 100k)
-        Dxs   = (force_func_theta(time) * CLN), # TB notifications (per 100k)
-        Spr   = (SUB / (SUB + CLN)))) # Proportion subclinical TB (%)
+        dSUSCEPTIBLE, dINFECTION, dCLEARED, dRECOVERED, dNON_INFECTIOUS,
+        dASYMPTOMATIC, dSYMPTOMATIC, dTREATMENT, dTREATED),
+        TBc = (ASYMPTOMATIC + SYMPTOMATIC),                                   # TB prevalence
+        Mor = (sym_dead * SYMPTOMATIC),                                       # TB mortality
+        Dxs = (theta * SYMPTOMATIC),                                          # TB notifications
+        Spr = ifelse((ASYMPTOMATIC + SYMPTOMATIC) > 0,                        # Proportion asymptomatic
+                     ASYMPTOMATIC / (ASYMPTOMATIC + SYMPTOMATIC), 0)))
     })
   }
 
-  yini <- c(SUS = 1e5 - 1e3, INF = 0, CLE = 0, REC = 0,
-            MIN = 0, SUB = 0, CLN = 1e3, TXT = 0, TRE = 0)
+  yini <- c(SUSCEPTIBLE    = 1e5 - 1e3,
+            INFECTION      = 0,
+            CLEARED        = 0,
+            RECOVERED      = 0,
+            NON_INFECTIOUS = 0,
+            ASYMPTOMATIC   = 0,
+            SYMPTOMATIC    = 1e3,
+            TREATMENT      = 0,
+            TREATED        = 0)
 
   times <- seq(start_time, end_time, by = 1)
   out <- deSolve::ode(yini, times, des, parms)

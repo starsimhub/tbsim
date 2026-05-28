@@ -1,9 +1,15 @@
 """
-Define compartmental TB models
+Define compartmental TB models.
 
-TB_ODE is a literal translation of the R model (lshtm_ode.R) into Python, with exact integration.
+TB_ODE is a translation of the R model (lshtm_ode.R) into Python, integrated with scipy.odeint.
+TB_SS is a Starsim implementation of the same compartmental model, with Euler integration.
 
-TB_SS is a Starsim implementation of the TB_ODE model, with Euler integration.
+State and parameter names are aligned with the agent-based ``tbsim.TB`` class. The ODE keeps
+``CLEARED`` split into three sub-states (CLEARED, RECOVERED, TREATED) so that the appropriate
+reinfection multiplier can be applied to each pathway, matching the per-agent
+``rr_reinfection_cleared`` / ``rr_reinfection_rec`` / ``rr_reinfection_treat`` mechanism in
+``tbsim.TB``. Treatment dynamics (theta, phi, delta) are off by default — enable explicitly
+when modelling a post-treatment-era period.
 """
 
 import numpy as np
@@ -15,37 +21,53 @@ from scipy.integrate import odeint
 __all__ = ['default_pars', 'TB_ODE', 'TB_SS']
 
 
-# Default parameters
+# Default parameters. Natural-history rates and reinfection multipliers are aligned with
+# tbsim.TB defaults so that the same numeric value produces the same expected per-year flux
+# in both models. Note that ``beta`` here is a contact-rate-times-transmissibility product
+# under homogeneous mixing, with different semantics than tbsim.TB's per-edge ``beta``.
 default_pars = sc.objdict(
-  beta = 9,         # Contact (per person/year) parameter
-  kappa = 0.75,     # Relative infectiousness
-  infcle = 1.83,    # Infected -> Cleared
-  infmin = 0.21,    # Infected -> Minimal
-  minrec = 0.16,    # Minimal -> Recovered
-  pi = 0.21,        # Protection from reinfection
-  minsub = 0.25,    # Minimal -> Subclinical
-  infsub = 0.07,    # Infected -> Subclinical
-  submin = 1.58,    # Subclinical -> Minimal
-  subcln = 0.77,    # Subclinical -> Clinical
-  clnsub = 0.53,    # Clinical -> Subclinical
-  mutb_ini = 0.3,   # TB mortality (Initial)
-  mutb_fin = 0.23,  # TB mortality (Final)
-  theta_ini = 0.44, # Diagnosis (Initial)
-  theta_fin = 0.9,  # Diagnosis (Final)
-  phi_ini = 0.69,   # Treatment failure (Initial)
-  phi_fin = 0.09,   # Treatment failure (Final)
-  rho = 3.25,       # Risk of reinfection
-  N = 1e5,          # Population size
-  mu = 1/70,        # Mortality rate
-  delta = 2,        # Treatment duration (6 months)
+    # Transmission
+    beta        = 9,    # Contact (per person/year). Different semantics than tbsim.TB beta (per-edge per-dt).
+    trans_asymp = 0.82, # Relative infectiousness, ASYMPTOMATIC vs SYMPTOMATIC (formerly kappa)
+
+    # Reinfection multipliers on FOI for each cleared sub-state
+    rr_reinfection_cleared = 1.0,  # CLEARED   (cleared from latent INFECTION)
+    rr_reinfection_rec     = 0.21, # RECOVERED (recovered from NON_INFECTIOUS) — formerly pi
+    rr_reinfection_treat   = 3.15, # TREATED   (completed TREATMENT)            — formerly rho
+
+    # From INFECTION (latent)
+    inf_cle = 1.90, # INFECTION -> CLEARED
+    inf_non = 0.16, # INFECTION -> NON_INFECTIOUS
+    inf_asy = 0.06, # INFECTION -> ASYMPTOMATIC
+
+    # From NON_INFECTIOUS
+    non_rec = 0.18, # NON_INFECTIOUS -> RECOVERED
+    non_asy = 0.25, # NON_INFECTIOUS -> ASYMPTOMATIC
+
+    # From ASYMPTOMATIC
+    asy_non = 1.66, # ASYMPTOMATIC -> NON_INFECTIOUS
+    asy_sym = 0.88, # ASYMPTOMATIC -> SYMPTOMATIC
+
+    # From SYMPTOMATIC
+    sym_asy  = 0.54, # SYMPTOMATIC -> ASYMPTOMATIC
+    sym_dead = 0.34, # SYMPTOMATIC -> DEAD (constant; replaces time-varying mutb_ini/mutb_fin)
+
+    # Treatment (off by default; set theta>0 to enable diagnosis/treatment dynamics)
+    theta = 0.0, # Diagnosis rate, SYMPTOMATIC -> TREATMENT
+    phi   = 0.0, # Treatment failure, TREATMENT -> SYMPTOMATIC
+    delta = 2,   # Treatment completion, TREATMENT -> TREATED (6-month duration)
+
+    # Demography
+    N  = 1e5,  # Population size (held constant)
+    mu = 1/70, # Background mortality rate
 )
 
 
 class TB_ODE(sc.prettyobj):
     """
-    Exact translation of the R model (lshtm_ode.R) into Python. No Starsim.
+    Continuous-time compartmental TB model integrated with scipy.odeint.
 
-    See default_pars for parameter definitions.
+    See ``default_pars`` for parameter definitions.
 
     Example
     -------
@@ -59,7 +81,7 @@ class TB_ODE(sc.prettyobj):
     """
     def __init__(self, **kwargs):
         """Initialize with ``default_pars``; keyword arguments override individual parameters."""
-        self.pars = default_pars
+        self.pars = sc.dcp(default_pars)
         self.pars.update(kwargs)
         return
 
@@ -67,70 +89,78 @@ class TB_ODE(sc.prettyobj):
         """Integrate the ODE system from ``start_time`` to ``end_time`` and store results."""
         p = self.pars
 
-        # Forcing functions (piecewise linear interpolation, constant extrapolation)
-        # Equivalent to R's approxfun(method="linear", rule=2)
-        interp_times  = [start_time, 1999, end_time]
-        mutb_vals   = [p.mutb_ini,  p.mutb_ini,  p.mutb_fin]
-        theta_vals  = [p.theta_ini, p.theta_ini, p.theta_fin]
-        phi_vals    = [p.phi_ini,   p.phi_ini,   p.phi_fin]
-
-        def force_mutb(t):  return np.interp(t, interp_times, mutb_vals)
-        def force_theta(t): return np.interp(t, interp_times, theta_vals)
-        def force_phi(t):   return np.interp(t, interp_times, phi_vals)
-
-        # ODE system
         def des(state, t):
-            SUS, INF, CLE, REC, MIN, SUB, CLN, TXT, TRE = state
+            (SUSCEPTIBLE, INFECTION, CLEARED, RECOVERED, NON_INFECTIOUS,
+             ASYMPTOMATIC, SYMPTOMATIC, TREATMENT, TREATED) = state
 
-            mutb  = force_mutb(t)
-            theta = force_theta(t)
-            phi   = force_phi(t)
-            foi   = (p.beta / p.N) * (p.kappa * SUB + CLN)  # Force of infection
+            foi = (p.beta / p.N) * (p.trans_asymp * ASYMPTOMATIC + SYMPTOMATIC)
 
-            dSUS = (p.mu * p.N) + (mutb * CLN) - foi * SUS - p.mu * SUS
-            dINF = foi * (SUS + CLE + p.pi * REC + p.rho * TRE) - p.infcle * INF - p.infmin * INF - p.infsub * INF - p.mu * INF
-            dCLE = p.infcle * INF - foi * CLE - p.mu * CLE
-            dREC = p.minrec * MIN - foi * (p.pi * REC) - p.mu * REC
-            dMIN = p.infmin * INF + p.submin * SUB - p.minrec * MIN - p.minsub * MIN - p.mu * MIN
-            dSUB = p.infsub * INF + p.minsub * MIN + p.clnsub * CLN - p.submin * SUB - p.subcln * SUB - p.mu * SUB
-            dCLN = p.subcln * SUB - p.clnsub * CLN - theta * CLN + phi * TXT - mutb * CLN - p.mu * CLN
-            dTXT = theta * CLN - phi * TXT - p.delta * TXT - p.mu * TXT
-            dTRE = p.delta * TXT - foi * (p.rho * TRE) - p.mu * TRE
+            dSUSCEPTIBLE    = (p.mu * p.N) + (p.sym_dead * SYMPTOMATIC) \
+                              - foi * SUSCEPTIBLE - p.mu * SUSCEPTIBLE
+            dINFECTION      = foi * (SUSCEPTIBLE
+                                     + p.rr_reinfection_cleared * CLEARED
+                                     + p.rr_reinfection_rec     * RECOVERED
+                                     + p.rr_reinfection_treat   * TREATED) \
+                              - (p.inf_cle + p.inf_non + p.inf_asy + p.mu) * INFECTION
+            dCLEARED        = p.inf_cle * INFECTION \
+                              - foi * p.rr_reinfection_cleared * CLEARED - p.mu * CLEARED
+            dRECOVERED      = p.non_rec * NON_INFECTIOUS \
+                              - foi * p.rr_reinfection_rec * RECOVERED - p.mu * RECOVERED
+            dNON_INFECTIOUS = p.inf_non * INFECTION + p.asy_non * ASYMPTOMATIC \
+                              - (p.non_rec + p.non_asy + p.mu) * NON_INFECTIOUS
+            dASYMPTOMATIC   = p.inf_asy * INFECTION + p.non_asy * NON_INFECTIOUS + p.sym_asy * SYMPTOMATIC \
+                              - (p.asy_non + p.asy_sym + p.mu) * ASYMPTOMATIC
+            dSYMPTOMATIC    = p.asy_sym * ASYMPTOMATIC - p.sym_asy * SYMPTOMATIC \
+                              - p.theta * SYMPTOMATIC + p.phi * TREATMENT \
+                              - p.sym_dead * SYMPTOMATIC - p.mu * SYMPTOMATIC
+            dTREATMENT      = p.theta * SYMPTOMATIC - p.phi * TREATMENT \
+                              - p.delta * TREATMENT - p.mu * TREATMENT
+            dTREATED        = p.delta * TREATMENT \
+                              - foi * p.rr_reinfection_treat * TREATED - p.mu * TREATED
 
-            return [dSUS, dINF, dCLE, dREC, dMIN, dSUB, dCLN, dTXT, dTRE]
+            return [dSUSCEPTIBLE, dINFECTION, dCLEARED, dRECOVERED, dNON_INFECTIOUS,
+                    dASYMPTOMATIC, dSYMPTOMATIC, dTREATMENT, dTREATED]
 
-        # Initial conditions
-        yini = [1e5 - 1e3, 0, 0, 0, 0, 0, 1e3, 0, 0]
+        # Initial conditions: 1% start in SYMPTOMATIC active TB
+        yini = [p.N - 1e3, 0, 0, 0, 0, 0, 1e3, 0, 0]
 
-        # Solve ODE
         times = np.arange(start_time, end_time + 1, 1)
         out = odeint(des, yini, times)
 
-        # Build results
-        labels = ['SUS', 'INF', 'CLE', 'REC', 'MIN', 'SUB', 'CLN', 'TXT', 'TRE']
+        labels = ['SUSCEPTIBLE', 'INFECTION', 'CLEARED', 'RECOVERED', 'NON_INFECTIOUS',
+                  'ASYMPTOMATIC', 'SYMPTOMATIC', 'TREATMENT', 'TREATED']
         results = sc.objdict(time=times)
         for i, label in enumerate(labels):
             results[label] = out[:, i]
 
-        # Derived quantities (matching R output columns)
-        mutb_arr  = np.array([force_mutb(t) for t in times])
-        theta_arr = np.array([force_theta(t) for t in times])
-        results.TBc = results.SUB + results.CLN                    # TB prevalence (per 100k)
-        results.Mor = mutb_arr * results.CLN                       # TB mortality (per 100k)
-        results.Dxs = theta_arr * results.CLN                      # TB notifications (per 100k)
-        results.Spr = results.SUB / (results.SUB + results.CLN)    # Proportion subclinical TB (%)
+        # Derived quantities
+        results.TBc = results.ASYMPTOMATIC + results.SYMPTOMATIC                # TB prevalence
+        results.Mor = p.sym_dead * results.SYMPTOMATIC                          # TB mortality
+        results.Dxs = p.theta * results.SYMPTOMATIC                             # TB notifications
+        with np.errstate(divide='ignore', invalid='ignore'):
+            results.Spr = np.where(results.TBc > 0,
+                                   results.ASYMPTOMATIC / results.TBc, 0)      # Proportion asymptomatic
 
         self.results = results
         return results
 
     def plot(self, **kwargs):
-        """ Plot all results, each in a separate axes """
+        """Plot all results, each in a separate axes."""
         res = self.results
         labels = sc.objdict(
-            SUS='Susceptible', INF='Infected', CLE='Cleared', REC='Recovered',
-            MIN='Minimal', SUB='Subclinical', CLN='Clinical', TXT='On treatment',
-            TRE='Treated', TBc='TB prevalence', Mor='TB mortality',
-            Dxs='TB notifications', Spr='Proportion subclinical',
+            SUSCEPTIBLE    = 'Susceptible',
+            INFECTION      = 'Latent infection',
+            CLEARED        = 'Cleared (from latent)',
+            RECOVERED      = 'Recovered (from active)',
+            NON_INFECTIOUS = 'Non-infectious',
+            ASYMPTOMATIC   = 'Asymptomatic',
+            SYMPTOMATIC    = 'Symptomatic',
+            TREATMENT      = 'On treatment',
+            TREATED        = 'Completed treatment',
+            TBc            = 'TB prevalence',
+            Mor            = 'TB mortality',
+            Dxs            = 'TB notifications',
+            Spr            = 'Proportion asymptomatic',
         )
         kw = sc.mergedicts(dict(lw=2, alpha=0.8), kwargs)
         with sc.options.with_style('fancy'):
@@ -151,9 +181,9 @@ class TB_SS(ss.Module):
     """
     Compartmental Starsim implementation of the LSHTM TB model (Euler integration).
 
-    Because this is a self-contained module, it does not need a network or People
+    Self-contained: does not need a network or People (operates on aggregate compartments).
 
-    See default_pars for parameter definitions.
+    See ``default_pars`` for parameter definitions.
 
     **Example**:
 
@@ -167,121 +197,102 @@ class TB_SS(ss.Module):
     def __init__(self, **kwargs):
         """Initialize compartmental states and parameters; keyword arguments override defaults."""
         super().__init__()
-        self.define_pars(
-            **default_pars,
-            start_time = 1500,
-            mid_time = 1999,
-            end_time = 2020,
-        )
+        self.define_pars(**default_pars)
         self.update_pars(**kwargs)
 
-        # Compartment labels
+        # Compartment labels (aligned with tbsim.TB; CLEARED is split into three sub-states)
         self.c_labels = sc.objdict(
-            SUS='Susceptible',
-            INF='Infected',
-            CLE='Cleared',
-            REC='Recovered',
-            MIN='Minimal',
-            SUB='Subclinical',
-            CLN='Clinical',
-            TXT='On treatment',
-            TRE='Treated',
+            SUSCEPTIBLE    = 'Susceptible',
+            INFECTION      = 'Latent infection',
+            CLEARED        = 'Cleared (from latent)',
+            RECOVERED      = 'Recovered (from active)',
+            NON_INFECTIOUS = 'Non-infectious',
+            ASYMPTOMATIC   = 'Asymptomatic',
+            SYMPTOMATIC    = 'Symptomatic',
+            TREATMENT      = 'On treatment',
+            TREATED        = 'Completed treatment',
         )
 
         # Compartments (scalars, not per-agent states)
-        self.c = sc.objdict({key:0 for key in self.c_labels}) # Compartment names
+        self.c = sc.objdict({key: 0 for key in self.c_labels})
         return
 
     def init_post(self):
-        """ Set initial conditions """
+        """Set initial conditions: 1% start in SYMPTOMATIC active TB."""
         super().init_post()
         p = self.pars
         c = self.c
-        init_cln = 1e3
-        c.SUS = p.N - init_cln
-        c.CLN = init_cln
-        self.interp_time = [p.start_time, p.mid_time, p.end_time]
+        init_sym = 1e3
+        c.SUSCEPTIBLE = p.N - init_sym
+        c.SYMPTOMATIC = init_sym
         return
 
-    def force_mutb(self, t):
-        """ Forcing function for TB mortality (piecewise linear, constant extrapolation) """
-        p = self.pars
-        return np.interp(t, self.interp_time, [p.mutb_ini, p.mutb_ini, p.mutb_fin])
-
-    def force_theta(self, t):
-        """ Forcing function for diagnosis rate """
-        p = self.pars
-        return np.interp(t, self.interp_time, [p.theta_ini, p.theta_ini, p.theta_fin])
-
-    def force_phi(self, t):
-        """ Forcing function for treatment failure rate """
-        p = self.pars
-        return np.interp(t, self.interp_time, [p.phi_ini, p.phi_ini, p.phi_fin])
-
     def step(self):
-        """ Euler integration of the ODE system """
+        """Euler integration of the ODE system."""
         p = self.pars
         c = self.c
-        t = self.now
-        dt = float(self.dt) # Note: this is hard-coded in years
+        dt = float(self.dt)  # hard-coded in years
 
-        # Time-varying parameters
-        mutb  = self.force_mutb(t)
-        theta = self.force_theta(t)
-        phi   = self.force_phi(t)
-        foi   = (p.beta / p.N) * (p.kappa * c.SUB + c.CLN)  # Force of infection
+        foi = (p.beta / p.N) * (p.trans_asymp * c.ASYMPTOMATIC + c.SYMPTOMATIC)
 
-        # Compute derivatives (matching R ODE)
         d = sc.objdict()
-        d.SUS = (p.mu * p.N) + (mutb * c.CLN) - foi * c.SUS - p.mu * c.SUS
-        d.INF = foi * (c.SUS + c.CLE + p.pi * c.REC + p.rho * c.TRE) - p.infcle * c.INF - p.infmin * c.INF - p.infsub * c.INF - p.mu * c.INF
-        d.CLE = p.infcle * c.INF - foi * c.CLE - p.mu * c.CLE
-        d.REC = p.minrec * c.MIN - foi * (p.pi * c.REC) - p.mu * c.REC
-        d.MIN = p.infmin * c.INF + p.submin * c.SUB - p.minrec * c.MIN - p.minsub * c.MIN - p.mu * c.MIN
-        d.SUB = p.infsub * c.INF + p.minsub * c.MIN + p.clnsub * c.CLN - p.submin * c.SUB - p.subcln * c.SUB - p.mu * c.SUB
-        d.CLN = p.subcln * c.SUB - p.clnsub * c.CLN - theta * c.CLN + phi * c.TXT - mutb * c.CLN - p.mu * c.CLN
-        d.TXT = theta * c.CLN - phi * c.TXT - p.delta * c.TXT - p.mu * c.TXT
-        d.TRE = p.delta * c.TXT - foi * (p.rho * c.TRE) - p.mu * c.TRE
-        d.SUS = (p.mu * p.N) + (mutb * c.CLN) - foi * c.SUS - p.mu * c.SUS
-        d.INF = foi * (c.SUS + c.CLE + p.pi * c.REC + p.rho * c.TRE) - p.infcle * c.INF - p.infmin * c.INF - p.infsub * c.INF - p.mu * c.INF
-        d.CLE = p.infcle * c.INF - foi * c.CLE - p.mu * c.CLE
-        d.REC = p.minrec * c.MIN - foi * (p.pi * c.REC) - p.mu * c.REC
+        d.SUSCEPTIBLE    = (p.mu * p.N) + (p.sym_dead * c.SYMPTOMATIC) \
+                           - foi * c.SUSCEPTIBLE - p.mu * c.SUSCEPTIBLE
+        d.INFECTION      = foi * (c.SUSCEPTIBLE
+                                  + p.rr_reinfection_cleared * c.CLEARED
+                                  + p.rr_reinfection_rec     * c.RECOVERED
+                                  + p.rr_reinfection_treat   * c.TREATED) \
+                           - (p.inf_cle + p.inf_non + p.inf_asy + p.mu) * c.INFECTION
+        d.CLEARED        = p.inf_cle * c.INFECTION \
+                           - foi * p.rr_reinfection_cleared * c.CLEARED - p.mu * c.CLEARED
+        d.RECOVERED      = p.non_rec * c.NON_INFECTIOUS \
+                           - foi * p.rr_reinfection_rec * c.RECOVERED - p.mu * c.RECOVERED
+        d.NON_INFECTIOUS = p.inf_non * c.INFECTION + p.asy_non * c.ASYMPTOMATIC \
+                           - (p.non_rec + p.non_asy + p.mu) * c.NON_INFECTIOUS
+        d.ASYMPTOMATIC   = p.inf_asy * c.INFECTION + p.non_asy * c.NON_INFECTIOUS + p.sym_asy * c.SYMPTOMATIC \
+                           - (p.asy_non + p.asy_sym + p.mu) * c.ASYMPTOMATIC
+        d.SYMPTOMATIC    = p.asy_sym * c.ASYMPTOMATIC - p.sym_asy * c.SYMPTOMATIC \
+                           - p.theta * c.SYMPTOMATIC + p.phi * c.TREATMENT \
+                           - p.sym_dead * c.SYMPTOMATIC - p.mu * c.SYMPTOMATIC
+        d.TREATMENT      = p.theta * c.SYMPTOMATIC - p.phi * c.TREATMENT \
+                           - p.delta * c.TREATMENT - p.mu * c.TREATMENT
+        d.TREATED        = p.delta * c.TREATMENT \
+                           - foi * p.rr_reinfection_treat * c.TREATED - p.mu * c.TREATED
 
-        # Euler update
         for key in d:
             c[key] += d[key] * dt
         return
 
     def init_results(self):
-        """ Initialize results """
+        """Initialize results."""
         super().init_results()
         self.define_results(
             *[ss.Result(key, label=value) for key, value in self.c_labels.items()],
             ss.Result('TBc', label='TB prevalence'),
             ss.Result('Mor', label='TB mortality'),
             ss.Result('Dxs', label='TB notifications'),
-            ss.Result('Spr', label='Proportion subclinical', scale=False),
+            ss.Result('Spr', label='Proportion asymptomatic', scale=False),
         )
         return
 
     def update_results(self):
-        """ Store the current state """
+        """Store the current state."""
         super().update_results()
         ti = self.ti
         c = self.c
+        p = self.pars
         for key in c:
             self.results[key][ti] = c[key]
 
-        # Derived quantities
-        tb_prev = c.SUB + c.CLN
+        tb_prev = c.ASYMPTOMATIC + c.SYMPTOMATIC
         self.results.TBc[ti] = tb_prev
-        self.results.Mor[ti] = self.force_mutb(self.now) * c.CLN
-        self.results.Dxs[ti] = self.force_theta(self.now) * c.CLN
-        self.results.Spr[ti] = c.SUB / tb_prev if tb_prev > 0 else 0
+        self.results.Mor[ti] = p.sym_dead * c.SYMPTOMATIC
+        self.results.Dxs[ti] = p.theta * c.SYMPTOMATIC
+        self.results.Spr[ti] = c.ASYMPTOMATIC / tb_prev if tb_prev > 0 else 0
         return
 
     def plot(self, **kwargs):
-        """ Plot all results, each in a separate axes """
+        """Plot all results, each in a separate axes."""
         results = list(self.results.all_results)
         kw = sc.mergedicts(dict(lw=2, alpha=0.8), kwargs)
         with sc.options.with_style('fancy'):
