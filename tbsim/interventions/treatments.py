@@ -44,15 +44,15 @@ class Tx(ss.Product):
             dp = drug_params[drug_type]
             efficacy = dp['cure_prob']
             if dur_treatment is None:
-                dur_treatment = ss.constant(v=dp['duration'].days)
+                dur_treatment = ss.constant(v=dp['duration'])
             adherence = dp['adherence_rate']
             p_relapse = dp['relapse_rate']
         else:
             if dur_treatment is None:
-                dur_treatment = ss.constant(v=ss.days(180).days)
+                dur_treatment = ss.constant(v=ss.days(180))
 
         if dur_relapse is None:
-            dur_relapse = ss.constant(v=ss.years(1.5).days)
+            dur_relapse = ss.constant(v=ss.years(1.5))
 
         self.define_pars(
             p_adherence = ss.bernoulli(adherence),
@@ -243,7 +243,7 @@ class TxDelivery(ss.Intervention):
         tb.results['new_notifications_15+'][tb.ti] += np.count_nonzero(self.sim.people.age[active] >= 15)
 
         # Record treatment timing (convert dur from days to timesteps)
-        dur_days = self.product.pars.dur_treatment.rvs(active)
+        dur_days = self.product.pars.dur_treatment.rvs(active)  # TODO: make time-unit-agnostic
         dur_steps = dur_days / self.dt.days
         self.ti_treatment_start[active] = self.ti
         self.ti_treatment_end[active] = self.ti + dur_steps
@@ -259,7 +259,7 @@ class TxDelivery(ss.Intervention):
         relapse_uids = outcomes.get('relapse', ss.uids())
         if len(relapse_uids):
             self.pending_relapse[relapse_uids] = True
-            relapse_days = self.product.pars.dur_relapse.rvs(relapse_uids)
+            relapse_days = self.product.pars.dur_relapse.rvs(relapse_uids) # TODO: make time-unit-agnostic
             relapse_steps = relapse_days / self.dt.days
             # Relapse clock starts when treatment ends (not when it began)
             self.ti_relapse[relapse_uids] = self.ti_treatment_end[relapse_uids] + relapse_steps
