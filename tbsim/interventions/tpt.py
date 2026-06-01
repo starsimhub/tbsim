@@ -314,14 +314,14 @@ class TPTHousehold(TBProductRoutine):
             return ss.uids()
 
         # 3. Find their household IDs
-        hhids = np.asarray(hh_net.household_ids[followed_up])
+        hhids = hh_net.household_ids[followed_up]
         target_hhids = np.unique(hhids[~np.isnan(hhids)])
 
         if len(target_hhids) == 0:
             return ss.uids()
 
         # 4. Find household contacts (excluding index cases)
-        all_hh = np.isin(np.asarray(hh_net.household_ids), target_hhids)
+        all_hh = np.isin(hh_net.household_ids, target_hhids)
         contacts = ss.uids(np.where(all_hh)[0]) 
         contacts = contacts.remove(followed_up)
 
