@@ -27,6 +27,7 @@ class TBS(IntEnum):
     TREATMENT       = 6     # On TB treatment
     DEAD            = 8     # Dead (TB-caused via sym_dead; general mortality via step_die also sets this)
     ACUTE           = 9     # Acute infection immediately after exposure (used by TBAcute)
+    REMOVED         = 10    # Removed from the active population (e.g. emigration)
 
     @staticmethod
     def active_tb_states():
@@ -39,6 +40,11 @@ class TBS(IntEnum):
         Only individuals with clinical symptoms (cough, fever, night sweats, etc.)
         recognise their illness and seek healthcare."""
         return np.array([TBS.SYMPTOMATIC])
+
+    @staticmethod
+    def terminal_states():
+        """States that should no longer participate in transmission or care flows."""
+        return [TBS.DEAD, TBS.REMOVED]
 
 
 class BaseTB(ss.Infection):
@@ -353,7 +359,7 @@ class TB(BaseTB):
         # --- Bookkeep from current state ---
 
         self.infected[:] = ~np.isin(self.state,
-            [TBS.SUSCEPTIBLE, TBS.CLEARED, TBS.DEAD])
+            [TBS.SUSCEPTIBLE, TBS.CLEARED, *TBS.terminal_states()])
         self.susceptible[:] = np.isin(self.state,
             [TBS.SUSCEPTIBLE, TBS.CLEARED])
         self.on_treatment[:] = (self.state == TBS.TREATMENT)
@@ -394,11 +400,17 @@ class TB(BaseTB):
         if len(uids) == 0:
             return
 
+        removed = np.asarray(self.state[uids] == TBS.REMOVED)
         super().step_die(uids)
         self.susceptible[uids] = False
         self.infected[uids] = False
-        self.state[uids] = TBS.DEAD
+        self.on_treatment[uids] = False
+        self.rel_sus[uids] = 0
         self.rel_trans[uids] = 0
+        if np.any(~removed):
+            self.state[uids[~removed]] = TBS.DEAD
+        if np.any(removed):
+            self.state[uids[removed]] = TBS.REMOVED
         return
 
     def init_results(self):
@@ -451,9 +463,9 @@ class TB(BaseTB):
 
         res.n_infectious[ti] = infectious.count()
         res['n_infectious_15+'][ti] = (infectious & age15).count()
-        res.prevalence_active[ti] = res.n_infectious[ti] / n_alive
-        res.incidence_kpy[ti] = 1_000 * (self.ti_infected == ti).count() / (n_alive * dty)
-        res.deaths_ppy[ti] = res.new_deaths[ti] / (n_alive * dty)
+        res.prevalence_active[ti] = res.n_infectious[ti] / n_alive if n_alive else 0
+        res.incidence_kpy[ti] = 1_000 * (self.ti_infected == ti).count() / (n_alive * dty) if n_alive else 0
+        res.deaths_ppy[ti] = res.new_deaths[ti] / (n_alive * dty) if n_alive else 0
 
         # New active: agents whose ti_asymp == this step
         res['new_active'][ti] = new_asymp.count()
@@ -588,7 +600,7 @@ class TBAcute(TB):
         # --- Bookkeep from current state ---
 
         self.infected[:] = ~np.isin(self.state,
-            [TBS.SUSCEPTIBLE, TBS.CLEARED, TBS.DEAD])
+            [TBS.SUSCEPTIBLE, TBS.CLEARED, *TBS.terminal_states()])
         self.susceptible[:] = np.isin(self.state,
             [TBS.SUSCEPTIBLE, TBS.CLEARED])
         self.on_treatment[:] = (self.state == TBS.TREATMENT)

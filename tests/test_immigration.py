@@ -493,19 +493,21 @@ def test_immigrants_are_assigned_households_and_edges():
 
 
 def test_immigration_rejects_invalid_tb_state_distribution():
-    """Invalid tb_state_distribution inputs fail at construction."""
+    """Invalid tb_state_distribution inputs either fail or are coerced with warnings."""
     with pytest.raises(ValueError, match='must be provided'):
         tbsim.Immigration(pars=dict(tb_state_distribution={}))
     with pytest.raises(ValueError, match='at least one positive'):
         tbsim.Immigration(pars=dict(tb_state_distribution=dict(SUSCEPTIBLE=0.0)))
-    with pytest.raises(KeyError, match='Unknown TB state'):
-        tbsim.Immigration(pars=dict(tb_state_distribution=dict(NOT_A_STATE=1.0)))
-    with pytest.raises(ValueError, match='negative'):
+    with pytest.warns(UserWarning, match='Ignoring unknown TB state'):
+        with pytest.raises(ValueError, match='at least one positive'):
+            tbsim.Immigration(pars=dict(tb_state_distribution=dict(NOT_A_STATE=1.0)))
+    with pytest.raises(ValueError, match='at least one positive'):
         tbsim.Immigration(pars=dict(tb_state_distribution=dict(SUSCEPTIBLE=-0.1)))
-    with pytest.raises(ValueError, match='finite'):
+    with pytest.raises(ValueError, match='at least one positive'):
         tbsim.Immigration(pars=dict(tb_state_distribution=dict(SUSCEPTIBLE=np.nan)))
-    with pytest.raises(ValueError, match='DEAD'):
-        tbsim.Immigration(pars=dict(tb_state_distribution=dict(SUSCEPTIBLE=0.5, DEAD=0.5)))
+    with pytest.warns(UserWarning, match='Removing terminal state DEAD'):
+        imm = tbsim.Immigration(pars=dict(tb_state_distribution=dict(SUSCEPTIBLE=0.5, DEAD=0.5)))
+    assert imm.pars.tb_state_distribution == dict(SUSCEPTIBLE=1.0)
 
 
 def test_immigrants_are_alive_not_tb_dead():
@@ -543,20 +545,20 @@ def test_immigrant_household_edges_skip_dead_members():
 
 
 def test_immigration_rejects_invalid_age_distribution():
-    """Invalid age_distribution inputs fail during sim initialization."""
+    """Invalid age_distribution inputs warn and fall back to uniform sampling."""
     tb = tbsim.TB(pars=dict(init_prev=ss.bernoulli(0), beta=ss.peryear(0)))
 
     def init_with_age_dist(age_distribution):
         imm = tbsim.Immigration(pars=dict(immigration_rate=ss.freqperyear(10), age_distribution=age_distribution))
         sim = ss.Sim(n_agents=50, start='2000', stop='2001', dt=0.25, diseases=tb, demographics=[imm], networks=ss.RandomNet(), verbose=0)
         sim.init()
+        return sim.demographics[0]
 
-    with pytest.raises(ValueError, match='non-negative'):
-        init_with_age_dist({0: -1})
-    with pytest.raises(ValueError, match='at least one positive'):
-        init_with_age_dist({0: 0.0, 5: 0.0})
-    with pytest.raises(ValueError, match='finite'):
-        init_with_age_dist({0: np.nan})
+    for age_distribution in ({0: -1}, {0: 0.0, 5: 0.0}, {0: np.nan}):
+        with pytest.warns(UserWarning, match='age_distribution has no usable bins'):
+            imm = init_with_age_dist(age_distribution)
+        assert imm._age_lows is None
+        assert imm._age_highs is None
 
 
 def test_immigration_exported_and_runs():

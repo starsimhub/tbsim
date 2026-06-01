@@ -165,11 +165,90 @@ class HouseholdNet(ss.Network):
         """Initialize with an optional list of households (each a list of agent UIDs)."""
         super().__init__(**kwargs)
 
-        self.hhs = [] if hhs is None else hhs
+        self.hhs = [] if hhs is None else [list(hh) for hh in hhs]
+        self.define_states(
+            ss.FloatArr('household_ids', default=np.nan),
+        )
         self.define_pars(
             add_newborns = False,
         )
         self.update_pars(pars, **kwargs)
+        return
+
+    def _refresh_household_ids(self):
+        """Rewrite per-agent household IDs from ``self.hhs``."""
+        self.household_ids[:] = np.nan
+        for household_index, household in enumerate(self.hhs):
+            if household:
+                self.household_ids[ss.uids(np.asarray(household, dtype=int))] = household_index
+        return
+
+    def _append_member_edges(self, uid, member_uids):
+        """Connect ``uid`` to every existing household member."""
+        member_uids = np.asarray(member_uids, dtype=int)
+        if len(member_uids) == 0:
+            return
+
+        p1 = np.minimum(member_uids, uid)
+        p2 = np.maximum(member_uids, uid)
+        keep = p1 != p2
+        p1 = p1[keep]
+        p2 = p2[keep]
+        if len(p1) == 0:
+            return
+
+        existing = {(int(a), int(b)) for a, b in zip(np.asarray(self.edges.p1, dtype=int), np.asarray(self.edges.p2, dtype=int))}
+        new_pairs = [(int(a), int(b)) for a, b in zip(p1, p2) if (int(a), int(b)) not in existing]
+        if not new_pairs:
+            return
+
+        new_p1 = np.fromiter((a for a, _ in new_pairs), dtype=int)
+        new_p2 = np.fromiter((b for _, b in new_pairs), dtype=int)
+        self.append(p1=ss.uids(new_p1), p2=ss.uids(new_p2), beta=np.ones(len(new_p1), dtype=float))
+        return
+
+    def _remove_edges_involving_uids(self, uids):
+        """Drop all edges touching any UID in ``uids``."""
+        uids = np.asarray(uids, dtype=int)
+        if len(uids) == 0 or len(self.edges.p1) == 0:
+            return
+        keep = ~(np.isin(self.edges.p1, uids) | np.isin(self.edges.p2, uids))
+        self.edges.p1 = self.edges.p1[keep]
+        self.edges.p2 = self.edges.p2[keep]
+        self.edges.beta = self.edges.beta[keep]
+        return
+
+    def add_member(self, uid, household_index):
+        """Add a member to an existing household and connect edges to all members."""
+        if household_index < 0 or household_index >= len(self.hhs):
+            raise IndexError(f'Household index {household_index} is out of range for {len(self.hhs)} households')
+
+        household = self.hhs[household_index]
+        uid = int(uid)
+        if uid in household:
+            return household_index
+
+        existing_members = np.asarray(household, dtype=int)
+        household.append(uid)
+        self.household_ids[uid] = household_index
+        self._append_member_edges(uid, existing_members)
+        return household_index
+
+    def remove_uids(self, uids):
+        """Remove agents from household edges and household membership."""
+        uids = np.asarray(uids, dtype=int)
+        if len(uids) == 0:
+            return
+
+        uid_set = set(uids.tolist())
+        self._remove_edges_involving_uids(uids)
+        new_households = []
+        for household in self.hhs:
+            kept = [member for member in household if int(member) not in uid_set]
+            if kept:
+                new_households.append(kept)
+        self.hhs = new_households
+        self._refresh_household_ids()
         return
 
     def _generate_complete_graph_edges(self, uids):
@@ -240,6 +319,12 @@ class HouseholdNet(ss.Network):
         self.edges.p2 = ss.uids(np.concatenate([self.edges.p2, all_p2s]))
         self.edges.beta = np.concatenate([self.edges.beta, np.ones(total_edges)])
         
+        return
+
+    def init_post(self):
+        """Finalize network setup and populate household IDs once states are sized."""
+        super().init_post(add_pairs=False)
+        self._refresh_household_ids()
         return
 
     def step(self): 
