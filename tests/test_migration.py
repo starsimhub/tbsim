@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import sciris as sc
 import starsim as ss
 import tbsim
 
@@ -17,17 +18,26 @@ def make_age_data():
     return pd.DataFrame({'age': AGE_BINS[:-1], 'value': AGE_WEIGHTS})
 
 
-def make_households(n_agents, seed=1):
-    """Create synthetic households with moderate size variation."""
+def make_household_dhs_data(n_agents, seed=1):
+    """Create a synthetic DHS household table for ``ss.HouseholdNet``.
+
+    Returns a dataframe with ``hh_id`` and ``ages`` columns covering all
+    ``n_agents`` agents, with moderate household-size variation.
+    """
     rng = np.random.default_rng(seed)
-    households = []
-    uid = 0
-    while uid < n_agents:
+    hh_id = []
+    ages = []
+    n_assigned = 0
+    h = 0
+    while n_assigned < n_agents:
         hh_size = int(rng.integers(2, 6))
-        hh_size = min(hh_size, n_agents - uid)
-        households.append(list(range(uid, uid + hh_size)))
-        uid += hh_size
-    return households
+        hh_size = min(hh_size, n_agents - n_assigned)
+        hh_ages = rng.integers(1, 75, size=hh_size)
+        hh_id.append(h)
+        ages.append(sc.strjoin(hh_ages))
+        n_assigned += hh_size
+        h += 1
+    return sc.dataframe(hh_id=hh_id, ages=ages)
 
 
 def get_migration(sim):
@@ -66,7 +76,7 @@ def make_sim(
         diseases=tbsim.TB(pars=tb_defaults),
         networks=[
             ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=4), dur=0)),
-            tbsim.HouseholdNet(hhs=make_households(n_agents=n_agents, seed=rand_seed)),
+            ss.HouseholdNet(dhs_data=make_household_dhs_data(n_agents=n_agents, seed=rand_seed), dynamic=False),
         ],
         demographics=demographics,
         analyzers=analyzers or [],

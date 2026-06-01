@@ -363,7 +363,7 @@ def _households_from_input(households_or_network, return_network=False):
         sim = households_or_network
         hh_net = None
         for net in sim.networks.values():
-            if hasattr(net, 'household_ids') or hasattr(net, 'hhs'):
+            if hasattr(net, 'household_ids'):
                 hh_net = net
                 break
         if hh_net is None:
@@ -383,14 +383,9 @@ def _households_from_input(households_or_network, return_network=False):
         households = [hh for hh in households if len(hh)]
         return (households, hh_net) if return_network else households
 
-    # Case 4: tbsim HouseholdNet with hhs list
-    if hasattr(hh_net, 'hhs'):
-        households = [list(hh) for hh in hh_net.hhs if len(hh)]
-        return (households, hh_net) if return_network else households
-
     raise TypeError(
         'households_or_network must be one of: list of households, ss.Sim, '
-        'or household network with household_ids/hhs'
+        'or household network with household_ids'
     )
 
 
@@ -419,7 +414,7 @@ def plot_household(
         households_or_network: one of:
             - list of households (each household is a list/array of UIDs)
             - an ``ss.Sim`` with a network exposing ``household_ids``
-            - a household network exposing ``household_ids`` or ``hhs``
+            - a household network exposing ``household_ids``
         title (str): Title for the plot
         figsize (tuple): Figure size (width, height)
         max_households (int/None): maximum households to render (largest first).

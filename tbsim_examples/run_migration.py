@@ -32,17 +32,22 @@ DEFAULT_MIGRATION_PARS = dict(
 )
 
 
-def _make_households(n_agents, rand_seed):
-    """Create synthetic household lists for tbsim.HouseholdNet."""
+def _make_household_dhs_data(n_agents, rand_seed):
+    """Create a synthetic DHS household table for ``ss.HouseholdNet``."""
     rng = np.random.default_rng(rand_seed)
-    households = []
-    uid = 0
-    while uid < n_agents:
+    hh_id = []
+    ages = []
+    n_assigned = 0
+    h = 0
+    while n_assigned < n_agents:
         hh_size = int(rng.integers(2, 7))
-        hh_size = min(hh_size, n_agents - uid)
-        households.append(list(range(uid, uid + hh_size)))
-        uid += hh_size
-    return households
+        hh_size = min(hh_size, n_agents - n_assigned)
+        hh_ages = rng.integers(1, 75, size=hh_size)
+        hh_id.append(h)
+        ages.append(sc.strjoin(hh_ages))
+        n_assigned += hh_size
+        h += 1
+    return sc.dataframe(hh_id=hh_id, ages=ages)
 
 
 def build_sim(scenario=None, spars=None):
@@ -64,7 +69,7 @@ def build_sim(scenario=None, spars=None):
     include_households = bool(scenario.get('use_households', True))
     networks = [ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))]
     if include_households:
-        networks.append(tbsim.HouseholdNet(hhs=_make_households(n_agents=spars.n_agents, rand_seed=spars.rand_seed)))
+        networks.append(ss.HouseholdNet(dhs_data=_make_household_dhs_data(n_agents=spars.n_agents, rand_seed=spars.rand_seed), dynamic=False))
 
     return tbsim.Sim(
         label=scenario.get('name', 'scenario'),

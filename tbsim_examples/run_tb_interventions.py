@@ -84,9 +84,12 @@ def build_sim(scenario=None, spars=None):
                 interventions.append(tbsim.BetaByYear(pars=params))
 
     # Create simulation using tbsim.Sim
+    n_households = 200
+    age_strings = [sc.strjoin(np.random.randint(1, 70, np.random.randint(2, 6))) for _ in range(n_households)]
+    dhs_data = sc.dataframe(hh_id=np.arange(n_households), ages=age_strings)
     networks = [
         ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
-        tbsim.HouseholdNet(),
+        ss.HouseholdNet(dhs_data=dhs_data, dynamic=False),
     ]
 
     spars.n_agents = 500
