@@ -392,13 +392,32 @@ class Migration(ss.Demographics):
         hh_inds = np.searchsorted(cdf, draws, side='right').astype(int)
         return hh_ids[hh_inds]
 
-    def _append_household_edges(self, household_net, uid, member_uids):
-        """Connect a new member ``uid`` to every existing member of its household."""
-        member_uids = member_uids[member_uids != uid]
-        if len(member_uids) == 0:
+    def _append_household_group_edges(self, household_net, new_uids, member_uids):
+        """Connect new household members to existing members and each other."""
+        new_uids = np.asarray(new_uids, dtype=int)
+        member_uids = np.asarray(member_uids, dtype=int)
+        if len(new_uids) == 0:
             return
-        p1 = ss.uids(member_uids)
-        p2 = ss.uids(np.full(len(member_uids), int(uid), dtype=int))
+
+        p1_parts = []
+        p2_parts = []
+        n_new = len(new_uids)
+        n_existing = len(member_uids)
+
+        if n_existing:
+            p1_parts.append(np.tile(member_uids, n_new))
+            p2_parts.append(np.repeat(new_uids, n_existing))
+
+        if n_new > 1:
+            new_rows, new_cols = np.tril_indices(n_new, k=-1)
+            p1_parts.append(new_uids[new_cols])
+            p2_parts.append(new_uids[new_rows])
+
+        if not p1_parts:
+            return
+
+        p1 = ss.uids(np.concatenate(p1_parts))
+        p2 = ss.uids(np.concatenate(p2_parts))
         beta = np.ones(len(p1), dtype=ss.dtypes.float)
         household_net.append(p1=p1, p2=p2, beta=beta)
         return
@@ -420,13 +439,13 @@ class Migration(ss.Demographics):
         if len(household_ids) == 0:
             return self._create_household_singletons(household_net, new_uids)
 
-        assigned = np.empty(len(new_uids), dtype=int)
-        for i, uid in enumerate(np.asarray(new_uids, dtype=int)):
-            household_id = int(household_ids[i])
+        new_uids = np.asarray(new_uids, dtype=int)
+        assigned = np.asarray(household_ids, dtype=int)
+        for household_id in np.unique(assigned):
+            group_uids = new_uids[assigned == household_id]
             members = ss.uids(household_net.household_ids == household_id)
-            household_net.household_ids[ss.uids(uid)] = household_id
-            self._append_household_edges(household_net, uid, members)
-            assigned[i] = household_id
+            household_net.household_ids[ss.uids(group_uids)] = household_id
+            self._append_household_group_edges(household_net, group_uids, members)
         self.hhid[new_uids] = assigned
         return assigned
 
