@@ -43,12 +43,16 @@ class Migration(ss.Demographics):
             arriving immigrant ages. Does not affect emigration.
         emigration_age_distribution (dict/None): Optional age weights
             ``{age_lower_bound: weight}`` used to bias emigrant selection
-            toward certain age groups. If None, emigrants are chosen
-            uniformly at random from the active population.
+            toward certain age groups. Bins are half-open intervals
+            ``[lower, next_lower)``, with the last bin ending at ``max_age``.
+            Ages below the smallest key or at/above ``max_age`` are not
+            age-weighted (they enter the uniform fallback pool). If None,
+            emigrants are chosen uniformly at random from the active population.
         age_data (DataFrame/Series/array/str/None): Immigration age histogram
             in Starsim ``People`` format; overrides
             ``immigration_age_distribution`` when both are provided.
-        max_age (float): Upper bound on sampled immigrant ages (default 85).
+        max_age (float): Upper age bound for immigration sampling and for the
+            top end of emigration age bins (default 85).
         tb_state_distribution (dict/None): ``{TBS state name: weight}`` mix
             for immigrants at entry. Terminal states (``DEAD``, ``REMOVED``)
             are stripped. If None, defaults are derived from TB module
@@ -116,6 +120,7 @@ class Migration(ss.Demographics):
         self.age_lows = None
         self.age_highs = None
         self.emig_age_lows = None
+        self.emig_age_highs = None
         self.emig_age_weights = None
 
         self.define_states(
@@ -237,9 +242,10 @@ class Migration(ss.Demographics):
         return
 
     def _configure_emig_age_weights(self):
-        """Parse ``emigration_age_distribution`` into normalized per-bin selection weights."""
+        """Parse ``emigration_age_distribution`` into normalized per-bin weights and bin upper edges."""
         spec = self.pars.emigration_age_distribution
         self.emig_age_lows = None
+        self.emig_age_highs = None
         self.emig_age_weights = None
         if spec is None:
             return
@@ -247,14 +253,18 @@ class Migration(ss.Demographics):
             warnings.warn('emigration_age_distribution is empty; using uniform emigration', stacklevel=2)
             return
 
+        max_age = float(self.pars.max_age)
         lows = np.array(sorted(spec.keys()), dtype=float)
         weights = np.array([spec[k] for k in lows], dtype=float)
         valid = np.isfinite(lows) & np.isfinite(weights)
         lows, weights = lows[valid], np.clip(weights[valid], 0, None)
+        lows = lows[lows < max_age]
+        weights = weights[:len(lows)]
         if len(lows) == 0 or weights.sum() <= 0:
             warnings.warn('emigration_age_distribution has no usable bins; using uniform emigration', stacklevel=2)
             return
         self.emig_age_lows = lows
+        self.emig_age_highs = np.r_[lows[1:], max_age]
         self.emig_age_weights = weights / weights.sum()
         return
 
@@ -385,17 +395,25 @@ class Migration(ss.Demographics):
 
     # --- Age sampling ------------------------------------------------------
 
+    def _bound_ages(self, ages):
+        """Coerce sampled ages into the valid simulation range [0, max_age)."""
+        ages = np.asarray(ages, dtype=float)
+        max_age = float(self.pars.max_age)
+        if not np.isfinite(max_age) or max_age <= 0:
+            return np.clip(ages, 0.0, None)
+        return np.clip(ages, 0.0, np.nextafter(max_age, 0.0))
+
     def _sample_ages(self, n):
         """Sample ``n`` immigrant ages from the configured age histogram, bins, or a uniform fallback."""
         if n <= 0:
             return np.empty(0, dtype=float)
         if self.dist_age_data is not None:
-            return np.asarray(self.dist_age_data.rvs(n), dtype=float)
+            return self._bound_ages(self.dist_age_data.rvs(n))
         if self.age_lows is None or self.age_highs is None:
-            return self.dist_age_uniform.rvs(n) * float(self.pars.max_age)
+            return self._bound_ages(self.dist_age_uniform.rvs(n) * float(self.pars.max_age))
         age_bin = self.dist_age_bin.rvs(n).astype(int)
         within_bin = self.dist_age_uniform.rvs(n)
-        return self.age_lows[age_bin] + within_bin * (self.age_highs[age_bin] - self.age_lows[age_bin])
+        return self._bound_ages(self.age_lows[age_bin] + within_bin * (self.age_highs[age_bin] - self.age_lows[age_bin]))
 
     # --- Household integration ---------------------------------------------
 
@@ -406,31 +424,73 @@ class Migration(ss.Demographics):
                 return net
         return None
 
-    def _household_sizes(self, household_net):
-        """Return member counts indexed by household ID, computed from live agents."""
+    def _household_ids_and_sizes(self, household_net):
+        """Return actual household IDs and live-member counts."""
         alive = self.sim.people.alive.uids
         ids = np.asarray(household_net.household_ids[alive], dtype=float)
         valid = ~np.isnan(ids)
         if not np.any(valid):
-            return np.empty(0, dtype=float)
-        return np.bincount(ids[valid].astype(int)).astype(float)
+            return np.empty(0, dtype=int), np.empty(0, dtype=float)
+        hh_ids, hh_sizes = np.unique(ids[valid].astype(int), return_counts=True)
+        return hh_ids, hh_sizes.astype(float)
 
-    def _weighted_household_indices(self, household_net, sample_uids):
+    def _weighted_household_ids(self, household_net, sample_uids):
         """Pick household IDs for new members with probability proportional to household size."""
-        household_sizes = self._household_sizes(household_net)
-        if len(household_sizes) == 0 or household_sizes.sum() <= 0:
+        hh_ids, hh_sizes = self._household_ids_and_sizes(household_net)
+        if len(hh_ids) == 0 or hh_sizes.sum() <= 0:
             return np.empty(0, dtype=int)
         draws = np.asarray(self.dist_household.rvs(sample_uids), dtype=float)
-        cdf = np.cumsum(household_sizes / household_sizes.sum())
-        return np.searchsorted(cdf, draws, side='right').astype(int)
+        cdf = np.cumsum(hh_sizes / hh_sizes.sum())
+        hh_inds = np.searchsorted(cdf, draws, side='right').astype(int)
+        return hh_ids[hh_inds]
 
-    def _append_household_edges(self, household_net, uid, member_uids):
-        """Connect a new member ``uid`` to every existing member of its household."""
-        member_uids = member_uids[member_uids != uid]
-        if len(member_uids) == 0:
+    def _members_by_household_id(self, household_net, household_ids):
+        """Return current member UID arrays for the requested household IDs."""
+        household_ids = np.asarray(household_ids, dtype=int)
+        if len(household_ids) == 0:
+            return {}
+
+        ids = np.asarray(household_net.household_ids, dtype=float)
+        in_target = np.isin(ids, household_ids)
+        if not np.any(in_target):
+            return {}
+
+        member_uids = np.flatnonzero(in_target)
+        member_hids = ids[member_uids].astype(int)
+        order = np.argsort(member_hids)
+        member_uids = member_uids[order]
+        member_hids = member_hids[order]
+
+        unique_hids, starts = np.unique(member_hids, return_index=True)
+        stops = np.r_[starts[1:], len(member_hids)]
+        return {hid: ss.uids(member_uids[start:stop]) for hid, start, stop in zip(unique_hids, starts, stops)}
+
+    def _append_household_group_edges(self, household_net, new_uids, member_uids):
+        """Connect new household members to existing members and each other."""
+        new_uids = np.asarray(new_uids, dtype=int)
+        member_uids = np.asarray(member_uids, dtype=int)
+        if len(new_uids) == 0:
             return
-        p1 = ss.uids(member_uids)
-        p2 = ss.uids(np.full(len(member_uids), int(uid), dtype=int))
+
+        p1_parts = []
+        p2_parts = []
+        n_new = len(new_uids)
+        n_existing = len(member_uids)
+
+        if n_existing:
+            p1_parts.append(np.tile(member_uids, n_new))
+            p2_parts.append(np.repeat(new_uids, n_existing))
+
+        if n_new > 1:
+            new_rows, new_cols = np.tril_indices(n_new, k=-1)
+            p1_parts.append(new_uids[new_cols])
+            p2_parts.append(new_uids[new_rows])
+
+        if not p1_parts:
+            return
+
+        p1 = ss.uids(np.concatenate(p1_parts))
+        p2 = ss.uids(np.concatenate(p2_parts))
         beta = np.ones(len(p1), dtype=ss.dtypes.float)
         household_net.append(p1=p1, p2=p2, beta=beta)
         return
@@ -450,17 +510,18 @@ class Migration(ss.Demographics):
         if household_net is None:
             return None
 
-        household_indices = self._weighted_household_indices(household_net, new_uids)
-        if len(household_indices) == 0:
+        household_ids = self._weighted_household_ids(household_net, new_uids)
+        if len(household_ids) == 0:
             return self._create_household_singletons(household_net, new_uids)
 
-        assigned = np.empty(len(new_uids), dtype=int)
-        for i, uid in enumerate(np.asarray(new_uids, dtype=int)):
-            household_index = int(household_indices[i])
-            members = ss.uids(household_net.household_ids == household_index)
-            household_net.household_ids[ss.uids(uid)] = household_index
-            self._append_household_edges(household_net, uid, members)
-            assigned[i] = household_index
+        new_uids = np.asarray(new_uids, dtype=int)
+        assigned = np.asarray(household_ids, dtype=int)
+        members_by_hid = self._members_by_household_id(household_net, np.unique(assigned))
+        for household_id in np.unique(assigned):
+            group_uids = new_uids[assigned == household_id]
+            members = members_by_hid.get(household_id, ss.uids())
+            household_net.household_ids[ss.uids(group_uids)] = household_id
+            self._append_household_group_edges(household_net, group_uids, members)
         self.hhid[new_uids] = assigned
         return assigned
 
@@ -534,10 +595,11 @@ class Migration(ss.Demographics):
         if self.emig_age_lows is None or self.emig_age_weights is None or len(uids) == 0:
             return None
         ages = np.asarray(self.sim.people.age[uids], dtype=float)
-        age_bins = np.searchsorted(self.emig_age_lows, ages, side='right') - 1
         weights = np.zeros(len(uids), dtype=float)
-        valid = age_bins >= 0
-        if np.any(valid):
+        age_bins = np.searchsorted(self.emig_age_lows, ages, side='right') - 1
+        valid = np.where(age_bins >= 0)[0]
+        if len(valid):
+            valid = valid[ages[valid] < self.emig_age_highs[age_bins[valid]]]
             weights[valid] = self.emig_age_weights[age_bins[valid]]
         return weights
 
@@ -565,12 +627,12 @@ class Migration(ss.Demographics):
 
         # If the weighted pool was too small, fill the remainder uniformly from the rest.
         if len(selected) < n_select:
-            sel_set = set(selected.tolist())
-            fallback = np.array([u for u in np.asarray(eligible, dtype=int) if u not in sel_set], dtype=int)
-            if len(fallback):
+            eligible_arr = np.asarray(eligible, dtype=int)
+            fallback_uids = eligible_arr[~np.isin(eligible_arr, selected)]
+            if len(fallback_uids):
                 n_fill = n_select - len(selected)
-                fallback_scores = np.asarray(self.dist_emigrant.rvs(fallback), dtype=float)
-                selected = np.concatenate([selected, fallback[np.argsort(fallback_scores)[:n_fill]]])
+                fallback_scores = np.asarray(self.dist_emigrant.rvs(fallback_uids), dtype=float)
+                selected = np.concatenate([selected, fallback_uids[np.argsort(fallback_scores)[:n_fill]]])
 
         return ss.uids(selected)
 

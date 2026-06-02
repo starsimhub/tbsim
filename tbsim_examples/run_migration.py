@@ -85,9 +85,15 @@ def summarize(sim):
     """Return a one-row summary for a completed scenario."""
     household_net = getattr(sim.networks, 'householdnet', None)
     if household_net is not None:
-        hh_sizes = np.array([len(hh) for hh in household_net.hhs], dtype=float)
-        n_households = int(len(hh_sizes))
-        mean_household_size = float(hh_sizes.mean()) if n_households else float('nan')
+        hh_ids = np.asarray(household_net.household_ids, dtype=float)
+        valid = hh_ids[~np.isnan(hh_ids)].astype(int)
+        if valid.size:
+            _, counts = np.unique(valid, return_counts=True)
+            n_households = int(counts.size)
+            mean_household_size = float(counts.mean())
+        else:
+            n_households = 0
+            mean_household_size = float('nan')
     else:
         n_households = np.nan
         mean_household_size = np.nan
@@ -127,20 +133,6 @@ def get_scenarios():
                 emigration_rate=ss.freqperyear(100),
             ),
         },
-        'Net Growth': {
-            'name': 'Net Growth',
-            'migration': dict(
-                immigration_rate=ss.freqperyear(180),
-                emigration_rate=ss.freqperyear(80),
-            ),
-        },
-        'Net Shrinkage': {
-            'name': 'Net Shrinkage',
-            'migration': dict(
-                immigration_rate=ss.freqperyear(60),
-                emigration_rate=ss.freqperyear(160),
-            ),
-        },
         'Maintain Population': {
             'name': 'Maintain Population',
             'migration': dict(
@@ -169,15 +161,7 @@ def get_scenarios():
                 start=ss.date('2000-01-01'),
                 stop=ss.date('2004-01-01'),
             ),
-        },
-        'No Household Network': {
-            'name': 'No Household Network',
-            'use_households': False,
-            'migration': dict(
-                immigration_rate=ss.freqperyear(100),
-                emigration_rate=ss.freqperyear(100),
-            ),
-        },
+        }
     }
 
 
@@ -204,10 +188,10 @@ def run_scenarios(do_plot=False, savefig=False, fig_path='results/migration_mult
         tbsim.plot(
             msim,
             title='Migration scenarios (TBsim)',
-            select=['~None', '~n_multiplier_applied', '~ACUTE', '~acute'],
+            select=['~None', '~n_multiplier_applied', '~ACUTE', '~acute', '~15+'],
             filename=fig_path if savefig else None,
             show=do_plot,
-            style='dark_background',
+            # style='dark_background',
         )
 
     return msim, summary_df
