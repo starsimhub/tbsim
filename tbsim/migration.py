@@ -152,9 +152,38 @@ class Migration(ss.Demographics):
         self.pars.tb_state_distribution = self._validate_tb_state_distribution(self.pars.tb_state_distribution)
 
         self._configure_age_sampling()
-        self._validate_max_age()
-        self._configure_immigration_age_bins()
-        self._configure_tb_state_sampler()
+
+        max_age = float(self.pars.max_age)
+        if not np.isfinite(max_age) or max_age <= 0:
+            max_age = 85.0
+            warnings.warn(f'max_age invalid ({self.pars.max_age!r}); using {max_age}', stacklevel=2)
+            self.pars.max_age = max_age
+
+        # Immigrant age bins: install a default profile if none given, then build piecewise-uniform bins.
+        if self.dist_age_data is None and self.pars.immigration_age_distribution is None:
+            keys, weights = [0, 5, 15, 30, 50, 65], [0.15, 0.20, 0.25, 0.20, 0.15, 0.05]
+            self.pars.immigration_age_distribution = {k: w for k, w in zip(keys, weights) if k < max_age}
+        age_bins = self.pars.immigration_age_distribution
+        if self.dist_age_data is None and isinstance(age_bins, dict) and len(age_bins):
+            edges = np.array(sorted(age_bins.keys()), dtype=float)
+            bin_weights = np.array([age_bins[k] for k in edges], dtype=float)
+            valid = np.isfinite(edges) & np.isfinite(bin_weights)
+            edges, bin_weights = edges[valid], np.clip(bin_weights[valid], 0, None)
+            edges = edges[edges < max_age]
+            bin_weights = bin_weights[:len(edges)]
+            if len(edges) == 0 or bin_weights.sum() <= 0:
+                warnings.warn('immigration_age_distribution has no usable bins; using uniform [0, max_age)', stacklevel=2)
+            else:
+                self.age_lows = edges
+                self.age_highs = np.r_[edges[1:], max_age]
+                self.dist_age_bin.pars.a = np.arange(len(edges), dtype=int)
+                self.dist_age_bin.pars.p = bin_weights / bin_weights.sum()
+
+        # Entry TB-state sampler.
+        weights = self.pars.tb_state_distribution
+        self.dist_tb_state.pars.a = np.array([int(TBS[name]) for name in weights], dtype=int)
+        self.dist_tb_state.pars.p = np.array(list(weights.values()), dtype=float)
+
         self._configure_emig_age_weights()
         return
 
@@ -181,14 +210,6 @@ class Migration(ss.Demographics):
 
     # --- Configuration helpers (init-time) ---------------------------------
 
-    def _validate_max_age(self):
-        """Clamp ``max_age`` to a positive finite value, warning if it was invalid."""
-        max_age = float(self.pars.max_age)
-        if not np.isfinite(max_age) or max_age <= 0:
-            warnings.warn(f'max_age invalid ({self.pars.max_age!r}); using 85.0', stacklevel=2)
-            self.pars.max_age = 85.0
-        return
-
     def _configure_age_sampling(self):
         """Build the immigrant-age histogram sampler from ``age_data``, if provided."""
         if self.pars.age_data is None:
@@ -198,47 +219,6 @@ class Migration(ss.Demographics):
         self.dist_age_data = ss.People.get_age_dist(self.pars.age_data)
         self.age_lows = None
         self.age_highs = None
-        return
-
-    def _configure_immigration_age_bins(self):
-        """Build piecewise-uniform age bins for sampling immigrant ages.
-
-        Uses ``immigration_age_distribution`` (a ``{lower_bound: weight}``
-        dict), installing a default profile when none is supplied. Skipped
-        when ``age_data`` has already configured a histogram sampler.
-        """
-        if self.dist_age_data is not None:
-            return
-        max_age = float(self.pars.max_age)
-        if self.pars.immigration_age_distribution is None:
-            keys, weights = [0, 5, 15, 30, 50, 65], [0.15, 0.20, 0.25, 0.20, 0.15, 0.05]
-            self.pars.immigration_age_distribution = {k: w for k, w in zip(keys, weights) if k < max_age}
-
-        age_bins = self.pars.immigration_age_distribution
-        if not (isinstance(age_bins, dict) and len(age_bins)):
-            return
-
-        edges = np.array(sorted(age_bins.keys()), dtype=float)
-        bin_weights = np.array([age_bins[k] for k in edges], dtype=float)
-        valid = np.isfinite(edges) & np.isfinite(bin_weights)
-        edges, bin_weights = edges[valid], np.clip(bin_weights[valid], 0, None)
-        edges = edges[edges < max_age]
-        bin_weights = bin_weights[:len(edges)]
-        if len(edges) == 0 or bin_weights.sum() <= 0:
-            warnings.warn('immigration_age_distribution has no usable bins; using uniform [0, max_age)', stacklevel=2)
-            return
-
-        self.age_lows = edges
-        self.age_highs = np.r_[edges[1:], max_age]
-        self.dist_age_bin.pars.a = np.arange(len(edges), dtype=int)
-        self.dist_age_bin.pars.p = bin_weights / bin_weights.sum()
-        return
-
-    def _configure_tb_state_sampler(self):
-        """Point the entry-state sampler at the validated TB-state distribution."""
-        weights = self.pars.tb_state_distribution
-        self.dist_tb_state.pars.a = np.array([int(TBS[name]) for name in weights], dtype=int)
-        self.dist_tb_state.pars.p = np.array(list(weights.values()), dtype=float)
         return
 
     def _configure_emig_age_weights(self):
