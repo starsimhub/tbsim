@@ -11,10 +11,11 @@ names=()
 for nb in *.ipynb; do
     # Execute to validate; send the executed notebook to /dev/null so the
     # source file is left untouched. Execution errors -> nonzero exit + log.
-    uv run jupyter nbconvert --to notebook --execute --stdout "$nb" \
-        > /dev/null 2> "$nb.log" &
+    
+    jupyter nbconvert --to notebook --execute --stdout "$nb" > /dev/null 2> "$nb.log" &
     pids+=("$!")
     names+=("$nb")
+    echo "Working on $nb ..."
 done
 
 failed=()
@@ -24,6 +25,7 @@ for i in "${!pids[@]}"; do
         cat "${names[$i]}.log"
         failed+=("${names[$i]}")
     fi
+    echo "... done with $i"
 done
 
 echo
@@ -33,3 +35,6 @@ else
     echo "Failed (${#failed[@]}): ${failed[*]}"
     exit 1
 fi
+
+# Clean up
+rm -iv ./*.ipynb.log
