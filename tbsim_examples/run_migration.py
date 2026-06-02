@@ -85,9 +85,15 @@ def summarize(sim):
     """Return a one-row summary for a completed scenario."""
     household_net = getattr(sim.networks, 'householdnet', None)
     if household_net is not None:
-        hh_sizes = np.array([len(hh) for hh in household_net.hhs], dtype=float)
-        n_households = int(len(hh_sizes))
-        mean_household_size = float(hh_sizes.mean()) if n_households else float('nan')
+        hh_ids = np.asarray(household_net.household_ids, dtype=float)
+        valid = hh_ids[~np.isnan(hh_ids)].astype(int)
+        if valid.size:
+            _, counts = np.unique(valid, return_counts=True)
+            n_households = int(counts.size)
+            mean_household_size = float(counts.mean())
+        else:
+            n_households = 0
+            mean_household_size = float('nan')
     else:
         n_households = np.nan
         mean_household_size = np.nan
