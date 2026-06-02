@@ -27,9 +27,9 @@ pytest tests/test_tb.py::test_something -v
 # Run tests in parallel
 pytest tests/test_*.py -n auto
 
-# Build docs
-mkdocs serve  # local preview
-mkdocs build  # build static site
+# Build docs (Quarto; run from the docs/ directory)
+cd docs && ./preview   # local preview with live reload
+cd docs && ./render    # build static site to docs/_site
 ```
 
 ## Architecture

@@ -1,0 +1,95 @@
+---
+title: Comprehensive Analyzer Plots Example
+jupyter: python3
+---
+
+This notebook demonstrates all available plotting methods in the `DwtAnalyzer` class from the `tbsim` package. It is adapted from the original Python script for interactive exploration.
+
+
+```{python}
+import tbsim
+import starsim as ss
+import matplotlib.pyplot as plt
+```
+
+## Build a TB simulation with dwell time analyzer
+
+```{python}
+def build_tbsim(sim_pars=None):
+    sim_params = dict(
+        start = ss.date('2013-01-01'),
+        stop = ss.date('2016-12-31'),
+        rand_seed=123,
+        dt=ss.days(7),
+    )
+    if sim_pars is not None:
+        sim_params.update(sim_pars)
+    pop = ss.People(n_agents=1000)
+    tb_params = dict(
+        beta=ss.peryear(0.025),
+        init_prev=ss.bernoulli(p=0.25),
+    )
+    tb = tbsim.TB(tb_params)
+    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
+    dwell_analyzer = tbsim.DwtAnalyzer(scenario_name='comprehensive_plots_example')
+    sim = ss.Sim(
+        people=pop,
+        networks=net,
+        diseases=tb,
+        pars=sim_params,
+        analyzers=dwell_analyzer,
+    )
+    sim.pars.verbose = 0
+    return sim
+```
+
+## Run the simulation and extract the analyzer
+
+```{python}
+print("Building and running TB simulation...")
+sim_tb = build_tbsim()
+sim_tb.run()
+analyzer = sim_tb.analyzers[0]
+```
+
+## 1. Network Graph
+Directed graph of state transitions.
+
+```{python}
+analyzer.plot('network')
+```
+
+## 2. Histograms
+Histograms with KDE of dwell time distributions per state.
+
+```{python}
+analyzer.plot('histogram')
+```
+
+## 3. Survival Analysis
+Kaplan-Meier survival curves for dwell times.
+
+```{python}
+analyzer.plot('kaplan_meier')
+```
+
+## 4. Validation
+Observed dwell-time histograms for validation.
+
+```{python}
+analyzer.plot('validation')
+```
+
+## 5. Loading from file
+You can also create a DwellTime instance from a saved CSV file.
+
+```{python}
+from tbsim.analyzers import DwellTime
+
+file_path = analyzer.file_path
+print(f'Generated data file: {file_path}')
+
+plotter = DwellTime(file_path=file_path)
+plotter.plot('histogram')
+```
+
