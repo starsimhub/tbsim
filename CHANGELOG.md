@@ -17,5 +17,6 @@ All notable changes to the codebase are documented in this file.
 - Added `HouseholdStats` analyzer for tracking household size distributions, age-mixing matrices, and contact patterns over time when using `ss.HouseholdNet`. Includes visualization methods for household statistics, age-mixing heatmaps, and normalized contact matrices.
 - Renamed `tb_health_seeking.py` to `health_seeking.py` and simplified the `HealthSeekingBehavior` class
 - Moved `immigration.py` to an archive folder
+- Added `migration.py` with a single `Migration` demographics class providing bidirectional migration (immigration and emigration, with optional population maintenance, age-weighted flows, TB-state-aware imports, and household integration); immigration-only behavior is obtained by setting `emigration_rate=0`
 - Added admin files (`code_of_conduct.md`, `contributing.md`, `CHANGELOG.md`)
 - Updated `starsim` dependency to v3.2.1 for `HouseholdNet` support

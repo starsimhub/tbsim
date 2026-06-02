@@ -6,7 +6,7 @@ import starsim as ss
 
 from .tb import TBS, TB, TBAcute, get_tb
 
-__all__ = ['Immigration', 'Migration']
+__all__ = ['Migration']
 
 
 class Migration(ss.Demographics):
@@ -347,29 +347,43 @@ class Migration(ss.Demographics):
 
     def _find_household_network(self):
         for net in self.sim.networks.values():
-            if hasattr(net, 'add_member') and hasattr(net, 'remove_uids') and hasattr(net, 'hhs'):
+            if hasattr(net, 'household_ids') and hasattr(net, 'remove_uids'):
                 return net
         return None
 
+    def _household_sizes(self, household_net):
+        """Return member counts indexed by household ID, computed from live agents."""
+        alive = self.sim.people.alive.uids
+        ids = np.asarray(household_net.household_ids[alive], dtype=float)
+        valid = ~np.isnan(ids)
+        if not np.any(valid):
+            return np.empty(0, dtype=float)
+        return np.bincount(ids[valid].astype(int)).astype(float)
+
     def _weighted_household_indices(self, household_net, sample_uids):
-        household_sizes = np.asarray([len(hh) for hh in household_net.hhs], dtype=float)
+        household_sizes = self._household_sizes(household_net)
         if len(household_sizes) == 0 or household_sizes.sum() <= 0:
             return np.empty(0, dtype=int)
         draws = np.asarray(self._dist_hhu.rvs(sample_uids), dtype=float)
         cdf = np.cumsum(household_sizes / household_sizes.sum())
         return np.searchsorted(cdf, draws, side='right').astype(int)
 
+    def _append_household_edges(self, household_net, uid, member_uids):
+        """Connect a new member ``uid`` to every existing member of its household."""
+        member_uids = member_uids[member_uids != uid]
+        if len(member_uids) == 0:
+            return
+        p1 = ss.uids(member_uids)
+        p2 = ss.uids(np.full(len(member_uids), int(uid), dtype=int))
+        beta = np.ones(len(p1), dtype=ss.dtypes.float)
+        household_net.append(p1=p1, p2=p2, beta=beta)
+        return
+
     def _create_household_singletons(self, household_net, new_uids):
-        assigned = np.empty(len(new_uids), dtype=int)
-        for i, uid in enumerate(np.asarray(new_uids, dtype=int)):
-            household_net.hhs.append([uid])
-            assigned[i] = len(household_net.hhs) - 1
-        try:
-            refresh = household_net._refresh_household_ids
-        except AttributeError:
-            pass
-        else:
-            refresh()
+        new_uids = ss.uids(new_uids)
+        assigned = household_net.n_households + np.arange(len(new_uids))
+        household_net.n_households += len(new_uids)
+        household_net.household_ids[new_uids] = assigned
         self.hhid[new_uids] = assigned
         return assigned
 
@@ -378,14 +392,16 @@ class Migration(ss.Demographics):
         if household_net is None:
             return None
 
-        assigned = np.empty(len(new_uids), dtype=int)
         household_indices = self._weighted_household_indices(household_net, new_uids)
         if len(household_indices) == 0:
             return self._create_household_singletons(household_net, new_uids)
 
+        assigned = np.empty(len(new_uids), dtype=int)
         for i, uid in enumerate(np.asarray(new_uids, dtype=int)):
             household_index = int(household_indices[i])
-            household_net.add_member(uid, household_index)
+            members = ss.uids(household_net.household_ids == household_index)
+            household_net.household_ids[ss.uids(uid)] = household_index
+            self._append_household_edges(household_net, uid, members)
             assigned[i] = household_index
         self.hhid[new_uids] = assigned
         return assigned
@@ -544,350 +560,6 @@ class Migration(ss.Demographics):
             if not np.isfinite(w) or w < 0:
                 w = 0.0
             valid[name] = w
-        for term in [TBS.DEAD.name, TBS.REMOVED.name]:
-            if term in valid:
-                warnings.warn(f'Removing terminal state {term} from tb_state_distribution', stacklevel=2)
-                valid.pop(term)
-        weight_sum = sum(valid.values())
-        if weight_sum <= 0:
-            raise ValueError('tb_state_distribution must include at least one positive probability')
-        return {k: v / weight_sum for k, v in valid.items() if v > 0}
-
-
-#============================#
-#.     IMMIGRATION ONLY      #
-#============================#
-
-# ***If the migration class is enough we can remove the class below.
-
-class Immigration(ss.Demographics):
-    """
-    Immigration-only demographic module (no emigration).
-
-    Adds new agents to the simulation on a Poisson schedule each timestep.
-    Each immigrant is assigned an age (sampled from a configurable
-    distribution), a TB disease state, and (when a household network is
-    present) a household. This is the simpler, one-directional counterpart
-    to :class:`Migration`.
-
-    Unlike :class:`Migration`, this class does **not** support emigration,
-    population maintenance, or age-weighted emigrant selection. Use
-    :class:`Migration` when bidirectional flows are needed.
-
-    Args (pars):
-        immigration_rate (ss.freq/float): Expected arrivals per year
-            (default ``ss.freqperyear(10)``). Must be an event rate
-            (``ss.freq...``), not a probability rate (``ss.peryear``).
-        age_distribution (dict/None): ``{age_lower_bound: weight}`` for
-            piecewise-uniform age sampling; the top bin extends to
-            ``max_age``. Used when ``age_data`` is None. If both are None,
-            a built-in profile spanning 0 to ``max_age`` is installed at
-            ``init_pre``. All keys must be strictly less than ``max_age``.
-        age_data (DataFrame/Series/array/str/None): Age histogram in Starsim
-            ``People`` format; overrides ``age_distribution`` when provided.
-        max_age (float): Upper bound on sampled ages (default 85.0).
-        tb_state_distribution (dict): ``{TBS state name: weight}`` at entry.
-            Weights are normalized automatically. Terminal states (``DEAD``,
-            ``REMOVED``) are rejected. ``ACUTE`` requires the ``TBAcute``
-            disease module.
-
-    Attributes:
-        hhid (IntArr): Household index on the network, or -1 if unassigned.
-        is_immigrant (BoolState): True for agents created by this module.
-        immigration_time (FloatArr): Timestep index when the agent arrived.
-        age_at_immigration (FloatArr): Age at arrival (years).
-        immigration_tb_status (IntArr): ``TBS`` value assigned at entry.
-
-    Results:
-        n_immigrants: Count of arrivals in the last step.
-
-    Example::
-
-        import starsim as ss
-        import tbsim
-
-        imm = tbsim.Immigration(pars=dict(immigration_rate=ss.freqperyear(50)))
-        sim = tbsim.Sim(demographics=[ss.Births(), ss.Deaths(), imm])
-        sim.run()
-    """
-
-    def __init__(self, pars=None, **kwargs):
-        super().__init__()
-        self.define_pars(
-            immigration_rate=ss.freqperyear(10),
-            age_distribution=None,
-            age_data=None,
-            max_age=85.0,
-            tb_state_distribution={
-                TBS.SUSCEPTIBLE.name: 0.6517,
-                TBS.INFECTION.name: 0.33,
-                TBS.CLEARED.name: 0.007,
-                TBS.NON_INFECTIOUS.name: 0.0008,
-                TBS.ASYMPTOMATIC.name: 0.0015,
-                TBS.SYMPTOMATIC.name: 0.0010,
-                TBS.TREATMENT.name: 0.0,
-            },
-        )
-        self.update_pars(pars, **kwargs)
-        self.pars.tb_state_distribution = self._validate_tb_state_distribution(self.pars.tb_state_distribution)
-
-        self._dist_n = ss.poisson(lam=self._lam_per_timestep)
-        self._dist_agebin = ss.choice(a=[0], p=[1.0])
-        self._dist_ageu = ss.random()
-        self._dist_tbstate = ss.choice(a=[-1], p=[1.0])
-        self._dist_hhu = ss.random()
-        self._dist_age = None
-        self._age_lows = None
-        self._age_highs = None
-
-        self.define_states(
-            ss.IntArr('hhid', default=-1),
-            ss.BoolState('is_immigrant', default=False),
-            ss.FloatArr('immigration_time', default=np.nan),
-            ss.FloatArr('age_at_immigration', default=np.nan),
-            ss.IntArr('immigration_tb_status', default=-1),
-        )
-        self.n_immigrants = 0
-        self._fresh_import_uids = None
-        return
-
-    def init_post(self):
-        super().init_post()
-        self._tb_name = next((k for k, d in self.sim.diseases.items() if isinstance(d, (TB, TBAcute))), None)
-        if self._tb_name is None:
-            raise RuntimeError('Expected TB or TBAcute disease module for immigration initialization')
-        return
-
-    def init_pre(self, sim):
-        super().init_pre(sim)
-        self._configure_age_sampling()
-        max_age = float(self.pars.max_age)
-        if not np.isfinite(max_age) or max_age <= 0:
-            max_age = 85.0
-            warnings.warn(f'max_age invalid ({self.pars.max_age!r}); using {max_age}', stacklevel=2)
-            self.pars.max_age = max_age
-        if self._dist_age is None and self.pars.age_distribution is None:
-            default_keys = [0, 5, 15, 30, 50, 65]
-            self.pars.age_distribution = {k: w for k, w in zip(default_keys, [0.15, 0.20, 0.25, 0.20, 0.15, 0.05]) if k < max_age}
-
-        age_bins = self.pars.age_distribution
-        if isinstance(age_bins, dict) and len(age_bins) and self._dist_age is None:
-            bin_edges = np.array(sorted(age_bins.keys()), dtype=float)
-            bin_weights = np.array([age_bins[k] for k in bin_edges], dtype=float)
-            valid = np.isfinite(bin_edges) & np.isfinite(bin_weights)
-            bin_edges, bin_weights = bin_edges[valid], bin_weights[valid]
-            bin_weights = np.clip(bin_weights, 0, None)
-            bin_edges = bin_edges[bin_edges < max_age]
-            bin_weights = bin_weights[:len(bin_edges)]
-            weight_sum = bin_weights.sum()
-            if len(bin_edges) == 0 or weight_sum <= 0:
-                warnings.warn('age_distribution has no usable bins; using uniform [0, max_age)', stacklevel=2)
-                return
-            bin_weights = bin_weights / weight_sum
-            self._age_lows = bin_edges
-            self._age_highs = np.r_[bin_edges[1:], max_age]
-            self._dist_agebin.pars.a = np.arange(len(bin_edges), dtype=int)
-            self._dist_agebin.pars.p = bin_weights
-
-        tb_entry_weights = self.pars.tb_state_distribution
-        self._dist_tbstate.pars.a = np.array([int(TBS[state_name]) for state_name in tb_entry_weights], dtype=int)
-        self._dist_tbstate.pars.p = np.array(list(tb_entry_weights.values()), dtype=float)
-        return
-
-    def _configure_age_sampling(self):
-        age_data = self.pars.age_data
-        if age_data is None:
-            return
-        if self.pars.age_distribution is not None:
-            warnings.warn('age_data is set; ignoring age_distribution', stacklevel=2)
-        self._dist_age = ss.People.get_age_dist(age_data)
-        self._age_lows = None
-        self._age_highs = None
-        return
-
-    def init_results(self):
-        super().init_results()
-        self.define_results(ss.Result('n_immigrants', dtype=int, label='Number of immigrants'))
-        return
-
-    def expected_immigrants_per_timestep(self):
-        rate_spec = self.pars.immigration_rate
-        if rate_spec is None:
-            return 0.0
-        if isinstance(rate_spec, ss.Rate):
-            if not isinstance(rate_spec, ss.freq):
-                warnings.warn('immigration_rate should be ss.freq (event rate), not ss.peryear (probability rate); treating as ss.freqperyear', stacklevel=2)
-            annual_rate = rate_spec
-        else:
-            annual_rate = ss.freqperyear(float(rate_spec))
-        expected_arrivals = float(annual_rate.to_events(self.t.dt))
-        if not np.isfinite(expected_arrivals) or expected_arrivals < 0:
-            expected_arrivals = 0.0
-        return expected_arrivals
-
-    def _lam_per_timestep(self, module):
-        return module.expected_immigrants_per_timestep()
-
-    def _sample_ages(self, n):
-        if n <= 0:
-            return np.empty(0, dtype=float)
-        if self._dist_age is not None:
-            return np.asarray(self._dist_age.rvs(n), dtype=float)
-        if self._age_lows is None or self._age_highs is None:
-            return self._dist_ageu.rvs(n) * float(self.pars.max_age)
-        age_bin = self._dist_agebin.rvs(n).astype(int)
-        within_bin = self._dist_ageu.rvs(n)
-        bin_lower = self._age_lows[age_bin]
-        bin_upper = self._age_highs[age_bin]
-        return bin_lower + within_bin * (bin_upper - bin_lower)
-
-    def _init_tb_states(self, new_uids):
-        tb = self.sim.diseases[self._tb_name]
-        entry_state_codes = np.asarray(self._dist_tbstate.pars.a, dtype=int)
-        if TBS.ACUTE in entry_state_codes and not isinstance(tb, TBAcute):
-            raise ValueError(f'tb_state_distribution includes {TBS.ACUTE.name} but TB module is not TBAcute')
-
-        entry_states = self._dist_tbstate.rvs(len(new_uids)).astype(int)
-        tb.state[new_uids] = entry_states
-        tb.infected[new_uids] = ~np.isin(entry_states, [TBS.SUSCEPTIBLE, TBS.CLEARED, TBS.DEAD])
-        tb.susceptible[new_uids] = np.isin(entry_states, [TBS.SUSCEPTIBLE, TBS.CLEARED])
-        tb.ever_infected[new_uids] = entry_states != TBS.SUSCEPTIBLE
-        tb.on_treatment[new_uids] = entry_states == TBS.TREATMENT
-        tb.ti_infected[new_uids] = -np.inf
-        tb.ti_asymp[new_uids] = self.ti
-        tb.rr_reinfection[new_uids] = 1.0
-        tb.ti_rr_reinfection_wane[new_uids] = np.inf
-        is_cleared = entry_states == TBS.CLEARED
-        if np.any(is_cleared):
-            tb.rr_reinfection[new_uids[is_cleared]] = float(tb.pars.rr_reinfection_cleared)
-        tb.rel_sus[new_uids] = 1.0
-        tb.rel_sus[new_uids[is_cleared]] = tb.rr_reinfection[new_uids[is_cleared]]
-        tb.rel_trans[new_uids] = 1.0
-        tb.rel_trans[new_uids[entry_states == TBS.ASYMPTOMATIC]] = float(tb.pars.trans_asymp)
-        if isinstance(tb, TBAcute):
-            tb.rel_trans[new_uids[entry_states == TBS.ACUTE]] = float(tb.pars.trans_acute)
-        return entry_states
-
-    def step(self):
-        n_arrivals = int(self._dist_n.rvs(1)[0])
-        if n_arrivals == 0:
-            self.n_immigrants = 0
-            self._fresh_import_uids = None
-            return []
-        arrival_ages = self._sample_ages(n_arrivals)
-        new_uids = self.sim.people.grow(n_arrivals)
-        self.sim.people.age[new_uids] = arrival_ages
-        self.immigration_tb_status[new_uids] = self._init_tb_states(new_uids)
-        self.assign_immigrants_to_households(new_uids)
-        self.is_immigrant[new_uids] = True
-        self.immigration_time[new_uids] = float(self.ti)
-        self.age_at_immigration[new_uids] = self.sim.people.age[new_uids]
-        self.n_immigrants = n_arrivals
-        self._fresh_import_uids = new_uids
-        return new_uids
-
-    def assign_immigrants_to_households(self, new_uids):
-        household_net = None
-        household_id_attr = None
-        for net in self.sim.networks.values():
-            for attr in ['hhid', 'household_ids']:
-                household_ids = getattr(net, attr, None)
-                if isinstance(household_ids, (np.ndarray, ss.BaseArr)):
-                    household_net = net
-                    household_id_attr = attr
-                    break
-            if household_net is not None:
-                break
-        if household_net is None:
-            return
-
-        household_ids = getattr(household_net, household_id_attr)
-        tb = self.sim.diseases[self._tb_name]
-        household_ids_arr = np.asarray(household_ids, dtype=float)
-        has_household_id = np.isfinite(household_ids_arr) & (household_ids_arr >= 0)
-        is_active = np.asarray(self.sim.people.alive) & (np.asarray(tb.state) != TBS.DEAD)
-        occupied_household_ids = np.unique(household_ids_arr[has_household_id & is_active]).astype(int)
-
-        if len(occupied_household_ids):
-            household_draw = self._dist_hhu.rvs(len(new_uids))
-            household_idx = np.floor(household_draw * len(occupied_household_ids)).astype(int)
-            household_idx = np.clip(household_idx, 0, len(occupied_household_ids) - 1)
-            assigned_household_ids = occupied_household_ids[household_idx]
-        else:
-            assigned_household_ids = np.arange(len(new_uids), dtype=int)
-
-        household_ids[new_uids] = assigned_household_ids
-        self.hhid[new_uids] = assigned_household_ids
-        self._connect_immigrants_to_households(
-            household_net=household_net,
-            household_ids=household_ids,
-            new_uids=new_uids,
-            assigned_household_ids=assigned_household_ids,
-        )
-        return
-
-    def _connect_immigrants_to_households(self, household_net, household_ids, new_uids, assigned_household_ids):
-        try:
-            edges = household_net.edges
-            _ = edges.p1, edges.p2
-        except AttributeError:
-            return
-        tb = self.sim.diseases[self._tb_name]
-        household_ids_arr = np.asarray(household_ids, dtype=float)
-        edge_p1 = np.asarray(household_net.edges.p1, dtype=int)
-        edge_p2 = np.asarray(household_net.edges.p2, dtype=int)
-        existing_edge_pairs = {(int(min(a, b)), int(max(a, b))) for a, b in zip(edge_p1, edge_p2) if a != b}
-        assigned_household_ids = np.asarray(assigned_household_ids, dtype=int)
-        new_edge_pairs = set()
-        for household_id in np.unique(assigned_household_ids):
-            if isinstance(household_ids, ss.BaseArr):
-                member_uids = np.asarray((household_ids == household_id).uids, dtype=int)
-            else:
-                member_uids = np.where(household_ids_arr == household_id)[0].astype(int)
-            is_active_member = np.asarray(self.sim.people.alive[member_uids]) & (tb.state[member_uids] != TBS.DEAD)
-            member_uids = member_uids[is_active_member]
-            if len(member_uids) < 2:
-                continue
-            immigrant_uids = np.asarray(new_uids[assigned_household_ids == household_id], dtype=int)
-            for immigrant_uid in immigrant_uids:
-                for member_uid in member_uids:
-                    if immigrant_uid == member_uid:
-                        continue
-                    uid_lo, uid_hi = (immigrant_uid, member_uid) if immigrant_uid < member_uid else (member_uid, immigrant_uid)
-                    if (uid_lo, uid_hi) not in existing_edge_pairs:
-                        new_edge_pairs.add((uid_lo, uid_hi))
-        if len(new_edge_pairs):
-            new_p1 = np.fromiter((lo for lo, _ in sorted(new_edge_pairs)), dtype=int)
-            new_p2 = np.fromiter((hi for _, hi in sorted(new_edge_pairs)), dtype=int)
-            household_net.append(p1=ss.uids(new_p1), p2=ss.uids(new_p2), beta=np.ones(len(new_p1), dtype=float))
-        return
-
-    def update_results(self):
-        super().update_results()
-        if isinstance(self.results, ss.Results):
-            self.results['n_immigrants'][self.ti] = int(self.n_immigrants)
-        if self._fresh_import_uids is not None and len(self._fresh_import_uids):
-            tb = self.sim.diseases[self._tb_name]
-            tb.ti_asymp[self._fresh_import_uids] = -np.inf
-            self._fresh_import_uids = None
-        return
-
-    @staticmethod
-    def _validate_tb_state_distribution(tb_state_distribution):
-        if not tb_state_distribution:
-            raise ValueError('tb_state_distribution must be provided')
-        raw = dict(tb_state_distribution)
-        # Drop unknown states with a warning
-        valid = {}
-        for name, weight in raw.items():
-            if name not in TBS._member_names_:
-                warnings.warn(f'Ignoring unknown TB state "{name}" in tb_state_distribution', stacklevel=2)
-                continue
-            w = float(weight)
-            if not np.isfinite(w) or w < 0:
-                w = 0.0
-            valid[name] = w
-        # Remove terminal states silently
         for term in [TBS.DEAD.name, TBS.REMOVED.name]:
             if term in valid:
                 warnings.warn(f'Removing terminal state {term} from tb_state_distribution', stacklevel=2)
