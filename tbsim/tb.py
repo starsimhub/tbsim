@@ -476,8 +476,8 @@ class TB(BaseTB):
 
         Args:
             **kwargs: Forwarded to :func:`tbsim.plots.plot`. Common options
-                include ``select``, ``title``, ``n_cols``, ``theme``,
-                ``savefig``, ``filename``, ``output_dir``, and ``show``.
+                include ``select``, ``title``, ``n_cols``, ``row_height``,
+                ``style``, ``filename``, and ``show``.
 
         Returns:
             matplotlib.figure.Figure

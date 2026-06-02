@@ -6,7 +6,6 @@ This section contains step-by-step tutorials and examples for using TBsim. These
 
 ### Beginner Tutorials
 
-- [tutorials/basic_tbrun](tutorials/basic_tbrun.md)
 - [tutorials/tuberculosis_sim.ipynb](tutorials/tuberculosis_sim.ipynb)
 
 ## Core Modeling
@@ -25,9 +24,6 @@ This section contains step-by-step tutorials and examples for using TBsim. These
 - [tutorials/comprehensive_analyzer_plots_example.ipynb](tutorials/comprehensive_analyzer_plots_example.ipynb)
 
 ## Tutorial Descriptions
-
-**basic_tbrun.md**  
-Basic introduction to TBsim concepts and workflow
 
 **tuberculosis_sim.ipynb**  
 Comprehensive TB simulation tutorial with step-by-step explanations

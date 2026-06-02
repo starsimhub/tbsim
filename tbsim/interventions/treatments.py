@@ -30,7 +30,7 @@ class Tx(ss.Product):
         dur_treatment: Treatment duration distribution. Default 180 days.
         adherence: Probability of completing the full course (0-1). Default 0.85.
         p_relapse: Probability that a successfully cured agent relapses to active TB.
-            Default 0.05 (matches drug_params['dots']['relapse_rate']).
+            Default 0.05 (matches ``drug_params['dots']['relapse_rate']``).
         dur_relapse: Distribution for time-to-relapse (days), measured from the
             end of successful treatment. Default constant 1.5 years.
         drug_type: If provided (e.g. 'dots', 'first_line_combo'), overrides
