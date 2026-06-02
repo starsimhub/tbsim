@@ -130,7 +130,6 @@ for rate in transmission_rates:
 The `tbsim_examples/` directory contains ready-to-run examples:
 
 - **Basic TB**: `run_tb.py` - Simple TB simulation
-- **LSHTM Model**: `run_tb_acute.py` - Spectrum of TB disease natural history
 - **Malnutrition**: `run_malnutrition.py` - TB and malnutrition comorbidity
 - **TB-HIV**: `run_tbhiv.py` - TB-HIV coinfection model
 - **Interventions**: `run_tb_interventions.py` - BCG, TPT, and beta scenarios

@@ -173,33 +173,6 @@ def test_beta_intervention_changes_beta():
     assert np.isclose(pars.beta.value, expected_beta)
 
 
-def test_beta_intervention_with_acute():
-    """BetaByYear works with TBAcute."""
-    initial_beta = 0.02
-    x_beta = 0.6
-    intervention_year = 2005
-
-    tb_pars = dict(beta=initial_beta, init_prev=0.25)
-    sim_pars = dict(start='2004-01-01', stop='2007-01-01', dt=ss.days(7), rand_seed=42)
-
-    pop = ss.People(n_agents=100)
-    tb = tbsim.TBAcute(pars=tb_pars)
-    net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
-
-    beta_intv = tbsim.BetaByYear(pars={'years': intervention_year, 'x_beta': x_beta})
-    sim = ss.Sim(people=pop, networks=net, diseases=tb, interventions=beta_intv, pars=sim_pars)
-    sim.init()
-
-    while sim.t.now('year') < intervention_year:
-        sim.run_one_step()
-
-    sim.run_one_step()
-    expected_beta = initial_beta * x_beta
-    beta_val = tbsim.get_tb(sim).pars.beta
-    actual = beta_val.value if hasattr(beta_val, 'value') else float(beta_val)
-    assert np.isclose(actual, expected_beta)
-
-
 def test_beta_multiple_years():
     """BetaByYear applies different x_beta values at multiple years."""
     initial_beta = 0.1

@@ -212,15 +212,15 @@ class TxDelivery(ss.Intervention):
         """
         Start treatment for eligible agents.
 
-        Latent/acute agents are cleared immediately. Active TB agents are put
+        Latent agents are cleared immediately. Active TB agents are put
         into TREATMENT state and their outcome (success/failure) is pre-rolled
         via the product, but not resolved until dur_treatment has elapsed.
         """
         tb = self.sim.get_tb()
         uids = self._elig_uids
 
-        # ACUTE or INFECTION: clear immediately (no treatment course needed)
-        latent = uids[np.isin(tb.state[uids], [TBS.ACUTE, TBS.INFECTION])]
+        # INFECTION: clear immediately (no treatment course needed)
+        latent = uids[np.isin(tb.state[uids], [TBS.INFECTION])]
         tb.state[latent] = TBS.CLEARED
         tb.rr_reinfection[latent] = tb.pars.rr_reinfection_cleared
         if tb.pars.dur_reinfection_protection is not None and len(latent):

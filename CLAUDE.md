@@ -38,7 +38,7 @@ cd docs && ./render    # build static site to docs/_site
 
 The TB natural history model lives in `tbsim/`:
 
-- **TB** ([tb.py](tbsim/tb.py)) — LSHTM "spectrum of disease" approach with states: SUSCEPTIBLE → INFECTION → NON_INFECTIOUS → ASYMPTOMATIC → SYMPTOMATIC → TREATMENT (or CLEARED/DEAD). State enum is `TBS`. Variant `TBAcute` adds an ACUTE state post-exposure.
+- **TB** ([tb.py](tbsim/tb.py)) — LSHTM "spectrum of disease" approach with states: SUSCEPTIBLE → INFECTION → NON_INFECTIOUS → ASYMPTOMATIC → SYMPTOMATIC → TREATMENT (or CLEARED/DEAD). State enum is `TBS`.
 
 Extends `ss.Disease` from Starsim.
 

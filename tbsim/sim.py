@@ -22,7 +22,7 @@ class Sim(ss.Sim):
         sim_pars (dict): Explicit sim-level parameter overrides.
         tb_pars (dict): Explicit TB parameter overrides.
         tb_model (str/Disease): Which TB model to use. Options: 'default' (default),
-            'acute', or a pre-built Disease instance.
+            or a pre-built Disease instance.
         location (str): Placeholder for future location-based data.
         **kwargs: Additional parameters (auto-routed like ``pars``).
 
@@ -38,9 +38,6 @@ class Sim(ss.Sim):
         # Override TB and sim parameters via flat dict
         sim = tbsim.Sim(n_agents=2000, beta=ss.peryear(0.3), start=1990, stop=2020)
 
-        # Use a different TB model
-        sim = tbsim.Sim(tb_model='acute')
-
         # Pass a pre-built TB instance
         tb = tbsim.TB(pars=dict(beta=ss.peryear(0.5)))
         sim = tbsim.Sim(tb_model=tb)
@@ -49,7 +46,6 @@ class Sim(ss.Sim):
     # Map of string names to TB model classes
     _tb_models = {
         'default':  'TB',
-        'acute':    'TBAcute',
     }
 
     def __init__(self, pars=None, sim_pars=None, tb_pars=None, tb_model=None, name='tb', **kwargs):
