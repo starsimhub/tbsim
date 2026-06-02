@@ -136,4 +136,4 @@ The `tbsim_examples/` directory contains ready-to-run examples:
 - **Interventions**: `run_tb_interventions.py` - BCG, TPT, and beta scenarios
 - **Health Seeking**: `run_health_seeking.py` - Health-seeking behaviour with the LSHTM TB model
 
-For more detailed tutorials and step-by-step guides, see the [tutorials](tutorials.md) section.
+For more detailed tutorials and step-by-step guides, see the [tutorials](tutorials/index.md) section.

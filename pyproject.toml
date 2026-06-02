@@ -19,6 +19,10 @@ authors = [
   { name = "Mike Famulare" },
   { name = "Deven Gokhale" },
   { name = "Stewart Chang" },
+  { name = "Tess Ryckman" },
+  { name = "Kyra Grantz" },
+  { name = "Ted Cohen" },
+  { name = "Jamie Cohen" },
 ]
 
 classifiers = [
@@ -50,11 +54,10 @@ dev = [
   "pytest-env",
   "pytest-xdist",
   "jupyter",
-  "mkdocs",
-  "mkdocs-material",
-  "mkdocstrings[python]",
-  "mkdocs-include-markdown-plugin",
-  "mkdocs-jupyter",
+  "jupyter-cache",
+  "jupytext",
+  "quartodoc",
+  "sphobjinv",
 ]
 
 [project.urls]

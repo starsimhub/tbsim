@@ -191,4 +191,4 @@ analyzer.plot('network')
 analyzer.plot('kaplan_meier')
 ```
 
-For specific examples and tutorials, see the [examples](examples.md) and [tutorials](tutorials.md) sections.
+For specific examples and tutorials, see the [examples](examples.md) and [tutorials](tutorials/index.md) sections.

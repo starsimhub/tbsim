@@ -1,0 +1,223 @@
+project:
+  type: website
+  pre-render: python quarto_utils.py pre
+  post-render: python quarto_utils.py post
+  output-dir: _site
+  title: "TBsim"
+  execute-dir: file
+  resources:
+    - objects.json
+    - objects.inv
+
+website:
+  title: "TBsim"
+  image: /assets/tbsim-logo.png
+  favicon: /assets/favicon.ico
+
+  repo-url: https://github.com/starsimhub/tbsim
+  repo-actions: [issue]
+  page-navigation: true
+  search:
+    type: overlay
+
+  page-footer:
+    center: "Docs built for TBsim v{{< var version >}} ({{< var versiondate >}}).<br>© 2023–2026, Gates Foundation and collaborators. All rights reserved. [Privacy and Cookies Notice](https://www.gatesfoundation.org/Privacy-and-Cookies-Notice) | [Terms of Use](https://www.gatesfoundation.org/Terms-of-Use)"
+    right:
+      - icon: github
+        href: https://github.com/starsimhub/tbsim
+        aria-label: GitHub
+      - icon: envelope-at-fill
+        href: mailto:info@starsim.org
+      - icon: slack
+        href: https://starsim-idm.slack.com
+      - icon: globe
+        href: https://starsim.org/
+
+  navbar:
+    logo: /assets/tbsim-logo.png
+    title: false
+    collapse-below: lg
+
+    tools:
+      - icon: github
+        href: https://github.com/starsimhub/tbsim
+      - icon: envelope-at-fill
+        href: mailto:info@starsim.org
+      - icon: slack
+        href: https://starsim-idm.slack.com
+      - icon: globe
+        href: https://starsim.org
+
+    left:
+      - href: index.md
+        text: Home
+      - href: whatsnew.md
+        text: What's new
+      - href: tutorials/index.md
+        text: Tutorials
+      - href: user_guide.md
+        text: User guide
+      - href: examples.md
+        text: Examples
+      - href: api/index.qmd
+        text: API reference
+
+  sidebar:
+    - id: main
+      collapse-level: 3
+      contents:
+        - href: index.md
+          text: "**Home**"
+        - href: whatsnew.md
+          text: "**What's new**"
+        - href: installation.md
+          text: "**Installation**"
+        - href: quickstart.md
+          text: "**Quick start**"
+        - section: "**Tutorials**"
+          contents:
+            - href: tutorials/index.md
+              text: "Overview"
+            - tutorials/tuberculosis_sim.qmd
+            - tutorials/tb_interventions_tutorial.qmd
+            - tutorials/run_tbhiv_scens.qmd
+            - tutorials/tbhiv_comorbidity.qmd
+            - tutorials/malnutrition_tutorial.qmd
+            - tutorials/comprehensive_analyzer_plots_example.qmd
+        - href: user_guide.md
+          text: "**User guide**"
+        - href: examples.md
+          text: "**Examples**"
+        - href: scripts.md
+          text: "**Scripts**"
+        - href: api/index.qmd
+          text: "**API reference**"
+        - href: contributing.md
+          text: "**Contributing**"
+        - href: code_of_conduct.md
+          text: "**Code of conduct**"
+    - id: api
+      collapse-level: 2
+      contents:
+        - href: index.md
+          text: "**Home**"
+        - href: api/index.qmd
+          text: "**API reference**"
+        - section: "**Core**"
+          contents:
+            - api/sim.qmd
+            - api/tb.qmd
+            - api/networks.qmd
+            - api/analyzers.qmd
+            - api/plots.qmd
+        - section: "**Interventions**"
+          contents:
+            - text: bcg
+              href: api/interventions.bcg.qmd
+            - text: beta
+              href: api/interventions.beta.qmd
+            - text: diagnostics
+              href: api/interventions.diagnostics.qmd
+            - text: health_seeking
+              href: api/interventions.health_seeking.qmd
+            - text: interventions
+              href: api/interventions.interventions.qmd
+            - text: products
+              href: api/interventions.products.qmd
+            - text: tpt
+              href: api/interventions.tpt.qmd
+            - text: treatments
+              href: api/interventions.treatments.qmd
+        - section: "**Comorbidities**"
+          contents:
+            - text: hiv
+              href: api/comorbidities.hiv.qmd
+            - text: malnutrition
+              href: api/comorbidities.malnutrition.qmd
+        - section: "**Compartmental**"
+          contents:
+            - text: lshtm_ode
+              href: api/compartmental.lshtm_ode.qmd
+
+quartodoc:
+  package: tbsim
+  title: API reference
+  style: pkgdown
+  dir: api
+  parser: google
+  render_interlinks: true
+  sections:
+    - title: Core
+      desc: Core simulation classes and utilities.
+      contents:
+        - sim
+        - tb
+        - networks
+        - analyzers
+        - plots
+    - title: Interventions
+      desc: Diagnostics, treatment, and prevention.
+      contents:
+        - interventions.bcg
+        - interventions.beta
+        - interventions.diagnostics
+        - interventions.health_seeking
+        - interventions.interventions
+        - interventions.products
+        - interventions.tpt
+        - interventions.treatments
+    - title: Comorbidities
+      desc: HIV and malnutrition co-infection modules.
+      contents:
+        - comorbidities.hiv
+        - comorbidities.malnutrition
+    - title: Compartmental
+      desc: Compartmental (ODE-style) TB models.
+      contents:
+        - compartmental.lshtm_ode
+
+format:
+  html:
+    theme:
+      light: [cosmo, ./assets/styles-light.scss]
+      dark: [cosmo, ./assets/styles-dark.scss]
+    css: ./assets/styles.css
+    toc: true
+    toc-expand: true
+    toc-depth: 5
+    highlight-style: github
+
+filters:
+  - interlinks
+
+interlinks:
+  fast: false
+  sources:
+    python:
+      url: https://docs.python.org/3/
+    numpy:
+      url: https://numpy.org/doc/stable/
+    pandas:
+      url: https://pandas.pydata.org/pandas-docs/stable/
+    scipy:
+      url: https://docs.scipy.org/doc/scipy/
+    matplotlib:
+      url: https://matplotlib.org/stable/
+    sciris:
+      url: https://docs.sciris.org/en/latest/
+    starsim:
+      url: https://docs.starsim.org/
+  autolink: true
+  aliases:
+    numpy: [np]
+    pandas: [pd]
+    matplotlib: [plt]
+    sciris: [sc]
+    starsim: [ss]
+
+execute:
+  freeze: auto
+  cache: true
+  error: false
+  echo: true
+  warning: true
