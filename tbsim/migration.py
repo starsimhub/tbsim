@@ -392,6 +392,27 @@ class Migration(ss.Demographics):
         hh_inds = np.searchsorted(cdf, draws, side='right').astype(int)
         return hh_ids[hh_inds]
 
+    def _members_by_household_id(self, household_net, household_ids):
+        """Return current member UID arrays for the requested household IDs."""
+        household_ids = np.asarray(household_ids, dtype=int)
+        if len(household_ids) == 0:
+            return {}
+
+        ids = np.asarray(household_net.household_ids, dtype=float)
+        in_target = np.isin(ids, household_ids)
+        if not np.any(in_target):
+            return {}
+
+        member_uids = np.flatnonzero(in_target)
+        member_hids = ids[member_uids].astype(int)
+        order = np.argsort(member_hids)
+        member_uids = member_uids[order]
+        member_hids = member_hids[order]
+
+        unique_hids, starts = np.unique(member_hids, return_index=True)
+        stops = np.r_[starts[1:], len(member_hids)]
+        return {hid: ss.uids(member_uids[start:stop]) for hid, start, stop in zip(unique_hids, starts, stops)}
+
     def _append_household_group_edges(self, household_net, new_uids, member_uids):
         """Connect new household members to existing members and each other."""
         new_uids = np.asarray(new_uids, dtype=int)
@@ -441,9 +462,10 @@ class Migration(ss.Demographics):
 
         new_uids = np.asarray(new_uids, dtype=int)
         assigned = np.asarray(household_ids, dtype=int)
+        members_by_hid = self._members_by_household_id(household_net, np.unique(assigned))
         for household_id in np.unique(assigned):
             group_uids = new_uids[assigned == household_id]
-            members = ss.uids(household_net.household_ids == household_id)
+            members = members_by_hid.get(household_id, ss.uids())
             household_net.household_ids[ss.uids(group_uids)] = household_id
             self._append_household_group_edges(household_net, group_uids, members)
         self.hhid[new_uids] = assigned
@@ -507,9 +529,11 @@ class Migration(ss.Demographics):
             return None
         ages = np.asarray(self.sim.people.age[uids], dtype=float)
         weights = np.zeros(len(uids), dtype=float)
-        for lo, hi, w in zip(self._emig_age_lows, self._emig_age_highs, self._emig_age_weights):
-            in_bin = (ages >= lo) & (ages < hi)
-            weights[in_bin] = w
+        age_bins = np.searchsorted(self._emig_age_lows, ages, side='right') - 1
+        valid = np.where(age_bins >= 0)[0]
+        if len(valid):
+            valid = valid[ages[valid] < self._emig_age_highs[age_bins[valid]]]
+            weights[valid] = self._emig_age_weights[age_bins[valid]]
         return weights
 
     def _sample_emigrants(self, n_requested):
@@ -537,8 +561,8 @@ class Migration(ss.Demographics):
             selected    = weighted_uids[order[:n_weighted]]
 
         if len(selected) < n_select:
-            sel_set       = set(selected.tolist())
-            fallback_uids = np.array([u for u in np.asarray(eligible, dtype=int) if u not in sel_set], dtype=int)
+            eligible_arr = np.asarray(eligible, dtype=int)
+            fallback_uids = eligible_arr[~np.isin(eligible_arr, selected)]
             if len(fallback_uids):
                 n_fill         = n_select - len(selected)
                 fallback_scores = np.asarray(self._dist_emig_u.rvs(fallback_uids), dtype=float)
