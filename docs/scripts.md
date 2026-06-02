@@ -7,9 +7,6 @@ This section provides documentation for the example scripts in the `tbsim_exampl
 **run_tb.py**  
 Basic TB simulation with default parameters. The simplest starting point for understanding TBsim.
 
-**run_tb_acute.py**
-LSHTM "spectrum of TB disease" natural history model, comparing simulations with and without the acute compartment.
-
 **run_malnutrition.py**  
 TB-Malnutrition comorbidity model demonstrating how to add a co-disease to a simulation.
 

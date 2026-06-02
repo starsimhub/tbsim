@@ -54,7 +54,7 @@ class HealthSeekingBehavior(ss.Intervention):
         """Locate the TB disease module and resolve eligible states."""
         super().init_post()
 
-        # Find and store the TB disease module (works with TB and TB_Acute)
+        # Find and store the TB disease module
         try:
             self._tb = tbsim.get_tb(self.sim)
         except ValueError:

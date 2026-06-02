@@ -8,3 +8,4 @@ from .networks import *
 from .analyzers import *
 from .plots import *
 from .sim import *
+from .migration import *
