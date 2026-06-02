@@ -373,22 +373,24 @@ class Migration(ss.Demographics):
                 return net
         return None
 
-    def _household_sizes(self, household_net):
-        """Return member counts indexed by household ID, computed from live agents."""
+    def _household_ids_and_sizes(self, household_net):
+        """Return actual household IDs and live-member counts."""
         alive = self.sim.people.alive.uids
         ids = np.asarray(household_net.household_ids[alive], dtype=float)
         valid = ~np.isnan(ids)
         if not np.any(valid):
-            return np.empty(0, dtype=float)
-        return np.bincount(ids[valid].astype(int)).astype(float)
+            return np.empty(0, dtype=int), np.empty(0, dtype=float)
+        hh_ids, hh_sizes = np.unique(ids[valid].astype(int), return_counts=True)
+        return hh_ids, hh_sizes.astype(float)
 
-    def _weighted_household_indices(self, household_net, sample_uids):
-        household_sizes = self._household_sizes(household_net)
-        if len(household_sizes) == 0 or household_sizes.sum() <= 0:
+    def _weighted_household_ids(self, household_net, sample_uids):
+        hh_ids, hh_sizes = self._household_ids_and_sizes(household_net)
+        if len(hh_ids) == 0 or hh_sizes.sum() <= 0:
             return np.empty(0, dtype=int)
         draws = np.asarray(self._dist_hhu.rvs(sample_uids), dtype=float)
-        cdf = np.cumsum(household_sizes / household_sizes.sum())
-        return np.searchsorted(cdf, draws, side='right').astype(int)
+        cdf = np.cumsum(hh_sizes / hh_sizes.sum())
+        hh_inds = np.searchsorted(cdf, draws, side='right').astype(int)
+        return hh_ids[hh_inds]
 
     def _append_household_edges(self, household_net, uid, member_uids):
         """Connect a new member ``uid`` to every existing member of its household."""
@@ -414,17 +416,17 @@ class Migration(ss.Demographics):
         if household_net is None:
             return None
 
-        household_indices = self._weighted_household_indices(household_net, new_uids)
-        if len(household_indices) == 0:
+        household_ids = self._weighted_household_ids(household_net, new_uids)
+        if len(household_ids) == 0:
             return self._create_household_singletons(household_net, new_uids)
 
         assigned = np.empty(len(new_uids), dtype=int)
         for i, uid in enumerate(np.asarray(new_uids, dtype=int)):
-            household_index = int(household_indices[i])
-            members = ss.uids(household_net.household_ids == household_index)
-            household_net.household_ids[ss.uids(uid)] = household_index
+            household_id = int(household_ids[i])
+            members = ss.uids(household_net.household_ids == household_id)
+            household_net.household_ids[ss.uids(uid)] = household_id
             self._append_household_edges(household_net, uid, members)
-            assigned[i] = household_index
+            assigned[i] = household_id
         self.hhid[new_uids] = assigned
         return assigned
 
