@@ -11,6 +11,7 @@ All notable changes to the codebase are documented in this file.
     - Household integration with `ss.HouseholdNet`: immigrants are assigned to existing households (size-weighted) and wired into household edges, and emigrants are removed from their households
     - Per-step `n_immigrants`, `n_emigrants`, and `net_migration` results
 - Removed the separate `Immigration` class in favor of the unified `Migration` class
+- Removed the `TBAcute` model variant and its ACUTE state; only `TB` is supported now
 
 ## Version 0.7.0 (2026-03-16)
 - Added `tbsim.Sim`, a convenience wrapper around `ss.Sim` that auto-routes flat parameters between the sim and the TB module, provides TB-specific defaults (demographics, networks, disease), and supports a `tb_model` argument for selecting among TB model variants. Includes a `demo()` function for quick setup.

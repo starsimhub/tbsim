@@ -188,7 +188,7 @@ def run_scenarios(do_plot=False, savefig=False, fig_path='results/migration_mult
         tbsim.plot(
             msim,
             title='Migration scenarios (TBsim)',
-            select=['~None', '~n_multiplier_applied', '~ACUTE', '~acute', '~15+'],
+            select=['~None', '~n_multiplier_applied', '~15+'],
             filename=fig_path if savefig else None,
             show=do_plot,
             # style='dark_background',

@@ -1,5 +1,5 @@
 """
-Tests for the LSHTM-style TB model (TB, TBAcute, TBS).
+Tests for the LSHTM-style TB model (TB, TBS).
 
 Assertions are written against the actual implementation in tbsim/tb.py;
 no behavior is assumed beyond what is defined there.
@@ -18,15 +18,11 @@ def make_tb_sim(
     start=ss.date("2000-01-01"),
     stop=ss.date("2010-12-31"),
     dt=ss.days(7),
-    use_acute=False,
     pars=None, # TB parameters
     **kwargs # Sim parameters
 ):
-    """Build a minimal Sim with TB or TBAcute."""
-    if use_acute:
-        tb = tbsim.TBAcute(pars=pars)
-    else:
-        tb = tbsim.TB(pars=pars)
+    """Build a minimal Sim with TB."""
+    tb = tbsim.TB(pars=pars)
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=30))
     sim = ss.Sim(n_agents=n_agents, networks=net, diseases=tb, dt=dt, start=start, stop=stop, **kwargs)
     sim.pars.verbose = 0
@@ -138,23 +134,6 @@ def test_sim_run_tb():
     assert len(tb.results["timevec"]) > 0
     assert np.any(tb.results["n_infectious"][:] >= 0)
     assert np.any(np.isfinite(tb.results["prevalence_active"][:]))
-
-
-def test_sim_run_tb_acute():
-    """Short sim with TBAcute runs and produces results."""
-    sim = make_tb_sim(
-        n_agents=200,
-        use_acute=True,
-        start=ss.date("2000-01-01"),
-        stop=ss.date("2002-12-31"),
-        dt=ss.days(7),
-        pars={"init_prev": ss.bernoulli(0.05), "beta": ss.peryear(0.2)},
-    )
-    sim.run()
-    tb = tbsim.get_tb(sim)
-    assert isinstance(tb, tbsim.TBAcute)
-    assert "n_infectious" in tb.results
-    assert "prevalence_active" in tb.results
 
 
 def test_init_results_defines_expected_keys():
@@ -310,18 +289,6 @@ def test_step_all_susceptible_no_infection_leaves_state_unchanged():
     tb.step()
     state_after = np.array(tb.state, copy=True)
     np.testing.assert_array_equal(state_before, state_after)
-
-
-def test_set_prognoses_acute_enters_acute_not_infection():
-    """TBAcute: set_prognoses puts new infections in ACUTE (not INFECTION)."""
-    sim = make_tb_sim(n_agents=30, use_acute=True)
-    sim.init()
-    tb = tbsim.get_tb(sim)
-    uids = ss.uids([1, 2, 3])
-    tb.susceptible[uids] = True
-    tb.infected[uids] = False
-    tb.set_prognoses(uids)
-    assert np.all(tb.state[uids] == TBS.ACUTE)
 
 
 def test_rr_activation_zero_prevents_progression_to_active():

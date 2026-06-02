@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 import starsim as ss
 
-from .tb import TBS, TBAcute, get_tb
+from .tb import TBS, get_tb
 
 __all__ = ['Migration']
 
@@ -144,7 +144,7 @@ class Migration(ss.Demographics):
         try:
             tb = get_tb(sim)
         except ValueError as exc:
-            raise RuntimeError('Expected TB or TBAcute disease module for migration initialization') from exc
+            raise RuntimeError('Expected TB disease module for migration initialization') from exc
         self.tb_name = tb.name
 
         if not self.tb_state_distribution_specified:
@@ -205,7 +205,7 @@ class Migration(ss.Demographics):
 
     @property
     def tb(self):
-        """The resolved TB (or TBAcute) disease module."""
+        """The resolved TB disease module."""
         return self.sim.diseases[self.tb_name]
 
     # --- Configuration helpers (init-time) ---------------------------------
@@ -510,9 +510,6 @@ class Migration(ss.Demographics):
     def _init_tb_states(self, new_uids):
         """Assign immigrant entry TB states and the dependent TB flags/timers, returning the states."""
         tb = self.tb
-        if TBS.ACUTE in np.asarray(self.dist_tb_state.pars.a, dtype=int) and not isinstance(tb, TBAcute):
-            raise ValueError(f'tb_state_distribution includes {TBS.ACUTE.name} but TB module is not TBAcute')
-
         entry_states = self.dist_tb_state.rvs(len(new_uids)).astype(int)
         susceptible_like = [TBS.SUSCEPTIBLE, TBS.CLEARED]
         infected_mask = ~np.isin(entry_states, [*susceptible_like, *TBS.terminal_states()])
@@ -544,8 +541,6 @@ class Migration(ss.Demographics):
         # Relative transmissibility by state.
         tb.rel_trans[new_uids] = 1.0
         tb.rel_trans[new_uids[asymptomatic]] = float(tb.pars.trans_asymp)
-        if isinstance(tb, TBAcute):
-            tb.rel_trans[new_uids[entry_states == TBS.ACUTE]] = float(tb.pars.trans_acute)
         return entry_states
 
     def _perform_immigration(self, n_arrivals):
