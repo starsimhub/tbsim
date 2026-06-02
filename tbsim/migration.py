@@ -42,12 +42,16 @@ class Migration(ss.Demographics):
             arriving immigrant ages. Does not affect emigration.
         emigration_age_distribution (dict/None): Optional age weights
             ``{age_lower_bound: weight}`` used to bias emigrant selection
-            toward certain age groups. If None, emigrants are chosen
-            uniformly at random from the active population.
+            toward certain age groups. Bins are half-open intervals
+            ``[lower, next_lower)``, with the last bin ending at ``max_age``.
+            Ages below the smallest key or at/above ``max_age`` are not
+            age-weighted (they enter the uniform fallback pool). If None,
+            emigrants are chosen uniformly at random from the active population.
         age_data (DataFrame/Series/array/str/None): Immigration age histogram
             in Starsim ``People`` format; overrides
             ``immigration_age_distribution`` when both are provided.
-        max_age (float): Upper bound on sampled immigrant ages (default 85).
+        max_age (float): Upper age bound for immigration sampling and for the
+            top end of emigration age bins (default 85).
         tb_state_distribution (dict/None): ``{TBS state name: weight}`` mix
             for immigrants at entry. Terminal states (``DEAD``, ``REMOVED``)
             are stripped. If None, defaults are derived from TB module
@@ -113,6 +117,7 @@ class Migration(ss.Demographics):
         self._age_lows = None
         self._age_highs = None
         self._emig_age_lows = None
+        self._emig_age_highs = None
         self._emig_age_weights = None
 
         self.define_states(
@@ -198,26 +203,33 @@ class Migration(ss.Demographics):
         spec = self.pars.emigration_age_distribution
         if spec is None:
             self._emig_age_lows = None
+            self._emig_age_highs = None
             self._emig_age_weights = None
             return
         if not isinstance(spec, dict) or not len(spec):
             warnings.warn('emigration_age_distribution is empty; using uniform emigration', stacklevel=2)
             self._emig_age_lows = None
+            self._emig_age_highs = None
             self._emig_age_weights = None
             return
 
+        max_age = float(self.pars.max_age)
         age_lows = np.array(sorted(spec.keys()), dtype=float)
         age_weights = np.array([spec[k] for k in age_lows], dtype=float)
         valid = np.isfinite(age_lows) & np.isfinite(age_weights)
         age_lows, age_weights = age_lows[valid], age_weights[valid]
         age_weights = np.clip(age_weights, 0, None)
+        age_lows = age_lows[age_lows < max_age]
+        age_weights = age_weights[:len(age_lows)]
         weight_sum = age_weights.sum()
         if len(age_lows) == 0 or weight_sum <= 0:
             warnings.warn('emigration_age_distribution has no usable bins; using uniform emigration', stacklevel=2)
             self._emig_age_lows = None
+            self._emig_age_highs = None
             self._emig_age_weights = None
             return
         self._emig_age_lows = age_lows
+        self._emig_age_highs = np.r_[age_lows[1:], max_age]
         self._emig_age_weights = age_weights / weight_sum
         return
 
@@ -473,11 +485,10 @@ class Migration(ss.Demographics):
         if self._emig_age_lows is None or self._emig_age_weights is None or len(uids) == 0:
             return None
         ages = np.asarray(self.sim.people.age[uids], dtype=float)
-        age_bins = np.searchsorted(self._emig_age_lows, ages, side='right') - 1
         weights = np.zeros(len(uids), dtype=float)
-        valid = age_bins >= 0
-        if np.any(valid):
-            weights[valid] = self._emig_age_weights[age_bins[valid]]
+        for lo, hi, w in zip(self._emig_age_lows, self._emig_age_highs, self._emig_age_weights):
+            in_bin = (ages >= lo) & (ages < hi)
+            weights[in_bin] = w
         return weights
 
     def _sample_emigrants(self, n_requested):
