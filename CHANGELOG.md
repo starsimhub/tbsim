@@ -2,6 +2,10 @@
 
 All notable changes to the codebase are documented in this file.
 
+## Version 0.8.0 (2026-06-02)
+
+
+
 ## Version 0.7.0 (2026-03-16)
 - Added `tbsim.Sim`, a convenience wrapper around `ss.Sim` that auto-routes flat parameters between the sim and the TB module, provides TB-specific defaults (demographics, networks, disease), and supports a `tb_model` argument for selecting among TB model variants. Includes a `demo()` function for quick setup.
 - Refactored all diagnostic and treatment interventions into a product/delivery architecture:
