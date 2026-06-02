@@ -163,12 +163,14 @@ class Migration(ss.Demographics):
             weight_sum = bin_weights.sum()
             if len(bin_edges) == 0 or weight_sum <= 0:
                 warnings.warn('immigration_age_distribution has no usable bins; using uniform [0, max_age)', stacklevel=2)
-                return
-            bin_weights = bin_weights / weight_sum
-            self._age_lows = bin_edges
-            self._age_highs = np.r_[bin_edges[1:], max_age]
-            self._dist_agebin.pars.a = np.arange(len(bin_edges), dtype=int)
-            self._dist_agebin.pars.p = bin_weights
+                self._age_lows = None
+                self._age_highs = None
+            else:
+                bin_weights = bin_weights / weight_sum
+                self._age_lows = bin_edges
+                self._age_highs = np.r_[bin_edges[1:], max_age]
+                self._dist_agebin.pars.a = np.arange(len(bin_edges), dtype=int)
+                self._dist_agebin.pars.p = bin_weights
 
         tb_entry_weights = self.pars.tb_state_distribution
         self._dist_tbstate.pars.a = np.array([int(TBS[state_name]) for state_name in tb_entry_weights], dtype=int)
@@ -307,18 +309,26 @@ class Migration(ss.Demographics):
     def _lam_emigrants_per_timestep(self, module):
         return module.expected_emigrants_per_timestep()
 
+    def _bound_ages(self, ages):
+        """Coerce sampled ages into the valid simulation range [0, max_age)."""
+        ages = np.asarray(ages, dtype=float)
+        max_age = float(self.pars.max_age)
+        if not np.isfinite(max_age) or max_age <= 0:
+            return np.clip(ages, 0.0, None)
+        return np.clip(ages, 0.0, np.nextafter(max_age, 0.0))
+
     def _sample_ages(self, n):
         if n <= 0:
             return np.empty(0, dtype=float)
         if self._dist_age is not None:
-            return np.asarray(self._dist_age.rvs(n), dtype=float)
+            return self._bound_ages(self._dist_age.rvs(n))
         if self._age_lows is None or self._age_highs is None:
-            return self._dist_ageu.rvs(n) * float(self.pars.max_age)
+            return self._bound_ages(self._dist_ageu.rvs(n) * float(self.pars.max_age))
         age_bin = self._dist_agebin.rvs(n).astype(int)
         within_bin = self._dist_ageu.rvs(n)
         bin_lower = self._age_lows[age_bin]
         bin_upper = self._age_highs[age_bin]
-        return bin_lower + within_bin * (bin_upper - bin_lower)
+        return self._bound_ages(bin_lower + within_bin * (bin_upper - bin_lower))
 
     def _draw_emigrants(self):
         if self.expected_emigrants_per_timestep() <= 0:
