@@ -1,25 +1,30 @@
 """Scientific tests for the Migration demographics module.
 
-These tests check the population-level consequences of migration, not object
-internals: net-positive migration should grow the population and net-negative
-migration should shrink it, relative to a no-migration baseline.
+Migration covers both immigration (new agents arriving) and emigration
+(existing agents leaving); immigration-only behavior is simply
+``emigration_rate=0``. These tests check population-level consequences rather
+than object internals: net-positive migration grows the population,
+net-negative migration shrinks it, and importing from a higher-prevalence
+source raises active-TB prevalence -- all relative to a no-migration baseline.
 """
 
 import starsim as ss
 import tbsim
 
-# Disable transmission and background TB so population change is driven purely by migration.
-QUIET_TB = dict(init_prev=ss.bernoulli(0.0), beta=ss.peryear(0.0))
 
+def make_sim(immigration_rate=0, emigration_rate=0, tb_state_distribution=None, init_prev=0.0,
+             migration=True, n_agents=500, rand_seed=2, stop='2004-01-01'):
+    """Build a minimal TB sim, optionally with a Migration module.
 
-def make_sim(immigration_rate=0, emigration_rate=0, migration=True, n_agents=500, rand_seed=2, stop='2004-01-01'):
-    """Build a minimal TB sim, optionally with a Migration module."""
+    Transmission is disabled (``beta=0``) so that changes in population and
+    prevalence are attributable to migration rather than within-sim spread.
+    """
     demographics = []
     if migration:
         demographics.append(tbsim.Migration(pars=dict(
             immigration_rate=ss.freqperyear(immigration_rate),
             emigration_rate=ss.freqperyear(emigration_rate),
-            tb_state_distribution=dict(SUSCEPTIBLE=1.0),
+            tb_state_distribution=tb_state_distribution or dict(SUSCEPTIBLE=1.0),
         )))
     return ss.Sim(
         n_agents=n_agents,
@@ -28,7 +33,7 @@ def make_sim(immigration_rate=0, emigration_rate=0, migration=True, n_agents=500
         dt=ss.days(30),
         rand_seed=rand_seed,
         verbose=0,
-        diseases=tbsim.TB(pars=QUIET_TB),
+        diseases=tbsim.TB(pars=dict(init_prev=ss.bernoulli(init_prev), beta=ss.peryear(0.0))),
         networks=ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=4), dur=0)),
         demographics=demographics,
     )
@@ -66,7 +71,36 @@ def test_balanced_migration_keeps_population_near_baseline():
     assert abs(final_pop(balanced) - final_pop(baseline)) < 0.15 * final_pop(baseline)
 
 
+def test_immigration_increases_population():
+    """Immigration with no emigration grows the population above a no-migration baseline."""
+    baseline = make_sim(migration=False)
+    imm = make_sim(immigration_rate=100, emigration_rate=0)
+    baseline.run()
+    imm.run()
+    assert final_pop(imm) > final_pop(baseline)
+
+
+def test_prevalence_increases_with_high_prevalence_source():
+    """Importing from a higher-prevalence source raises active-TB prevalence above baseline."""
+    # Baseline: low-prevalence resident population, no migration.
+    baseline = make_sim(migration=False, init_prev=0.02)
+    # Immigration from a source where arrivals already have active TB.
+    high = make_sim(
+        immigration_rate=200,
+        emigration_rate=0,
+        init_prev=0.02,
+        tb_state_distribution=dict(ASYMPTOMATIC=0.5, SYMPTOMATIC=0.5),
+    )
+    baseline.run()
+    high.run()
+    base_prev = float(tbsim.get_tb(baseline).results.prevalence_active[-1])
+    high_prev = float(tbsim.get_tb(high).results.prevalence_active[-1])
+    assert high_prev > base_prev
+
+
 if __name__ == '__main__':
     test_population_grows_when_immigration_exceeds_emigration()
     test_population_shrinks_when_emigration_exceeds_immigration()
     test_balanced_migration_keeps_population_near_baseline()
+    test_immigration_increases_population()
+    test_prevalence_increases_with_high_prevalence_source()
