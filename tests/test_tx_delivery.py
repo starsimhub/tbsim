@@ -19,9 +19,8 @@ def make_sim(n_agents=1000, interventions=None):
     return sim
 
 
-def make_tx_sim(n_agents=50, use_acute=False, **tb_pars):
+def make_tx_sim(n_agents=50, **tb_pars):
     """Create a minimal sim with TxDelivery for unit-testing step_start_treatment."""
-    tb_model = 'acute' if use_acute else 'default'
     dx = tbsim.DxDelivery(product=tbsim.Xpert())
     tx = tbsim.TxDelivery(product=tbsim.DOTS())
     sim = tbsim.Sim(
@@ -29,7 +28,6 @@ def make_tx_sim(n_agents=50, use_acute=False, **tb_pars):
         interventions=[dx, tx],
         sim_pars=dict(start=ss.date('2000-01-01'), stop=ss.date('2005-12-31')),
         tb_pars=tb_pars or None,
-        tb_model=tb_model,
     )
     sim.init()
     return sim, tbsim.get_tb(sim), sim.interventions.txdelivery
@@ -66,17 +64,6 @@ def test_start_treatment_empty_uids():
     sim, tb, tx = make_tx_sim(n_agents=10)
     tx._elig_uids = ss.uids()
     tx.step_start_treatment()
-
-
-def test_start_treatment_acute_latent_cleared():
-    """TBAcute: step_start_treatment on ACUTE or INFECTION sets state to CLEARED."""
-    sim, tb, tx = make_tx_sim(n_agents=20, use_acute=True)
-    tb.state[ss.uids([0])] = TBS.ACUTE
-    tb.state[ss.uids([1])] = TBS.INFECTION
-    tx._elig_uids = ss.uids([0, 1])
-    tx.step_start_treatment()
-    assert tb.state[0] == TBS.CLEARED
-    assert tb.state[1] == TBS.CLEARED
 
 
 def test_start_treatment_mixed_latent_active_ignores_cleared():
