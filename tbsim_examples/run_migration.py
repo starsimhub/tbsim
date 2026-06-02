@@ -133,20 +133,6 @@ def get_scenarios():
                 emigration_rate=ss.freqperyear(100),
             ),
         },
-        'Net Growth': {
-            'name': 'Net Growth',
-            'migration': dict(
-                immigration_rate=ss.freqperyear(180),
-                emigration_rate=ss.freqperyear(80),
-            ),
-        },
-        'Net Shrinkage': {
-            'name': 'Net Shrinkage',
-            'migration': dict(
-                immigration_rate=ss.freqperyear(60),
-                emigration_rate=ss.freqperyear(160),
-            ),
-        },
         'Maintain Population': {
             'name': 'Maintain Population',
             'migration': dict(
@@ -175,15 +161,7 @@ def get_scenarios():
                 start=ss.date('2000-01-01'),
                 stop=ss.date('2004-01-01'),
             ),
-        },
-        'No Household Network': {
-            'name': 'No Household Network',
-            'use_households': False,
-            'migration': dict(
-                immigration_rate=ss.freqperyear(100),
-                emigration_rate=ss.freqperyear(100),
-            ),
-        },
+        }
     }
 
 
@@ -210,10 +188,10 @@ def run_scenarios(do_plot=False, savefig=False, fig_path='results/migration_mult
         tbsim.plot(
             msim,
             title='Migration scenarios (TBsim)',
-            select=['~None', '~n_multiplier_applied', '~ACUTE', '~acute'],
+            select=['~None', '~n_multiplier_applied', '~ACUTE', '~acute', '~15+'],
             filename=fig_path if savefig else None,
             show=do_plot,
-            style='dark_background',
+            # style='dark_background',
         )
 
     return msim, summary_df
