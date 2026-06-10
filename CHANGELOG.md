@@ -2,6 +2,10 @@
 
 All notable changes to the codebase are documented in this file.
 
+## Version 0.8.1 (2026-06-10)
+- Fixed a UID/position confusion bug (#425) where several interventions identified agents by running `np.where`/`np.flatnonzero` over a starsim `Arr`'s compact, alive-only `.values` view and then treating the resulting positions as UIDs. Once any agents had died (so UIDs no longer matched compact positions), this silently selected the wrong agents. Affected `HouseholdContactTracing.step`, `TPTHousehold.check_eligibility`, `TxDelivery._get_eligible`, `Migration._members_by_household_id`, and `HealthSeekingBehavior.step`. All now use native starsim filtering (`arr.auids[mask]`) so positions map back to real UIDs.
+- Added regression tests covering household contact tracing, treatment eligibility, care-seeking, and diagnostic administration after agent deaths.
+
 ## Version 0.8.0 (2026-06-02)
 - Added `migration.py` with a single `Migration` demographics class providing bidirectional, household-aware population turnover:
     - Immigration (new agents enter) and emigration (existing agents leave), each driven by an annual `ss.freq` rate; setting `emigration_rate=0` gives immigration-only behavior
