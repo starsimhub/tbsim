@@ -321,7 +321,7 @@ class TPTHousehold(TBProductRoutine):
             return ss.uids()
 
         # 4. Find household contacts (excluding index cases)
-        in_target = np.isin(hh_net.household_ids.values, target_hhids)
+        in_target = np.isin(hh_net.household_ids, target_hhids)
         contacts = hh_net.household_ids.auids[in_target]
         contacts = contacts.remove(followed_up)
 
@@ -429,7 +429,7 @@ class HouseholdContactTracing(ss.Intervention):
             return
 
         # 4. Find household contacts (excluding index cases)
-        in_target = np.isin(hh_net.household_ids.values, target_hhids)
+        in_target = np.isin(hh_net.household_ids, target_hhids)
         contacts = hh_net.household_ids.auids[in_target]
         contacts = contacts.remove(followed_up)
 

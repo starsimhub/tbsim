@@ -176,7 +176,7 @@ class TxDelivery(ss.Intervention):
             return ss.uids()
         diagnosed_uids = (self._dx.diagnosed & sim.people.alive).uids
         tb = tbsim.get_tb(sim)
-        active_tb_uids = tb.state.auids[np.isin(tb.state.values, TBS.active_tb_states())]
+        active_tb_uids = tb.state.auids[np.isin(tb.state, TBS.active_tb_states())]
         return diagnosed_uids & active_tb_uids
 
     def init_results(self):

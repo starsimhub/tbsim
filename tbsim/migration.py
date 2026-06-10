@@ -355,9 +355,8 @@ class Migration(ss.Demographics):
 
     def _active_pop_uids(self):
         """UIDs of alive agents that are not in a terminal TB state."""
-        alive = self.sim.people.alive.values
-        active = ~np.isin(self.tb.state.values, [*TBS.terminal_states()])
-        return self.tb.state.auids[alive & active]
+        active = ~np.isin(self.tb.state, [*TBS.terminal_states()])
+        return self.tb.state.auids[active]
 
     def _count_active_pop(self):
         """Number of alive, non-terminal agents."""
@@ -405,8 +404,7 @@ class Migration(ss.Demographics):
 
     def _household_ids_and_sizes(self, household_net):
         """Return actual household IDs and live-member counts."""
-        alive = self.sim.people.alive.uids
-        ids = household_net.household_ids[alive]
+        ids = household_net.household_ids.values
         valid = ~np.isnan(ids)
         if not np.any(valid):
             return np.empty(0, dtype=int), np.empty(0, dtype=float)

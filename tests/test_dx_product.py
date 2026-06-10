@@ -66,6 +66,41 @@ def test_dx_simple_dataframe():
         assert uid in negative_uids, f"Non-symptomatic agent {uid} should default to negative"
 
 
+def test_dx_administer_correct_after_deaths():
+    """ProductMulti.administer maps states -> results -> UIDs correctly after
+    deaths create a UID/position gap (issue #425 bug class).
+
+    administer already maps results back via ``uids[results == i]``, so it is
+    UID-safe; this guards that property explicitly. (It does not exercise the
+    CRN-safety of ``temp_uids`` -- see starsim#1254.)
+    """
+    df = pd.DataFrame([
+        dict(state=TBS.SYMPTOMATIC, result='positive', probability=1.0),
+        dict(state=TBS.SYMPTOMATIC, result='negative', probability=0.0),
+    ])
+    sim = make_dx_sim(n_agents=300, dx=df)
+    ppl = sim.people
+    tb = tbsim.get_tb(sim)
+    dx = sim.interventions.dxdelivery.product
+
+    # Kill a block of low-numbered agents to force a UID/position gap.
+    ppl.request_death(ss.uids(np.arange(0, len(ppl) // 3)))
+    ppl.step_die()
+    ppl.remove_dead()
+    alive = ppl.alive.uids
+    assert not np.array_equal(np.asarray(alive), np.arange(len(alive))), \
+        "Test setup failed to create a UID/position gap"
+
+    # Make a block of high-UID alive agents symptomatic.
+    symptomatic = alive[-20:]
+    tb.state[symptomatic] = TBS.SYMPTOMATIC
+
+    results = dx.administer(sim, alive)
+    # With sensitivity=1.0, positives must be exactly the symptomatic block.
+    assert set(np.asarray(results['positive']).tolist()) == set(np.asarray(symptomatic).tolist()), \
+        "Positives must be exactly the genuinely symptomatic agents"
+
+
 def test_dx_age_stratified():
     """Dx with age_min/age_max columns filters agents by age."""
     df = pd.DataFrame([

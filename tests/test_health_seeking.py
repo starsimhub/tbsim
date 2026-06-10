@@ -80,6 +80,50 @@ def test_inactive_outside_start_stop():
     assert hsb(sim).results['new_sought_care'][:].sum() == 0
 
 
+def test_care_seeking_correct_after_deaths():
+    """Regression for the issue #425 bug class in HealthSeekingBehavior.step.
+
+    After agents die, the eligible-for-seek mask is over the Arr's alive-only
+    view, so compact positions no longer equal UIDs. Care-seeking must still
+    target genuinely eligible (symptomatic, alive) agents, not random living
+    agents at the matching compact positions.
+    """
+    sim = make_sim(
+        n_agents = 300,
+        tb_pars  = dict(init_prev=ss.bernoulli(0.0), beta=ss.peryear(0.0)),
+        hsb_pars = dict(initial_care_seeking_rate=ss.perday(1.0)),
+    )
+    sim.init()
+    ppl = sim.people
+    h = hsb(sim)
+    tb = tbsim.get_tb(sim)
+
+    # Kill a block of low-numbered agents so alive-array positions no longer
+    # line up with UIDs (the precondition that triggers the bug).
+    ppl.request_death(ss.uids(np.arange(0, len(ppl) // 3)))
+    ppl.step_die()
+    ppl.remove_dead()
+    alive = ppl.alive.uids
+    assert not np.array_equal(np.asarray(alive), np.arange(len(alive))), \
+        "Test setup failed to create a UID/position gap"
+
+    # Make a block of high-UID alive agents symptomatic (care-seeking eligible).
+    eligible = alive[-20:]
+    tb.state[eligible] = tbsim.TBS.SYMPTOMATIC
+
+    h.step()
+
+    sought = h.sought_care.uids
+    assert len(sought) > 0, "Some eligible agent should have sought care"
+    # Everyone who sought care must really be eligible + alive, and must come
+    # only from the symptomatic block we created.
+    assert np.all(np.isin(np.asarray(tb.state[sought]), h._states)), \
+        "Care-seekers must be in an eligible state"
+    assert np.all(np.asarray(ppl.alive[sought])), "Care-seekers must be alive"
+    assert set(np.asarray(sought).tolist()).issubset(set(np.asarray(eligible).tolist())), \
+        "Care-seekers must be a subset of the genuinely eligible agents"
+
+
 def test_missing_tb_raises():
     """A sim without tb raises an explicit error on init."""
     sim = ss.Sim(

@@ -90,7 +90,7 @@ class HealthSeekingBehavior(ss.Intervention):
             eligible_for_seek = active & ((~self.sought_care) | can_retry)
         else:
             eligible_for_seek = active & (~self.sought_care)
-        not_yet_sought = np.flatnonzero(eligible_for_seek)
+        not_yet_sought = ppl.auids[eligible_for_seek]
         self._new_seekers_count = 0
 
         if len(not_yet_sought) == 0:
@@ -98,7 +98,7 @@ class HealthSeekingBehavior(ss.Intervention):
 
         rate = self.pars.initial_care_seeking_rate
         self.care_seeking_dist.set(p=rate.to_prob())
-        seeking_uids = self.care_seeking_dist.filter(ss.uids(not_yet_sought))
+        seeking_uids = self.care_seeking_dist.filter(not_yet_sought)
 
         if len(seeking_uids) == 0:
             return
