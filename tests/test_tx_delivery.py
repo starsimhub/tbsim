@@ -79,6 +79,52 @@ def test_start_treatment_mixed_latent_active_ignores_cleared():
     assert tb.state[2] == TBS.CLEARED    # CLEARED stays CLEARED (not affected)
 
 
+def test_get_eligible_correct_after_deaths():
+    """Regression for the issue #425 bug class in TxDelivery._get_eligible.
+
+    Default eligibility identifies active-TB agents. After agents die, the
+    Arr's alive-only ``.values`` view is shorter than the raw UID space, so
+    compact positions no longer equal UIDs. Eligibility must still be the
+    genuine diagnosed + active-TB agents, not random living agents at the
+    matching compact positions.
+    """
+    sim, tb, tx = make_tx_sim(n_agents=300, init_prev=0.0)
+    dx = sim.get_dx(result_state='diagnosed')
+    people = sim.people
+
+    # Kill a block of low-numbered agents so alive-array positions no longer
+    # line up with UIDs (the precondition that triggers the bug).
+    people.request_death(ss.uids(np.arange(0, len(people) // 3)))
+    people.step_die()
+    people.remove_dead()
+    alive = people.alive.uids
+    assert not np.array_equal(np.asarray(alive), np.arange(len(alive))), \
+        "Test setup failed to create a UID/position gap"
+
+    # Pick a high-UID alive agent, give it active TB, and mark it diagnosed.
+    index_uid = alive[-1:]
+    tb.state[index_uid] = TBS.SYMPTOMATIC
+    dx.diagnosed[index_uid] = True
+
+    # A diagnosed-but-not-active agent and an active-but-not-diagnosed agent
+    # must both be excluded.
+    other_diag = alive[-2:-1]
+    tb.state[other_diag] = TBS.CLEARED
+    dx.diagnosed[other_diag] = True
+    other_active = alive[-3:-2]
+    tb.state[other_active] = TBS.SYMPTOMATIC  # not diagnosed
+
+    elig = tx._get_eligible(sim)
+
+    # The genuine eligible agent must be selected...
+    assert index_uid[0] in elig, "Diagnosed active-TB agent must be eligible"
+    # ...and every selected agent must really be diagnosed + active TB + alive.
+    assert np.all(np.asarray(dx.diagnosed[elig])), "All eligible must be diagnosed"
+    assert np.all(np.isin(np.asarray(tb.state[elig]), TBS.active_tb_states())), \
+        "All eligible must have active TB"
+    assert np.all(np.asarray(people.alive[elig])), "All eligible must be alive"
+
+
 def test_tx_delivery_runs():
     """TxDelivery completes a full run with HSB + DxDelivery upstream."""
     dx = tbsim.DxDelivery(product=tbsim.Xpert())

@@ -320,9 +320,11 @@ class TPTHousehold(TBProductRoutine):
         if len(target_hhids) == 0:
             return ss.uids()
 
-        # 4. Find household contacts (excluding index cases)
-        all_hh = np.isin(hh_net.household_ids, target_hhids)
-        contacts = ss.uids(np.where(all_hh)[0]) 
+        # 4. Find household contacts (excluding index cases). Index into the
+        # Arr's aligned alive-only views so positions map back to real UIDs
+        # (np.where on the raw values returns compact positions, not UIDs).
+        in_target = np.isin(hh_net.household_ids.values, target_hhids)
+        contacts = hh_net.household_ids.auids[in_target]
         contacts = contacts.remove(followed_up)
 
         # 5. Age filter (if set)
@@ -422,24 +424,21 @@ class HouseholdContactTracing(ss.Intervention):
         self._n_followed = len(followed_up)
 
         # 3. Find their household IDs
-        hhids = np.asarray(hh_net.household_ids[followed_up])
+        hhids = hh_net.household_ids[followed_up]
         target_hhids = np.unique(hhids[~np.isnan(hhids)])
 
         if len(target_hhids) == 0:
             return
 
         # 4. Find household contacts (excluding index cases)
-        all_hh = np.isin(np.asarray(hh_net.household_ids), target_hhids)
-        contacts = ss.uids(np.where(all_hh)[0])
+        in_target = np.isin(hh_net.household_ids.values, target_hhids)
+        contacts = hh_net.household_ids.auids[in_target]
         contacts = contacts.remove(followed_up)
-
-        # 5. Filter to alive agents only
-        contacts = contacts.intersect(self.sim.people.alive.uids)
 
         if len(contacts) == 0:
             return
 
-        # 6. Set contact_identified flag
+        # 5. Set contact_identified flag
         self.contact_identified[contacts] = True
         self.ti_contact_identified[contacts] = self.ti
         self._n_contacts = len(contacts)

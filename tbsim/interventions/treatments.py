@@ -176,8 +176,10 @@ class TxDelivery(ss.Intervention):
             return ss.uids()
         diagnosed_uids = (self._dx.diagnosed & sim.people.alive).uids
         tb = tbsim.get_tb(sim)
-        active_tb_mask = np.isin(tb.state, TBS.active_tb_states())
-        active_tb_uids = ss.uids(np.where(active_tb_mask)[0])
+        # Index the Arr's aligned alive-only views so positions map back to real
+        # UIDs. np.where on the raw values returns compact positions, not UIDs
+        # (which diverge once agents have died -- see issue #425).
+        active_tb_uids = tb.state.auids[np.isin(tb.state.values, TBS.active_tb_states())]
         return diagnosed_uids & active_tb_uids
 
     def init_results(self):

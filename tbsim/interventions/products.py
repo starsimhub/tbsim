@@ -122,7 +122,7 @@ class ProductMulti(ss.Product):
             if 'hiv' in vals and hiv_states is not None:
                 mask = mask & (hiv_states == vals['hiv'])
 
-            matched_idx = np.where(np.asarray(mask))[0]
+            matched_idx = np.where(mask)[0]
             if len(matched_idx) == 0:
                 continue
 

@@ -355,10 +355,9 @@ class Migration(ss.Demographics):
 
     def _active_pop_uids(self):
         """UIDs of alive agents that are not in a terminal TB state."""
-        uid = np.asarray(self.sim.people.uid, dtype=int)
-        alive = np.asarray(self.sim.people.alive, dtype=bool)
-        active = ~np.isin(np.asarray(self.tb.state), [*TBS.terminal_states()])
-        return ss.uids(uid[alive & active])
+        alive = self.sim.people.alive.values
+        active = ~np.isin(self.tb.state.values, [*TBS.terminal_states()])
+        return self.tb.state.auids[alive & active]
 
     def _count_active_pop(self):
         """Number of alive, non-terminal agents."""
@@ -407,7 +406,7 @@ class Migration(ss.Demographics):
     def _household_ids_and_sizes(self, household_net):
         """Return actual household IDs and live-member counts."""
         alive = self.sim.people.alive.uids
-        ids = np.asarray(household_net.household_ids[alive], dtype=float)
+        ids = household_net.household_ids[alive]
         valid = ~np.isnan(ids)
         if not np.any(valid):
             return np.empty(0, dtype=int), np.empty(0, dtype=float)
@@ -430,13 +429,13 @@ class Migration(ss.Demographics):
         if len(household_ids) == 0:
             return {}
 
-        ids = np.asarray(household_net.household_ids, dtype=float)
+        ids = household_net.household_ids.values
         in_target = np.isin(ids, household_ids)
         if not np.any(in_target):
             return {}
 
-        member_uids = np.flatnonzero(in_target)
-        member_hids = ids[member_uids].astype(int)
+        member_uids = household_net.household_ids.auids[in_target]
+        member_hids = ids[in_target].astype(int)
         order = np.argsort(member_hids)
         member_uids = member_uids[order]
         member_hids = member_hids[order]
