@@ -386,6 +386,68 @@ def test_hh_contact_tracing_identifies_contacts():
         assert not ct.contact_identified[0], "Index case should not be identified as contact"
 
 
+def test_hh_contact_tracing_correct_after_deaths():
+    """Regression for issue #425.
+
+    After agents die, an Arr's alive-only ``.values`` view is shorter than the
+    raw UID space, so compact positions no longer equal UIDs. The intervention
+    must still flag exactly the index case's living household members -- not
+    random living agents at the matching compact positions.
+    """
+    np.random.seed(0)
+    dhs_data = make_dhs_data(60)
+    hh_net = ss.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+
+    tb = tbsim.TB(name='tb', pars={'init_prev': 0.0})
+    hh_tracing = tbsim.HouseholdContactTracing(coverage=1.0)
+
+    sim = ss.Sim(
+        diseases=tb, networks=hh_net,
+        interventions=hh_tracing,
+        pars=dict(n_agents=500, dt=ss.days(7), start=ss.date('2000-01-01'), stop=ss.date('2010-12-31')),
+    )
+    sim.init()
+
+    people = sim.people
+    ct = sim.interventions['householdcontacttracing']
+    tb_disease = sim.diseases.tb
+    # Reference the sim's initialized copy of the network, not the local original.
+    hh_ids = sim.networks['householdnet'].household_ids
+
+    # Kill a block of low-numbered agents so alive-array positions no longer
+    # line up with UIDs (the precondition that triggers the bug).
+    n_total = len(people)
+    people.request_death(ss.uids(np.arange(0, n_total // 3)))
+    people.step_die()
+    people.remove_dead()
+    auids = np.asarray(people.auids)
+    assert not np.array_equal(auids, np.arange(len(auids))), \
+        "Test setup failed to create a UID/position gap"
+
+    # Pick an alive index case whose household has at least one other alive member.
+    alive = people.alive.uids
+    alive_hhids = np.asarray(hh_ids[alive])
+    uniq, counts = np.unique(alive_hhids[~np.isnan(alive_hhids)], return_counts=True)
+    multi = uniq[counts >= 2]
+    assert len(multi) > 0, "Need a household with >= 2 alive members"
+    target_hh = multi[0]
+    members = alive[alive_hhids == target_hh]
+    index_uid = members[:1]
+
+    tb_disease.on_treatment[index_uid] = True
+    ct.step()
+
+    identified = ct.contact_identified.uids
+    assert len(identified) > 0, "Should identify the index case's household contacts"
+    # Every identified contact must actually belong to the index's household...
+    assert np.all(np.asarray(hh_ids[identified]) == target_hh), \
+        "Identified contacts must all share the index case's household"
+    # ...and they must be exactly the alive household members minus the index.
+    expected = members.remove(index_uid)
+    assert set(np.asarray(identified).tolist()) == set(np.asarray(expected).tolist()), \
+        "Identified contacts must equal the index's living household members"
+
+
 def test_hh_contact_tracing_no_retrigger():
     """Same index case does not retrigger contact identification."""
     dhs_data = make_dhs_data(50)

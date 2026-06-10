@@ -80,7 +80,7 @@ class TBProductRoutine(ss.Intervention):
         # Disease state filter
         if self.pars.eligible_states is not None:
             tb = self.sim.diseases[self.product.pars.disease]
-            state_ok = np.isin(np.asarray(tb.state[eligible]), self.pars.eligible_states)
+            state_ok = np.isin(tb.state[eligible], self.pars.eligible_states)
             eligible = eligible[state_ok]
 
         # Not yet offered (one-time offer)

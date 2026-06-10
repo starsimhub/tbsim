@@ -395,7 +395,7 @@ class TB(BaseTB):
         if len(uids) == 0:
             return
 
-        removed = np.asarray(self.state[uids] == TBS.REMOVED)
+        removed = self.state[uids] == TBS.REMOVED
         super().step_die(uids)
         self.susceptible[uids] = False
         self.infected[uids] = False
