@@ -72,7 +72,16 @@ class StrainAwareTPTTx(TPTTx):
         return np.all(registry.resistance[:, cols] == 0, axis=1)
 
     def _apply_sterilization(self, uids):
-        """Per-strain sterilization: clear susceptible strains; resistant strains remain."""
+        """Per-strain sterilization: clear susceptible strains; resistant strains remain.
+
+        TPT-driven acquisition runs *before* sterilization: a susceptible
+        carried strain may mutate to its resistant counterpart with
+        probability ``p_tpt_acquisition[drug]`` (state-modified). Mutated
+        strains are by construction resistant to the regimen and therefore
+        survive the subsequent sterilization step. This models the biology
+        of suboptimal drug pressure selecting resistance rather than
+        clearance.
+        """
         tb = self.sim.diseases[self.pars.disease]
         profile = getattr(tb, 'strain_profile', None)
         if profile is None:
@@ -85,14 +94,21 @@ class StrainAwareTPTTx(TPTTx):
             self.tpt_resolved[uids] = True
             return
 
-        # Remove susceptible strains in-place.
+        # TPT-driven acquisition: mutate a fraction of susceptible carried
+        # strains to their resistant counterpart *before* sterilization. Must
+        # run on the pre-sterilization profile, otherwise the only strains
+        # still present would be regimen-resistant and have nothing to mutate.
+        self._acq_resolver.selective_acquisition(
+            profile, still_infected, self.regimen.drugs, tb=tb,
+        )
+
+        # Sterilization: remove any remaining susceptible (non-mutated) strains.
         for s_idx in np.where(self._cover_mask)[0]:
             profile.remove_strain(still_infected, int(s_idx))
 
         # Agents who now carry zero strains have been fully cleared.
         counts = profile.n_strains_per_agent(still_infected)
         fully_cleared = still_infected[counts == 0]
-        partial = still_infected[counts > 0]
 
         if len(fully_cleared):
             tb.state[fully_cleared] = TBS.CLEARED
@@ -102,12 +118,7 @@ class StrainAwareTPTTx(TPTTx):
             tb.infected[fully_cleared] = False
             tb.susceptible[fully_cleared] = True
 
-        # Partial-clearance agents keep resistant strains; they remain latent.
-        # Optionally apply TPT-driven acquisition on partial outcomes.
-        if len(partial):
-            self._acq_resolver.selective_acquisition(
-                profile, partial, self.regimen.drugs, tb=tb,
-            )
-
+        # Partial-clearance agents (still carrying resistant or mutated strains)
+        # remain latent and may transmit later.
         self.tpt_resolved[uids] = True
         return

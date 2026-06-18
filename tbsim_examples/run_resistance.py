@@ -1,11 +1,14 @@
 
 import os
 import sys
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import sciris as sc
 import starsim as ss
 
 import tbsim
+from tbsim.plots import _normalize_results
 from tbsim.resistance import ( DSTDelivery, DSTDx, DuplicateStrainAnalyzer, Regimen, ResistanceConnector,
                                StrainAwareTPTTx, StrainAwareTx, StrainAwareTxDelivery, StrainResults, StrainSpec)
 
@@ -19,14 +22,19 @@ DEFAULT_SPARS = dict(
     verbose  = 0,
 )
 
-# Per-TPT-dose acquisition probability for a strain that *survives* TPT.
-# NOTE: in the current ``StrainAwareTPTTx`` flow these never fire (see write-up
-# in chat) — selective_acquisition runs *after* sterilization, by which point
-# all surviving strains are already resistant to the regimen's drugs and the
-# acquisition resolver has nothing susceptible to mutate. Left here as the
-# intended tuning knob; revisit once the TPT resistance path is wired.
-TPT_ACQ_INH = 0.10
-TPT_ACQ_BDQ = 0.15
+# Per-TPT-dose mutation probability: a susceptible carried strain mutates to
+# its resistant counterpart (rather than being cleared by TPT) with this
+# probability per regimen drug, scaled by the per-state modifier (overridden
+# below to be ``1.0`` across states for a clear demo signal — defaults
+# downweight latent infections to 0.05).
+TPT_ACQ_INH = 0.20
+TPT_ACQ_BDQ = 0.30
+# Use unit state modifiers in the demo so latent-state TPT doses have full
+# acquisition weight; defaults (DEFAULT_TPT_STATE_MODIFIERS) attenuate
+# INFECTION to 0.05, which masks the signal at single-seed sizes.
+TPT_STATE_MODIFIERS = dict(infection=1.0, non_infectious=1.0,
+                           asymptomatic=1.0, symptomatic=1.0,
+                           treatment=0.0, cleared=0.0)
 
 
 def build_strains():
@@ -74,6 +82,7 @@ def inh_tpt(tb):
     return StrainAwareTPTTx(
         regimen=regimen, registry=tb._strain_registry,
         p_tpt_acquisition=dict(INH=TPT_ACQ_INH),
+        acq_state_modifiers=TPT_STATE_MODIFIERS,
     )
 
 
@@ -83,6 +92,7 @@ def lai_bdq_tpt(tb):
     return StrainAwareTPTTx(
         regimen=regimen, registry=tb._strain_registry,
         p_tpt_acquisition=dict(BDQ=TPT_ACQ_BDQ),
+        acq_state_modifiers=TPT_STATE_MODIFIERS,
     )
 
 
@@ -90,15 +100,15 @@ def get_scenarios():
     """Scenarios for the LAI-BDQ-TPT question. ``tpt`` selects the preventive layer (None / 'inh' / 'lai_bdq')."""
     return {
         'Baseline': {
-            'name': 'Baseline',
+            'name': 'Baseline (No TPT)',
             'tpt': None,
         },
         'INH-TPT': {
-            'name': 'INH-TPT',
+            'name': 'Intervention: Isoniazid TPT',
             'tpt': 'inh',
         },
         'LAI-BDQ-TPT': {
-            'name': 'LAI-BDQ-TPT',
+            'name': 'Intervention: Long-Acting Injectable Bedaquiline',
             'tpt': 'lai_bdq',
         },
     }
@@ -125,15 +135,18 @@ def build_sim(scenario=None, spars=None):
 
     interventions = [hsb, confirm, treat, dst]
     tpt = scenario.get('tpt')
-    # Coverage 0.9 (vs default 0.5) so the TPT arms actually deliver enough
-    # doses for the resistance contrast to be visible in a single seed.
+    # Coverage 0.9 (vs default 0.5) so TPT arms deliver enough doses for the
+    # resistance contrast to show up in a single seed.
     tpt_pars = dict(coverage=ss.bernoulli(p=0.9))
-    if tpt == 'inh':
-        interventions.append(tbsim.TPTSimple(product=inh_tpt(tb), pars=tpt_pars))
-    elif tpt == 'lai_bdq':
-        interventions.append(tbsim.TPTSimple(product=lai_bdq_tpt(tb), pars=tpt_pars))
-    elif tpt is not None:
-        raise ValueError(f'unknown tpt {tpt!r}')
+    if tpt is not None:
+        # Force every effective TPT dose down the sterilization path
+        # (default p_sterilize=0.0 routes everything to suppression, which
+        # never exercises the strain-aware mutation / clearance logic).
+        product = inh_tpt(tb) if tpt == 'inh' else lai_bdq_tpt(tb) if tpt == 'lai_bdq' else None
+        if product is None:
+            raise ValueError(f'unknown tpt {tpt!r}')
+        product.pars.p_sterilize = ss.bernoulli(p=1.0)
+        interventions.append(tbsim.TPTSimple(product=product, pars=tpt_pars))
 
     sim = tbsim.Sim(
         label         = scenario.get('name', 'scenario'),
@@ -175,7 +188,93 @@ def print_summary(rows):
     print(pd.DataFrame(rows).set_index('scenario').T.to_string())
 
 
-def run_scenarios(do_plot=False, savefig=False, fig_path='results/resistance_multisim.png'):
+STRAIN_LABELS = {
+    'pan': 'Pan-susceptible', 'inh_r': 'INH-R', 'rif_r': 'RIF-R',
+    'mdr': 'MDR', 'bdq_r': 'BDQ-R',
+}
+
+# Cohen-style legend: short labels, baseline dashed, interventions solid.
+PLOT_SCENARIOS = [
+    ('Baseline (No TPT)',                              '--', '#666666'),
+    ('Intervention: Isoniazid TPT',                    '-',  '#C44E52'),
+    ('Intervention: Long-Acting Injectable Bedaquiline', '-',  '#4C72B0'),
+]
+PLOT_SCENARIO_LABELS = {
+    'Baseline (No TPT)': 'No TPT',
+    'Intervention: Isoniazid TPT': 'Isoniazid TPT',
+    'Intervention: Long-Acting Injectable Bedaquiline': 'LAI Bedaquiline TPT',
+}
+
+
+def _result_xy(result):
+    if result is None or not hasattr(result, 'timevec') or not hasattr(result, 'values'):
+        return None, None
+    return np.asarray(result.timevec), np.asarray(result.values).ravel()
+
+
+def plot_tradeoff(msim, filename=None, show=True):
+    """Cohen-style 2x2 trade-off figure: DS benefit vs DR costs by TPT regimen."""
+    flat = _normalize_results(msim)
+    panels = [
+        ('A', 'n_carriers_pan',   'Pan-susceptible carriers'),
+        ('B', 'n_carriers_inh_r', 'INH-R carriers'),
+        ('C', 'n_carriers_bdq_r', 'BDQ-R carriers'),
+        ('D', 'n_active_mdr',     'Active MDR'),
+    ]
+    fig, axs = plt.subplots(2, 2, figsize=(8, 5.5), sharex=True)
+    for ax, (letter, key, title) in zip(axs.flat, panels):
+        for scen, ls, color in PLOT_SCENARIOS:
+            res = flat.get(scen, {}).get(key)
+            x, y = _result_xy(res)
+            if x is None:
+                continue
+            short = PLOT_SCENARIO_LABELS.get(scen, scen)
+            ax.plot(x, y, ls, color=color, lw=1.8, label=short)
+        ax.set_title(title, loc='left', fontsize=10)
+        ax.text(-0.08, 1.02, letter, transform=ax.transAxes, fontsize=12, fontweight='bold', va='bottom')
+        ax.grid(True, alpha=0.25, linestyle=':')
+        ax.set_ylabel('Count')
+    axs[1, 0].set_xlabel('Time')
+    axs[1, 1].set_xlabel('Time')
+    fig.suptitle('TPT trade-off: drug-sensitive benefit vs drug-resistant cost', fontsize=11, y=0.98)
+    fig.subplots_adjust(top=0.88, bottom=0.18, hspace=0.35, wspace=0.28)
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.06),
+               ncol=3, fontsize=8, frameon=False)
+    if filename:
+        sc.savefig(sc.makefilepath(filename, makedirs=True), fig=fig)
+    if show:
+        plt.show()
+    return fig
+
+
+def plot_summary(summary_df, filename=None, show=True):
+    """End-of-run bar chart: cumulative new carriers by strain (Cohen Table 1 analog)."""
+    cols = [c for c in summary_df.columns if c.startswith('cum_new_carriers_')]
+    if not cols:
+        return None
+    strains = [c.removeprefix('cum_new_carriers_') for c in cols]
+    plot_df = summary_df.set_index('scenario')[cols].T
+    plot_df.index = [STRAIN_LABELS.get(s, s) for s in strains]
+    plot_df.columns = [PLOT_SCENARIO_LABELS.get(c, c) for c in plot_df.columns]
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+    plot_df.plot(kind='bar', ax=ax, rot=0, width=0.8, color=[c for _, _, c in PLOT_SCENARIOS])
+    ax.set_title('Cumulative new carriers by strain (end of simulation)')
+    ax.set_xlabel('')
+    ax.set_ylabel('Count')
+    ax.legend(title='Scenario', fontsize=8)
+    fig.tight_layout()
+    if filename:
+        sc.savefig(sc.makefilepath(filename, makedirs=True), fig=fig)
+    if show:
+        plt.show()
+    return fig
+
+
+def run_scenarios(do_plot=False, savefig=False,
+                  tradeoff_fig_path='results/resistance_tradeoff.png',
+                  summary_fig_path='results/resistance_summary.png'):
     """Run resistance scenarios and optionally plot outputs."""
     scenarios = get_scenarios()
     sims = []
@@ -193,28 +292,24 @@ def run_scenarios(do_plot=False, savefig=False, fig_path='results/resistance_mul
     summary_df = pd.DataFrame(summaries)
 
     msim = ss.MultiSim(sims=sims)
+    if do_plot or savefig:
+        if savefig:
+            tradeoff_fig_path = sc.makefilepath(tradeoff_fig_path, makedirs=True)
+            summary_fig_path = sc.makefilepath(summary_fig_path, makedirs=True)
+        plot_tradeoff(
+            msim,
+            filename=tradeoff_fig_path if savefig else None,
+            show=do_plot,
+        )
+        plot_summary(
+            summary_df,
+            filename=summary_fig_path if savefig else None,
+            show=do_plot,
+        )
 
     return msim, summary_df
 
 
 if __name__ == '__main__':
     print('Running resistance scenarios...')
-    msim, summary = run_scenarios()
-
-    tbsim.plot(
-        msim,
-        title='Resistance scenarios (TBsim)',
-        select=dict(items=[
-            # Headline TB curves
-            'n_alive', 'n_infectious', 'prevalence_active', 'incidence_kpy', 'new_deaths',
-            # Per-strain incidence (cumulative is what the summary reports)
-            'new_carriers_pan', 'new_carriers_inh_r', 'new_carriers_rif_r',
-            'new_carriers_mdr', 'new_carriers_bdq_r',
-            # Per-strain active prevalence
-            'n_active_pan', 'n_active_inh_r', 'n_active_rif_r',
-            'n_active_mdr', 'n_active_bdq_r',
-            # Duplicate-strain diagnostic + treatment cascade
-            'cum_duplicate_blocked', 'n_treated', 'cum_success', 'cum_failure',
-        ]),
-        show=True,
-    )
+    run_scenarios(do_plot=True, savefig=True)
