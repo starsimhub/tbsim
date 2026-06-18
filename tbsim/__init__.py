@@ -10,3 +10,10 @@ from .analyzers import *
 from .plots import *
 from .sim import *
 from .migration import *
+from . import resistance
+from .resistance import (
+    StrainSpec, StrainRegistry, StrainProfile, ResistanceConnector,
+    Regimen, ProgressionResolver, AcquisitionResolver,
+    StrainAwareTx, StrainAwareTxDelivery, StrainAwareTPTTx,
+    DSTDx, DSTDelivery, StrainResults, DuplicateStrainAnalyzer,
+)

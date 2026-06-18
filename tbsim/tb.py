@@ -140,9 +140,63 @@ class TB(BaseTB):
 
     """
 
-    def __init__(self, pars=None, **kwargs):
-        """Initialize with default natural history parameters; override via ``pars``."""
+    def __init__(self, pars=None, strains=None, **kwargs):
+        """Initialize with default natural history parameters; override via ``pars``.
+
+        Args:
+            pars (dict): Natural history parameter overrides.
+            strains (list/StrainRegistry/None): Optional strain configuration enabling
+                the drug-resistance overlay. May be a list of
+                :class:`tbsim.resistance.StrainSpec` or an already-built
+                :class:`tbsim.resistance.StrainRegistry`. When ``None`` (default),
+                TB runs in the original single-strain mode.
+        """
         super().__init__(name=kwargs.pop('name', None), label=kwargs.pop('label', None))
+
+        # --- Resistance overlay (opt-in) ---
+        # Built lazily to avoid a hard import cycle and to keep resistance optional.
+        self.strain_profile = None
+        self._strain_registry = None
+        # Phase 2 hooks (set later via kwargs)
+        self._progression_resolver = None
+        self._acquisition_resolver = None
+
+        if strains is not None:
+            from .resistance.strains import StrainRegistry, StrainSpec
+            from .resistance.profile import StrainProfile
+            from .resistance.resolvers import ProgressionResolver, AcquisitionResolver
+            if isinstance(strains, StrainRegistry):
+                registry = strains
+            else:
+                registry = StrainRegistry(list(strains))
+            self._strain_registry = registry
+            self.strain_profile = StrainProfile(registry)
+            self._rng_strain_pick = ss.random(name='tb_rng_strain_pick')
+            self._rng_strain_init = ss.random(name='tb_rng_strain_init')
+            self._rng_super = ss.random(name='tb_rng_super_protection')
+            # Precise per-step counter of transmission events where the
+            # transmitted strain was already carried by the recipient and
+            # thus blocked (Decision 3 in the findings).
+            self._n_duplicate_blocked_this_step = 0
+            # Configurable progression bottleneck and random-acquisition resolvers.
+            progression_mode = kwargs.pop('progression_mode', 'bottleneck')
+            p_multi = kwargs.pop('p_multi', 1.0)
+            p_random_acq = kwargs.pop('p_random_acquisition', None)
+            self._progression_resolver = ProgressionResolver(
+                mode=progression_mode, p_multi=p_multi,
+            )
+            self._acquisition_resolver = AcquisitionResolver(p_random=p_random_acq)
+            # α_super: per-spec multiplicative protection against superinfection
+            # for currently-infected agents. Applied to any incoming strain
+            # whose recipient is already in INFECTION / NON_INFECTIOUS /
+            # ASYMPTOMATIC / SYMPTOMATIC / TREATMENT. Per-state overrides
+            # (α_act_*) refine the active-disease classes; defaults: all 0
+            # (i.e., active-disease agents cannot be superinfected) per spec.
+            self._alpha_super = float(kwargs.pop('alpha_super', 0.21))  # 1 - rr_reinfection_rec default
+            self._alpha_act = dict(kwargs.pop('alpha_act', {}) or {})
+            self._alpha_act.setdefault('non_infectious', 0.0)
+            self._alpha_act.setdefault('asymptomatic',   0.0)
+            self._alpha_act.setdefault('symptomatic',    0.0)
 
         # --- Transmission and reinfection ---
         self.define_pars(
@@ -198,6 +252,11 @@ class TB(BaseTB):
             reset=True,
         )
 
+        # Strain presence flags (one BoolArr per strain) if resistance is enabled.
+        if self.strain_profile is not None:
+            self.define_states(*self.strain_profile.state_defs())
+            self.strain_profile.attach(self)
+
         return
 
     @property
@@ -217,6 +276,12 @@ class TB(BaseTB):
         The base `starsim.Infection` calls this when a susceptible agent
         acquires infection. We mark agents infected and set state to INFECTION
         (latent). Transitions are evaluated per dt each timestep in `step`.
+
+        When a strain overlay is configured, the recipient's strain profile is
+        also updated: the transmitted strain is sampled from the source agent's
+        carried strains weighted by fitness, or from registry init prevalences
+        when no source carries a strain. Duplicate-strain superinfection is
+        blocked per the resistance spec (the recipient retains existing strains).
         """
         super().set_prognoses(uids, sources)
         if len(uids) == 0:
@@ -228,6 +293,107 @@ class TB(BaseTB):
         self.ti_infected[uids] = self.ti
         self.state[uids] = TBS.INFECTION
 
+        if self.strain_profile is not None:
+            self._assign_transmitted_strains(uids, sources)
+
+        return
+
+    def _apply_strain_progression(self, uids, activating_only):
+        """Apply progression bottleneck and random acquisition to progressing *uids*.
+
+        Args:
+            uids: Agents that just left ``INFECTION`` (or ``NON_INFECTIOUS``).
+            activating_only: When True, the bottleneck only applies to agents
+                whose destination is ``ASYMPTOMATIC`` (the "activation" event).
+                When False, both ``NON_INFECTIOUS`` and ``ASYMPTOMATIC``
+                destinations are considered, but bottleneck is still scoped
+                to those activating to ``ASYMPTOMATIC``.
+        """
+        if len(uids) == 0:
+            return
+        # The bottleneck only applies at activation (-> ASYMPTOMATIC).
+        if activating_only:
+            activating = uids
+        else:
+            activating = uids[self.state[uids] == TBS.ASYMPTOMATIC]
+        if self._progression_resolver is not None and len(activating):
+            self._progression_resolver.resolve(self.strain_profile, activating)
+        if self._acquisition_resolver is not None:
+            self._acquisition_resolver.random_acquisition(self.strain_profile, uids)
+        return
+
+    def _assign_transmitted_strains(self, uids, sources):
+        """Assign strain identity to newly infected ``uids`` (resistance overlay).
+
+        Strain selection:
+
+        - ``sources`` is the per-recipient source UID array passed by Starsim.
+          When real source UIDs are present, the transmitted strain is sampled
+          from the source's carried strains, weighted by fitness.
+        - When ``sources`` is None or the Starsim seed sentinel (``-1``), the
+          strain is sampled from registry ``init_prev`` weights, falling back
+          to strain index 0 if no initial prevalence is configured.
+
+        Duplicate-strain superinfection is blocked: if the recipient already
+        carries the assigned strain the assignment is skipped (the recipient
+        keeps the strains they had).
+        """
+        profile = self.strain_profile
+        registry = self._strain_registry
+        n = len(uids)
+        picks = np.full(n, -1, dtype=int)
+
+        if sources is not None and not np.isscalar(sources):
+            try:
+                src_arr = np.asarray(sources, dtype=int)
+            except (TypeError, ValueError):
+                src_arr = None
+            if src_arr is not None and src_arr.ndim == 1 and src_arr.size == n:
+                real = src_arr >= 0
+                if real.any():
+                    src_uids = ss.uids(src_arr[real])
+                    src_picks = profile.sample_transmitted_strain(
+                        src_uids, self._rng_strain_pick,
+                    )
+                    picks[real] = src_picks
+
+        # Fallback: sample from registry init prevalences (or default to strain 0).
+        need_fallback = picks < 0
+        if need_fallback.any():
+            init_prev = registry.init_prev
+            if init_prev.sum() > 0:
+                p = init_prev / init_prev.sum()
+                u = np.asarray(
+                    self._rng_strain_init.rvs(int(need_fallback.sum())), dtype=float
+                )
+                cdf = np.cumsum(p)
+                fallback_picks = (u[:, None] < cdf).argmax(axis=1)
+            else:
+                fallback_picks = np.zeros(int(need_fallback.sum()), dtype=int)
+            picks[need_fallback] = fallback_picks
+
+        # Note: α_super protection (spec §"Strain competition / protection
+        # against reinfection") is *configured* on TB (``_alpha_super``,
+        # ``_alpha_act``) but not yet applied here, because in stock
+        # ``ss.Infection`` already-infected agents are not eligible as
+        # transmission recipients (``susceptible == False``). Superinfection
+        # via transmission, with α-gated acceptance, is the next milestone.
+
+        # Apply picks; duplicate-strain superinfection is blocked (do not re-add).
+        # Count blocked events for the analyzer hook.
+        n_blocked = 0
+        for idx in range(registry.n):
+            sel = picks == idx
+            if not sel.any():
+                continue
+            target = uids[sel]
+            arr = getattr(self, profile.names[idx])
+            already = np.asarray(arr[target], dtype=bool)
+            n_blocked += int(already.sum())
+            new = target[~already]
+            if len(new):
+                arr[new] = True
+        self._n_duplicate_blocked_this_step += n_blocked
         return
 
     def transition(self, uids, to, rng):
@@ -303,6 +469,9 @@ class TB(BaseTB):
            states in one step.
         4. **Bookkeeping**: update flags, modifiers, deaths, results.
         """
+        # Reset per-step counters for analyzers that read them.
+        if self.strain_profile is not None:
+            self._n_duplicate_blocked_this_step = 0
         super().step()
 
         # --- Evaluate transitions (each mutates self.state in place) ---
@@ -321,6 +490,11 @@ class TB(BaseTB):
             self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_cleared
             if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
                 self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
+            if self.strain_profile is not None and len(newly_cleared):
+                self.strain_profile.clear_all(newly_cleared)
+            if self.strain_profile is not None:
+                progressing = u[np.isin(self.state[u], [TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC])]
+                self._apply_strain_progression(progressing, activating_only=False)
 
         u = ss.uids(self.state == TBS.NON_INFECTIOUS)
         if len(u):
@@ -332,6 +506,11 @@ class TB(BaseTB):
             self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_rec
             if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
                 self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
+            if self.strain_profile is not None and len(newly_cleared):
+                self.strain_profile.clear_all(newly_cleared)
+            if self.strain_profile is not None:
+                progressing = u[self.state[u] == TBS.ASYMPTOMATIC]
+                self._apply_strain_progression(progressing, activating_only=True)
 
         u = ss.uids(self.state == TBS.ASYMPTOMATIC)
         if len(u):
@@ -406,6 +585,8 @@ class TB(BaseTB):
             self.state[uids[~removed]] = TBS.DEAD
         if np.any(removed):
             self.state[uids[removed]] = TBS.REMOVED
+        if self.strain_profile is not None:
+            self.strain_profile.clear_all(uids)
         return
 
     def init_results(self):
