@@ -30,9 +30,24 @@ class StrainAwareTPTTx(TPTTx):
         registry (StrainRegistry): Strain registry.
         p_tpt_acquisition (dict): Optional per-drug acquisition probability
             applied to surviving strains in agents whose TPT is ineffective.
+        acq_state_modifiers (dict): Optional per-state modifier on the
+            acquisition probability. Defaults follow the spec:
+            very low for INFECTION (0.05), medium for NON_INFECTIOUS (0.5),
+            high for ASYMPTOMATIC and SYMPTOMATIC (1.0).
     """
 
-    def __init__(self, regimen, registry, p_tpt_acquisition=None, **kwargs):
+    # Spec §"TPT": TPT-driven acquisition risk varies by TB state.
+    DEFAULT_TPT_STATE_MODIFIERS = {
+        'infection':      0.05,
+        'non_infectious': 0.5,
+        'asymptomatic':   1.0,
+        'symptomatic':    1.0,
+        'treatment':      0.0,
+        'cleared':        0.0,
+    }
+
+    def __init__(self, regimen, registry, p_tpt_acquisition=None,
+                 acq_state_modifiers=None, **kwargs):
         if not isinstance(regimen, Regimen):
             raise TypeError(f'regimen must be a Regimen; got {type(regimen).__name__}')
         super().__init__(**kwargs)
@@ -40,7 +55,12 @@ class StrainAwareTPTTx(TPTTx):
         self._registry = registry
         self._cover_mask = self._compute_cover_mask(registry, regimen)
         from .resolvers import AcquisitionResolver
-        self._acq_resolver = AcquisitionResolver(p_selective=p_tpt_acquisition)
+        if acq_state_modifiers is None:
+            acq_state_modifiers = dict(self.DEFAULT_TPT_STATE_MODIFIERS)
+        self._acq_resolver = AcquisitionResolver(
+            p_selective=p_tpt_acquisition,
+            state_modifiers=acq_state_modifiers,
+        )
         return
 
     @staticmethod
@@ -85,7 +105,9 @@ class StrainAwareTPTTx(TPTTx):
         # Partial-clearance agents keep resistant strains; they remain latent.
         # Optionally apply TPT-driven acquisition on partial outcomes.
         if len(partial):
-            self._acq_resolver.selective_acquisition(profile, partial, self.regimen.drugs)
+            self._acq_resolver.selective_acquisition(
+                profile, partial, self.regimen.drugs, tb=tb,
+            )
 
         self.tpt_resolved[uids] = True
         return

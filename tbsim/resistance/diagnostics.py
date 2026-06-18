@@ -4,7 +4,8 @@ import numpy as np
 import starsim as ss
 import tbsim
 
-__all__ = ['DSTDx', 'DSTDelivery']
+__all__ = ['DSTDx', 'DSTDelivery', 'RegimenRouter',
+           'treatment_monitoring_eligibility']
 
 
 class DSTDx(ss.Product):
@@ -148,3 +149,182 @@ class DSTDelivery(ss.Intervention):
             arr[uids[obs]] = True
         self.tested_dst[uids] = True
         return
+
+
+class RegimenRouter:
+    """
+    Build DST-aware eligibility lambdas that route agents to regimens.
+
+    Spec §"Diagnostics & Treatment Modification": treatment provision can be
+    dependent on the observed DST phenotype. This helper turns a
+    :class:`DSTDelivery` into composable eligibility functions for use by
+    multiple :class:`StrainAwareTxDelivery` instances.
+
+    The router does not own any state itself; it produces lambdas of the
+    form ``lambda sim -> ss.uids`` that the user passes as
+    ``eligibility=`` to the relevant ``StrainAwareTxDelivery``. Routing is
+    idempotent: agents already on treatment (``tb.on_treatment == True``)
+    are filtered out.
+
+    Args:
+        dst (DSTDelivery): The DST delivery whose observed-resistance state
+            arrays we read.
+        diagnosed_state (str): Optional state name to require for routing
+            (default ``'diagnosed'`` — reads ``sim.get_dx(result_state=...)``).
+            Pass ``None`` to skip the diagnosed gate (DST-tested only).
+        require_dst_tested (bool): If True (default), require
+            ``dst.tested_dst == True`` (agent has actually been DST-tested).
+
+    Example:
+        ::
+
+            dst = DSTDelivery(product=DSTDx(registry, drugs=['INH','RIF','BDQ']))
+            router = RegimenRouter(dst)
+
+            first_line  = StrainAwareTxDelivery(
+                product=first_line_tx,
+                eligibility=router.matches(INH=False, RIF=False),
+                name='first_line',
+            )
+            second_line = StrainAwareTxDelivery(
+                product=second_line_tx,
+                eligibility=router.matches(INH=True, RIF=True),  # MDR
+                name='second_line',
+            )
+            sim = tbsim.Sim(..., interventions=[
+                hsb, screen, dst, first_line, second_line,
+            ])
+    """
+
+    def __init__(self, dst, diagnosed_state='diagnosed', require_dst_tested=True):
+        self.dst = dst
+        self.diagnosed_state = diagnosed_state
+        self.require_dst_tested = require_dst_tested
+        return
+
+    def _base_eligible(self, sim):
+        """UIDs that have passed the diagnosis + DST-tested gates.
+
+        Implemented entirely in the Starsim UID API: every filter is
+        expressed as ``ss.uids`` set operations rather than numpy boolean
+        manipulation.
+        """
+        elig = sim.people.alive.uids
+        if self.diagnosed_state is not None:
+            dx = sim.get_dx(result_state=self.diagnosed_state)
+            if dx is None:
+                return ss.uids()
+            elig = elig.intersect(getattr(dx, self.diagnosed_state).uids)
+        if self.require_dst_tested:
+            elig = elig.intersect(self.dst.tested_dst.uids)
+        # Exclude agents already on treatment
+        tb = tbsim.get_tb(sim)
+        elig = elig.intersect(tb.on_treatment.false())
+        return elig
+
+    def matches(self, **per_drug_resistance):
+        """Return an eligibility lambda matching agents whose observed phenotype
+        matches the given drug→bool dict.
+
+        Args:
+            **per_drug_resistance: e.g. ``INH=True, RIF=True`` (MDR) or
+                ``RIF=False, BDQ=False`` (BDQ-susceptible RIF-susceptible).
+
+        Returns:
+            callable: ``(sim) -> ss.uids`` selecting matching agents.
+        """
+        dst = self.dst
+        spec = dict(per_drug_resistance)
+        # Validate drugs exist on DST
+        for d in spec:
+            attr = f'observed_{d}_resistant'
+            if not hasattr(dst, attr):
+                raise ValueError(
+                    f'RegimenRouter.matches: drug {d!r} has no observed_{d}_resistant '
+                    f'state on DSTDelivery. Available: {dst.product.drugs}'
+                )
+
+        def _elig(sim):
+            base = self._base_eligible(sim)
+            if len(base) == 0:
+                return base
+            out = base
+            for drug, want_resistant in spec.items():
+                arr = getattr(dst, f'observed_{drug}_resistant')
+                match_uids = arr.uids if want_resistant else arr.false()
+                out = out.intersect(match_uids)
+            return out
+        _elig.__name__ = 'router_matches_' + '_'.join(
+            f'{d}{"+" if v else "-"}' for d, v in spec.items()
+        )
+        return _elig
+
+    def default(self):
+        """Eligibility lambda for "everything that didn't match a specific phenotype"
+        — useful as the fallback first-line tier. Note: this returns *all*
+        base-eligible agents; place the router-specific tiers BEFORE the
+        default tier so the specific tiers consume their agents first."""
+        return lambda sim: self._base_eligible(sim)
+
+
+def treatment_monitoring_eligibility(tx_delivery_name, after_steps=4, every_steps=None):
+    """
+    Build a treatment-monitoring eligibility lambda (spec §"Treatment monitoring").
+
+    Returns a function ``(sim) -> ss.uids`` selecting agents who are currently
+    on a given treatment course AND have been on treatment for at least
+    ``after_steps`` simulation steps. Use as ``eligibility=`` on a standard
+    ``DxDelivery`` to gate a "still bacteriologically positive" check. The
+    output of that Dx can in turn gate a regimen-switch
+    :class:`StrainAwareTxDelivery`.
+
+    Args:
+        tx_delivery_name (str): The ``name`` of the TxDelivery to monitor.
+            Used to look up its state via ``sim.interventions[name]``.
+        after_steps (int): Minimum number of timesteps since
+            ``ti_treatment_start`` before an agent is eligible for monitoring.
+            Default 4 steps.
+        every_steps (int|None): If given, only retest every N steps after
+            the first eligibility. ``None`` means a single test once-after.
+
+    Returns:
+        callable: ``(sim) -> ss.uids`` selecting eligible agents.
+
+    Example:
+        ::
+
+            tx = StrainAwareTxDelivery(product=first_line, name='first_line')
+            monitor = tbsim.DxDelivery(
+                name='monitor', product=tbsim.Xpert(), coverage=0.9,
+                eligibility=treatment_monitoring_eligibility('first_line',
+                                                              after_steps=8),
+                result_state='still_positive',
+            )
+            switch = StrainAwareTxDelivery(
+                product=second_line,
+                name='second_line',
+                eligibility=lambda sim: sim.interventions['monitor'].still_positive.uids,
+            )
+    """
+    def _elig(sim):
+        tx = sim.interventions.get(tx_delivery_name)
+        if tx is None:
+            return ss.uids()
+        tb = tbsim.get_tb(sim)
+        # On-treatment agents (TB-state, not just intervention bookkeeping)
+        on_tx_uids = tb.on_treatment.uids
+        if len(on_tx_uids) == 0:
+            return on_tx_uids
+        # Time on treatment, in sim steps. ti_treatment_start is a FloatArr
+        # indexed by UID; np.asarray here is only used to do arithmetic on
+        # the resulting positional values.
+        ti_start = np.asarray(tx.ti_treatment_start[on_tx_uids], dtype=float)
+        elapsed = sim.ti - ti_start
+        ready_mask = elapsed >= float(after_steps)
+        if every_steps:
+            ready_mask &= (
+                (elapsed - float(after_steps)) % float(every_steps) == 0
+            )
+        return on_tx_uids[ready_mask]
+    _elig.__name__ = f'monitoring_after_{after_steps}_steps'
+    return _elig

@@ -123,23 +123,68 @@ class AcquisitionResolver:
     event is silently dropped (resistant variant is not configured).
     """
 
-    def __init__(self, p_random=None, p_selective=None, rng=None):
+    # Per-state modifier defaults for ω_R,d (spec §"Treatment & (Selective)
+    # Acquisition"). Multiplied with the base p_selective to yield the
+    # effective acquisition probability for an agent in that state.
+    # Default: 0 for INFECTION/NON_INFECTIOUS (no acquisition while latent /
+    # early disease), 1 for ASYMPTOMATIC and SYMPTOMATIC, 0 for TREATMENT
+    # (treatment failure outcome resolved before the state transition).
+    DEFAULT_STATE_MODIFIERS = {
+        'infection':      0.0,
+        'non_infectious': 0.0,
+        'asymptomatic':   1.0,
+        'symptomatic':    1.0,
+        'treatment':      0.0,
+        'cleared':        0.0,
+    }
+
+    def __init__(self, p_random=None, p_selective=None,
+                 state_modifiers=None, rng=None):
         """
         Args:
             p_random (dict): Per-drug random acquisition probability per
                 activation transition. Default {} (off).
             p_selective (dict): Per-drug acquisition probability per
                 treatment-failure episode. Default {} (off).
+            state_modifiers (dict): Optional per-state multiplier on
+                ``p_selective`` (spec ω depends on TB state). Keys are TB
+                state names: ``'infection'``, ``'non_infectious'``,
+                ``'asymptomatic'``, ``'symptomatic'``, ``'treatment'``,
+                ``'cleared'``. Defaults follow
+                :attr:`DEFAULT_STATE_MODIFIERS`.
             rng: Optional ``ss.random`` to use; otherwise one is created.
         """
         self.p_random = dict(p_random or {})
         self.p_selective = dict(p_selective or {})
+        self.state_modifiers = dict(self.DEFAULT_STATE_MODIFIERS)
+        if state_modifiers:
+            self.state_modifiers.update(state_modifiers)
         self._rng = rng if rng is not None else ss.random(
             name='resmod_rng_acquisition', strict=False,
         )
         if not self._rng.initialized:
             self._rng.init()
         return
+
+    def _state_modifier_array(self, tb, uids):
+        """Return a (len(uids),) array of per-agent state modifiers for ω."""
+        from ..tb import TBS
+        states = np.asarray(tb.state[uids], dtype=int)
+        mod = np.ones(len(uids), dtype=float)
+        # Defensive mapping from TB state enum to modifier-dict keys.
+        for key, val in self.state_modifiers.items():
+            tbs = {
+                'infection':      TBS.INFECTION,
+                'non_infectious': TBS.NON_INFECTIOUS,
+                'asymptomatic':   TBS.ASYMPTOMATIC,
+                'symptomatic':    TBS.SYMPTOMATIC,
+                'treatment':      TBS.TREATMENT,
+                'cleared':        TBS.CLEARED,
+            }.get(key)
+            if tbs is None:
+                continue
+            mod[states == int(tbs)] = float(val)
+        return mod
 
     def _resistant_target_idx(self, registry, source_idx, drug):
         """Find the strain index that equals source's phenotype + resistance to *drug*.
@@ -194,12 +239,11 @@ class AcquisitionResolver:
                 target_idx = self._resistant_target_idx(registry, s_idx, drug)
                 if target_idx is None:
                     continue
-                carriers_mask = np.asarray(
-                    getattr(profile._tb, profile.names[s_idx])[uids], dtype=bool,
-                )
-                if not carriers_mask.any():
+                # Idiomatic Starsim filter: BoolArr.uids ∩ uids of interest.
+                strain_arr = getattr(profile._tb, profile.names[s_idx])
+                carrier_uids = strain_arr.uids.intersect(uids)
+                if len(carrier_uids) == 0:
                     continue
-                carrier_uids = uids[carriers_mask]
                 u = np.asarray(self._rng.rvs(len(carrier_uids)), dtype=float)
                 hit = carrier_uids[u < float(p)]
                 if len(hit) == 0:
@@ -208,22 +252,35 @@ class AcquisitionResolver:
                 profile.add_strain(hit, target_idx)
         return
 
-    def selective_acquisition(self, profile, uids, drugs_used):
+    def selective_acquisition(self, profile, uids, drugs_used, tb=None):
         """Acquire resistance on treatment failure for surviving susceptible strains.
+
+        Spec §"Treatment & (Selective) Acquisition": ω_R,d is one trial per
+        treatment episode, drug-specific, and may vary by TB state (e.g. 0
+        for non-symptomatic agents, equal for SYMPTOMATIC/ASYMPTOMATIC).
 
         Args:
             profile (StrainProfile): Strain profile to mutate.
             uids (ss.uids): Agents who failed treatment.
             drugs_used (list[str]): Drugs in the failed regimen.
+            tb: Optional TB module reference. When provided, per-agent state
+                modifiers (``self.state_modifiers``) scale the base
+                ``p_selective`` for each agent.
         """
         if len(uids) == 0 or not self.p_selective:
             return
+        # Per-agent state modifier (1.0 if tb not supplied).
+        if tb is not None:
+            mod = self._state_modifier_array(tb, uids)
+        else:
+            mod = np.ones(len(uids), dtype=float)
         for drug in drugs_used:
             p = self.p_selective.get(drug, 0.0)
             if p <= 0:
                 continue
+            eff_p = float(p) * mod
             u = np.asarray(self._rng.rvs(len(uids)), dtype=float)
-            hit = uids[u < float(p)]
+            hit = uids[u < eff_p]
             if len(hit) == 0:
                 continue
             self._apply_acquisition(profile, hit, drug)
@@ -240,23 +297,22 @@ class AcquisitionResolver:
         drug_col = registry.drugs.index(drug)
 
         # Identify, per uid, the first susceptible carried strain.
-        # We iterate strain index in order — first hit wins.
-        applied = np.zeros(len(uids), dtype=bool)
+        # We iterate strain index in order — first hit wins per agent.
+        # The "applied" set is a uids set; remaining is uids \ applied.
+        applied = ss.uids()
         for s_idx in range(registry.n):
             if registry.resistance[s_idx, drug_col] == 1:
                 continue  # already resistant
             target_idx = self._resistant_target_idx(registry, s_idx, drug)
             if target_idx is None:
                 continue
-            carriers = np.asarray(
-                getattr(profile._tb, profile.names[s_idx])[uids], dtype=bool
-            )
-            do = carriers & ~applied
-            if not do.any():
-                continue
-            sub = uids[do]
-            profile.replace_strain(sub, old=s_idx, new=target_idx)
-            applied |= do
-            if applied.all():
+            remaining = uids.remove(applied) if len(applied) else uids
+            if len(remaining) == 0:
                 break
+            strain_arr = getattr(profile._tb, profile.names[s_idx])
+            sub = strain_arr.uids.intersect(remaining)
+            if len(sub) == 0:
+                continue
+            profile.replace_strain(sub, old=s_idx, new=target_idx)
+            applied = applied.union(sub)
         return

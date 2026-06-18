@@ -36,6 +36,7 @@ class StrainAwareTx(Tx):
     """
 
     def __init__(self, regimen, registry, p_selective_acquisition=None,
+                 acq_state_modifiers=None,
                  adherence=0.85, dur_treatment=None, p_relapse=0.05,
                  dur_relapse=None, **kwargs):
         if not isinstance(regimen, Regimen):
@@ -59,9 +60,12 @@ class StrainAwareTx(Tx):
             for i in range(registry.n)
         ]
 
-        # Acquisition resolver lazily — instantiated only if needed
+        # Acquisition resolver — state-dependent ω_R,d
         from .resolvers import AcquisitionResolver
-        self._acq_resolver = AcquisitionResolver(p_selective=p_selective_acquisition)
+        self._acq_resolver = AcquisitionResolver(
+            p_selective=p_selective_acquisition,
+            state_modifiers=acq_state_modifiers,
+        )
         return
 
     def administer(self, sim, uids):
@@ -232,9 +236,10 @@ class StrainAwareTxDelivery(TxDelivery):
                     sub = cured_uids.intersect(failure_uids)
                     if len(sub):
                         tb.strain_profile.remove_strain(sub, int(s_idx))
-            # Selective acquisition on the regimen drugs
+            # Selective acquisition on the regimen drugs — state-dependent ω
             self.product._acq_resolver.selective_acquisition(
                 tb.strain_profile, failure_uids, self.product.regimen.drugs,
+                tb=tb,
             )
         super().step_failures()
         return

@@ -269,33 +269,112 @@ class TB(BaseTB):
         """
         return (self.state == TBS.ASYMPTOMATIC) | (self.state == TBS.SYMPTOMATIC)
 
+    def infect(self):
+        """
+        TB transmission step with optional superinfection-via-transmission.
+
+        When the resistance overlay is configured, already-infected agents
+        are eligible as transmission targets at a reduced rel_sus governed by
+        the α factors (spec §"Strain competition / protection against
+        reinfection"):
+
+        - ``INFECTION``       → ``α_super``
+        - ``NON_INFECTIOUS``  → ``α_act['non_infectious']``
+        - ``ASYMPTOMATIC``    → ``α_act['asymptomatic']``
+        - ``SYMPTOMATIC``     → ``α_act['symptomatic']``
+
+        With defaults (active-state α = 0, α_super = 0.21) only latent agents
+        are typically reachable, matching the spec's recommended starting
+        parameterisation.
+        """
+        if self.strain_profile is None:
+            return super().infect()
+
+        # Identify per-state super-eligible UIDs using the Starsim UID API
+        # (BoolArr state-equality .uids, concatenated via uids.concatenate).
+        per_state_alpha = (
+            (TBS.INFECTION,      self._alpha_super),
+            (TBS.NON_INFECTIOUS, self._alpha_act['non_infectious']),
+            (TBS.ASYMPTOMATIC,   self._alpha_act['asymptomatic']),
+            (TBS.SYMPTOMATIC,    self._alpha_act['symptomatic']),
+        )
+        chunks_uids = []
+        chunks_alpha = []
+        for tbs_val, alpha in per_state_alpha:
+            if alpha <= 0:
+                continue
+            state_uids = (self.state == tbs_val).uids
+            if len(state_uids) == 0:
+                continue
+            chunks_uids.append(state_uids)
+            chunks_alpha.append(np.full(len(state_uids), float(alpha)))
+
+        if not chunks_uids:
+            return super().infect()
+
+        elig_uids = ss.uids.concatenate(chunks_uids)
+        alphas    = np.concatenate(chunks_alpha)
+
+        # Save and temporarily mutate susceptible / rel_sus for these UIDs.
+        # ``np.asarray(...)`` on the values is only to copy the snapshot.
+        orig_sus     = np.asarray(self.susceptible[elig_uids], dtype=bool).copy()
+        orig_rel_sus = np.asarray(self.rel_sus[elig_uids], dtype=float).copy()
+        try:
+            self.susceptible[elig_uids] = True
+            self.rel_sus[elig_uids] = orig_rel_sus * alphas
+            return super().infect()
+        finally:
+            self.susceptible[elig_uids] = orig_sus
+            self.rel_sus[elig_uids] = orig_rel_sus
+
     def set_prognoses(self, uids, sources=None):
         """
         Set prognoses for newly infected agents (called when transmission occurs).
 
-        The base `starsim.Infection` calls this when a susceptible agent
-        acquires infection. We mark agents infected and set state to INFECTION
-        (latent). Transitions are evaluated per dt each timestep in `step`.
+        Two paths:
+
+        - **New infection** (recipient was SUSCEPTIBLE or CLEARED): mark
+          infected, set state to INFECTION, reset prognosis timers.
+        - **Superinfection** (recipient was already in INFECTION /
+          NON_INFECTIOUS / ASYMPTOMATIC / SYMPTOMATIC): keep TB state and
+          timers as-is; only add the transmitted strain.
 
         When a strain overlay is configured, the recipient's strain profile is
         also updated: the transmitted strain is sampled from the source agent's
-        carried strains weighted by fitness, or from registry init prevalences
-        when no source carries a strain. Duplicate-strain superinfection is
+        carried strains weighted by fitness. Duplicate-strain superinfection is
         blocked per the resistance spec (the recipient retains existing strains).
         """
         super().set_prognoses(uids, sources)
         if len(uids) == 0:
             return
 
-        self.susceptible[uids] = False
-        self.infected[uids] = True
-        self.ever_infected[uids] = True
-        self.ti_infected[uids] = self.ti
-        self.state[uids] = TBS.INFECTION
+        if self.strain_profile is None:
+            # Stock single-strain semantics
+            self.susceptible[uids] = False
+            self.infected[uids] = True
+            self.ever_infected[uids] = True
+            self.ti_infected[uids] = self.ti
+            self.state[uids] = TBS.INFECTION
+            return
 
-        if self.strain_profile is not None:
-            self._assign_transmitted_strains(uids, sources)
+        # Strain overlay path: split into new vs super-infections using the
+        # Starsim UID API. ``susceptible`` includes SUSCEPTIBLE; CLEARED
+        # agents are picked out via a state-equality BoolArr.
+        susceptible_uids = self.susceptible.uids
+        cleared_uids     = (self.state == TBS.CLEARED).uids
+        new_uids = uids.intersect(susceptible_uids.union(cleared_uids))
 
+        if len(new_uids):
+            self.susceptible[new_uids] = False
+            self.infected[new_uids] = True
+            self.ever_infected[new_uids] = True
+            self.ti_infected[new_uids] = self.ti
+            self.state[new_uids] = TBS.INFECTION
+
+        # Both populations get a strain assignment (the duplicate-block
+        # counter inside _assign_transmitted_strains handles already-carried
+        # strains automatically).
+        self._assign_transmitted_strains(uids, sources)
         return
 
     def _apply_strain_progression(self, uids, activating_only):

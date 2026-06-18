@@ -19,12 +19,15 @@ from .regimens import Regimen
 from .resolvers import ProgressionResolver, AcquisitionResolver
 from .tx import StrainAwareTx, StrainAwareTxDelivery
 from .tpt import StrainAwareTPTTx
-from .diagnostics import DSTDx, DSTDelivery
+from .diagnostics import (
+    DSTDx, DSTDelivery, RegimenRouter, treatment_monitoring_eligibility,
+)
 from .analyzers import StrainResults, DuplicateStrainAnalyzer
 
 __all__ = [
     'StrainSpec', 'StrainRegistry', 'StrainProfile', 'ResistanceConnector',
     'Regimen', 'ProgressionResolver', 'AcquisitionResolver',
     'StrainAwareTx', 'StrainAwareTxDelivery', 'StrainAwareTPTTx',
-    'DSTDx', 'DSTDelivery', 'StrainResults', 'DuplicateStrainAnalyzer',
+    'DSTDx', 'DSTDelivery', 'RegimenRouter', 'treatment_monitoring_eligibility',
+    'StrainResults', 'DuplicateStrainAnalyzer',
 ]
