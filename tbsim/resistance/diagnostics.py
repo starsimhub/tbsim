@@ -28,14 +28,11 @@ class DSTDx(ss.Product):
     test reports "resistant" or "susceptible". Internal strain state is not
     exposed; the test sees the union of carried strains' resistance bits.
 
-    Per-drug sensitivity (probability of correctly detecting resistance when
-    any carried strain is resistant) and specificity (probability of
-    correctly reporting susceptibility when no carried strain is resistant)
-    are configurable, either as a scalar (applied to every drug) or as a
-    ``{drug: p}`` dict. Each becomes a proper ``ss.bernoulli`` parameter
-    named ``p_sens_<drug>`` / ``p_spec_<drug>`` on ``self.pars`` so it
-    inherits Starsim's standard RNG initialization (no ``strict=False``
-    plumbing required).
+    Per-drug sensitivity/specificity are applied at the strain level and then
+    aggregated to an agent-level observed phenotype (any observed strain with
+    observed resistance to a drug yields agent-level observed resistance for
+    that drug). A per-strain observability term ``p_strain_obs`` models
+    strain-level drop-out in mixed infections.
 
     Args:
         registry (StrainRegistry): Strain registry.
@@ -43,6 +40,10 @@ class DSTDx(ss.Product):
             registry).
         sensitivity (dict|float): Per-drug sensitivity. Default 0.95.
         specificity (dict|float): Per-drug specificity. Default 0.99.
+        p_strain_obs (float|dict|None): Probability a carried strain is
+            observed at all by DST before applying sens/spec. If ``None``
+            (default), uses strain fitness per registry entry. If float,
+            applies one strain-agnostic value to all strains.
 
     Example::
 
@@ -53,7 +54,7 @@ class DSTDx(ss.Product):
     """
 
     def __init__(self, registry, drugs=None, sensitivity=0.95,
-                 specificity=0.99, **kwargs):
+                 specificity=0.99, p_strain_obs=None, **kwargs):
         super().__init__()
         self.registry = registry
         if drugs is None:
@@ -71,6 +72,26 @@ class DSTDx(ss.Product):
         if isinstance(specificity, (int, float)):
             specificity = {d: float(specificity) for d in self.drugs}
 
+        # Normalize strain observability inputs.
+        if p_strain_obs is None:
+            strain_obs = np.asarray(registry.fitness, dtype=float)
+        elif isinstance(p_strain_obs, (int, float)):
+            strain_obs = np.full(registry.n, float(p_strain_obs), dtype=float)
+        elif isinstance(p_strain_obs, dict):
+            if 'all' in p_strain_obs:
+                strain_obs = np.full(registry.n, float(p_strain_obs['all']), dtype=float)
+            else:
+                strain_obs = np.array([
+                    float(p_strain_obs.get(uid, registry.fitness[i]))
+                    for i, uid in enumerate(registry.uids)
+                ], dtype=float)
+        else:
+            raise TypeError(
+                f'p_strain_obs must be float, dict, or None; got {type(p_strain_obs).__name__}'
+            )
+        if np.any((strain_obs < 0.0) | (strain_obs > 1.0)):
+            raise ValueError(f'p_strain_obs values must be in [0, 1]; got {strain_obs}')
+
         # Define per-drug Bernoullis as proper Starsim pars. ``strict=False``
         # allows DSTDx to be invoked standalone (e.g. from tests that build
         # a DSTDx outside a DSTDelivery), while keeping the standard RNG
@@ -83,6 +104,10 @@ class DSTDx(ss.Product):
             )
             bernoulli_pars[f'p_spec_{d}'] = ss.bernoulli(
                 p=float(specificity[d]), strict=False,
+            )
+        for s_idx in range(registry.n):
+            bernoulli_pars[f'p_obs_strain_{s_idx}'] = ss.bernoulli(
+                p=float(strain_obs[s_idx]), strict=False,
             )
         self.define_pars(**bernoulli_pars)
         self.update_pars(**kwargs)
@@ -134,12 +159,43 @@ class DSTDx(ss.Product):
             return {}
         tb = tbsim.get_tb(sim)
         n = len(uids)
-        results = {}
-        for drug in self.drugs:
-            true_res = self.true_phenotype(tb, uids, drug)
-            sens_pos = np.asarray(self.pars[f'p_sens_{drug}'].rvs(n), dtype=bool)
-            spec_neg = np.asarray(self.pars[f'p_spec_{drug}'].rvs(n), dtype=bool)
-            results[drug] = np.where(true_res, sens_pos, ~spec_neg)
+        results = {drug: np.zeros(n, dtype=bool) for drug in self.drugs}
+        profile = tb.strain_profile
+
+        # Fallback for non-overlay contexts: all are effectively susceptible,
+        # with per-drug false positives controlled by specificity.
+        if profile is None:
+            for drug in self.drugs:
+                spec_neg = np.asarray(self.pars[f'p_spec_{drug}'].rvs(n), dtype=bool)
+                results[drug] = ~spec_neg
+            return results
+
+        uid_to_pos = {int(uid): i for i, uid in enumerate(uids)}
+        drug_cols = {drug: self.registry.drugs.index(drug) for drug in self.drugs}
+
+        # Apply DST at strain level, then aggregate to agent-level phenotype.
+        for s_idx in range(self.registry.n):
+            strain_arr = getattr(profile._tb, profile.names[s_idx])
+            carrier_uids = strain_arr.uids.intersect(uids)
+            if len(carrier_uids) == 0:
+                continue
+
+            obs_draw = np.asarray(self.pars[f'p_obs_strain_{s_idx}'].rvs(len(carrier_uids)), dtype=bool)
+            observed_uids = carrier_uids[obs_draw]
+            if len(observed_uids) == 0:
+                continue
+
+            for drug in self.drugs:
+                m = len(observed_uids)
+                sens_pos = np.asarray(self.pars[f'p_sens_{drug}'].rvs(m), dtype=bool)
+                spec_neg = np.asarray(self.pars[f'p_spec_{drug}'].rvs(m), dtype=bool)
+                is_resistant = bool(self.registry.resistance[s_idx, drug_cols[drug]])
+                observed_resistant = sens_pos if is_resistant else ~spec_neg
+                if not observed_resistant.any():
+                    continue
+                hit_uids = observed_uids[observed_resistant]
+                hit_idx = [uid_to_pos[int(uid)] for uid in hit_uids]
+                results[drug][hit_idx] = True
         return results
 
 

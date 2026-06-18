@@ -277,6 +277,13 @@ class StrainAwareTxDelivery(TxDelivery):
             for s_idx, raw_uids in by_strain.items():
                 tb.strain_profile.add_strain(ss.uids(raw_uids), int(s_idx))
 
+            # Updated spec: relapse is an unsuccessful treatment outcome that
+            # can drive selective acquisition under regimen pressure.
+            self.product._acq_resolver.selective_acquisition(
+                tb.strain_profile, relapsed, self.product.regimen.drugs,
+                tb=tb,
+            )
+
         # Drop snapshots for agents whose relapse episode is no longer pending
         # (due and resolved, ineligible, dead, etc.).
         ended = [uid for uid in self._relapse_strains_by_uid
