@@ -40,36 +40,46 @@ class StrainAwareTx(Tx):
                  adherence=0.85, dur_treatment=None, p_relapse=0.05,
                  dur_relapse=None, **kwargs):
         if not isinstance(regimen, Regimen):
-            raise TypeError(f'regimen must be a Regimen; got {type(regimen).__name__}')
+            raise TypeError(
+                f'regimen must be a Regimen; got {type(regimen).__name__}'
+            )
+        # First, build the standard Tx pars (p_adherence, p_success,
+        # p_relapse, dur_*). Do NOT pass user kwargs yet — we'll add
+        # per-strain pars and then run update_pars(**kwargs) once at the end
+        # so user overrides hit a fully-populated pars dict.
         super().__init__(
             efficacy=regimen.base_efficacy,
             dur_treatment=dur_treatment,
             adherence=adherence,
             p_relapse=p_relapse,
             dur_relapse=dur_relapse,
-            **kwargs,
         )
         self.regimen = regimen
         self._registry = registry
         self._strain_cure_p = regimen.strain_cure_probs(registry)
 
-        # Per-strain RNGs for independent cure rolls
-        self._rng_per_strain = [
-            ss.bernoulli(p=float(self._strain_cure_p[i]),
-                         name=f'tx_cure_{regimen.name}_{registry.uids[i]}')
+        # Per-strain Bernoullis are added as proper Starsim pars so they
+        # participate in the standard RNG plumbing. Naming convention:
+        # ``p_cure_strain_<i>`` for the i-th strain in the registry.
+        per_strain = {
+            f'p_cure_strain_{i}': ss.bernoulli(p=float(self._strain_cure_p[i]))
             for i in range(registry.n)
-        ]
+        }
+        self.define_pars(**per_strain)
 
-        # Acquisition resolver — state-dependent ω_R,d
+        # Acquisition resolver — state-dependent ω_R,d (Phase 4).
         from .resolvers import AcquisitionResolver
         self._acq_resolver = AcquisitionResolver(
             p_selective=p_selective_acquisition,
             state_modifiers=acq_state_modifiers,
         )
+
+        self.update_pars(**kwargs)
         return
 
     def administer(self, sim, uids):
-        """Roll per-strain cure outcomes; adherence is correlated within an agent.
+        """Roll per-strain cure outcomes; adherence is correlated within an
+        agent.
 
         Returns the same shape dict as :meth:`Tx.administer` plus a
         ``per_strain`` key giving per-strain cure masks.
@@ -77,21 +87,25 @@ class StrainAwareTx(Tx):
         n = len(uids)
         # Agent-level adherence draw (correlated across strains).
         adherent_mask = np.asarray(self.pars.p_adherence.rvs(uids), dtype=bool)
-        # Per-strain cure rolls, gated by adherence.
-        cure_masks = {}
-        tb = sim.diseases['tb']
+
+        tb = tbsim.get_tb(sim)
         profile = tb.strain_profile
-        for s_idx, dist in enumerate(self._rng_per_strain):
+
+        # Per-strain cure rolls, gated by adherence and carrier status.
+        cure_masks = {}
+        for s_idx in range(self._registry.n):
+            dist = self.pars[f'p_cure_strain_{s_idx}']
             roll = np.asarray(dist.rvs(uids), dtype=bool)
-            carriers = np.asarray(
-                getattr(profile._tb, profile.names[s_idx])[uids], dtype=bool
-            )
+            strain_arr = getattr(profile._tb, profile.names[s_idx])
+            # Idiomatic Starsim: BoolArr.uids ∩ uids → carrier mask in `uids` order.
+            carrier_uids = strain_arr.uids.intersect(uids)
+            carriers = np.isin(uids, carrier_uids) if len(carrier_uids) else np.zeros(n, dtype=bool)
             cure_masks[s_idx] = adherent_mask & roll & carriers
 
         # An agent is a "success" if every carried strain is cured.
         carried_total = profile.n_strains_per_agent(uids)
         cured_per_agent = np.zeros(n, dtype=np.int32)
-        for s_idx, mask in cure_masks.items():
+        for mask in cure_masks.values():
             cured_per_agent += mask.astype(np.int32)
         all_cured = (cured_per_agent == carried_total) & (carried_total > 0)
         any_failure = ~all_cured

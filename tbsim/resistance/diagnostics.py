@@ -1,4 +1,16 @@
-"""Drug susceptibility testing (DST) for the TB resistance overlay."""
+"""Drug susceptibility testing (DST) for the TB resistance overlay.
+
+The product/delivery split here mirrors ``tbsim/interventions/diagnostics.py``
+(``Dx`` + ``DxDelivery``):
+
+- :class:`DSTDx` is the **product** — owns per-drug sensitivity / specificity
+  as proper ``ss.bernoulli`` parameters under ``self.pars`` so they share the
+  Starsim RNG plumbing and are reproducible.
+- :class:`DSTDelivery` is the **delivery** — owns eligibility, coverage,
+  per-agent state arrays, and a ``step()`` orchestrator that defers to small
+  ``step_*`` submethods (`step_select_eligible`, `step_administer`,
+  `step_update_states`) so subclasses can override one phase at a time.
+"""
 
 import numpy as np
 import starsim as ss
@@ -19,135 +31,252 @@ class DSTDx(ss.Product):
     Per-drug sensitivity (probability of correctly detecting resistance when
     any carried strain is resistant) and specificity (probability of
     correctly reporting susceptibility when no carried strain is resistant)
-    are configurable.
+    are configurable, either as a scalar (applied to every drug) or as a
+    ``{drug: p}`` dict. Each becomes a proper ``ss.bernoulli`` parameter
+    named ``p_sens_<drug>`` / ``p_spec_<drug>`` on ``self.pars`` so it
+    inherits Starsim's standard RNG initialization (no ``strict=False``
+    plumbing required).
 
     Args:
         registry (StrainRegistry): Strain registry.
         drugs (list[str]): Subset of drugs to report on (default: all in
             registry).
-        sensitivity (dict|float): Per-drug sensitivity. Default 0.95 for all drugs.
-        specificity (dict|float): Per-drug specificity. Default 0.99 for all drugs.
+        sensitivity (dict|float): Per-drug sensitivity. Default 0.95.
+        specificity (dict|float): Per-drug specificity. Default 0.99.
 
-    Example:
-        ::
+    Example::
 
-            dst = DSTDx(registry, drugs=['INH', 'RIF'], sensitivity=0.95,
-                        specificity=0.99)
-            result = dst.administer(sim, agent_uids)
-            # result['INH'] is a boolean array of observed INH-resistance
+        dst = DSTDx(registry, drugs=['INH', 'RIF'], sensitivity=0.95,
+                    specificity=0.99)
+        result = dst.administer(sim, agent_uids)
+        # result['INH'] is a boolean array of observed INH-resistance
     """
 
-    def __init__(self, registry, drugs=None, sensitivity=0.95, specificity=0.99):
+    def __init__(self, registry, drugs=None, sensitivity=0.95,
+                 specificity=0.99, **kwargs):
         super().__init__()
         self.registry = registry
         if drugs is None:
             drugs = list(registry.drugs)
         for d in drugs:
             if d not in registry.drugs:
-                raise ValueError(f'DSTDx drug {d!r} not in registry drugs {registry.drugs}')
+                raise ValueError(
+                    f'DSTDx drug {d!r} not in registry drugs {registry.drugs}'
+                )
         self.drugs = list(drugs)
 
+        # Normalize scalar inputs to per-drug dicts.
         if isinstance(sensitivity, (int, float)):
             sensitivity = {d: float(sensitivity) for d in self.drugs}
         if isinstance(specificity, (int, float)):
             specificity = {d: float(specificity) for d in self.drugs}
-        self.sensitivity = {d: float(sensitivity[d]) for d in self.drugs}
-        self.specificity = {d: float(specificity[d]) for d in self.drugs}
 
-        self._rng_sens = {
-            d: ss.bernoulli(p=self.sensitivity[d], name=f'dst_sens_{d}', strict=False)
-            for d in self.drugs
-        }
-        self._rng_spec = {
-            d: ss.bernoulli(p=self.specificity[d], name=f'dst_spec_{d}', strict=False)
-            for d in self.drugs
-        }
-        for dist in list(self._rng_sens.values()) + list(self._rng_spec.values()):
+        # Define per-drug Bernoullis as proper Starsim pars. ``strict=False``
+        # allows DSTDx to be invoked standalone (e.g. from tests that build
+        # a DSTDx outside a DSTDelivery), while keeping the standard RNG
+        # plumbing intact when the product is wrapped in a DSTDelivery and
+        # the sim's intervention init flow runs.
+        bernoulli_pars = {}
+        for d in self.drugs:
+            bernoulli_pars[f'p_sens_{d}'] = ss.bernoulli(
+                p=float(sensitivity[d]), strict=False,
+            )
+            bernoulli_pars[f'p_spec_{d}'] = ss.bernoulli(
+                p=float(specificity[d]), strict=False,
+            )
+        self.define_pars(**bernoulli_pars)
+        self.update_pars(**kwargs)
+
+        # Eagerly init so the distributions are sampleable even when the
+        # product is not yet owned by an intervention.
+        for name in bernoulli_pars:
+            dist = self.pars[name]
             if not dist.initialized:
                 dist.init()
         return
 
     def true_phenotype(self, tb, uids, drug):
-        """Return per-uid boolean array of true resistance to *drug*."""
+        """Return per-uid boolean array of true resistance to *drug*.
+
+        A UID is "truly resistant" to a drug if it carries at least one
+        strain whose registry phenotype is resistant to that drug. The
+        carrier check is expressed via :class:`ss.BoolArr.uids` set
+        intersection with *uids* — the canonical Starsim filtering idiom.
+        """
         if not len(uids):
             return np.zeros(0, dtype=bool)
         profile = tb.strain_profile
         if profile is None:
             return np.zeros(len(uids), dtype=bool)
         drug_col = self.registry.drugs.index(drug)
-        resistant_strain_idx = np.where(self.registry.resistance[:, drug_col] == 1)[0]
+        resistant_strain_idx = np.where(
+            self.registry.resistance[:, drug_col] == 1
+        )[0]
         true_pos = np.zeros(len(uids), dtype=bool)
         for s_idx in resistant_strain_idx:
-            carrier_mask = np.asarray(
-                getattr(profile._tb, profile.names[int(s_idx)])[uids], dtype=bool,
-            )
-            true_pos |= carrier_mask
+            strain_arr = getattr(profile._tb, profile.names[int(s_idx)])
+            carrier_uids = strain_arr.uids.intersect(uids)
+            if len(carrier_uids) == 0:
+                continue
+            # Mark positions in `uids` where the carrier_uids intersect.
+            true_pos |= np.isin(uids, carrier_uids)
         return true_pos
 
     def administer(self, sim, uids):
-        """Run DST on *uids* and return per-drug observed-resistance dict."""
+        """Run DST on *uids* and return ``{drug: bool array}``.
+
+        We sample by integer size rather than by UID because the test- and
+        documentation-friendly standalone use-case (DSTDx constructed
+        outside a DSTDelivery) does not have agent slots wired into the
+        Bernoulli — and per-drug DST does not depend on UID-keyed CRN here.
+        """
+        if len(uids) == 0:
+            return {}
         tb = tbsim.get_tb(sim)
-        results = {}
         n = len(uids)
+        results = {}
         for drug in self.drugs:
             true_res = self.true_phenotype(tb, uids, drug)
-            sens_pos = np.asarray(self._rng_sens[drug].rvs(n), dtype=bool)
-            spec_neg = np.asarray(self._rng_spec[drug].rvs(n), dtype=bool)
-            observed = np.where(true_res, sens_pos, ~spec_neg)
-            results[drug] = observed
+            sens_pos = np.asarray(self.pars[f'p_sens_{drug}'].rvs(n), dtype=bool)
+            spec_neg = np.asarray(self.pars[f'p_spec_{drug}'].rvs(n), dtype=bool)
+            results[drug] = np.where(true_res, sens_pos, ~spec_neg)
         return results
 
 
 class DSTDelivery(ss.Intervention):
     """
-    Run DST on diagnosed agents and stash observed phenotype on a state array.
+    Delivers a :class:`DSTDx` product to diagnosed agents and stashes the
+    observed phenotype on per-drug state arrays.
 
-    Each per-drug result is stored on a ``BoolArr`` named
-    ``observed_<drug>_resistant``. Downstream treatment routing can read these
-    arrays to choose a regimen.
+    Mirrors the :class:`tbsim.DxDelivery` shape: ``__init__`` declares pars
+    (``p_coverage``) and per-agent states; ``step()`` is split into
+    ``step_select_eligible`` / ``step_administer`` / ``step_update_states``;
+    ``init_results`` / ``update_results`` / ``finalize_results`` populate
+    per-timestep and cumulative counters; ``shrink()`` drops transients.
 
     Args:
         product (DSTDx): The DST product.
-        eligibility (callable): Optional function ``(sim) -> uids``.
-            Default: agents who have been diagnosed by any DxDelivery.
         coverage (float): Probability of receiving DST among eligible agents.
             Default 1.0.
+        eligibility (callable): Optional ``(sim) -> uids`` override.
+            Default: diagnosed & alive & not-yet-DST-tested.
     """
 
-    def __init__(self, product, eligibility=None, coverage=1.0, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, product, coverage=1.0, eligibility=None, **kwargs):
+        super().__init__()
         self.product = product
         self.eligibility = eligibility
+
         self.define_pars(
-            coverage=ss.bernoulli(p=float(coverage)),
+            p_coverage=ss.bernoulli(p=float(coverage)),
         )
-        states = [ss.BoolArr('tested_dst', default=False)]
+
+        states = [
+            ss.BoolArr('tested_dst', default=False),
+            ss.IntArr('n_times_dst_tested', default=0),
+            ss.FloatArr('ti_dst_tested', default=np.nan),
+        ]
         for drug in product.drugs:
             states.append(ss.BoolArr(f'observed_{drug}_resistant', default=False))
         self.define_states(*states)
+
+        self.update_pars(**kwargs)
+        product.name = f'{self.name}_product'
         return
 
-    def _default_eligibility(self, sim):
-        dx = sim.get_dx(result_state='diagnosed')
-        if dx is None:
+    def init_post(self):
+        """Resolve a reference to the diagnostic delivery whose ``diagnosed``
+        flag we gate on. Falls back to ``None`` for plain ``ss.Sim`` parents
+        that don't expose ``get_dx`` — matches ``TxDelivery.init_post``.
+        """
+        super().init_post()
+        self._dx = None
+        if hasattr(self.sim, 'get_dx'):
+            try:
+                self._dx = self.sim.get_dx(result_state='diagnosed')
+            except Exception:
+                self._dx = None
+        return
+
+    def _get_eligible(self, sim):
+        """Custom-or-default eligibility, in canonical Starsim UID idiom."""
+        if self.eligibility is not None:
+            return ss.uids(self.eligibility(sim))
+        if self._dx is None:
             return ss.uids()
-        return (dx.diagnosed & sim.people.alive & ~self.tested_dst).uids
+        return (self._dx.diagnosed & sim.people.alive & ~self.tested_dst).uids
+
+    def init_results(self):
+        super().init_results()
+        results = [
+            ss.Result('n_tested_dst', dtype=int),
+            ss.Result('cum_tested_dst', dtype=int),
+        ]
+        for drug in self.product.drugs:
+            results.append(ss.Result(f'n_obs_{drug}_resistant', dtype=int))
+            results.append(ss.Result(f'cum_obs_{drug}_resistant', dtype=int))
+        self.define_results(*results)
+        return
 
     def step(self):
-        if self.eligibility is not None:
-            uids = ss.uids(self.eligibility(self.sim))
+        """Orchestrator — see ``step_*`` submethods for details."""
+        self.step_select_eligible()
+        self.step_administer()
+        self.step_update_states()
+        return
+
+    def step_select_eligible(self):
+        """Pick eligible agents and apply the coverage filter."""
+        eligible = self._get_eligible(self.sim)
+        if len(eligible):
+            self._selected = self.pars.p_coverage.filter(eligible)
         else:
-            uids = self._default_eligibility(self.sim)
-        if len(uids) == 0:
+            self._selected = ss.uids()
+        return self._selected
+
+    def step_administer(self):
+        """Run the DST product on the selected agents."""
+        if len(self._selected) == 0:
+            self._results = {}
+            return self._results
+        self._results = self.product.administer(self.sim, self._selected)
+        return self._results
+
+    def step_update_states(self):
+        """Write per-drug observed-resistance and bookkeeping flags."""
+        selected = self._selected
+        if len(selected) == 0:
             return
-        uids = self.pars.coverage.filter(uids)
-        if len(uids) == 0:
-            return
-        results = self.product.administer(self.sim, uids)
-        for drug, obs in results.items():
+        for drug, obs in self._results.items():
             arr = getattr(self, f'observed_{drug}_resistant')
-            arr[uids[obs]] = True
-        self.tested_dst[uids] = True
+            arr[selected[obs]] = True
+        self.tested_dst[selected] = True
+        self.n_times_dst_tested[selected] += 1
+        self.ti_dst_tested[selected] = self.ti
+        return
+
+    def update_results(self):
+        ti = self.ti
+        self.results.n_tested_dst[ti] = len(self._selected)
+        for drug in self.product.drugs:
+            obs = self._results.get(drug, np.zeros(0, dtype=bool))
+            self.results[f'n_obs_{drug}_resistant'][ti] = int(np.count_nonzero(obs))
+        return
+
+    def finalize_results(self):
+        super().finalize_results()
+        self.results.cum_tested_dst[:] = np.cumsum(self.results.n_tested_dst)
+        for drug in self.product.drugs:
+            self.results[f'cum_obs_{drug}_resistant'][:] = np.cumsum(
+                self.results[f'n_obs_{drug}_resistant']
+            )
+        return
+
+    def shrink(self):
+        """Drop per-step transient references so multisim pickling is small."""
+        self._selected = None
+        self._results = None
+        self._dx = None
         return
 
 
