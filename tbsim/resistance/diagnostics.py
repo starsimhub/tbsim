@@ -414,7 +414,8 @@ def treatment_monitoring_eligibility(tx_delivery_name, after_steps=4, every_step
             ``ti_treatment_start`` before an agent is eligible for monitoring.
             Default 4 steps.
         every_steps (int|None): If given, only retest every N steps after
-            the first eligibility. ``None`` means a single test once-after.
+            the first eligibility. ``None`` means a single test at exactly
+            ``after_steps``.
 
     Returns:
         callable: ``(sim) -> ss.uids`` selecting eligible agents.
@@ -449,11 +450,14 @@ def treatment_monitoring_eligibility(tx_delivery_name, after_steps=4, every_step
         # the resulting positional values.
         ti_start = np.asarray(tx.ti_treatment_start[on_tx_uids], dtype=float)
         elapsed = sim.ti - ti_start
-        ready_mask = elapsed >= float(after_steps)
         if every_steps:
+            ready_mask = elapsed >= float(after_steps)
             ready_mask &= (
                 (elapsed - float(after_steps)) % float(every_steps) == 0
             )
+        else:
+            # One-shot semantics: eligible only on the first due step.
+            ready_mask = np.isclose(elapsed, float(after_steps))
         return on_tx_uids[ready_mask]
     _elig.__name__ = f'monitoring_after_{after_steps}_steps'
     return _elig

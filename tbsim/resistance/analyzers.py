@@ -48,7 +48,7 @@ class StrainResults(ss.Analyzer):
             results.append(ss.Result(f'n_active_{uid}', dtype=int))
             results.append(ss.Result(f'new_carriers_{uid}', dtype=int))
         self.define_results(*results)
-        self._prev_carriers = {uid: 0 for uid in self._uids}
+        self._prev_carriers = {uid: ss.uids() for uid in self._uids}
         return
 
     def step(self):
@@ -63,11 +63,12 @@ class StrainResults(ss.Analyzer):
             carrier_uids = arr.uids
             n_carry = len(carrier_uids)
             n_active = len(carrier_uids.intersect(active_uids))
-            new_carry = max(0, n_carry - self._prev_carriers[uid])
+            prev = self._prev_carriers[uid]
+            new_carry = len(carrier_uids.remove(prev))
             self.results[f'n_carriers_{uid}'][ti] = n_carry
             self.results[f'n_active_{uid}'][ti] = n_active
             self.results[f'new_carriers_{uid}'][ti] = new_carry
-            self._prev_carriers[uid] = n_carry
+            self._prev_carriers[uid] = ss.uids(carrier_uids)
         return
 
 

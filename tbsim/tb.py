@@ -451,12 +451,9 @@ class TB(BaseTB):
                 fallback_picks = np.zeros(int(need_fallback.sum()), dtype=int)
             picks[need_fallback] = fallback_picks
 
-        # Note: α_super protection (spec §"Strain competition / protection
-        # against reinfection") is *configured* on TB (``_alpha_super``,
-        # ``_alpha_act``) but not yet applied here, because in stock
-        # ``ss.Infection`` already-infected agents are not eligible as
-        # transmission recipients (``susceptible == False``). Superinfection
-        # via transmission, with α-gated acceptance, is the next milestone.
+        # α-gated superinfection acceptance is handled in infect(); this method
+        # only assigns transmitted strain identity for recipients selected by
+        # the transmission kernel.
 
         # Apply picks; duplicate-strain superinfection is blocked (do not re-add).
         # Count blocked events for the analyzer hook.

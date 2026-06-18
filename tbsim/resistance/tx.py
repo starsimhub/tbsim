@@ -144,6 +144,9 @@ class StrainAwareTxDelivery(TxDelivery):
             )
         super().__init__(product=product, **kwargs)
         self._pending_per_strain = None  # set on each start
+        # Snapshot of strain identities for scheduled relapses.
+        # Key: uid (int) -> tuple[strain_idx, ...]
+        self._relapse_strains_by_uid = {}
         return
 
     def step_start_treatment(self):
@@ -201,6 +204,7 @@ class StrainAwareTxDelivery(TxDelivery):
 
         relapse_uids = outcomes.get('relapse', ss.uids())
         if len(relapse_uids):
+            self._capture_relapse_strains(relapse_uids)
             self.pending_relapse[relapse_uids] = True
             relapse_days = self.product.pars.dur_relapse.rvs(relapse_uids)
             relapse_steps = relapse_days / self.dt.days
@@ -258,7 +262,48 @@ class StrainAwareTxDelivery(TxDelivery):
         super().step_failures()
         return
 
+    def step_relapses(self):
+        """Restore pre-cure strain identity for agents who relapse."""
+        super().step_relapses()
+        tb = self.sim.get_tb()
+        relapsed = getattr(self, '_relapsed', ss.uids())
+        if tb.strain_profile is not None and len(relapsed):
+            # Re-assign the strain(s) carried at treatment start to prevent
+            # symptomatic relapse without a strain identity.
+            by_strain = {}
+            for uid in relapsed:
+                for s_idx in self._relapse_strains_by_uid.get(int(uid), ()): 
+                    by_strain.setdefault(int(s_idx), []).append(int(uid))
+            for s_idx, raw_uids in by_strain.items():
+                tb.strain_profile.add_strain(ss.uids(raw_uids), int(s_idx))
+
+        # Drop snapshots for agents whose relapse episode is no longer pending
+        # (due and resolved, ineligible, dead, etc.).
+        ended = [uid for uid in self._relapse_strains_by_uid
+                 if not bool(self.pending_relapse[ss.uids([uid])][0])]
+        for uid in ended:
+            self._relapse_strains_by_uid.pop(uid, None)
+        return
+
+    def _capture_relapse_strains(self, relapse_uids):
+        """Store per-agent strain identities to restore if/when relapse occurs."""
+        tb = self.sim.get_tb()
+        profile = tb.strain_profile
+        if profile is None or len(relapse_uids) == 0:
+            return
+        carriers = {
+            int(s_idx): set(getattr(profile._tb, profile.names[s_idx]).uids.intersect(relapse_uids).tolist())
+            for s_idx in range(profile.registry.n)
+        }
+        for uid in relapse_uids:
+            uid_i = int(uid)
+            self._relapse_strains_by_uid[uid_i] = tuple(
+                s_idx for s_idx, uidset in carriers.items() if uid_i in uidset
+            )
+        return
+
     def shrink(self):
         super().shrink()
         self._pending_per_strain = None
+        self._relapse_strains_by_uid = None
         return
