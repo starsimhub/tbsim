@@ -48,6 +48,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+jax = [
+  "jax[cpu]>=0.4.0",
+]
 dev = [
   "pytest>=7.4",
   "pytest-cov",

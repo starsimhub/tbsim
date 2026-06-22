@@ -444,7 +444,6 @@ class TB(BaseTB):
         ti = self.ti
         dty = self.sim.t.dt_year
 
-        # Cache commonly reused arrays
         age15 = self.sim.people.age >= 15
         infectious = self.infectious
         n_alive = self.sim.people.alive.count()
@@ -461,8 +460,6 @@ class TB(BaseTB):
         res.prevalence_active[ti] = res.n_infectious[ti] / n_alive if n_alive else 0
         res.incidence_kpy[ti] = 1_000 * (self.ti_infected == ti).count() / (n_alive * dty) if n_alive else 0
         res.deaths_ppy[ti] = res.new_deaths[ti] / (n_alive * dty) if n_alive else 0
-
-        # New active: agents whose ti_asymp == this step
         res['new_active'][ti] = new_asymp.count()
         res['new_active_15+'][ti] = (new_asymp & age15).count()
         res['n_detectable_15+'][ti] = (age15 * (in_state[TBS.SYMPTOMATIC] + self.pars.cxr_asymp_sens*in_state[TBS.ASYMPTOMATIC])).sum()
