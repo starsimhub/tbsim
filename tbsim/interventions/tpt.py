@@ -156,10 +156,13 @@ class TPTTx(ss.Product):
                 if len(suppress_uids) > 0:
                     self.tpt_protected[suppress_uids] = True
 
-                # Neither: mark as resolved so they aren't re-checked each step
+                # Neither: TPT had no protective effect. Default behaviour
+                # is to mark as resolved; subclasses (e.g. StrainAwareTPTTx)
+                # may add side effects such as TPT-driven resistance
+                # acquisition on the "neither effective" cohort.
                 neither_uids = ready[mechs == self.MECH_NONE]
                 if len(neither_uids) > 0:
-                    self.tpt_resolved[neither_uids] = True
+                    self._apply_neither_branch(neither_uids)
 
         # Expire protection for suppression agents
         protected_uids = self.tpt_protected.uids
@@ -188,6 +191,15 @@ class TPTTx(ss.Product):
         tb.infected[still_infected] = False
         tb.susceptible[still_infected] = True
 
+        self.tpt_resolved[uids] = True
+        return
+
+    def _apply_neither_branch(self, uids):
+        """Hook fired when TPT was completely ineffective.
+
+        Default: just mark the agents as resolved. Subclasses may add side
+        effects (e.g. resistance acquisition on TPT-failure agents).
+        """
         self.tpt_resolved[uids] = True
         return
 
