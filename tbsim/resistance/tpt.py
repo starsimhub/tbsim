@@ -81,6 +81,12 @@ class StrainAwareTPTTx(TPTTx):
         survive the subsequent sterilization step. This models the biology
         of suboptimal drug pressure selecting resistance rather than
         clearance.
+
+        Acquisition trials run on **all** sterilize-branch agents regardless
+        of TB state — the spec's per-state modifier (``acq_state_modifiers``)
+        is what governs whether NI/ASY/SYM agents actually acquire. The
+        clearance step (state → CLEARED) is restricted to agents still in
+        ``INFECTION``, matching base TPT semantics.
         """
         tb = self.sim.diseases[self.pars.disease]
         profile = getattr(tb, 'strain_profile', None)
@@ -88,37 +94,59 @@ class StrainAwareTPTTx(TPTTx):
             # Fall back to the base agent-level sterilization if no overlay.
             return super()._apply_sterilization(uids)
 
-        # Only act on agents still in INFECTION (latent) — matches base TPT semantics.
-        still_infected = uids[tb.state[uids] == TBS.INFECTION]
-        if len(still_infected) == 0:
-            self.tpt_resolved[uids] = True
-            return
-
         # TPT-driven acquisition: mutate a fraction of susceptible carried
         # strains to their resistant counterpart *before* sterilization. Must
         # run on the pre-sterilization profile, otherwise the only strains
         # still present would be regimen-resistant and have nothing to mutate.
+        # Runs on the full uids cohort so per-state ω modifiers actually
+        # apply to non-INFECTION agents (NI/ASY/SYM) per spec.
         self._acq_resolver.selective_acquisition(
-            profile, still_infected, self.regimen.drugs, tb=tb,
+            profile, uids, self.regimen.drugs, tb=tb,
         )
 
-        # Sterilization: remove any remaining susceptible (non-mutated) strains.
-        for s_idx in np.where(self._cover_mask)[0]:
-            profile.remove_strain(still_infected, int(s_idx))
+        # Sterilization (strain removal + state → CLEARED) only applies to
+        # agents still in INFECTION — sterilize→CLEARED is a latent-only
+        # transition per base TPT semantics.
+        still_infected = uids[tb.state[uids] == TBS.INFECTION]
+        if len(still_infected) > 0:
+            for s_idx in np.where(self._cover_mask)[0]:
+                profile.remove_strain(still_infected, int(s_idx))
 
-        # Agents who now carry zero strains have been fully cleared.
-        counts = profile.n_strains_per_agent(still_infected)
-        fully_cleared = still_infected[counts == 0]
+            # Agents who now carry zero strains have been fully cleared.
+            counts = profile.n_strains_per_agent(still_infected)
+            fully_cleared = still_infected[counts == 0]
 
-        if len(fully_cleared):
-            tb.state[fully_cleared] = TBS.CLEARED
-            tb.rr_reinfection[fully_cleared] = tb.pars.rr_reinfection_cleared
-            if tb.pars.dur_reinfection_protection is not None:
-                tb.ti_rr_reinfection_wane[fully_cleared] = self.ti + tb.pars.dur_reinfection_protection.rvs(fully_cleared)
-            tb.infected[fully_cleared] = False
-            tb.susceptible[fully_cleared] = True
+            if len(fully_cleared):
+                tb.state[fully_cleared] = TBS.CLEARED
+                tb.rr_reinfection[fully_cleared] = tb.pars.rr_reinfection_cleared
+                if tb.pars.dur_reinfection_protection is not None:
+                    tb.ti_rr_reinfection_wane[fully_cleared] = self.ti + tb.pars.dur_reinfection_protection.rvs(fully_cleared)
+                tb.infected[fully_cleared] = False
+                tb.susceptible[fully_cleared] = True
 
-        # Partial-clearance agents (still carrying resistant or mutated strains)
-        # remain latent and may transmit later.
+        # Partial-clearance agents (still carrying resistant or mutated strains),
+        # and any non-INFECTION agents in this branch, remain in their prior
+        # state and may transmit later.
         self.tpt_resolved[uids] = True
         return
+
+    def _apply_neither_branch(self, uids):
+        """Per-spec: TPT was completely ineffective — apply acquisition.
+
+        Spec §"TPT": "some percentage of agents for whom TPT was not
+        effective (provided neither clearance nor longer-term protection
+        from progression) have a probability of acquiring resistance to
+        the drugs/classes included in the TPT regimen."
+
+        The "neither" branch is exactly this cohort, so we run a selective
+        acquisition trial against the regimen's drugs. Per-state modifiers
+        (``acq_state_modifiers``) make this a no-op when configured to 0
+        for a given state.
+        """
+        tb = self.sim.diseases[self.pars.disease]
+        profile = getattr(tb, 'strain_profile', None)
+        if profile is not None and len(uids) > 0:
+            self._acq_resolver.selective_acquisition(
+                profile, uids, self.regimen.drugs, tb=tb,
+            )
+        return super()._apply_neither_branch(uids)

@@ -31,10 +31,10 @@ class StrainResults(ss.Analyzer):
         # Resolve strain registry uids before super().init_pre() triggers
         # init_results() which depends on self._uids.
         tb = sim.diseases[self.disease]
-        if tb.strain_profile is None:
+        if getattr(tb, 'strain_profile', None) is None:
             raise RuntimeError(
                 'StrainResults requires the TB disease module to have a strain overlay '
-                'configured (TB(strains=[...])).'
+                'configured (MultiStrainTB(strains=[...])).'
             )
         self._uids = list(tb.strain_profile.registry.uids)
         super().init_pre(sim)

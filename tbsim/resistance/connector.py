@@ -19,7 +19,7 @@ class ResistanceConnector(ss.Connector):
 
     This connector does *not* own strain state and does *not* sample which
     strain is transmitted; both responsibilities belong to
-    :class:`StrainProfile` and :class:`tbsim.TB.set_prognoses`.
+    :class:`StrainProfile` and :class:`tbsim.MultiStrainTB.set_prognoses`.
 
     Args:
         disease (str): Name of the TB disease module. Default ``'tb'``.
@@ -36,7 +36,7 @@ class ResistanceConnector(ss.Connector):
                 StrainSpec('rif_r', {'INH': 0, 'RIF': 1, 'BDQ': 0}, fitness=0.9,
                            init_prev=0.005),
             ]
-            tb = tbsim.TB(strains=strains)
+            tb = tbsim.MultiStrainTB(strains=strains)
             sim = ss.Sim(diseases=tb, connectors=ResistanceConnector(),
                          pars=dict(start='2000', stop='2010'))
             sim.run()
