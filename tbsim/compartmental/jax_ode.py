@@ -35,6 +35,7 @@ _N_STATES = len(_STATE_NAMES)
 # can carry it as a static argument.
 _PARS_KEYS = tuple(default_pars.keys())
 _PARS_DEFAULT = np.array([float(default_pars[k]) for k in _PARS_KEYS])
+_N_IDX = _PARS_KEYS.index('N')
 
 
 try:
@@ -78,9 +79,9 @@ try:
         """Single ODE integration. JIT-compiled, differentiable."""
         return odeint(_deriv, y0, t, pars_vec)
 
-    # vmap over the first axis of pars_vec → run a batch of parameter sets in
-    # parallel. Same t and y0 for all members of the batch.
+    # vmap over pars_vec; shared y0 (explicit y0) or per-row y0 (from each N).
     _batch_integrate = jax.jit(jax.vmap(_integrate, in_axes=(None, None, 0)))
+    _batch_integrate_var_y0 = jax.jit(jax.vmap(_integrate, in_axes=(0, None, 0)))
 
 except ImportError:
     _HAS_JAX = False
@@ -92,10 +93,19 @@ def available():
 
 
 def _default_y0(N):
-    """LSHTM-style initial conditions: 0.1% seed in SYMPTOMATIC."""
+    """LSHTM-style initial conditions matching ``TB_ODE``: 1000 in SYMPTOMATIC."""
     y0 = np.zeros(_N_STATES)
     y0[0] = N - 1e3   # SUSCEPTIBLE
     y0[6] = 1e3       # SYMPTOMATIC
+    return y0
+
+
+def _y0_batch_from_pars_vecs(pars_vecs):
+    """Build per-row initial conditions from each parameter vector's ``N``."""
+    N_vals = pars_vecs[:, _N_IDX]
+    y0 = np.zeros((len(N_vals), _N_STATES))
+    y0[:, 0] = N_vals - 1e3
+    y0[:, 6] = 1e3
     return y0
 
 
@@ -122,7 +132,8 @@ class TB_JAX_ODE(sc.prettyobj):
         start (float): start year
         stop (float): stop year
         dt (float): time-step (years)
-        y0 (array-like): initial compartment vector; default is 0.1% in SYMPTOMATIC
+        y0 (array-like): initial compartment vector; default matches ``TB_ODE``
+            (1000 in SYMPTOMATIC, 1% at default ``N=1e5``)
 
     Example:
         ::
@@ -160,7 +171,10 @@ class TB_JAX_ODE(sc.prettyobj):
         """
         Return ``(init_prev, seed_kwargs)`` for ABM handoff at *year*.
 
-        Mirrors ``utils.ode_state_to_init_params`` output format.
+        ``init_prev`` is the fraction ever-infected; ``seed_kwargs`` gives the
+        conditional distribution across ever-infected compartments
+        (``init_inf``, ``init_non``, ``init_asy``, ``init_sym``, ``init_cle``,
+        ``init_rec``, ``init_treat``), summing to 1.
         """
         if self.results is None:
             raise RuntimeError('Call run() first')
@@ -206,7 +220,8 @@ def batch_run(pars_batch, start=1500, stop=2020, dt=1.0, y0=None):
         pars_batch (list of dict OR (n_batch, n_pars) array): parameter
             override dicts, or pre-packed vector matching ``_PARS_KEYS`` order
         start, stop, dt: same as ``TB_JAX_ODE``
-        y0 (array): shared initial condition; default 0.1% SYMPTOMATIC
+        y0 (array): shared initial condition; default derives ``N`` from each
+            parameter set (1000 in SYMPTOMATIC, matching ``TB_ODE``)
 
     Returns:
         t (array, shape (n_steps,))
@@ -220,13 +235,14 @@ def batch_run(pars_batch, start=1500, stop=2020, dt=1.0, y0=None):
     else:
         pars_vecs = np.stack([_pars_to_vec(p) for p in pars_batch])
 
-    N_pop = float(default_pars.N if y0 is None else default_pars.N)
-    if y0 is None:
-        y0 = _default_y0(N_pop)
-
     n_steps = int(np.ceil((stop - start) / dt)) + 1
     t = jnp.linspace(start, stop, n_steps)
-    results = _batch_integrate(jnp.asarray(y0), t, jnp.asarray(pars_vecs))
+    pars_arr = jnp.asarray(pars_vecs)
+    if y0 is None:
+        y0_arr = jnp.asarray(_y0_batch_from_pars_vecs(pars_vecs))
+        results = _batch_integrate_var_y0(y0_arr, t, pars_arr)
+    else:
+        results = _batch_integrate(jnp.asarray(y0), t, pars_arr)
     return np.asarray(t), np.asarray(results)
 
 
@@ -313,7 +329,7 @@ def calibrate(initial_pars, targets, calib_keys,
     m = jnp.zeros_like(theta)
     v = jnp.zeros_like(theta)
     b1, b2, eps = 0.9, 0.999, 1e-8
-    history = []
+    losses = []
 
     for step in range(1, n_steps + 1):
         loss, grad = loss_and_grad(theta)
@@ -324,9 +340,10 @@ def calibrate(initial_pars, targets, calib_keys,
         theta = theta - lr * mhat / (jnp.sqrt(vhat) + eps)
         # Clip to positive — all TB rates are non-negative
         theta = jnp.maximum(theta, 1e-6)
-        history.append(float(loss))
+        losses.append(loss)
         if verbose and step % 50 == 0:
-            print(f'  step {step:4d}  loss = {float(loss):.6g}')
+            print(f'  step {step:4d}  loss = {float(jax.device_get(loss)):.6g}')
 
+    history = [float(x) for x in jax.device_get(losses)]
     best_pars = dict(zip(calib_keys, [float(x) for x in np.asarray(theta)]))
     return dict(best_pars=best_pars, loss_history=history, final_loss=history[-1])

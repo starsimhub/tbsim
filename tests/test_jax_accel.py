@@ -57,6 +57,15 @@ def test_handoff_state_sums_to_one():
     assert abs(sum(seed_kwargs.values()) - 1.0) < 1e-6
 
 
+def test_batch_run_respects_N_override():
+    """Default y0 should use each parameter set's ``N``, not ``default_pars.N``."""
+    pars_list = [dict(N=1e5), dict(N=2e5)]
+    _, res_batch = jax_ode.batch_run(pars_list, start=1900, stop=1950)
+    for i, p in enumerate(pars_list):
+        single = jax_ode.TB_JAX_ODE(pars=p, start=1900, stop=1950).run().results
+        np.testing.assert_allclose(res_batch[i], single, rtol=1e-4)
+
+
 def test_batch_run_matches_serial():
     """Batched vmap output should match a Python loop element-wise."""
     pars_list = [
