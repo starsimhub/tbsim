@@ -1,6 +1,7 @@
 
 import os
 import sys
+import textwrap
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -22,16 +23,10 @@ DEFAULT_SPARS = dict(
     verbose  = 0,
 )
 
-# Per-TPT-dose mutation probability: a susceptible carried strain mutates to
-# its resistant counterpart (rather than being cleared by TPT) with this
-# probability per regimen drug, scaled by the per-state modifier (overridden
-# below to be ``1.0`` across states for a clear demo signal — defaults
-# downweight latent infections to 0.05).
+
 TPT_ACQ_INH = 0.20
 TPT_ACQ_BDQ = 0.30
-# Use unit state modifiers in the demo so latent-state TPT doses have full
-# acquisition weight; defaults (DEFAULT_TPT_STATE_MODIFIERS) attenuate
-# INFECTION to 0.05, which masks the signal at single-seed sizes.
+
 TPT_STATE_MODIFIERS = dict(infection=1.0, non_infectious=1.0,
                            asymptomatic=1.0, symptomatic=1.0,
                            treatment=0.0, cleared=0.0)
@@ -50,7 +45,7 @@ def build_strains():
 
 def build_tb():
     """TB module with bottleneck strain progression and a tiny background acquisition rate."""
-    return tbsim.TB(
+    return tbsim.MultiStrainTB(
         strains=build_strains(),
         pars=dict(
             init_prev=ss.bernoulli(0.06),     # ~6% initial latent/active TB
@@ -189,15 +184,24 @@ def print_summary(rows):
 
 
 STRAIN_LABELS = {
-    'pan': 'Pan-susceptible', 'inh_r': 'INH-R', 'rif_r': 'RIF-R',
-    'mdr': 'MDR', 'bdq_r': 'BDQ-R',
+    'pan': 'Susceptible',
+    'inh_r': 'INH-resistant',
+    'rif_r': 'RIF-resistant',
+    'mdr': 'MDR',
+    'bdq_r': 'BDQ-resistant',
 }
 
-# Cohen-style legend: short labels, baseline dashed, interventions solid.
+ABREV = (
+    'Lines: StrainResults via _normalize_results after MultiSim.run(). '
+    'Bars: summarize() sums new_carriers_* by strain.\n'
+    'INH = isoniazid; RIF = rifampicin; BDQ = bedaquiline; MDR = multidrug-resistant (INH+RIF); '
+    'TPT = tuberculosis preventive treatment; LAI = long-acting injectable bedaquiline; DST = drug susceptibility testing.'
+)
+
 PLOT_SCENARIOS = [
-    ('Baseline (No TPT)',                              '--', '#666666'),
-    ('Intervention: Isoniazid TPT',                    '-',  '#C44E52'),
-    ('Intervention: Long-Acting Injectable Bedaquiline', '-',  '#4C72B0'),
+    ('Baseline (No TPT)', '--', '#666666'),
+    ('Intervention: Isoniazid TPT', '-', '#C44E52'),
+    ('Intervention: Long-Acting Injectable Bedaquiline', '-', '#4C72B0'),
 ]
 PLOT_SCENARIO_LABELS = {
     'Baseline (No TPT)': 'No TPT',
@@ -206,41 +210,18 @@ PLOT_SCENARIO_LABELS = {
 }
 
 
-def _result_xy(result):
-    if result is None or not hasattr(result, 'timevec') or not hasattr(result, 'values'):
+def _xy(res):
+    if res is None or not hasattr(res, 'timevec'):
         return None, None
-    return np.asarray(result.timevec), np.asarray(result.values).ravel()
+    return np.asarray(res.timevec), np.asarray(res.values).ravel()
 
 
-def plot_tradeoff(msim, filename=None, show=True):
-    """Cohen-style 2x2 trade-off figure: DS benefit vs DR costs by TPT regimen."""
-    flat = _normalize_results(msim)
-    panels = [
-        ('A', 'n_carriers_pan',   'Pan-susceptible carriers'),
-        ('B', 'n_carriers_inh_r', 'INH-R carriers'),
-        ('C', 'n_carriers_bdq_r', 'BDQ-R carriers'),
-        ('D', 'n_active_mdr',     'Active MDR'),
-    ]
-    fig, axs = plt.subplots(2, 2, figsize=(8, 5.5), sharex=True)
-    for ax, (letter, key, title) in zip(axs.flat, panels):
-        for scen, ls, color in PLOT_SCENARIOS:
-            res = flat.get(scen, {}).get(key)
-            x, y = _result_xy(res)
-            if x is None:
-                continue
-            short = PLOT_SCENARIO_LABELS.get(scen, scen)
-            ax.plot(x, y, ls, color=color, lw=1.8, label=short)
-        ax.set_title(title, loc='left', fontsize=10)
-        ax.text(-0.08, 1.02, letter, transform=ax.transAxes, fontsize=12, fontweight='bold', va='bottom')
-        ax.grid(True, alpha=0.25, linestyle=':')
-        ax.set_ylabel('Count')
-    axs[1, 0].set_xlabel('Time')
-    axs[1, 1].set_xlabel('Time')
-    fig.suptitle('TPT trade-off: drug-sensitive benefit vs drug-resistant cost', fontsize=11, y=0.98)
-    fig.subplots_adjust(top=0.88, bottom=0.18, hspace=0.35, wspace=0.28)
-    handles, labels = axs[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.06),
-               ncol=3, fontsize=8, frameon=False)
+def _finish(fig, filename=None, show=True, bottom=0.22):
+    fig.text(
+        0.5, 0.01, ABREV, ha='center', va='bottom', fontsize=7.5, transform=fig.transFigure,
+        bbox=dict(boxstyle='square,pad=0.35', facecolor='#f7f7f7', edgecolor='#ddd'),
+    )
+    fig.subplots_adjust(bottom=bottom)
     if filename:
         sc.savefig(sc.makefilepath(filename, makedirs=True), fig=fig)
     if show:
@@ -248,28 +229,45 @@ def plot_tradeoff(msim, filename=None, show=True):
     return fig
 
 
-def plot_summary(summary_df, filename=None, show=True):
-    """End-of-run bar chart: cumulative new carriers by strain (Cohen Table 1 analog)."""
+def plot_results(msim, summary_df, tradeoff_fig=None, summary_fig=None, show=True):
+    """TPT trade-off panels and end-of-run carrier summary."""
+    flat = _normalize_results(msim)
+    panels = [
+        ('n_carriers_pan', 'Susceptible carriers'),
+        ('n_carriers_inh_r', 'INH-resistant carriers'),
+        ('n_carriers_bdq_r', 'BDQ-resistant carriers'),
+        ('n_active_mdr', 'Active MDR cases'),
+    ]
+    fig, axs = plt.subplots(2, 2, figsize=(8, 5.5), sharex=True)
+    for ax, (key, title) in zip(axs.flat, panels):
+        for scen, ls, color in PLOT_SCENARIOS:
+            x, y = _xy(flat.get(scen, {}).get(key))
+            if x is None:
+                continue
+            ax.plot(x, y, ls, color=color, lw=1.8, label=PLOT_SCENARIO_LABELS.get(scen, scen))
+        ax.set(title=title, ylabel='People')
+        ax.grid(True, alpha=0.25, linestyle=':')
+    axs[1, 0].set_xlabel('Year')
+    axs[1, 1].set_xlabel('Year')
+    fig.suptitle('TPT trade-off: benefit vs resistance risk', fontsize=11, y=0.98)
+    h, l = axs[0, 0].get_legend_handles_labels()
+    fig.legend(h, l, loc='upper center', bbox_to_anchor=(0.5, 0.22), ncol=3, fontsize=8, frameon=False)
+    fig.tight_layout()
+    _finish(fig, tradeoff_fig, show, bottom=0.28)
+
     cols = [c for c in summary_df.columns if c.startswith('cum_new_carriers_')]
     if not cols:
-        return None
+        return
     strains = [c.removeprefix('cum_new_carriers_') for c in cols]
     plot_df = summary_df.set_index('scenario')[cols].T
     plot_df.index = [STRAIN_LABELS.get(s, s) for s in strains]
     plot_df.columns = [PLOT_SCENARIO_LABELS.get(c, c) for c in plot_df.columns]
-
     fig, ax = plt.subplots(figsize=(7, 4))
     plot_df.plot(kind='bar', ax=ax, rot=0, width=0.8, color=[c for _, _, c in PLOT_SCENARIOS])
-    ax.set_title('Cumulative new carriers by strain (end of simulation)')
-    ax.set_xlabel('')
-    ax.set_ylabel('Count')
+    ax.set(title='New carriers by strain (end of simulation)', xlabel='', ylabel='People')
     ax.legend(title='Scenario', fontsize=8)
     fig.tight_layout()
-    if filename:
-        sc.savefig(sc.makefilepath(filename, makedirs=True), fig=fig)
-    if show:
-        plt.show()
-    return fig
+    _finish(fig, summary_fig, show)
 
 
 def run_scenarios(do_plot=False, savefig=False,
@@ -293,17 +291,11 @@ def run_scenarios(do_plot=False, savefig=False,
 
     msim = ss.MultiSim(sims=sims)
     if do_plot or savefig:
-        if savefig:
-            tradeoff_fig_path = sc.makefilepath(tradeoff_fig_path, makedirs=True)
-            summary_fig_path = sc.makefilepath(summary_fig_path, makedirs=True)
-        plot_tradeoff(
+        plot_results(
             msim,
-            filename=tradeoff_fig_path if savefig else None,
-            show=do_plot,
-        )
-        plot_summary(
             summary_df,
-            filename=summary_fig_path if savefig else None,
+            tradeoff_fig=sc.makefilepath(tradeoff_fig_path, makedirs=True) if savefig else None,
+            summary_fig=sc.makefilepath(summary_fig_path, makedirs=True) if savefig else None,
             show=do_plot,
         )
 
