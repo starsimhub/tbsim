@@ -548,6 +548,38 @@ class MultiStrainTB(TB):
         self.strain_profile.attach(self)
         return
 
+    def init_post(self):
+        """Seed initial infections and warn if the resistance connector is missing."""
+        out = super().init_post()
+        self._warn_if_missing_resistance_connector()
+        return out
+
+    def _warn_if_missing_resistance_connector(self):
+        """Warn when strain fitness will not be applied to transmission."""
+        sim = self.sim
+        if sim is None:
+            return
+        for conn in sim.connectors.values():
+            if conn.__class__.__name__ == 'ResistanceConnector':
+                return
+        ss.warn(
+            'MultiStrainTB is configured but no ResistanceConnector was found '
+            'in sim.connectors; strain fitness will not modify rel_trans.'
+        )
+        return
+
+    def seed_strains(self, uids, sources=None):
+        """Assign strain identity to ``uids`` using transmission/fallback rules.
+
+        Used for immigrants and other non-network seed events where no
+        infectious source is available.
+        """
+        uids = ss.uids(uids)
+        if len(uids) == 0:
+            return
+        self._assign_transmitted_strains(uids, sources)
+        return
+
     def _finalize_alpha_defaults(self):
         """Set ``self._alpha_super`` and ``self._alpha_act`` from stored inputs."""
         rr_rec = float(self.pars.rr_reinfection_rec)
@@ -703,9 +735,13 @@ class MultiStrainTB(TB):
                 )
                 cdf = np.cumsum(p)
                 fallback_picks = (u[:, None] < cdf).argmax(axis=1)
+                picks[need_fallback] = fallback_picks
             else:
-                fallback_picks = np.zeros(int(need_fallback.sum()), dtype=int)
-            picks[need_fallback] = fallback_picks
+                ss.warn(
+                    'No StrainSpec init_prev weights configured; agents infected '
+                    'without a transmission source will carry no strain until '
+                    'acquisition or superinfection occurs.'
+                )
 
         n_blocked = 0
         for idx in range(registry.n):

@@ -538,6 +538,10 @@ class Migration(ss.Demographics):
         # Relative transmissibility by state.
         tb.rel_trans[new_uids] = 1.0
         tb.rel_trans[new_uids[asymptomatic]] = float(tb.pars.trans_asymp)
+
+        seed_strains = getattr(tb, 'seed_strains', None)
+        if seed_strains is not None and infected_mask.any():
+            seed_strains(ss.uids(new_uids[infected_mask]), sources=None)
         return entry_states
 
     def _perform_immigration(self, n_arrivals):
