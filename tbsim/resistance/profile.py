@@ -85,6 +85,10 @@ class StrainProfile:
         """Return ``ss.uids`` of currently active agents carrying *strain*."""
         return self._arr(strain).uids
 
+    def carries_any(self, uids):
+        """Return boolean mask: True where agents carry at least one strain."""
+        return self.n_strains_per_agent(uids) > 0
+
     def n_strains_per_agent(self, uids=None):
         """Return per-agent count of strains currently carried.
 

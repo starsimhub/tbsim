@@ -15,7 +15,8 @@ class ResistanceConnector(ss.Connector):
     relative transmissibility is multiplied by the maximum fitness across
     strains the agent carries. Agents carrying no strain (e.g. legacy
     infections seeded before the resistance overlay was attached) get a
-    multiplier of 1.0 (no change).
+    multiplier of 1.0 (no change). Agents carrying only zero-fitness strains
+    get a multiplier of 0.0 (non-transmitting).
 
     This connector does *not* own strain state and does *not* sample which
     strain is transmitted; both responsibilities belong to
@@ -65,9 +66,10 @@ class ResistanceConnector(ss.Connector):
             return
 
         fitness = profile.effective_rel_trans(infectious_uids)
-        # Agents with no carried strain get fitness 0 — keep them at the prior
-        # rel_trans value so legacy infections still transmit normally.
-        no_strain = fitness == 0
+        # Distinguish agents with no strain profile (legacy seed) from agents
+        # carrying only zero-fitness strains. The former keep rel_trans
+        # unchanged; the latter must not transmit (multiplier 0).
+        no_strain = ~profile.carries_any(infectious_uids)
         if no_strain.any():
             fitness[no_strain] = 1.0
 
