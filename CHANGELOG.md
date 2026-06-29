@@ -2,6 +2,10 @@
 
 All notable changes to the codebase are documented in this file.
 
+## Version 0.8.2 (2026-06-29)
+- Updated for Starsim 3.4.0: `HouseholdNet` is now imported from `starsim.library` as `ssl.networks.HouseholdNet` (replacing `ss.HouseholdNet`).
+- Raised minimum Starsim dependency to `>=3.4.0`.
+
 ## Version 0.8.1 (2026-06-10)
 - Fixed a UID/position confusion bug (#425) where several interventions identified agents by running `np.where`/`np.flatnonzero` over a starsim `Arr`'s compact, alive-only `.values` view and then treating the resulting positions as UIDs. Once any agents had died (so UIDs no longer matched compact positions), this silently selected the wrong agents. Affected `HouseholdContactTracing.step`, `TPTHousehold.check_eligibility`, `TxDelivery._get_eligible`, `Migration._members_by_household_id`, and `HealthSeekingBehavior.step`. All now use native starsim filtering (`arr.auids[mask]`) so positions map back to real UIDs.
 - Added regression tests covering household contact tracing, treatment eligibility, care-seeking, and diagnostic administration after agent deaths.
