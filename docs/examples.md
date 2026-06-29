@@ -72,12 +72,12 @@ sim.run()
 Using household-based social networks:
 
 ```python
-from tbsim.networks import HouseholdNet
-from tbsim import TB
 import starsim as ss
+import starsim.library as ssl
+from tbsim import TB
 
 # Create household network and TB
-households = HouseholdNet()
+households = ssl.networks.HouseholdNet(dhs_data=dhs_data)
 tb = TB()
 
 sim = ss.Sim(
