@@ -263,7 +263,7 @@ class TPTHousehold(TBProductRoutine):
     handles eligibility filtering).
 
     Requires a household network with ``household_ids`` (e.g.
-    ``ssl.networks.HouseholdNet``).
+    ``starsim.library.networks.HouseholdNet``).
 
     Args:
         product (TPTTx): The TPT treatment product (created automatically if not provided).
@@ -358,7 +358,7 @@ class HouseholdContactTracing(ss.Intervention):
     index cases. Downstream interventions (e.g. ``DxDelivery`` for screening,
     ``TPTDelivery`` for preventive therapy) read this flag.
 
-    Requires a household network with ``household_ids`` (e.g. ``ssl.networks.HouseholdNet``).
+    Requires a household network with ``household_ids`` (e.g. ``starsim.library.networks.HouseholdNet``).
 
     Args:
         coverage (float): Probability that a given index case's household is

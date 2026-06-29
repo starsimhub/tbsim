@@ -16,7 +16,7 @@ class Migration(ss.Demographics):
     emigration (existing agents leaving). Each timestep, arrivals are drawn
     from a Poisson process and departures are sampled from the active
     population. Immigrants are assigned an age, a TB disease state, and
-    (when a ``ssl.networks.HouseholdNet`` is present) a household. Emigrants are removed
+    (when ``starsim.library.networks.HouseholdNet`` is present) a household. Emigrants are removed
     from the disease model and from household networks. Setting
     ``emigration_rate=0`` gives an immigration-only module.
 
@@ -72,7 +72,7 @@ class Migration(ss.Demographics):
         n_emigrants: Number of departures in the last step.
         net_migration: ``n_immigrants - n_emigrants`` for the last step.
 
-    **Household integration**: When a ``ssl.networks.HouseholdNet`` is present in the sim,
+    **Household integration**: When ``starsim.library.networks.HouseholdNet`` is present in the sim,
     immigrants are added to existing households (weighted by household size)
     and connected via complete-graph edges. Emigrants are removed from their
     household membership and edges.

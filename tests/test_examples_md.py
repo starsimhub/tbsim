@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import sciris as sc
 import starsim as ss
-import starsim.library as ssl
+import starsim.library.networks as ssln
 import tbsim
 from tbsim import TB
 from tbsim.analyzers import DwellTime
@@ -51,7 +51,7 @@ def test_example_household_networks():
         ages=['72, 17, 30', '37', '13, 55, 36'],
     )
     sim = ss.Sim(
-        networks=ssl.networks.HouseholdNet(dhs_data=dhs_data, dynamic=False),
+        networks=ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False),
         diseases=TB(),
     )
     sim.run()

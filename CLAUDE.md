@@ -74,6 +74,6 @@ Interventions in [tbsim/interventions/](tbsim/interventions/) follow a product/d
 
 ## Key Dependencies
 
-- **starsim** (>=3.4.0) — ABM framework; disease models extend `ss.Disease`, interventions extend `ss.Intervention`; household networks via `starsim.library` (`ssl.networks.HouseholdNet`)
+- **starsim** (>=3.4.0) — ABM framework; `import starsim.library.networks as ssln`, then `ssln.HouseholdNet`
 - **sciris** (>=3.1.0) — Utility library used throughout (`sc.objdict`, `sc.mergedicts`, etc.)
 - **pandas** (>=2.0.0) — Used heavily in diagnostic product definitions (DataFrame-based)

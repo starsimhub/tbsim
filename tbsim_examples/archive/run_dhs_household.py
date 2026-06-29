@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import starsim as ss
-import starsim.library as ssl
+import starsim.library.networks as ssln
 import tbsim
 
 raise NotImplementedError('Awaiting more permanent data solution')
@@ -44,7 +44,7 @@ dhs_data = sc.dataframe(hh_id=hh_ids, ages=age_strings)
 n_agents = sum(len(s.split()) for s in age_strings)  # make this match the HH structure
 
 # -- 2. Build simulation components -------------------------------------------
-net = ssl.networks.HouseholdNet(dhs_data=dhs_data, prob_move_out=0.7)
+net = ssln.HouseholdNet(dhs_data=dhs_data, prob_move_out=0.7)
 
 fertility_rates = pd.read_csv(Path(__file__).parents[1] / "tbsim" / "data" / "nigeria_asfr.csv")
 pregnancy = ss.Pregnancy(fertility_rate=fertility_rates)

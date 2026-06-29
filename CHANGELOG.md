@@ -3,7 +3,7 @@
 All notable changes to the codebase are documented in this file.
 
 ## Version 0.8.2 (2026-06-29)
-- Updated for Starsim 3.4.0: `HouseholdNet` is now imported from `starsim.library` as `ssl.networks.HouseholdNet` (replacing `ss.HouseholdNet`).
+- Updated for Starsim 3.4.0: `import starsim.library.networks as ssln` and `ssln.HouseholdNet` (replacing `ss.HouseholdNet`).
 - Raised minimum Starsim dependency to `>=3.4.0`.
 
 ## Version 0.8.1 (2026-06-10)

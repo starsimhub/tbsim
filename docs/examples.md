@@ -73,8 +73,8 @@ Using household-based social networks:
 
 ```python
 import starsim as ss
-import starsim.library as ssl
 import sciris as sc
+import starsim.library.networks as ssln
 from tbsim import TB
 
 # Synthetic DHS-style household data (hh_id + comma-separated ages per household)
@@ -84,7 +84,7 @@ dhs_data = sc.dataframe(
 )
 
 # Create household network and TB (static households; no Pregnancy module required)
-households = ssl.networks.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+households = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 tb = TB()
 
 sim = ss.Sim(

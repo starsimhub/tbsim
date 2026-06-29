@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import starsim as ss
-import starsim.library as ssl
+import starsim.library.networks as ssln
 import tbsim
 
 
@@ -34,7 +34,7 @@ DEFAULT_MIGRATION_PARS = dict(
 
 
 def _make_household_dhs_data(n_agents, rand_seed):
-    """Create a synthetic DHS household table for ``ssl.networks.HouseholdNet``."""
+    """Create a synthetic DHS household table for ``starsim.library.networks.HouseholdNet``."""
     rng = np.random.default_rng(rand_seed)
     hh_id = []
     ages = []
@@ -70,7 +70,7 @@ def build_sim(scenario=None, spars=None):
     include_households = bool(scenario.get('use_households', True))
     networks = [ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))]
     if include_households:
-        networks.append(ssl.networks.HouseholdNet(dhs_data=_make_household_dhs_data(n_agents=spars.n_agents, rand_seed=spars.rand_seed), dynamic=False))
+        networks.append(ssln.HouseholdNet(dhs_data=_make_household_dhs_data(n_agents=spars.n_agents, rand_seed=spars.rand_seed), dynamic=False))
 
     return tbsim.Sim(
         label=scenario.get('name', 'scenario'),
