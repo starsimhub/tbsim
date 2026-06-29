@@ -83,8 +83,8 @@ dhs_data = sc.dataframe(
     ages=['72, 17, 30', '37', '13, 55, 36'],
 )
 
-# Create household network and TB
-households = ssl.networks.HouseholdNet(dhs_data=dhs_data)
+# Create household network and TB (static households; no Pregnancy module required)
+households = ssl.networks.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 tb = TB()
 
 sim = ss.Sim(
@@ -108,9 +108,9 @@ sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
 sim.run()
 
 # Create plots from the analyzer
-sim.analyzers[0].plot('sankey')
 sim.analyzers[0].plot('histogram')
 sim.analyzers[0].plot('kaplan_meier')
+sim.analyzers[0].plot('network')
 ```
 
 ## Parameter Sweeps
