@@ -74,7 +74,14 @@ Using household-based social networks:
 ```python
 import starsim as ss
 import starsim.library as ssl
+import sciris as sc
 from tbsim import TB
+
+# Synthetic DHS-style household data (hh_id + comma-separated ages per household)
+dhs_data = sc.dataframe(
+    hh_id=[0, 1, 2],
+    ages=['72, 17, 30', '37', '13, 55, 36'],
+)
 
 # Create household network and TB
 households = ssl.networks.HouseholdNet(dhs_data=dhs_data)

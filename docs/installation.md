@@ -34,7 +34,7 @@ Common installation issues:
 
 **Import Errors**: Ensure you're using the correct Python environment and that all dependencies are installed.
 
-**Starsim Compatibility**: TBsim requires Starsim >=3.4.0. Install with `pip install 'starsim>=3.4.0'` or let `pip install -e .` pull it in as a dependency. Household networks use `import starsim.library as ssl` and `ssl.networks.HouseholdNet`.
+**Starsim Compatibility**: TBsim requires Starsim >=3.4.0. Install with `pip install "starsim>=3.4.0"` or let `pip install -e .` pull it in as a dependency. Household networks use `import starsim.library as ssl` and `ssl.networks.HouseholdNet`.
 
 **Permission Errors**: On some systems, you may need to use `pip install --user` or run with appropriate permissions.
 
