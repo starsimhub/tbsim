@@ -5,8 +5,7 @@ from enum import IntEnum
 import numpy as np
 import starsim as ss
 from .plots import plot as _tbsim_plot
-from .resistance.strains import StrainRegistry
-from .resistance.profile import StrainProfile
+from .resistance.strains import StrainRegistry, StrainProfile
 from .resistance.resolvers import ProgressionResolver, AcquisitionResolver
 
 

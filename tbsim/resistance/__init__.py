@@ -24,7 +24,7 @@ __all__ = [
 _exports = {
     'StrainSpec':                         'strains',
     'StrainRegistry':                     'strains',
-    'StrainProfile':                      'profile',
+    'StrainProfile':                      'strains',
     'ResistanceConnector':                'connector',
     'Regimen':                            'regimens',
     'ProgressionResolver':                'resolvers',
