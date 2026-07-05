@@ -323,15 +323,22 @@ class TB(BaseTB):
         Advance TB state machine one timestep.
 
         1. **Transmission** (via ``super().step()``): handles force of infection.
-        2. **Reset RR multipliers** for all agents (interventions set fresh each step).
-        3. **Evaluate transitions**: for each state group, evaluate competing-risk
-           transitions and apply immediately. Agents may cascade through multiple
-           states in one step.
-        4. **Bookkeeping**: update flags, modifiers, deaths, results.
+        2. **Evaluate transitions** (``step_transitions``): competing-risk transitions,
+           applied immediately; agents may cascade through multiple states in one step.
+        3. **Bookkeeping** (``step_bookkeeping``): update flags, modifiers, deaths, and
+           the transmission state (``susceptible``/``rel_sus``/``rel_trans``) for next step.
+
+        The work is split into ``step_transitions`` and ``step_bookkeeping`` so that
+        strain-aware subclasses (see ``tbsim.resistance``) can override the natural
+        history and the transmission set-up independently.
         """
         super().step()
+        self.step_transitions()
+        self.step_bookkeeping()
+        return
 
-        # --- Evaluate transitions (each mutates self.state in place) ---
+    def step_transitions(self):
+        """ Evaluate the natural-history state transitions (each mutates ``self.state`` in place). """
         # For transitions that lead to CLEARED, we snapshot the pre-transition CLEARED mask
         # and compare after to identify agents newly entering CLEARED from each source state,
         # so we can assign the correct pathway-specific rr_reinfection to each new entrant.
@@ -376,7 +383,11 @@ class TB(BaseTB):
         # NOTE: TREATMENT outcomes (success → CLEARED, failure → SYMPTOMATIC) are
         # handled by TxDelivery, not the natural history. Agents in TREATMENT state
         # without a TxDelivery intervention will remain in TREATMENT indefinitely.
+        return
 
+    def step_bookkeeping(self):
+        """ Update infection flags, request TB deaths, reset risk modifiers, and set the
+        transmission state (``susceptible``/``rel_sus``/``rel_trans``) used next step. """
         # --- Bookkeep from current state ---
         # Derive the transmission flags from the categorical state (identical values to,
         # but faster than, the previous np.isin re-derivation).
