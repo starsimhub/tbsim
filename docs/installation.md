@@ -30,12 +30,12 @@ pip install -e .[dev]
 
 ## Starsim library imports
 
-TBsim requires Starsim >=3.4.0. Household networks live in the Starsim library (not core ``starsim``):
+TBsim requires Starsim >=3.5.0. Household networks live in the Starsim library (not core ``starsim``):
 
 ```python
-import starsim.library.networks as ssln
+import starsim as ss
 
-net = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 ```
 
 ## Troubleshooting
@@ -44,7 +44,7 @@ Common installation issues:
 
 **Import Errors**: Ensure you're using the correct Python environment and that all dependencies are installed.
 
-**Starsim Compatibility**: Requires Starsim >=3.4.0 (`pip install "starsim>=3.4.0"`). See [Starsim library imports](#starsim-library-imports) above.
+**Starsim Compatibility**: Requires Starsim >=3.5.0 (`pip install "starsim>=3.5.0"`). See [Starsim library imports](#starsim-library-imports) above.
 
 **Permission Errors**: On some systems, you may need to use `pip install --user` or run with appropriate permissions.
 

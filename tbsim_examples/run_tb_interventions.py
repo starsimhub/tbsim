@@ -5,7 +5,6 @@ TB interventions example: scenarios with BCG, TPT, BetaByYear, and Dx/Tx cascade
 import numpy as np
 import sciris as sc
 import starsim as ss
-import starsim.library.networks as ssln
 import tbsim
 import matplotlib.pyplot as plt
 
@@ -90,7 +89,7 @@ def build_sim(scenario=None, spars=None):
     dhs_data = sc.dataframe(hh_id=np.arange(n_households), ages=age_strings)
     networks = [
         ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
-        ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False),
+        ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False),
     ]
 
     spars.n_agents = 500
@@ -227,7 +226,7 @@ def run_tpt_cascade():
     dhs_data = sc.dataframe(hh_id=hh_ids, ages=age_strings)
 
     # Networks
-    hh_net = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    hh_net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
     community_net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=3), dur=0))
 
     # --- Index case pathway ---

@@ -44,7 +44,7 @@ dependencies = [
   "networkx",
   "matplotlib",
   "seaborn",
-  "starsim>=3.4.0",
+  "starsim>=3.5.0",
 ]
 
 [project.optional-dependencies]

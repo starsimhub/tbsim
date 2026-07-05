@@ -579,11 +579,10 @@ class HouseholdStats(ss.Analyzer):
     Example::
 
         import starsim as ss
-        import starsim.library.networks as ssln
         import tbsim
 
         dhs_data = ...  # pandas DataFrame with hh_id and ages columns
-        net = ssln.HouseholdNet(dhs_data=dhs_data)
+        net = ss.library.HouseholdNet(dhs_data=dhs_data)
         analyzer = tbsim.HouseholdStats(network_name='householdnet')
         sim = ss.Sim(
             diseases='sis', networks=net,

@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import starsim as ss
-import starsim.library.networks as ssln
 import tbsim
 
 
@@ -248,7 +247,7 @@ def test_tpt_product_skips_on_treatment():
 def test_tpt_household_init():
     """Test TPTHousehold initializes with correct defaults."""
     dhs_data = make_dhs_data(50)
-    hh_net = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    hh_net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB(name='tb', pars={'init_prev': 0.20})
     tpt_hh = tbsim.TPTHousehold()
@@ -268,7 +267,7 @@ def test_tpt_household_init():
 def test_tpt_household_traces_on_treatment_start():
     """Test that household contacts are offered TPT when an index starts treatment."""
     dhs_data = make_dhs_data(50)
-    hh_net = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    hh_net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB(name='tb', pars={'init_prev': 0.20})
     tpt_hh = tbsim.TPTHousehold(pars={'coverage': 1.0})
@@ -302,7 +301,7 @@ def test_tpt_household_traces_on_treatment_start():
 def test_tpt_household_no_retrigger_same_index():
     """Test that the same index case doesn't retrigger tracing on subsequent steps."""
     dhs_data = make_dhs_data(50)
-    hh_net = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    hh_net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB(name='tb', pars={'init_prev': 0.20})
     tpt_hh = tbsim.TPTHousehold(pars={'coverage': 1.0})
@@ -331,7 +330,7 @@ def test_tpt_household_no_retrigger_same_index():
 def test_tpt_household_full_sim_run():
     """Test that TPTHousehold runs without error in a full simulation."""
     dhs_data = make_dhs_data(30)
-    hh_net = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    hh_net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB(name='tb', pars={'init_prev': 0.20, 'beta': ss.peryear(0.5)})
     tpt_hh = tbsim.TPTHousehold(pars={'coverage': 0.8})
@@ -357,7 +356,7 @@ def test_tpt_household_full_sim_run():
 def test_hh_contact_tracing_identifies_contacts():
     """HouseholdContactTracing sets contact_identified on household members."""
     dhs_data = make_dhs_data(50)
-    hh_net = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    hh_net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB(name='tb', pars={'init_prev': 0.20})
     hh_tracing = tbsim.HouseholdContactTracing(coverage=1.0)
@@ -397,7 +396,7 @@ def test_hh_contact_tracing_correct_after_deaths():
     """
     np.random.seed(0)
     dhs_data = make_dhs_data(60)
-    hh_net = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    hh_net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB(name='tb', pars={'init_prev': 0.0})
     hh_tracing = tbsim.HouseholdContactTracing(coverage=1.0)
@@ -452,7 +451,7 @@ def test_hh_contact_tracing_correct_after_deaths():
 def test_hh_contact_tracing_no_retrigger():
     """Same index case does not retrigger contact identification."""
     dhs_data = make_dhs_data(50)
-    hh_net = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    hh_net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 
     tb = tbsim.TB(name='tb', pars={'init_prev': 0.20})
     hh_tracing = tbsim.HouseholdContactTracing(coverage=1.0)
@@ -483,7 +482,7 @@ def test_hh_contact_tracing_no_retrigger():
 def _make_cascade_sim(n_agents=500, n_households=100, rand_seed=42):
     """Build a full TPT cascade sim for testing."""
     dhs_data = make_dhs_data(n_households)
-    hh_net = ssln.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+    hh_net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
     community_net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=3), dur=0))
 
     hsb = tbsim.HealthSeekingBehavior()

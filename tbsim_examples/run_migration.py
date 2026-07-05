@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import starsim as ss
-import starsim.library.networks as ssln
 import tbsim
 
 
@@ -70,7 +69,7 @@ def build_sim(scenario=None, spars=None):
     include_households = bool(scenario.get('use_households', True))
     networks = [ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))]
     if include_households:
-        networks.append(ssln.HouseholdNet(dhs_data=_make_household_dhs_data(n_agents=spars.n_agents, rand_seed=spars.rand_seed), dynamic=False))
+        networks.append(ss.library.HouseholdNet(dhs_data=_make_household_dhs_data(n_agents=spars.n_agents, rand_seed=spars.rand_seed), dynamic=False))
 
     return tbsim.Sim(
         label=scenario.get('name', 'scenario'),
