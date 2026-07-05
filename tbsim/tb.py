@@ -17,32 +17,24 @@ class TBS(IntEnum):
     - Each agent is in exactly one of these states.
     - Transitions are driven by exponential rates in `TB`.
     """
-    SUSCEPTIBLE     = -1    # Never infected (agents who clear/recover/treat remain in their last state, not here)
-    INFECTION       = 0     # Latent infection (not yet active TB)
-    CLEARED         = 1     # Post-infection: cleared latent, recovered from non-infectious, or completed treatment
-    NON_INFECTIOUS  = 2     # Non-infectious TB (early/smear-negative)
+    SUSCEPTIBLE     = 0     # Never infected (agents who clear/recover/treat remain in their last state, not here)
+    INFECTION       = 1     # Latent infection (not yet active TB)
+    CLEARED         = 2     # Post-infection: cleared latent, recovered from non-infectious, or completed treatment
+    NON_INFECTIOUS  = 3     # Non-infectious TB (early/smear-negative)
     ASYMPTOMATIC    = 4     # Active TB, asymptomatic (infectious)
     SYMPTOMATIC     = 5     # Active TB, symptomatic (infectious)
     TREATMENT       = 6     # On TB treatment
-    DEAD            = 8     # Dead (TB-caused via sym_dead; general mortality via step_die also sets this)
-    REMOVED         = 10    # Removed from the active population (e.g. emigration)
+    DEAD            = 7     # Dead (TB-caused via sym_dead; general mortality via step_die also sets this)
+    REMOVED         = 8     # Removed from the active population (e.g. emigration)
 
-    @staticmethod
-    def active_tb_states():
-        """States representing active TB disease (non-infectious, asymptomatic, symptomatic)."""
-        return [TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC, TBS.SYMPTOMATIC]
 
-    @staticmethod
-    def care_seeking_eligible():
-        """States eligible for care-seeking: only SYMPTOMATIC.
-        Only individuals with clinical symptoms (cough, fever, night sweats, etc.)
-        recognise their illness and seek healthcare."""
-        return np.array([TBS.SYMPTOMATIC])
+# State groups for fast membership tests, e.g. ``tb.state.isin(TBS.ACTIVE)``.
+TBS.ACTIVE       = (TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC, TBS.SYMPTOMATIC)  # active TB disease
+TBS.TERMINAL     = (TBS.DEAD, TBS.REMOVED)                                  # no longer in the active population
+TBS.CARE_SEEKING = (TBS.SYMPTOMATIC,)                                       # eligible to seek care (clinical symptoms only)
 
-    @staticmethod
-    def terminal_states():
-        """States that should no longer participate in transmission or care flows."""
-        return [TBS.DEAD, TBS.REMOVED]
+# Number of bins for one-pass state counting via np.bincount (TBS codes are contiguous from 0).
+_TBS_NBINS = int(max(TBS)) + 1
 
 
 class BaseTB(ss.Infection):
@@ -210,6 +202,40 @@ class TB(BaseTB):
         """
         return (self.state == TBS.ASYMPTOMATIC) | (self.state == TBS.SYMPTOMATIC)
 
+    # Read-only boolean views of the categorical `state` (the single source of truth).
+    # These give the boolean idiom at call sites (e.g. ``tb.active_tb.uids``,
+    # ``tb.latent[uids]``) with no extra storage and no risk of desync; to *write*
+    # state, assign ``self.state[uids] = TBS.X`` as before.
+    @property
+    def latent(self):
+        """Latent infection (`TBS.INFECTION`)."""
+        return self.state == TBS.INFECTION
+
+    @property
+    def non_infectious(self):
+        """Non-infectious TB (`TBS.NON_INFECTIOUS`)."""
+        return self.state == TBS.NON_INFECTIOUS
+
+    @property
+    def asymptomatic(self):
+        """Asymptomatic active TB (`TBS.ASYMPTOMATIC`)."""
+        return self.state == TBS.ASYMPTOMATIC
+
+    @property
+    def symptomatic(self):
+        """Symptomatic active TB (`TBS.SYMPTOMATIC`)."""
+        return self.state == TBS.SYMPTOMATIC
+
+    @property
+    def active_tb(self):
+        """Active TB disease (non-infectious, asymptomatic, or symptomatic)."""
+        return self.state.isin(TBS.ACTIVE)
+
+    @property
+    def terminal(self):
+        """No longer participating in transmission or care flows (dead or removed)."""
+        return self.state.isin(TBS.TERMINAL)
+
     def set_prognoses(self, uids, sources=None):
         """
         Set prognoses for newly infected agents (called when transmission occurs).
@@ -310,7 +336,7 @@ class TB(BaseTB):
         # and compare after to identify agents newly entering CLEARED from each source state,
         # so we can assign the correct pathway-specific rr_reinfection to each new entrant.
 
-        u = ss.uids(self.state == TBS.INFECTION)
+        u = self.latent.uids
         if len(u):
             self.transition(u, to={
                 TBS.CLEARED:        self.pars.inf_cle,
@@ -322,7 +348,7 @@ class TB(BaseTB):
             if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
                 self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
 
-        u = ss.uids(self.state == TBS.NON_INFECTIOUS)
+        u = self.non_infectious.uids
         if len(u):
             self.transition(u, to={
                 TBS.CLEARED:      self.pars.non_rec * self.rr_clearance[u],
@@ -333,14 +359,14 @@ class TB(BaseTB):
             if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
                 self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
 
-        u = ss.uids(self.state == TBS.ASYMPTOMATIC)
+        u = self.asymptomatic.uids
         if len(u):
             self.transition(u, to={
                 TBS.NON_INFECTIOUS: self.pars.asy_non,
                 TBS.SYMPTOMATIC:    self.pars.asy_sym,
             }, rng=self._rng_asy)
 
-        u = ss.uids(self.state == TBS.SYMPTOMATIC)
+        u = self.symptomatic.uids
         if len(u):
             self.transition(u, to={
                 TBS.ASYMPTOMATIC: self.pars.sym_asy,
@@ -352,15 +378,16 @@ class TB(BaseTB):
         # without a TxDelivery intervention will remain in TREATMENT indefinitely.
 
         # --- Bookkeep from current state ---
-
-        self.infected[:] = ~np.isin(self.state,
-            [TBS.SUSCEPTIBLE, TBS.CLEARED, *TBS.terminal_states()])
-        self.susceptible[:] = np.isin(self.state,
-            [TBS.SUSCEPTIBLE, TBS.CLEARED])
-        self.on_treatment[:] = (self.state == TBS.TREATMENT)
+        # Derive the transmission flags from the categorical state (identical values to,
+        # but faster than, the previous np.isin re-derivation).
+        st = self.state
+        susceptible = st.isin((TBS.SUSCEPTIBLE, TBS.CLEARED))
+        self.susceptible[:] = susceptible
+        self.infected[:] = ~(susceptible | st.isin(TBS.TERMINAL))
+        self.on_treatment[:] = (st == TBS.TREATMENT)
 
         # TB deaths
-        dead = ss.uids((self.state == TBS.DEAD) & self.sim.people.alive)
+        dead = ss.uids((st == TBS.DEAD) & self.sim.people.alive)
         self.sim.people.request_death(dead)
         self.results['new_deaths'][self.ti] = len(dead)
         self.results['new_deaths_15+'][self.ti] = np.count_nonzero(self.sim.people.age[dead] >= 15)
@@ -381,7 +408,7 @@ class TB(BaseTB):
             self.ti_rr_reinfection_wane[waned] = np.inf
         self.rel_sus[cleared] *= self.rr_reinfection[cleared]
         self.rel_trans[:] = 1
-        self.rel_trans[self.state == TBS.ASYMPTOMATIC] = self.pars.trans_asymp
+        self.rel_trans[self.asymptomatic] = self.pars.trans_asymp
 
         return
 
@@ -446,18 +473,24 @@ class TB(BaseTB):
 
         # Cache commonly reused arrays
         age15 = self.sim.people.age >= 15
-        infectious = self.infectious
         n_alive = self.sim.people.alive.count()
         new_asymp = self.ti_asymp == ti
 
-        in_state = {}
+        # Count every state in a single pass with np.bincount (TBS codes index bins directly),
+        # once over all agents and once restricted to 15+. The per-state, infectious, and
+        # detectable series are then plain lookups -- no per-state ==/& passes.
+        codes = self.state.values.astype(np.intp)
+        adult = age15.values
+        n_all = np.bincount(codes, minlength=_TBS_NBINS)
+        n_15  = np.bincount(codes[adult], minlength=_TBS_NBINS)
         for state in TBS:
-            in_state[state] = self.state == state
-            res[f'n_{state.name}'][ti] = in_state[state].count()
-            res[f'n_{state.name}_15+'][ti] = (age15 & in_state[state]).count()
+            res[f'n_{state.name}'][ti] = n_all[state]
+            res[f'n_{state.name}_15+'][ti] = n_15[state]
 
-        res.n_infectious[ti] = infectious.count()
-        res['n_infectious_15+'][ti] = (infectious & age15).count()
+        asy = int(TBS.ASYMPTOMATIC)
+        sym = int(TBS.SYMPTOMATIC)
+        res.n_infectious[ti] = n_all[asy] + n_all[sym]                       # infectious == asymptomatic | symptomatic
+        res['n_infectious_15+'][ti] = n_15[asy] + n_15[sym]
         res.prevalence_active[ti] = res.n_infectious[ti] / n_alive if n_alive else 0
         res.incidence_kpy[ti] = 1_000 * (self.ti_infected == ti).count() / (n_alive * dty) if n_alive else 0
         res.deaths_ppy[ti] = res.new_deaths[ti] / (n_alive * dty) if n_alive else 0
@@ -465,7 +498,7 @@ class TB(BaseTB):
         # New active: agents whose ti_asymp == this step
         res['new_active'][ti] = new_asymp.count()
         res['new_active_15+'][ti] = (new_asymp & age15).count()
-        res['n_detectable_15+'][ti] = (age15 * (in_state[TBS.SYMPTOMATIC] + self.pars.cxr_asymp_sens*in_state[TBS.ASYMPTOMATIC])).sum()
+        res['n_detectable_15+'][ti] = n_15[sym] + self.pars.cxr_asymp_sens * n_15[asy]
         return
 
     def finalize_results(self):

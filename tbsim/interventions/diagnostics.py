@@ -274,7 +274,7 @@ class DxDelivery(ss.Intervention):
 
         tb = tbsim.get_tb(self.sim)
         tb_states = tb.state[neg_uids]
-        has_tb = np.isin(tb_states, TBS.active_tb_states())
+        has_tb = np.isin(tb_states, TBS.ACTIVE)
         false_neg_uids = neg_uids[has_tb]
 
         if len(false_neg_uids) > 0 and self.care_seeking_multiplier_value != 1.0:

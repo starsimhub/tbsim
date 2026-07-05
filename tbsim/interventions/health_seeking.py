@@ -45,11 +45,6 @@ class HealthSeekingBehavior(ss.Intervention):
         self.care_seeking_dist = ss.bernoulli(p=self.pars.initial_care_seeking_rate.to_prob())
         return
 
-    @property
-    def tbsl(self):
-        """Shortcut to the TBS state enum."""
-        return tbsim.TBS
-
     def init_post(self):
         """Locate the TB disease module and resolve eligible states."""
         super().init_post()
@@ -61,11 +56,11 @@ class HealthSeekingBehavior(ss.Intervention):
             raise KeyError(f"{self.__class__} requires a TB disease module.")
         
         if self.pars.custom_states is not None:
-            self._states = np.asarray(self.pars.custom_states) 
-            if not np.isin(self._states,    self.tbsl.care_seeking_eligible()).all():
+            self._states = np.asarray(self.pars.custom_states)
+            if not np.isin(self._states, tbsim.TBS.CARE_SEEKING).all():
                 raise ValueError("Custom states must be a subset of the eligible states.")
         else:
-            self._states = self.tbsl.care_seeking_eligible()
+            self._states = np.asarray(tbsim.TBS.CARE_SEEKING)
         
         self._new_seekers_count = 0
         if self.pars.start is None: self.pars.start = self.sim.t.start
@@ -82,7 +77,7 @@ class HealthSeekingBehavior(ss.Intervention):
             self._new_seekers_count = 0
             return
 
-        active = np.isin(self._tb.state, self._states) & ppl.alive
+        active = self._tb.state.isin(self._states)  # dead agents are in DEAD/REMOVED, so already excluded (no need to & alive)
         # Reset sought_care when leaving eligible states so future episodes can seek care again.
         self.sought_care[~active] = False
         if self.pars.care_retry_steps is not None and int(self.pars.care_retry_steps) > 0:
@@ -123,9 +118,8 @@ class HealthSeekingBehavior(ss.Intervention):
         t = self.sim.now.date()
         if t < self.pars.start.date() or t > self.pars.stop.date():
             return
-        ppl = self.sim.people
         self.results['n_ever_sought_care'][self.ti] = np.count_nonzero(self.n_care_sought_total > 0)
         self.results['new_sought_care'][self.ti] = self._new_seekers_count
-        active = np.isin(self._tb.state, self._states) & ppl.alive
+        active = self._tb.state.isin(self._states)
         self.results['n_eligible'][self.ti] = np.count_nonzero(active & (~self.sought_care))
         return

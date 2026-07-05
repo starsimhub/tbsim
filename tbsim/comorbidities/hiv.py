@@ -17,6 +17,10 @@ class HIVState(IntEnum):
 
 
 
+# HIV-positive states, for membership tests, e.g. ``hiv.state.isin(HIVState.INFECTED)``.
+HIVState.INFECTED = (HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS)
+
+
 class HIV(ss.Disease):
     """
     A simplified agent-based HIV disease model for use with the Starsim framework.
@@ -97,12 +101,12 @@ class HIV(ss.Disease):
         """ Assign initial HIV infection and ART status (called at t=0). """
         uids = self.sim.people.auids
 
-        if len(self.state[self.state == HIVState.ACUTE]) == 0:
+        if not (self.state == HIVState.ACUTE).any():
             initial_infected = self.pars.init_prev.filter(uids)
             self.state[initial_infected] = HIVState.ACUTE
 
         current = self.state[uids].copy()
-        if len(self.on_ART[self.on_ART == True]) == 0:
+        if not self.on_ART.any():
             infected = uids[current == HIVState.ACUTE]
             initial_onart = self.pars.init_onart.filter(infected)
             self.on_ART[initial_onart] = True
@@ -148,22 +152,19 @@ class HIV(ss.Disease):
         """Record HIV state distribution and ART counts for the current timestep."""
         super().update_results()
         ti = self.sim.ti
-        uids = self.sim.people.auids
         n_alive = np.count_nonzero(self.sim.people.alive)
         res = self.results
-        n = len(uids)
 
-        states = self.state[uids]
         if n_alive > 0:
-            res.hiv_prevalence[ti] = np.count_nonzero(np.isin(self.state, [HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS])) / n_alive
+            res.hiv_prevalence[ti] = self.state.isin(HIVState.INFECTED).count() / n_alive
         else:
             res.hiv_prevalence[ti] = 0.0
-        res.infected[ti] = np.count_nonzero(np.isin(self.state, [HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS]))
+        res.infected[ti] = self.state.isin(HIVState.INFECTED).count()
         res.atrisk[ti]     = np.count_nonzero(self.state == HIVState.ATRISK)/n_alive
         res.acute[ti]      = np.count_nonzero(self.state == HIVState.ACUTE)/n_alive
         res.latent[ti]     = np.count_nonzero(self.state == HIVState.LATENT)/n_alive
         res.aids[ti]       = np.count_nonzero(self.state == HIVState.AIDS)/n_alive
-        res.on_art[ti]     = np.count_nonzero(self.on_ART == True)
+        res.on_art[ti]     = self.on_ART.count()
 
         return
 
@@ -210,7 +211,7 @@ class HivInterventions(ss.Intervention):
 
         target_prev = self.pars.prevalence(self.sim) if callable(self.pars.prevalence) else self.pars.prevalence
         expected_infectious = int(np.round(alive * target_prev))
-        infectious_uids = ((self.hiv.state == HIVState.ACUTE) | (self.hiv.state == HIVState.LATENT) | (self.hiv.state == HIVState.AIDS)).uids
+        infectious_uids = self.hiv.state.isin(HIVState.INFECTED).uids
         n_current = len(infectious_uids)
         delta = expected_infectious - n_current
         min_age = self.pars.min_age
@@ -258,7 +259,7 @@ class HivInterventions(ss.Intervention):
         target_prev = self.pars.prevalence(self.sim) if callable(self.pars.prevalence) else self.pars.prevalence
         expected_on_art = int(np.round(alive * self.pars.percent_on_ART * target_prev))
 
-        current_on_art = (self.hiv.on_ART == True).uids
+        current_on_art = self.hiv.on_ART.uids
         n_current = len(current_on_art)
         delta = expected_on_art - n_current
 
