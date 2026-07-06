@@ -30,7 +30,7 @@ TPT_STATE_MODIFIERS = dict(infection=1.0, non_infectious=1.0,
 
 
 def build_strains():
-    """Standard five-strain registry: pan-susceptible, INH-R, RIF-R, MDR, BDQ-R."""
+    """Standard five-strain catalog: pan-susceptible, INH-R, RIF-R, MDR, BDQ-R."""
     return [
         StrainSpec('pan',   {'INH': 0, 'RIF': 0, 'BDQ': 0}, fitness=1.00, init_prev=0.040), # pan-susceptible
         StrainSpec('inh_r', {'INH': 1, 'RIF': 0, 'BDQ': 0}, fitness=0.95, init_prev=0.010), # INH-mono-resistant
@@ -61,7 +61,7 @@ def first_line_tx(tb):
         per_drug_efficacy={'INH': 0.95, 'RIF': 0.95},
     )
     product = StrainAwareTx(
-        regimen=regimen, registry=tb._strain_registry,
+        regimen=regimen, catalog=tb._strain_catalog,
         p_selective_acquisition=dict(INH=0.05, RIF=0.02),
         adherence=0.85,
     )
@@ -72,7 +72,7 @@ def inh_tpt(tb):
     """Standard isoniazid TPT: covers any INH-susceptible strain (pan, RIF-R, BDQ-R); misses INH-R and MDR."""
     regimen = Regimen('inh_tpt', drugs=['INH'])
     return StrainAwareTPTTx(
-        regimen=regimen, registry=tb._strain_registry,
+        regimen=regimen, catalog=tb._strain_catalog,
         p_tpt_acquisition=dict(INH=TPT_ACQ_INH),
         acq_state_modifiers=TPT_STATE_MODIFIERS,
     )
@@ -82,7 +82,7 @@ def lai_bdq_tpt(tb):
     """LAI BDQ TPT: covers pan, INH-R, RIF-R, MDR; misses BDQ-R; can drive BDQ-R."""
     regimen = Regimen('lai_bdq_tpt', drugs=['BDQ'])
     return StrainAwareTPTTx(
-        regimen=regimen, registry=tb._strain_registry,
+        regimen=regimen, catalog=tb._strain_catalog,
         p_tpt_acquisition=dict(BDQ=TPT_ACQ_BDQ),
         acq_state_modifiers=TPT_STATE_MODIFIERS,
     )
@@ -122,7 +122,7 @@ def build_sim(scenario=None, spars=None):
     treat   = first_line_tx(tb)
     
     dst     = DSTDelivery(
-                product=DSTDx(tb._strain_registry, drugs=DRUGS,
+                product=DSTDx(tb._strain_catalog, drugs=DRUGS,
                             sensitivity=0.95, specificity=0.99))
 
     interventions = [hsb, confirm, treat, dst]
@@ -166,7 +166,7 @@ def summarize(sim):
     tx_res     = sim.results.get('strainawaretxdelivery')
 
     row = {'scenario': sim.label}
-    for uid in tb._strain_registry.uids:
+    for uid in tb._strain_catalog.uids:
         row[f'cum_new_carriers_{uid}'] = int(strain_res[f'new_carriers_{uid}'][:].sum())
         row[f'final_active_{uid}']     = int(strain_res[f'n_active_{uid}'][-1])
     row['cum_duplicate_blocked'] = int(dup_res['cum_duplicate_blocked'][-1])

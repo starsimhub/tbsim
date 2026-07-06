@@ -319,7 +319,7 @@ class SuperinfectionPrevalence(ss.Analyzer):
 
     def step(self):
         tb = self.sim.diseases[self.disease]
-        profile = tb.strain_profile
+        profile = tb.agent_strains
         counts = profile.n_strains_per_agent()
         n_super = int(np.count_nonzero(counts >= 2))
         n_alive = self.sim.people.alive.count()
@@ -448,7 +448,7 @@ def first_line_tx(tb, dst, scenario=None):
     )
     product = StrainAwareTx(
         regimen=regimen,
-        registry=tb._strain_registry,
+        catalog=tb._strain_catalog,
         p_selective_acquisition=scenario.first_line_acq,
         adherence=0.85,
     )
@@ -470,7 +470,7 @@ def bpal_tx(tb, dst, scenario=None):
     )
     product = StrainAwareTx(
         regimen=regimen,
-        registry=tb._strain_registry,
+        catalog=tb._strain_catalog,
         p_selective_acquisition=scenario.bpal_acq,
         adherence=scenario.bpal_adherence,
     )
@@ -487,7 +487,7 @@ def tpt_3hp(tb, scenario=None):
     regimen = Regimen('three_hp_proxy', drugs=['RIF'])
     product = StrainAwareTPTTx(
         regimen=regimen,
-        registry=tb._strain_registry,
+        catalog=tb._strain_catalog,
         p_tpt_acquisition=dict(RIF=scenario.tpt_acq_rif),
         acq_state_modifiers=dict(
             infection=0.05,
@@ -607,7 +607,7 @@ def build_sim(scenario, spars=None, seed=1):
     dst = DSTDelivery(
         name='dst',
         product=DSTDx(
-            tb._strain_registry,
+            tb._strain_catalog,
             drugs=DRUGS,
             sensitivity=0.95,
             specificity=0.99,
@@ -647,7 +647,7 @@ def _find(sim, cls):
 def has_resistance(sim):
     """Return whether this sim has the resistance overlay enabled."""
     tb = tbsim.get_tb(sim)
-    return getattr(tb, 'strain_profile', None) is not None
+    return getattr(tb, 'agent_strains', None) is not None
 
 
 def _active_uids(tb):
@@ -685,16 +685,16 @@ def summarize(sim):
     resistant_active = {drug: ss.uids() for drug in DRUGS}
     resistant_infected = {drug: ss.uids() for drug in DRUGS}
     if resistance:
-        registry = tb._strain_registry
-        profile = tb.strain_profile
+        catalog = tb._strain_catalog
+        profile = tb.agent_strains
         infected = tb.infected.uids
-        for s_idx, uid in enumerate(registry.uids):
+        for s_idx, uid in enumerate(catalog.uids):
             active_strain = getattr(profile._tb, profile.names[s_idx]).uids.intersect(active)
             infected_strain = getattr(profile._tb, profile.names[s_idx]).uids.intersect(infected)
             active_carriers = active_carriers.union(active_strain)
             infected_carriers = infected_carriers.union(infected_strain)
-            for drug_idx, drug in enumerate(registry.drugs):
-                if registry.resistance[s_idx, drug_idx]:
+            for drug_idx, drug in enumerate(catalog.drugs):
+                if catalog.resistance[s_idx, drug_idx]:
                     resistant_active[drug] = resistant_active[drug].union(active_strain)
                     resistant_infected[drug] = resistant_infected[drug].union(infected_strain)
             row[f'final_active_{uid}'] = int(len(active_strain))
@@ -714,13 +714,13 @@ def summarize(sim):
         )
 
     if resistance and strain_res is not None:
-        registry = tb._strain_registry
-        bdq_idx = registry.drugs.index('BDQ')
+        catalog = tb._strain_catalog
+        bdq_idx = catalog.drugs.index('BDQ')
         cum_new = {drug: 0 for drug in DRUGS}
-        for s_idx, uid in enumerate(registry.uids):
+        for s_idx, uid in enumerate(catalog.uids):
             new_total = int(np.sum(strain_res[f'new_carriers_{uid}'][:]))
-            for drug_idx, drug in enumerate(registry.drugs):
-                if registry.resistance[s_idx, drug_idx]:
+            for drug_idx, drug in enumerate(catalog.drugs):
+                if catalog.resistance[s_idx, drug_idx]:
                     cum_new[drug] += new_total
         for drug in DRUGS:
             row[f'cum_new_{drug.lower()}_resistant'] = cum_new[drug]
@@ -753,14 +753,14 @@ def active_resistant_share(sim, drug):
     """Return time series of active strain-carrier share resistant to one drug."""
     if not has_resistance(sim):
         return np.zeros(len(_tb_time(sim)), dtype=float)
-    registry = tbsim.get_tb(sim)._strain_registry
+    catalog = tbsim.get_tb(sim)._strain_catalog
     res = _strain_results(sim)
     num = None
     den = None
-    for s_idx, uid in enumerate(registry.uids):
+    for s_idx, uid in enumerate(catalog.uids):
         y = _values(res[f'n_active_{uid}'])
         den = y.copy() if den is None else den + y
-        if registry.resistance[s_idx, registry.drugs.index(drug)]:
+        if catalog.resistance[s_idx, catalog.drugs.index(drug)]:
             num = y.copy() if num is None else num + y
     if num is None:
         num = np.zeros_like(den)

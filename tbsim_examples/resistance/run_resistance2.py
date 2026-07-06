@@ -169,7 +169,7 @@ def _build_sim(
             )
             tx_product = StrainAwareTx(
                 regimen=regimen,
-                registry=tb._strain_registry,
+                catalog=tb._strain_catalog,
                 p_selective_acquisition={'INH': p_selective},
                 acq_state_modifiers={
                     'infection': 1.0,
@@ -220,7 +220,7 @@ def _build_sim(
             )
             uniform_tx = StrainAwareTx(
                 regimen=uniform_regimen,
-                registry=tb._strain_registry,
+                catalog=tb._strain_catalog,
                 p_selective_acquisition={'INH': 0.0},
                 adherence=1.0,
             )
@@ -252,7 +252,7 @@ def _build_sim(
             dst = DSTDelivery(
                 name='dst',
                 product=DSTDx(
-                    tb._strain_registry,
+                    tb._strain_catalog,
                     drugs=['INH'],
                     sensitivity=0.98,
                     specificity=0.99,
@@ -269,7 +269,7 @@ def _build_sim(
             )
             first_line_tx = StrainAwareTx(
                 regimen=first_line_regimen,
-                registry=tb._strain_registry,
+                catalog=tb._strain_catalog,
                 p_selective_acquisition={'INH': 0.0},
                 adherence=1.0,
             )
@@ -281,7 +281,7 @@ def _build_sim(
             )
             second_line_tx = StrainAwareTx(
                 regimen=second_line_regimen,
-                registry=tb._strain_registry,
+                catalog=tb._strain_catalog,
                 p_selective_acquisition={'RIF': 0.0},
                 adherence=1.0,
             )
@@ -451,7 +451,7 @@ def _cum_new_inh_r(sim):
 def _final_active_resistant_share(sim):
     """Final active-state resistant share among pan+inh_r agents."""
     tb = tbsim.get_tb(sim)
-    profile = getattr(tb, 'strain_profile', None)
+    profile = getattr(tb, 'agent_strains', None)
     if profile is None:
         return np.nan
     active = (
@@ -470,7 +470,7 @@ def _final_active_resistant_share(sim):
 def summarize_sim(sim, scenario_name):
     """Return one row of high-level scientific outputs for one scenario."""
     tb = tbsim.get_tb(sim)
-    profile = getattr(tb, 'strain_profile', None)
+    profile = getattr(tb, 'agent_strains', None)
     row = {
         'scenario': scenario_name,
         'with_resistance': bool(profile is not None),
