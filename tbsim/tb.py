@@ -5,7 +5,7 @@ from enum import IntEnum
 import numpy as np
 import starsim as ss
 from .plots import plot as _tbsim_plot
-from .resistance.strains import StrainRegistry, StrainProfile
+from .resistance.strains import StrainCatalog, AgentStrains
 from .resistance.resolvers import ProgressionResolver, AcquisitionResolver
 
 
@@ -504,7 +504,7 @@ class MultiStrainTB(TB):
 
         Args:
             pars (dict): Natural history parameter overrides.
-            strains (list/StrainRegistry): Strain configuration.
+            strains (list/StrainCatalog): Strain configuration.
             progression_mode (str): Progression bottleneck mode. Default ``'bottleneck'``.
             p_multi (float): Multi-strain retention probability at activation. Default 1.0.
             p_random_acquisition (dict/None): Per-drug random acquisition probabilities.
@@ -523,13 +523,13 @@ class MultiStrainTB(TB):
         return
 
     def _init_strains(self, strains, **kwargs):
-        """Initialize strain registry, per-agent strain states, and resolvers."""
-        if isinstance(strains, StrainRegistry):
-            registry = strains
+        """Initialize strain catalog, per-agent strain states, and resolvers."""
+        if isinstance(strains, StrainCatalog):
+            catalog = strains
         else:
-            registry = StrainRegistry(list(strains))
-        self._strain_registry = registry
-        self.strain_profile = StrainProfile(registry)
+            catalog = StrainCatalog(list(strains))
+        self._strain_catalog = catalog
+        self.agent_strains = AgentStrains(catalog)
         self._rng_strain_pick = ss.random(name='tb_rng_strain_pick')
         self._rng_strain_init = ss.random(name='tb_rng_strain_init')
         self._n_duplicate_blocked_this_step = 0
@@ -543,8 +543,8 @@ class MultiStrainTB(TB):
         self._alpha_super_input = kwargs.pop('alpha_super', None)
         self._alpha_act_input = dict(kwargs.pop('alpha_act', {}) or {})
         self._finalize_alpha_defaults()
-        self.define_states(*self.strain_profile.state_defs())
-        self.strain_profile.attach(self)
+        self.define_states(*self.agent_strains.state_defs())
+        self.agent_strains.attach(self)
         return
 
     def init_post(self):
@@ -656,13 +656,13 @@ class MultiStrainTB(TB):
         if from_state == int(TBS.INFECTION):
             newly_cleared = uids[self.state[uids] == TBS.CLEARED]
             if len(newly_cleared):
-                self.strain_profile.clear_all(newly_cleared)
+                self.agent_strains.clear_all(newly_cleared)
             progressing = uids[np.isin(self.state[uids], [TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC])]
             self._apply_strain_progression(progressing, activating_only=False)
         elif from_state == int(TBS.NON_INFECTIOUS):
             newly_cleared = uids[self.state[uids] == TBS.CLEARED]
             if len(newly_cleared):
-                self.strain_profile.clear_all(newly_cleared)
+                self.agent_strains.clear_all(newly_cleared)
             progressing = uids[self.state[uids] == TBS.ASYMPTOMATIC]
             self._apply_strain_progression(progressing, activating_only=True)
 
@@ -677,7 +677,7 @@ class MultiStrainTB(TB):
         """Apply TB death handling and clear carried strains."""
         out = super().step_die(uids)
         if len(uids):
-            self.strain_profile.clear_all(uids)
+            self.agent_strains.clear_all(uids)
         return out
 
     def _apply_strain_progression(self, uids, activating_only):
@@ -698,15 +698,15 @@ class MultiStrainTB(TB):
         else:
             activating = uids[self.state[uids] == TBS.ASYMPTOMATIC]
         if self._progression_resolver is not None and len(activating):
-            self._progression_resolver.resolve(self.strain_profile, activating)
+            self._progression_resolver.resolve(self.agent_strains, activating)
         if self._acquisition_resolver is not None and not activating_only:
-            self._acquisition_resolver.random_acquisition(self.strain_profile, uids)
+            self._acquisition_resolver.random_acquisition(self.agent_strains, uids)
         return
 
     def _assign_transmitted_strains(self, uids, sources):
         """Assign strain identity to newly infected ``uids``."""
-        profile = self.strain_profile
-        registry = self._strain_registry
+        profile = self.agent_strains
+        catalog = self._strain_catalog
         n = len(uids)
         picks = np.full(n, -1, dtype=int)
 
@@ -726,7 +726,7 @@ class MultiStrainTB(TB):
 
         need_fallback = picks < 0
         if need_fallback.any():
-            init_prev = registry.init_prev
+            init_prev = catalog.init_prev
             if init_prev.sum() > 0:
                 p = init_prev / init_prev.sum()
                 u = np.asarray(
@@ -743,7 +743,7 @@ class MultiStrainTB(TB):
                 )
 
         n_blocked = 0
-        for idx in range(registry.n):
+        for idx in range(catalog.n):
             sel = picks == idx
             if not sel.any():
                 continue
