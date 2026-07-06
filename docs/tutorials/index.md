@@ -11,6 +11,10 @@ These tutorials walk through TBsim's core functionality, from a first simulation
 - [TB interventions](tb_interventions_tutorial.qmd) -- Implementing and analyzing BCG, TPT, and treatment interventions
 - [Running TB-HIV scenarios](run_tbhiv_scens.qmd) -- Setting up and comparing TB-HIV co-infection scenarios
 
+## Drug resistance
+
+- [Drug resistance and multi-strain TB](resistance_tutorial.qmd) -- Defining strains, superinfection and competition, de-novo and treatment-acquired resistance, DST-routed regimens, treatment monitoring, and strain-aware preventive therapy
+
 ## Comorbidities
 
 - [TB-HIV comorbidity](tbhiv_comorbidity.qmd) -- Modeling the interaction between TB and HIV

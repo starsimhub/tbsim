@@ -43,33 +43,43 @@ class DST(ss.Product):
         else:
             self.p_obs_by_id = np.array([p_strain_obs.get(i, 1.0) for i in range(strains.m)])
 
-        self._obs_rng = ss.random(name='dst_obs')      # is each strain observed?
-        self._call_rng = ss.random(name='dst_call')    # per-(strain,drug) sens/spec call
+        # Independent CRN stream per strain, so a phenotype carried by several strains has a higher
+        # detection probability (spec §DST) and per-strain observation drop-out is independent across strains.
+        self._obs_rngs = [ss.random(name=f'dst_obs_{j}') for j in range(strains.m)]
+        self._call_rngs = [ss.random(name=f'dst_call_{j}') for j in range(strains.m)]
         return
 
     def administer(self, tb, uids):
-        """Return the observed ``n``-bit resistance profile (as an integer per agent) for ``uids``."""
+        """Return the observed ``n``-bit resistance profile (as an integer per agent) for ``uids``.
+
+        DST is applied at the strain level then aggregated to the agent phenotype: each carried strain
+        is independently observed (culture bottleneck ``p_strain_obs``), and each observed strain
+        independently passes sensitivity (if truly resistant) or fails specificity (if susceptible). A
+        drug is called resistant for an agent if *any* of its observed strains reads resistant — so a
+        phenotype carried by several strains is more likely detected (spec §DST). Sensitivity and
+        specificity for the drugs within one strain share that strain's call draw (a minor, deliberate
+        within-strain correlation); independence across strains is what drives the multi-strain boost.
+        """
         m = self.strains
         n_u = len(uids)
         if n_u == 0:
             return np.zeros(0, dtype=int)
         carried = m.carried(tb.strain_mask[uids])  # (n_u, m)
-
-        # Which carried strains are observed (bottleneck): one uniform per agent per strain.
-        u_obs = self._obs_rng.rvs(uids)[:, None]  # (n_u, 1) reused across strains (per-agent draw)
-        observed = carried & (u_obs < self.p_obs_by_id[None, :])
-
-        # Per-drug call: aggregate over observed strains. A drug is called resistant if any observed
-        # strain resistant to it passes sensitivity, or any observed susceptible strain fails specificity.
-        u_call = self._call_rng.rvs(uids)  # one uniform per agent, reused across (strain, drug) cells
         profile = np.zeros(n_u, dtype=int)
-        for di, drug in enumerate(m.drugs):
-            res_strain = m.profile[:, di][None, :]                 # (1, m) strain resistant to drug?
-            true_res = observed & res_strain                        # observed & truly resistant
-            true_sus = observed & ~res_strain                       # observed & truly susceptible
-            call_res = (true_res & (u_call[:, None] < self.sens[di])).any(1)
-            false_pos = (true_sus & (u_call[:, None] >= self.spec[di])).any(1)
-            profile |= ((call_res | false_pos).astype(int) << di)
+        for j in range(m.m):
+            cj = carried[:, j]
+            if not cj.any():
+                continue
+            seen = cj & (np.asarray(self._obs_rngs[j].rvs(uids), dtype=float) < self.p_obs_by_id[j])
+            if not seen.any():
+                continue
+            call = np.asarray(self._call_rngs[j].rvs(uids), dtype=float)
+            for di in range(m.n):
+                if m.profile[j, di]:
+                    hit = seen & (call < self.sens[di])    # truly resistant → read resistant w.p. sens
+                else:
+                    hit = seen & (call >= self.spec[di])   # truly susceptible → false positive w.p. 1-spec
+                profile[hit] |= (1 << di)
         return profile
 
 

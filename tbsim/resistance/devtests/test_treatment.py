@@ -1,0 +1,104 @@
+"""
+Strain-resolved treatment: the outcome operator π(m→s) (model-tests.md §6), acquisition-on-failure
+with the per-state RR, and treatment-driven selection for resistance (ABM vs ODE).
+"""
+
+import numpy as np
+import starsim as ss
+import tbsim
+from tbsim import TBS
+from tbsim.resistance.devtests import ode_utils as ou
+
+BETA_ODE = 45.0
+YEARS = 80
+NSEEDS = 2
+
+
+def _init_product(ea, eb, q):
+    """Build an initialized TxR (n=1: strain 0 = A susceptible, strain 1 = B resistant)."""
+    tb = tbsim.TBResistant(rel_fitness={'TX': 0.6}, pars=dict(init_prev=ss.bernoulli(0.0)))
+    prod = tbsim.TxR(strains=tb.strains, base_efficacy=ea, resist_penalty={'TX': eb / ea},
+                     adherence=1.0, q_acq={'TX': q})
+    net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
+    sim = ss.Sim(n_agents=30000, networks=net, diseases=tb,
+                 interventions=tbsim.TxDeliveryR(product=prod), dt=ss.days(30),
+                 start=ss.date('2000-01-01'), stop=ss.date('2001-12-31'), rand_seed=0, verbose=0)
+    sim.init()
+    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    prod = next(iv for iv in sim.interventions.values() if isinstance(iv, tbsim.TxDeliveryR)).product
+    return tb, prod
+
+
+def _outcome_dist(tb, prod, mask, n=30000):
+    """Apply the full operator (roll_survivors → acquire, at SYMPTOMATIC so state-RR=1) to a mask cohort."""
+    uids = ss.uids(np.arange(n))
+    tb.strain_mask[uids] = mask
+    surv = prod.roll_survivors(tb, uids)
+    surv = prod.acquire(uids, surv, states=np.full(n, int(TBS.SYMPTOMATIC)))
+    return {v: float(np.mean(surv == v)) for v in (0, 1, 2, 3)}
+
+
+# --------------------------------------------------------------------------- §6: outcome operator
+def test_treatment_operator_matches_ode_pi_table():
+    """The ABM's per-strain cure + replacement-acquisition reproduces the ODE π(m→s) table exactly
+    (two_strain_ode.py `pi_*`), including the AB→B collapse when a failed AB acquires resistance."""
+    ea, eb, q = 0.75, 0.3, 0.1
+    tb, prod = _init_product(ea, eb, q)
+
+    # A cohort (mask 1): cure ea; else A→A w.p. (1-ea)(1-q), A→B w.p. (1-ea)q.
+    dA = _outcome_dist(tb, prod, 1)
+    assert np.isclose(dA[0], ea, atol=0.02)
+    assert np.isclose(dA[1], (1 - ea) * (1 - q), atol=0.02)   # pi_A_to_A
+    assert np.isclose(dA[2], (1 - ea) * q, atol=0.02)         # pi_A_to_B
+
+    # B cohort (mask 2): cure eb; else stays B (already resistant → no acquisition).
+    dB = _outcome_dist(tb, prod, 2)
+    assert np.isclose(dB[0], eb, atol=0.02)
+    assert np.isclose(dB[2], (1 - eb), atol=0.02)             # pi_B_to_B
+
+    # AB cohort (mask 3): matches the ODE's pi_AB_to_{A,B,AB} + cure.
+    dAB = _outcome_dist(tb, prod, 3)
+    assert np.isclose(dAB[0], ea * eb, atol=0.02)                                  # both cured
+    assert np.isclose(dAB[1], (1 - ea) * eb * (1 - q), atol=0.02)                  # pi_AB_to_A
+    pi_ab_to_b = ea * (1 - eb) + (1 - ea) * eb * q + (1 - ea) * (1 - eb) * q
+    assert np.isclose(dAB[2], pi_ab_to_b, atol=0.02)                              # pi_AB_to_B (incl. AB→B collapse)
+    assert np.isclose(dAB[3], (1 - ea) * (1 - eb) * (1 - q), atol=0.02)            # pi_AB_to_AB
+
+
+# --------------------------------------------------------------------------- acquisition state-RR
+def test_acquisition_only_in_active_states():
+    """Spec: the acquisition-on-failure RR is 0 outside ASYMPTOMATIC/SYMPTOMATIC. Treating (by an
+    eligibility override) a NON_INFECTIOUS cohort must yield no acquired resistance; SYMPTOMATIC must."""
+    tb, prod = _init_product(ea=0.5, eb=0.5, q=1.0)  # q=1 → deterministic acquisition where RR>0
+    uids = ss.uids(np.arange(20000))
+    tb.strain_mask[uids] = 1  # all mono-A (susceptible; a failure can acquire)
+    surv = prod.roll_survivors(tb, uids)          # ~half survive (eff 0.5)
+    failed = surv != 0
+    # NON_INFECTIOUS → RR 0 → no acquisition (no A→B), so no surviving strain becomes B (mask 2).
+    surv_ni = prod.acquire(uids, surv.copy(), states=np.full(len(uids), int(TBS.NON_INFECTIOUS)))
+    assert np.count_nonzero(surv_ni == 2) == 0
+    # SYMPTOMATIC → RR 1 → every surviving A acquires B (mask 1 → 2).
+    surv_sy = prod.acquire(uids, surv.copy(), states=np.full(len(uids), int(TBS.SYMPTOMATIC)))
+    assert np.count_nonzero(surv_sy == 2) == np.count_nonzero(failed)
+    assert np.count_nonzero(surv_sy == 1) == 0
+
+
+# --------------------------------------------------------------------------- ABM ↔ ODE: selection
+def test_treatment_selects_for_resistance_matches_ode():
+    """Treatment that cures A well but B poorly drives the resistant fraction up in both models."""
+    be = ou.calibrate_beta(BETA_ODE)
+    fit_b, initB = 0.575, 0.1
+    treat = dict(eff_a=0.75, eff_b=0.25, q_treat=0.03, r_treat_sym=1.0, r_treat_asym=0.05)
+    seeds = dict(L_A=(1 - initB) * 0.05 * 1e5, L_B=initB * 0.05 * 1e5)
+    o = ou.run_ode(BETA_ODE, years=YEARS, fit_b=fit_b, seeds=seeds, treat=treat,
+                   rr_reinfection_inf=1.0, rr_reinfection_non=1.0)
+    a = [ou.run_abm(be, years=YEARS, seed=s, rel_fitness={'TX': fit_b}, init_strains=[1 - initB, initB],
+                    treat=treat, rr_reinfection_inf=1.0, rr_reinfection_non=1.0) for s in range(NSEEDS)]
+    assert ou.late_mean(o, 'frac_resist') > initB              # ODE: treatment selects resistance up
+    assert ou.final_mean(a, 'frac_resist') > initB             # ABM: same
+    assert ou.final_mean(a, 'frac_resist') > 0.5               # strongly selected under this pressure
+
+
+if __name__ == '__main__':
+    import sys, pytest
+    sys.exit(pytest.main([__file__, '-v']))

@@ -84,6 +84,7 @@ website:
             - tutorials/tbhiv_comorbidity.qmd
             - tutorials/malnutrition_tutorial.qmd
             - tutorials/comprehensive_analyzer_plots_example.qmd
+            - tutorials/resistance_tutorial.qmd
         - href: user_guide.md
           text: "**User guide**"
         - href: examples.md
