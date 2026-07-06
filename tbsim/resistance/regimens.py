@@ -79,31 +79,31 @@ class Regimen:
         self.combine = combine
         return
 
-    def strain_cure_probs(self, registry):
+    def strain_cure_probs(self, catalog):
         """
-        Compute per-strain cure probability for this regimen against the registry.
+        Compute per-strain cure probability for this regimen against the catalog.
 
         Args:
-            registry (StrainRegistry): Registry of all strains.
+            catalog (StrainCatalog): Catalog of all strains.
 
         Returns:
             np.ndarray, shape (n_strains,): cure probability per strain.
         """
-        probs = np.zeros(registry.n, dtype=float)
-        # Map regimen drugs to registry-drug indices once
+        probs = np.zeros(catalog.n, dtype=float)
+        # Map regimen drugs to catalog-drug indices once
         try:
-            drug_idx = [registry.drugs.index(d) for d in self.drugs]
+            drug_idx = [catalog.drugs.index(d) for d in self.drugs]
         except ValueError as exc:
-            unknown = [d for d in self.drugs if d not in registry.drugs]
+            unknown = [d for d in self.drugs if d not in catalog.drugs]
             raise ValueError(
                 f'Regimen {self.name!r} references drug(s) {unknown} '
-                f'not in registry drugs {registry.drugs}'
+                f'not in catalog drugs {catalog.drugs}'
             ) from exc
 
         per_drug = np.array([self.per_drug_efficacy[d] for d in self.drugs], dtype=float)
 
-        for s_idx in range(registry.n):
-            phenotype = registry.resistance[s_idx, drug_idx]  # 1 = resistant
+        for s_idx in range(catalog.n):
+            phenotype = catalog.resistance[s_idx, drug_idx]  # 1 = resistant
             susceptible = phenotype == 0
             if not susceptible.any():
                 probs[s_idx] = 0.0

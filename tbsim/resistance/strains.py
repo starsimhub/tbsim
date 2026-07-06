@@ -1,9 +1,9 @@
-"""Strain specifications, registry, and per-agent profile for the TB resistance overlay."""
+"""Strain specifications, catalog, and per-agent profile for the TB resistance overlay."""
 
 import numpy as np
 import starsim as ss
 
-__all__ = ['StrainSpec', 'StrainRegistry', 'StrainProfile']
+__all__ = ['StrainSpec', 'StrainCatalog', 'AgentStrains']
 
 
 class StrainSpec:
@@ -11,7 +11,7 @@ class StrainSpec:
     Declarative specification for a single TB strain.
 
     A StrainSpec is pure configuration: it does not own any simulation state.
-    Per-agent state is stored in :class:`StrainProfile`. Per-step behavior is
+    Per-agent state is stored in :class:`AgentStrains`. Per-step behavior is
     applied by :class:`ResistanceConnector` and (later) by progression,
     clearance, and acquisition resolvers.
 
@@ -21,7 +21,7 @@ class StrainSpec:
         fitness      (float): Multiplicative reduction on relative transmissibility (0-1).
             Default 1.0 (no fitness cost).
         init_prev    (float): Initial population prevalence of this strain at sim start.
-            Default 0.0. Used only when StrainProfile seeds initial infections.
+            Default 0.0. Used only when AgentStrains seeds initial infections.
         acquisition  (dict):  Optional per-drug random acquisition probabilities for this strain.
             Reserved for Phase 2. Default None.
         label        (str):   Optional human-readable label for plots. Defaults to uid.
@@ -71,11 +71,11 @@ class StrainSpec:
         return f"StrainSpec(uid={self.uid!r}, resistance={bits}, fitness={self.fitness:g})"
 
 
-class StrainRegistry:
+class StrainCatalog:
     """
     Catalog of strains used by a simulation.
 
-    The registry expands a list of :class:`StrainSpec` into ordered numpy
+    The catalog expands a list of :class:`StrainSpec` into ordered numpy
     arrays for fast indexing during transmission and progression.
 
     Args:
@@ -94,7 +94,7 @@ class StrainRegistry:
     Example:
         ::
 
-            reg = StrainRegistry([
+            reg = StrainCatalog([
                 StrainSpec('pan',   {'INH': 0, 'RIF': 0, 'BDQ': 0}),
                 StrainSpec('inh_r', {'INH': 1, 'RIF': 0, 'BDQ': 0}, fitness=0.95),
             ])
@@ -103,7 +103,7 @@ class StrainRegistry:
 
     def __init__(self, strains, drugs=None):
         if not strains:
-            raise ValueError('StrainRegistry requires at least one StrainSpec.')
+            raise ValueError('StrainCatalog requires at least one StrainSpec.')
 
         # Validate types
         strains = list(strains)
@@ -126,7 +126,7 @@ class StrainRegistry:
         # Check for duplicate uids
         uids = [s.uid for s in strains]
         if len(set(uids)) != len(uids):
-            raise ValueError(f'Duplicate strain uids in registry: {uids}')
+            raise ValueError(f'Duplicate strain uids in catalog: {uids}')
 
         # Build arrays
         n = len(strains)
@@ -144,7 +144,7 @@ class StrainRegistry:
         # Warn-ish: enforce init_prev sum <= 1 (allowed to be < 1: not everyone is seeded)
         if init_prev.sum() > 1.0 + 1e-9:
             raise ValueError(
-                f'StrainRegistry init_prev sums to {init_prev.sum():g} > 1; '
+                f'StrainCatalog init_prev sums to {init_prev.sum():g} > 1; '
                 f'each agent can only be seeded with at most one initial strain.'
             )
 
@@ -189,15 +189,15 @@ class StrainRegistry:
         return self.n
 
     def __repr__(self):
-        return (f"StrainRegistry(n={self.n}, drugs={self.drugs}, "
+        return (f"StrainCatalog(n={self.n}, drugs={self.drugs}, "
                 f"uids={self.uids})")
 
 
-class StrainProfile:
+class AgentStrains:
     """
     Per-agent strain presence state attached to a :class:`tbsim.TB` instance.
 
-    For each strain in the registry, allocates one :class:`ss.BoolArr` named
+    For each strain in the catalog, allocates one :class:`ss.BoolArr` named
     ``carries_<uid>``. The arrays are defined on TB via
     ``tb.define_states(...)`` so Starsim handles agent growth automatically.
 
@@ -205,21 +205,21 @@ class StrainProfile:
     ``BoolArr.uids`` / ``intersect()`` APIs rather than raw NumPy.
 
     Args:
-        registry (StrainRegistry): The strain registry.
+        catalog (StrainCatalog): The strain catalog.
 
     Example:
         ::
 
-            profile = StrainProfile(registry)
-            profile.attach(tb)
-            profile.add_strain(uids, 'pan')
+            agent_strains = AgentStrains(catalog)
+            agent_strains.attach(tb)
+            agent_strains.add_strain(uids, 'pan')
     """
 
     PREFIX = 'carries_'
 
-    def __init__(self, registry):
-        self.registry = registry
-        self.names = [f'{self.PREFIX}{uid}' for uid in registry.uids]
+    def __init__(self, catalog):
+        self.catalog = catalog
+        self.names = [f'{self.PREFIX}{uid}' for uid in catalog.uids]
         self._tb = None
         return
 
@@ -233,8 +233,8 @@ class StrainProfile:
         for name in self.names:
             if not hasattr(tb, name):
                 raise RuntimeError(
-                    f'StrainProfile state {name!r} not found on TB; '
-                    f'did you forget to include profile.state_defs() in define_states()?'
+                    f'AgentStrains state {name!r} not found on TB; '
+                    f'did you forget to include agent_strains.state_defs() in define_states()?'
                 )
         return
 
@@ -243,12 +243,12 @@ class StrainProfile:
     def _arr(self, strain):
         """Return the ``ss.BoolArr`` for *strain* (by uid or idx)."""
         if self._tb is None:
-            raise RuntimeError('StrainProfile is not attached to a TB module.')
+            raise RuntimeError('AgentStrains is not attached to a TB module.')
         return getattr(self._tb, self.names[self._to_idx(strain)])
 
     def _to_idx(self, strain):
         if isinstance(strain, str):
-            return self.registry.index(strain)
+            return self.catalog.index(strain)
         return int(strain)
 
     def carries(self, strain, uids=None):
@@ -283,7 +283,7 @@ class StrainProfile:
         when ``uids`` is supplied the result is in the same order as ``uids``.
         """
         if self._tb is None:
-            raise RuntimeError('StrainProfile is not attached to a TB module.')
+            raise RuntimeError('AgentStrains is not attached to a TB module.')
         if uids is None:
             n_alive = len(self._tb.sim.people.auids)
             total = np.zeros(n_alive, dtype=np.int32)
@@ -342,10 +342,10 @@ class StrainProfile:
         zero if none).
         """
         if self._tb is None:
-            raise RuntimeError('StrainProfile is not attached to a TB module.')
+            raise RuntimeError('AgentStrains is not attached to a TB module.')
         if len(uids) == 0:
             return np.zeros(0, dtype=float)
-        fit = self.registry.fitness
+        fit = self.catalog.fitness
         out = np.zeros(len(uids), dtype=float)
         for idx, name in enumerate(self.names):
             carrier_mask = np.asarray(getattr(self._tb, name)[uids], dtype=bool)
@@ -360,14 +360,14 @@ class StrainProfile:
         Sources carrying no strain return -1.
         """
         if self._tb is None:
-            raise RuntimeError('StrainProfile is not attached to a TB module.')
+            raise RuntimeError('AgentStrains is not attached to a TB module.')
         n = len(source_uids)
         if n == 0:
             return np.zeros(0, dtype=int)
 
-        ns = self.registry.n
+        ns = self.catalog.n
         weights = np.zeros((n, ns), dtype=float)
-        fit = self.registry.fitness
+        fit = self.catalog.fitness
         for idx, name in enumerate(self.names):
             carrier_mask = np.asarray(getattr(self._tb, name)[source_uids], dtype=bool)
             weights[:, idx] = carrier_mask * fit[idx]

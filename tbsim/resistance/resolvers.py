@@ -2,7 +2,7 @@
 Strain-level resolvers used by :class:`tbsim.TB` and strain-aware interventions.
 
 These are lightweight helper classes that operate on a TB module's
-:class:`StrainProfile` to apply the spec's progression and acquisition rules.
+:class:`AgentStrains` to apply the spec's progression and acquisition rules.
 They do not hold state of their own and are safe to instantiate per call.
 """
 
@@ -28,7 +28,7 @@ class ProgressionResolver:
       a transmission bottleneck.
 
     The resolver is a pure helper; it mutates the supplied
-    :class:`StrainProfile` in place.
+    :class:`AgentStrains` in place.
     """
 
     MODES = ('all', 'bottleneck')
@@ -52,7 +52,7 @@ class ProgressionResolver:
         Apply the bottleneck (in-place) to *uids* that just activated.
 
         Args:
-            profile (StrainProfile): The TB strain profile.
+            profile (AgentStrains): Per-agent strain carriage on TB.
             uids (ss.uids): UIDs that just activated to ``ASYMPTOMATIC``.
 
         Returns:
@@ -81,8 +81,8 @@ class ProgressionResolver:
 
         # Spec: equal probability across carried strains (no fitness cost on
         # progression). Build per-funnel carrier mask (no fitness weighting).
-        registry = profile.registry
-        ns = registry.n
+        catalog = profile.catalog
+        ns = catalog.n
         weights = np.zeros((len(funnel_uids), ns), dtype=float)
         for idx, name in enumerate(profile.names):
             carriers = np.asarray(getattr(profile._tb, name)[funnel_uids], dtype=bool)
@@ -119,7 +119,7 @@ class AcquisitionResolver:
 
     Acquisition replaces a susceptible strain with the corresponding
     resistant strain whose phenotype differs by exactly one bit (the acquired
-    drug). If no such target strain exists in the registry the acquisition
+    drug). If no such target strain exists in the catalog the acquisition
     event is silently dropped (resistant variant is not configured).
     """
 
@@ -186,22 +186,22 @@ class AcquisitionResolver:
             mod[states == int(tbs)] = float(val)
         return mod
 
-    def _resistant_target_idx(self, registry, source_idx, drug):
+    def _resistant_target_idx(self, catalog, source_idx, drug):
         """Find the strain index that equals source's phenotype + resistance to *drug*.
 
         Returns ``None`` if no such strain is configured.
         """
-        if drug not in registry.drugs:
+        if drug not in catalog.drugs:
             return None
-        drug_col = registry.drugs.index(drug)
-        src_phen = registry.resistance[source_idx]
+        drug_col = catalog.drugs.index(drug)
+        src_phen = catalog.resistance[source_idx]
         # Already resistant to this drug -> no-op
         if src_phen[drug_col] == 1:
             return None
         target_phen = src_phen.copy()
         target_phen[drug_col] = 1
         # Find a strain whose phenotype equals target_phen
-        match = np.all(registry.resistance == target_phen, axis=1)
+        match = np.all(catalog.resistance == target_phen, axis=1)
         idxs = np.where(match)[0]
         if len(idxs) == 0:
             return None
@@ -221,22 +221,22 @@ class AcquisitionResolver:
         - A strain already resistant to drug *d* gets no trial for *d*.
 
         Args:
-            profile (StrainProfile): The TB strain profile.
+            profile (AgentStrains): Per-agent strain carriage on TB.
             uids (ss.uids): Agents that just progressed.
         """
         if len(uids) == 0 or not self.p_random:
             return
-        registry = profile.registry
+        catalog = profile.catalog
         for drug, p in self.p_random.items():
-            if p <= 0 or drug not in registry.drugs:
+            if p <= 0 or drug not in catalog.drugs:
                 continue
-            drug_col = registry.drugs.index(drug)
+            drug_col = catalog.drugs.index(drug)
             # For each strain susceptible to this drug, roll one Bernoulli per
             # carrier and ADD the resistant variant to those who hit.
-            for s_idx in range(registry.n):
-                if registry.resistance[s_idx, drug_col] == 1:
+            for s_idx in range(catalog.n):
+                if catalog.resistance[s_idx, drug_col] == 1:
                     continue  # already resistant -> skip per spec
-                target_idx = self._resistant_target_idx(registry, s_idx, drug)
+                target_idx = self._resistant_target_idx(catalog, s_idx, drug)
                 if target_idx is None:
                     continue
                 # Idiomatic Starsim filter: BoolArr.uids ∩ uids of interest.
@@ -260,7 +260,7 @@ class AcquisitionResolver:
         for non-symptomatic agents, equal for SYMPTOMATIC/ASYMPTOMATIC).
 
         Args:
-            profile (StrainProfile): Strain profile to mutate.
+            profile (AgentStrains): Per-agent strain carriage to mutate.
             uids (ss.uids): Agents who failed treatment.
             drugs_used (list[str]): Drugs in the failed regimen.
             tb: Optional TB module reference. When provided, per-agent state
@@ -289,21 +289,21 @@ class AcquisitionResolver:
     def _apply_acquisition(self, profile, uids, drug):
         """For each *uid* carrying a strain susceptible to *drug*, replace one such
         strain with its resistant counterpart. Multi-strain agents pick the
-        first susceptible carrier by registry order.
+        first susceptible carrier by catalog order.
         """
-        registry = profile.registry
-        if drug not in registry.drugs:
+        catalog = profile.catalog
+        if drug not in catalog.drugs:
             return
-        drug_col = registry.drugs.index(drug)
+        drug_col = catalog.drugs.index(drug)
 
         # Identify, per uid, the first susceptible carried strain.
         # We iterate strain index in order — first hit wins per agent.
         # The "applied" set is a uids set; remaining is uids \ applied.
         applied = ss.uids()
-        for s_idx in range(registry.n):
-            if registry.resistance[s_idx, drug_col] == 1:
+        for s_idx in range(catalog.n):
+            if catalog.resistance[s_idx, drug_col] == 1:
                 continue  # already resistant
-            target_idx = self._resistant_target_idx(registry, s_idx, drug)
+            target_idx = self._resistant_target_idx(catalog, s_idx, drug)
             if target_idx is None:
                 continue
             remaining = uids.remove(applied) if len(applied) else uids

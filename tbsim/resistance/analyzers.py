@@ -11,7 +11,7 @@ class StrainResults(ss.Analyzer):
     """
     Track per-strain prevalence and incidence channels.
 
-    For each strain ``<uid>`` in the registry, records:
+    For each strain ``<uid>`` in the catalog, records:
 
     - ``n_carriers_<uid>``: number of agents currently carrying the strain.
     - ``n_active_<uid>``: carriers in any active TB state.
@@ -28,15 +28,15 @@ class StrainResults(ss.Analyzer):
         return
 
     def init_pre(self, sim):
-        # Resolve strain registry uids before super().init_pre() triggers
+        # Resolve strain catalog uids before super().init_pre() triggers
         # init_results() which depends on self._uids.
         tb = sim.diseases[self.disease]
-        if getattr(tb, 'strain_profile', None) is None:
+        if getattr(tb, 'agent_strains', None) is None:
             raise RuntimeError(
                 'StrainResults requires the TB disease module to have a strain overlay '
                 'configured (MultiStrainTB(strains=[...])).'
             )
-        self._uids = list(tb.strain_profile.registry.uids)
+        self._uids = list(tb.agent_strains.catalog.uids)
         super().init_pre(sim)
         return
 
@@ -59,7 +59,7 @@ class StrainResults(ss.Analyzer):
                        | (tb.state == TBS.SYMPTOMATIC)).uids
         ti = self.sim.ti
         for s_idx, uid in enumerate(self._uids):
-            arr = getattr(tb, tb.strain_profile.names[s_idx])
+            arr = getattr(tb, tb.agent_strains.names[s_idx])
             carrier_uids = arr.uids
             n_carry = len(carrier_uids)
             n_active = len(carrier_uids.intersect(active_uids))
@@ -103,7 +103,7 @@ class DuplicateStrainAnalyzer(ss.Analyzer):
 
     def step(self):
         tb = self.sim.diseases[self.disease]
-        if tb.strain_profile is None:
+        if tb.agent_strains is None:
             return
         ti = self.sim.ti
         n_blocked = int(getattr(tb, '_n_duplicate_blocked_this_step', 0))

@@ -25,7 +25,7 @@ class StrainAwareTx(Tx):
 
     Args:
         regimen (Regimen): The regimen definition.
-        registry (StrainRegistry): Strain registry.
+        catalog (StrainCatalog): Strain catalog.
         p_selective_acquisition (dict): Optional per-drug selective acquisition
             probability on failure (forwarded to AcquisitionResolver).
         adherence (float): Per-agent course-completion probability.
@@ -35,7 +35,7 @@ class StrainAwareTx(Tx):
         dur_relapse (ss.Dist): Time-to-relapse distribution.
     """
 
-    def __init__(self, regimen, registry, p_selective_acquisition=None,
+    def __init__(self, regimen, catalog, p_selective_acquisition=None,
                  acq_state_modifiers=None,
                  adherence=0.85, dur_treatment=None, p_relapse=0.05,
                  dur_relapse=None, **kwargs):
@@ -55,15 +55,15 @@ class StrainAwareTx(Tx):
             dur_relapse=dur_relapse,
         )
         self.regimen = regimen
-        self._registry = registry
-        self._strain_cure_p = regimen.strain_cure_probs(registry)
+        self._catalog = catalog
+        self._strain_cure_p = regimen.strain_cure_probs(catalog)
 
         # Per-strain Bernoullis are added as proper Starsim pars so they
         # participate in the standard RNG plumbing. Naming convention:
-        # ``p_cure_strain_<i>`` for the i-th strain in the registry.
+        # ``p_cure_strain_<i>`` for the i-th strain in the catalog.
         per_strain = {
             f'p_cure_strain_{i}': ss.bernoulli(p=float(self._strain_cure_p[i]))
-            for i in range(registry.n)
+            for i in range(catalog.n)
         }
         self.define_pars(**per_strain)
 
@@ -89,11 +89,11 @@ class StrainAwareTx(Tx):
         adherent_mask = np.asarray(self.pars.p_adherence.rvs(uids), dtype=bool)
 
         tb = tbsim.get_tb(sim)
-        profile = tb.strain_profile
+        profile = tb.agent_strains
 
         # Per-strain cure rolls, gated by adherence and carrier status.
         cure_masks = {}
-        for s_idx in range(self._registry.n):
+        for s_idx in range(self._catalog.n):
             dist = self.pars[f'p_cure_strain_{s_idx}']
             roll = np.asarray(dist.rvs(uids), dtype=bool)
             strain_arr = getattr(profile._tb, profile.names[s_idx])
@@ -153,7 +153,7 @@ class StrainAwareTxDelivery(TxDelivery):
         tb = self.sim.get_tb()
         uids = self._elig_uids
 
-        if tb.strain_profile is None:
+        if tb.agent_strains is None:
             # Fall through to the base behavior; should be configured though.
             return super().step_start_treatment()
 
@@ -161,8 +161,8 @@ class StrainAwareTxDelivery(TxDelivery):
         latent = uids[np.isin(tb.state[uids], [TBS.INFECTION])]
         if len(latent):
             self._clear_susceptible_strains(latent)
-            cleared = latent[tb.strain_profile.n_strains_per_agent(latent) == 0]
-            still = latent[tb.strain_profile.n_strains_per_agent(latent) > 0]
+            cleared = latent[tb.agent_strains.n_strains_per_agent(latent) == 0]
+            still = latent[tb.agent_strains.n_strains_per_agent(latent) > 0]
             if len(cleared):
                 tb.state[cleared] = TBS.CLEARED
                 tb.rr_reinfection[cleared] = tb.pars.rr_reinfection_cleared
@@ -217,18 +217,18 @@ class StrainAwareTxDelivery(TxDelivery):
         """Remove from carriers any strain susceptible to *all* regimen drugs.
 
         For latent (INFECTION) treatment we apply a simple model: any carried
-        strain whose registry phenotype is susceptible to every drug in the
+        strain whose catalog phenotype is susceptible to every drug in the
         regimen is cleared. Resistant strains persist.
         """
         tb = tbsim.get_tb(self.sim)
-        profile = tb.strain_profile
-        registry = profile.registry
+        profile = tb.agent_strains
+        catalog = profile.catalog
         regimen = self.product.regimen
-        drug_cols = [registry.drugs.index(d) for d in regimen.drugs if d in registry.drugs]
+        drug_cols = [catalog.drugs.index(d) for d in regimen.drugs if d in catalog.drugs]
         if not drug_cols:
             return
         # A strain is "covered" if it is susceptible to every regimen drug.
-        covered = np.all(registry.resistance[:, drug_cols] == 0, axis=1)
+        covered = np.all(catalog.resistance[:, drug_cols] == 0, axis=1)
         for s_idx in np.where(covered)[0]:
             profile.remove_strain(uids, int(s_idx))
         return
@@ -237,15 +237,15 @@ class StrainAwareTxDelivery(TxDelivery):
         """Clear all remaining strains for successful agents (full cure)."""
         super().step_success()
         tb = self.sim.get_tb()
-        if tb.strain_profile is not None and len(self._success):
-            tb.strain_profile.clear_all(self._success)
+        if tb.agent_strains is not None and len(self._success):
+            tb.agent_strains.clear_all(self._success)
         return
 
     def step_failures(self):
         """Run selective acquisition on failure, then revert state via base class."""
         tb = self.sim.get_tb()
         failure_uids = self._fail
-        if tb.strain_profile is not None and len(failure_uids):
+        if tb.agent_strains is not None and len(failure_uids):
             # Apply per-strain cure outcomes from the original pre-roll
             if self._pending_per_strain:
                 for s_idx, cured_uids in self._pending_per_strain.items():
@@ -253,10 +253,10 @@ class StrainAwareTxDelivery(TxDelivery):
                     # agent ultimately failed — clear them from the profile.
                     sub = cured_uids.intersect(failure_uids)
                     if len(sub):
-                        tb.strain_profile.remove_strain(sub, int(s_idx))
+                        tb.agent_strains.remove_strain(sub, int(s_idx))
             # Selective acquisition on the regimen drugs — state-dependent ω
             self.product._acq_resolver.selective_acquisition(
-                tb.strain_profile, failure_uids, self.product.regimen.drugs,
+                tb.agent_strains, failure_uids, self.product.regimen.drugs,
                 tb=tb,
             )
         super().step_failures()
@@ -267,7 +267,7 @@ class StrainAwareTxDelivery(TxDelivery):
         super().step_relapses()
         tb = self.sim.get_tb()
         relapsed = getattr(self, '_relapsed', ss.uids())
-        if tb.strain_profile is not None and len(relapsed):
+        if tb.agent_strains is not None and len(relapsed):
             # Re-assign the strain(s) carried at treatment start to prevent
             # symptomatic relapse without a strain identity.
             by_strain = {}
@@ -275,12 +275,12 @@ class StrainAwareTxDelivery(TxDelivery):
                 for s_idx in self._relapse_strains_by_uid.get(int(uid), ()): 
                     by_strain.setdefault(int(s_idx), []).append(int(uid))
             for s_idx, raw_uids in by_strain.items():
-                tb.strain_profile.add_strain(ss.uids(raw_uids), int(s_idx))
+                tb.agent_strains.add_strain(ss.uids(raw_uids), int(s_idx))
 
             # Updated spec: relapse is an unsuccessful treatment outcome that
             # can drive selective acquisition under regimen pressure.
             self.product._acq_resolver.selective_acquisition(
-                tb.strain_profile, relapsed, self.product.regimen.drugs,
+                tb.agent_strains, relapsed, self.product.regimen.drugs,
                 tb=tb,
             )
 
@@ -295,12 +295,12 @@ class StrainAwareTxDelivery(TxDelivery):
     def _capture_relapse_strains(self, relapse_uids):
         """Store per-agent strain identities to restore if/when relapse occurs."""
         tb = self.sim.get_tb()
-        profile = tb.strain_profile
+        profile = tb.agent_strains
         if profile is None or len(relapse_uids) == 0:
             return
         carriers = {
             int(s_idx): set(getattr(profile._tb, profile.names[s_idx]).uids.intersect(relapse_uids).tolist())
-            for s_idx in range(profile.registry.n)
+            for s_idx in range(profile.catalog.n)
         }
         for uid in relapse_uids:
             uid_i = int(uid)

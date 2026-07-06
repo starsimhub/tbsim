@@ -20,7 +20,7 @@ class ResistanceConnector(ss.Connector):
 
     This connector does *not* own strain state and does *not* sample which
     strain is transmitted; both responsibilities belong to
-    :class:`StrainProfile` and :class:`tbsim.MultiStrainTB.set_prognoses`.
+    :class:`AgentStrains` and :class:`tbsim.MultiStrainTB.set_prognoses`.
 
     Args:
         disease (str): Name of the TB disease module. Default ``'tb'``.
@@ -57,7 +57,7 @@ class ResistanceConnector(ss.Connector):
     def step(self):
         """Apply fittest-strain fitness multiplier to TB.rel_trans for infectious agents."""
         tb = self._get_tb()
-        profile = getattr(tb, 'strain_profile', None)
+        profile = getattr(tb, 'agent_strains', None)
         if profile is None:
             return  # no strain overlay configured; nothing to do
 

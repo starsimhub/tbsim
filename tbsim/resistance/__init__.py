@@ -6,15 +6,15 @@ multi-strain layer on top of the agent-level TB natural-history state.
 
 Public objects:
     StrainSpec        — declarative strain specification
-    StrainRegistry    — catalog of strains with phenotype and fitness lookup
-    StrainProfile     — per-agent strain presence state (owned by MultiStrainTB)
+    StrainCatalog    — catalog of strains with phenotype and fitness lookup
+    AgentStrains     — per-agent strain presence state (owned by MultiStrainTB)
     ResistanceConnector — applies strain fitness to TB.rel_trans
 """
 
 from importlib import import_module
 
 __all__ = [
-    'StrainSpec', 'StrainRegistry', 'StrainProfile', 'ResistanceConnector',
+    'StrainSpec', 'StrainCatalog', 'AgentStrains', 'ResistanceConnector',
     'Regimen', 'ProgressionResolver', 'AcquisitionResolver',
     'StrainAwareTx', 'StrainAwareTxDelivery', 'StrainAwareTPTTx',
     'DSTDx', 'DSTDelivery', 'RegimenRouter', 'treatment_monitoring_eligibility',
@@ -23,8 +23,8 @@ __all__ = [
 
 _exports = {
     'StrainSpec':                         'strains',
-    'StrainRegistry':                     'strains',
-    'StrainProfile':                      'strains',
+    'StrainCatalog':                     'strains',
+    'AgentStrains':                      'strains',
     'ResistanceConnector':                'connector',
     'Regimen':                            'regimens',
     'ProgressionResolver':                'resolvers',

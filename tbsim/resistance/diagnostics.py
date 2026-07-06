@@ -35,34 +35,34 @@ class DSTDx(ss.Product):
     strain-level drop-out in mixed infections.
 
     Args:
-        registry (StrainRegistry): Strain registry.
+        catalog (StrainCatalog): Strain catalog.
         drugs (list[str]): Subset of drugs to report on (default: all in
-            registry).
+            catalog).
         sensitivity (dict|float): Per-drug sensitivity. Default 0.95.
         specificity (dict|float): Per-drug specificity. Default 0.99.
         p_strain_obs (float|dict|None): Probability a carried strain is
             observed at all by DST before applying sens/spec. If ``None``
-            (default), uses strain fitness per registry entry. If float,
+            (default), uses strain fitness per catalog entry. If float,
             applies one strain-agnostic value to all strains.
 
     Example::
 
-        dst = DSTDx(registry, drugs=['INH', 'RIF'], sensitivity=0.95,
+        dst = DSTDx(catalog, drugs=['INH', 'RIF'], sensitivity=0.95,
                     specificity=0.99)
         result = dst.administer(sim, agent_uids)
         # result['INH'] is a boolean array of observed INH-resistance
     """
 
-    def __init__(self, registry, drugs=None, sensitivity=0.95,
+    def __init__(self, catalog, drugs=None, sensitivity=0.95,
                  specificity=0.99, p_strain_obs=None, **kwargs):
         super().__init__()
-        self.registry = registry
+        self.catalog = catalog
         if drugs is None:
-            drugs = list(registry.drugs)
+            drugs = list(catalog.drugs)
         for d in drugs:
-            if d not in registry.drugs:
+            if d not in catalog.drugs:
                 raise ValueError(
-                    f'DSTDx drug {d!r} not in registry drugs {registry.drugs}'
+                    f'DSTDx drug {d!r} not in catalog drugs {catalog.drugs}'
                 )
         self.drugs = list(drugs)
 
@@ -74,16 +74,16 @@ class DSTDx(ss.Product):
 
         # Normalize strain observability inputs.
         if p_strain_obs is None:
-            strain_obs = np.asarray(registry.fitness, dtype=float)
+            strain_obs = np.asarray(catalog.fitness, dtype=float)
         elif isinstance(p_strain_obs, (int, float)):
-            strain_obs = np.full(registry.n, float(p_strain_obs), dtype=float)
+            strain_obs = np.full(catalog.n, float(p_strain_obs), dtype=float)
         elif isinstance(p_strain_obs, dict):
             if 'all' in p_strain_obs:
-                strain_obs = np.full(registry.n, float(p_strain_obs['all']), dtype=float)
+                strain_obs = np.full(catalog.n, float(p_strain_obs['all']), dtype=float)
             else:
                 strain_obs = np.array([
-                    float(p_strain_obs.get(uid, registry.fitness[i]))
-                    for i, uid in enumerate(registry.uids)
+                    float(p_strain_obs.get(uid, catalog.fitness[i]))
+                    for i, uid in enumerate(catalog.uids)
                 ], dtype=float)
         else:
             raise TypeError(
@@ -105,7 +105,7 @@ class DSTDx(ss.Product):
             bernoulli_pars[f'p_spec_{d}'] = ss.bernoulli(
                 p=float(specificity[d]), strict=False,
             )
-        for s_idx in range(registry.n):
+        for s_idx in range(catalog.n):
             bernoulli_pars[f'p_obs_strain_{s_idx}'] = ss.bernoulli(
                 p=float(strain_obs[s_idx]), strict=False,
             )
@@ -124,18 +124,18 @@ class DSTDx(ss.Product):
         """Return per-uid boolean array of true resistance to *drug*.
 
         A UID is "truly resistant" to a drug if it carries at least one
-        strain whose registry phenotype is resistant to that drug. The
+        strain whose catalog phenotype is resistant to that drug. The
         carrier check is expressed via :class:`ss.BoolArr.uids` set
         intersection with *uids* — the canonical Starsim filtering idiom.
         """
         if not len(uids):
             return np.zeros(0, dtype=bool)
-        profile = tb.strain_profile
+        profile = tb.agent_strains
         if profile is None:
             return np.zeros(len(uids), dtype=bool)
-        drug_col = self.registry.drugs.index(drug)
+        drug_col = self.catalog.drugs.index(drug)
         resistant_strain_idx = np.where(
-            self.registry.resistance[:, drug_col] == 1
+            self.catalog.resistance[:, drug_col] == 1
         )[0]
         true_pos = np.zeros(len(uids), dtype=bool)
         for s_idx in resistant_strain_idx:
@@ -160,7 +160,7 @@ class DSTDx(ss.Product):
         tb = tbsim.get_tb(sim)
         n = len(uids)
         results = {drug: np.zeros(n, dtype=bool) for drug in self.drugs}
-        profile = tb.strain_profile
+        profile = tb.agent_strains
 
         # Fallback for non-overlay contexts: all are effectively susceptible,
         # with per-drug false positives controlled by specificity.
@@ -171,10 +171,10 @@ class DSTDx(ss.Product):
             return results
 
         uid_to_pos = {int(uid): i for i, uid in enumerate(uids)}
-        drug_cols = {drug: self.registry.drugs.index(drug) for drug in self.drugs}
+        drug_cols = {drug: self.catalog.drugs.index(drug) for drug in self.drugs}
 
         # Apply DST at strain level, then aggregate to agent-level phenotype.
-        for s_idx in range(self.registry.n):
+        for s_idx in range(self.catalog.n):
             strain_arr = getattr(profile._tb, profile.names[s_idx])
             carrier_uids = strain_arr.uids.intersect(uids)
             if len(carrier_uids) == 0:
@@ -189,7 +189,7 @@ class DSTDx(ss.Product):
                 m = len(observed_uids)
                 sens_pos = np.asarray(self.pars[f'p_sens_{drug}'].rvs(m), dtype=bool)
                 spec_neg = np.asarray(self.pars[f'p_spec_{drug}'].rvs(m), dtype=bool)
-                is_resistant = bool(self.registry.resistance[s_idx, drug_cols[drug]])
+                is_resistant = bool(self.catalog.resistance[s_idx, drug_cols[drug]])
                 observed_resistant = sens_pos if is_resistant else ~spec_neg
                 if not observed_resistant.any():
                     continue
@@ -363,7 +363,7 @@ class RegimenRouter:
     Example:
         ::
 
-            dst = DSTDelivery(product=DSTDx(registry, drugs=['INH','RIF','BDQ']))
+            dst = DSTDelivery(product=DSTDx(catalog, drugs=['INH','RIF','BDQ']))
             router = RegimenRouter(dst)
 
             first_line  = StrainAwareTxDelivery(

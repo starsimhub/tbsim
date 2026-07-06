@@ -27,7 +27,7 @@ class StrainAwareTPTTx(TPTTx):
 
     Args:
         regimen (Regimen): TPT regimen (drugs + per-drug efficacy).
-        registry (StrainRegistry): Strain registry.
+        catalog (StrainCatalog): Strain catalog.
         p_tpt_acquisition (dict): Optional per-drug acquisition probability
             applied to surviving strains in agents whose TPT is ineffective.
         acq_state_modifiers (dict): Optional per-state modifier on the
@@ -46,14 +46,14 @@ class StrainAwareTPTTx(TPTTx):
         'cleared':        0.0,
     }
 
-    def __init__(self, regimen, registry, p_tpt_acquisition=None,
+    def __init__(self, regimen, catalog, p_tpt_acquisition=None,
                  acq_state_modifiers=None, **kwargs):
         if not isinstance(regimen, Regimen):
             raise TypeError(f'regimen must be a Regimen; got {type(regimen).__name__}')
         super().__init__(**kwargs)
         self.regimen = regimen
-        self._registry = registry
-        self._cover_mask = self._compute_cover_mask(registry, regimen)
+        self._catalog = catalog
+        self._cover_mask = self._compute_cover_mask(catalog, regimen)
         from .resolvers import AcquisitionResolver
         if acq_state_modifiers is None:
             acq_state_modifiers = dict(self.DEFAULT_TPT_STATE_MODIFIERS)
@@ -64,12 +64,12 @@ class StrainAwareTPTTx(TPTTx):
         return
 
     @staticmethod
-    def _compute_cover_mask(registry, regimen):
+    def _compute_cover_mask(catalog, regimen):
         """Return a boolean array of length n_strains: True if regimen covers strain."""
-        cols = [registry.drugs.index(d) for d in regimen.drugs if d in registry.drugs]
+        cols = [catalog.drugs.index(d) for d in regimen.drugs if d in catalog.drugs]
         if not cols:
-            return np.zeros(registry.n, dtype=bool)
-        return np.all(registry.resistance[:, cols] == 0, axis=1)
+            return np.zeros(catalog.n, dtype=bool)
+        return np.all(catalog.resistance[:, cols] == 0, axis=1)
 
     def _apply_sterilization(self, uids):
         """Per-strain sterilization: clear susceptible strains; resistant strains remain.
@@ -89,7 +89,7 @@ class StrainAwareTPTTx(TPTTx):
         ``INFECTION``, matching base TPT semantics.
         """
         tb = self.sim.diseases[self.pars.disease]
-        profile = getattr(tb, 'strain_profile', None)
+        profile = getattr(tb, 'agent_strains', None)
         if profile is None:
             # Fall back to the base agent-level sterilization if no overlay.
             return super()._apply_sterilization(uids)
@@ -144,7 +144,7 @@ class StrainAwareTPTTx(TPTTx):
         for a given state.
         """
         tb = self.sim.diseases[self.pars.disease]
-        profile = getattr(tb, 'strain_profile', None)
+        profile = getattr(tb, 'agent_strains', None)
         if profile is not None and len(uids) > 0:
             self._acq_resolver.selective_acquisition(
                 profile, uids, self.regimen.drugs, tb=tb,
