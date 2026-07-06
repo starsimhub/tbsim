@@ -12,9 +12,10 @@ Transmission reuses Starsim's common-random-number force-of-infection engine
 ``susceptible`` / ``rel_sus`` / ``rel_trans`` so the engine does the transmission
 arithmetic, and ``set_prognoses`` picks *which* strain is passed (∝ fitness),
 enforces identical-strain blocking, and applies superinfection. ``step_transitions``
-overlays the strain-aware natural history: the progression bottleneck (``p_multi``),
-de-novo resistance acquisition (``q_prog``), clear-all-strains on natural clearance,
-and the superinfection rate modifiers (``rr_prog_super`` ψ, ``rr_clear_super`` ω).
+overlays the strain-aware natural history: de-novo resistance acquisition (``p_rand``,
+per drug, per carried strain), the progression bottleneck (``p_multi``), clear-all-strains
+on natural clearance, and the superinfection rate modifiers (``rr_prog_super`` ψ,
+``rr_clear_super`` ω).
 
 This reproduces the two-strain reference ODE (``ode.r`` / ``model-tests.md``) in the
 ``n=1`` case; see ``tests/test_resistance.py``.
@@ -40,40 +41,50 @@ class TBResistant(TB):
         rel_fitness (dict): per-drug transmission fitness cost ``r_i`` (default none).
 
     Resistance parameters (``pars``):
-        - ``rr_reinfection_inf`` (σ_L): susceptibility of a mono ``INFECTION`` agent to a 2nd strain. Default 1.
-        - ``rr_reinfection_non`` (σ_N): of a mono ``NON_INFECTIOUS`` agent. Default 1.
+        - ``rr_reinfection_inf`` (σ_L): susceptibility of an ``INFECTION`` agent to a 2nd strain.
+          Default ``None`` → ``rr_reinfection_rec`` (the spec's coupling; set to 1.0 for the ODE null).
+        - ``rr_reinfection_non`` (σ_N): of a ``NON_INFECTIOUS`` agent. Default ``None`` → ``rr_reinfection_inf``.
         - ``rr_reinfection_asy`` (σ_A): of a mono ``ASYMPTOMATIC`` agent. Default 0.
         - ``rr_reinfection_sym`` (σ_Y): of a mono ``SYMPTOMATIC`` agent. Default 0.
         - ``p_multi``: prob. both strains co-progress at ``→ASYMPTOMATIC`` (1 = no bottleneck). Default 1.
         - ``rr_prog_super`` (ψ): progression-rate multiplier for multi-strain agents. Default 1.
         - ``rr_clear_super`` (ω): natural-clearance multiplier for multi-strain agents. Default 1.
-        - ``q_prog``: de-novo resistance prob. per not-yet-resistant drug at each ``INFECTION→NON_INFECTIOUS``
-          and ``INFECTION→ASYMPTOMATIC`` progression (mono-strain agents only). Default 0.
+        - ``p_rand``: de-novo resistance ``{drug: prob}`` per not-yet-resistant drug at each
+          ``INFECTION→NON_INFECTIOUS`` and ``INFECTION→ASYMPTOMATIC`` progression; each carried
+          strain mutates independently. Default none (off).
         - ``prog_resist_mode``: de-novo mechanism, ``'mixed'`` (→ superinfection) or ``'replacement'``. Default ``'mixed'``.
         - ``prog_select``: strain selected when one progresses under the bottleneck, ``'random'`` or ``'fitness'``. Default ``'random'``.
         - ``init_strains``: probability vector over strain ids for seeded infections (default all on id 0, pan-susceptible).
     """
 
     def __init__(self, pars=None, drugs=None, rel_fitness=None, name=None, label=None, **kwargs):
-        # Let TB define its own pars/states/RNGs with defaults first.
-        super().__init__(name=name, label=label)
+        # Let TB define its own pars/states/RNGs with defaults first. Default the module name to
+        # 'tb' so the standard tbsim interventions (TPT, HSB, Dx) that key on disease 'tb' just work.
+        super().__init__(name=name if name is not None else 'tb', label=label)
 
         self.strains = Strains(drugs if drugs is not None else ['TX'], rel_fitness)
 
         self.define_pars(
-            rr_reinfection_inf = 1.0,   # σ_L
-            rr_reinfection_non = 1.0,   # σ_N
-            rr_reinfection_asy = 0.0,   # σ_A
-            rr_reinfection_sym = 0.0,   # σ_Y
+            rr_reinfection_inf = None,   # σ_L; None → rr_reinfection_rec (spec coupling)
+            rr_reinfection_non = None,   # σ_N; None → rr_reinfection_inf (spec coupling)
+            rr_reinfection_asy = 0.0,    # σ_A
+            rr_reinfection_sym = 0.0,    # σ_Y
             p_multi            = 1.0,
-            rr_prog_super      = 1.0,   # ψ
-            rr_clear_super     = 1.0,   # ω
-            q_prog             = 0.0,   # de-novo acquisition prob per drug
+            rr_prog_super      = 1.0,    # ψ
+            rr_clear_super     = 1.0,    # ω
+            p_rand             = None,   # de-novo resistance {drug: prob} per not-yet-resistant drug
             prog_resist_mode   = 'mixed',       # 'mixed' | 'replacement'
             prog_select        = 'random',      # 'random' | 'fitness'
             init_strains       = None,          # prob over strain ids for seeds
         )
         self.update_pars(pars, **kwargs)
+
+        # Spec default coupling: σ_L defaults to rr_reinfection_rec, σ_N to σ_L. Users (or the ODE
+        # null) override explicitly, e.g. rr_reinfection_inf=1.0.
+        if self.pars.rr_reinfection_inf is None:
+            self.pars.rr_reinfection_inf = float(self.pars.rr_reinfection_rec)
+        if self.pars.rr_reinfection_non is None:
+            self.pars.rr_reinfection_non = float(self.pars.rr_reinfection_inf)
 
         # Per-agent strain membership (bit j = carries strain j; 0 = uninfected).
         self.define_states(ss.IntArr('strain_mask', default=0))
@@ -83,7 +94,9 @@ class TBResistant(TB):
         self._strain_dist = choice2d(p=np.ones((1, m)) / m)   # which strain is transmitted / seeded
         self._prog_dist   = choice2d(p=np.ones((1, m)) / m)   # which strain progresses under the bottleneck
         self._rng_pmulti  = ss.bernoulli(name='tb_rng_pmulti', p=float(self.pars.p_multi))
-        self._rng_denovo  = ss.bernoulli(name='tb_rng_denovo', p=float(self.pars.q_prog))
+        # One independent CRN stream per drug for de-novo acquisition (keeps per-drug draws uncorrelated).
+        p_rand = self.pars.p_rand or {}
+        self._denovo_rngs = [ss.bernoulli(name=f'tb_denovo_{d}', p=float(p_rand.get(d, 0.0))) for d in self.strains.drugs]
 
         # Per-step resistance-origin counters (written to results in update_results).
         self._n_blocked = 0
@@ -199,9 +212,9 @@ class TBResistant(TB):
             self._set_reinfection_wane(cleared)
             self.strain_mask[cleared] = 0  # natural clearance removes all strains
 
-            # Progression bottleneck (only at →ASYMPTOMATIC) and de-novo acquisition
-            # (at →NON_INFECTIOUS and →ASYMPTOMATIC, mono-strain agents only). Subsets
-            # are computed from the pre-edit mask so the two operators don't interfere.
+            # De-novo acquisition (at →NON_INFECTIOUS and →ASYMPTOMATIC) and the progression
+            # bottleneck (only at →ASYMPTOMATIC). Subsets are computed from the pre-edit mask so
+            # the two operators don't interfere.
             self._progress(u[dest == TBS.ASYMPTOMATIC], bottleneck=True, denovo=True)
             self._progress(u[dest == TBS.NON_INFECTIOUS], bottleneck=False, denovo=True)
 
@@ -241,14 +254,15 @@ class TBResistant(TB):
         return
 
     def _progress(self, prog_uids, bottleneck, denovo):
-        """Apply the progression bottleneck and/or de-novo acquisition to progressing agents."""
+        """Apply de-novo acquisition and/or the progression bottleneck to progressing agents."""
         if len(prog_uids) == 0:
             return
-        nstr = self.strains.carried(self.strain_mask[prog_uids]).sum(1)
-        if bottleneck:
-            self._bottleneck(prog_uids[nstr >= 2])
         if denovo:
-            self._denovo(prog_uids[nstr == 1])
+            self._denovo(prog_uids)
+        if bottleneck:
+            # Recompute counts after de-novo (mixed de-novo may have created a second strain).
+            nstr = self.strains.carried(self.strain_mask[prog_uids]).sum(1)
+            self._bottleneck(prog_uids[nstr >= 2])
         return
 
     def _bottleneck(self, uids):
@@ -273,27 +287,37 @@ class TBResistant(TB):
 
     def _denovo(self, uids):
         """
-        Mono-strain agents progressing out of INFECTION acquire de-novo resistance to each
-        not-yet-resistant drug with probability ``q_prog`` (mixed → superinfection, replacement → switch).
+        De-novo resistance at progression out of INFECTION: each carried strain independently
+        acquires resistance to each not-yet-resistant drug with probability ``p_rand[drug]``. The
+        drug bits a source strain acquires this step combine into one resistant target strain,
+        added (``prog_resist_mode='mixed'`` → superinfection) or swapped in (``'replacement'``).
+        The bitmask guarantees the resistant target always exists, so no acquisition is dropped.
         """
-        if len(uids) == 0 or self.pars.q_prog <= 0:
+        p_rand = self.pars.p_rand or {}
+        if len(uids) == 0 or not p_rand:
             return
         m = self.strains
-        strain_id = m.carried(self.strain_mask[uids]).argmax(1)  # exactly one carried strain
         mixed = self.pars.prog_resist_mode == 'mixed'
-        for di, drug in enumerate(m.drugs):
-            # NB: per-drug draws reuse one CRN stream, so for n>1 the drug acquisitions are
-            # correlated within an agent; negligible since q_prog is tiny and n=1 is the reference.
-            elig = uids[~m.profile[strain_id, di]]
-            if len(elig) == 0:
+        masks = self.strain_mask[uids]  # snapshot: carriers read from this so freshly-added strains aren't re-mutated
+        for j in range(m.m):
+            carrier = ((masks >> j) & 1).astype(bool)
+            cu = uids[carrier]
+            if len(cu) == 0:
                 continue
-            acq = self._rng_denovo.filter(elig)
-            if len(acq) == 0:
+            acquired = np.zeros(len(cu), dtype=int)  # OR of drug bits acquired for source strain j
+            for di, drug in enumerate(m.drugs):
+                if m.profile[j, di] or p_rand.get(drug, 0.0) <= 0:
+                    continue  # strain j already resistant to this drug, or no de-novo configured for it
+                hit = np.asarray(self._denovo_rngs[di].rvs(cu), dtype=bool)
+                acquired[hit] |= (1 << di)
+            got = acquired > 0
+            if not got.any():
                 continue
-            cur = self.strain_mask[acq]
-            new_strain = m.carried(cur).argmax(1) | m.drug_bit(drug)
-            self.strain_mask[acq] = (cur | (1 << new_strain)) if mixed else (1 << new_strain)
-            self._n_denovo += len(acq)
+            agents = cu[got]
+            targets = j | acquired[got]  # resistant target strain id(s)
+            cur = self.strain_mask[agents]
+            self.strain_mask[agents] = (cur | (1 << targets)) if mixed else ((cur & ~(1 << j)) | (1 << targets))
+            self._n_denovo += len(agents)
         return
 
     def _set_reinfection_wane(self, uids):

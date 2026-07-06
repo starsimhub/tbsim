@@ -6,13 +6,14 @@ carried strains, applying per-drug sensitivity/specificity **at the strain level
 an optional per-strain observation probability ``p_strain_obs`` (a within-host/culture
 bottleneck; default = strain fitness). ``DSTDelivery`` (intervention) administers it to
 eligible agents and stores the observed profile, which downstream treatment eligibility
-can read (e.g. "observed RIF-resistant → second-line regimen").
+can read — either a single-drug callable (``observed_resistant``) or a composable
+multi-drug router (``matches``) for DST-dependent regimen selection.
 """
 
 import numpy as np
 import starsim as ss
 
-from ..tb import get_tb
+from ..tb import TBS, get_tb
 from .tb_resistant import TBResistant
 
 __all__ = ['DST', 'DSTDelivery']
@@ -103,7 +104,41 @@ class DSTDelivery(ss.Intervention):
     def observed_resistant(self, drug):
         """Return a callable ``sim -> uids`` selecting agents observed resistant to ``drug`` (for treatment eligibility)."""
         di = self.product.strains.drug_idx[drug]
-        return lambda sim: ((self.dst_profile >> di) & 1).astype(bool).uids
+        name = self.name  # resolve the sim's own (copied) DST instance at call time
+        def _elig(sim):
+            dst = sim.interventions[name]
+            obs = ((np.asarray(dst.dst_profile.values) >> di) & 1).astype(bool)
+            return dst.dst_profile.auids[obs]
+        return _elig
+
+    def matches(self, require_tested=True, exclude_on_treatment=True, **per_drug):
+        """Return an eligibility callable selecting agents whose observed DST profile matches ``per_drug``.
+
+        E.g. ``matches(RIF=True, BDQ=False)`` selects observed-RIF-resistant, observed-BDQ-susceptible
+        agents. The returned ``sim -> uids`` callable restricts to DST-tested (unless
+        ``require_tested=False``) and, unless ``exclude_on_treatment=False``, not-currently-on-treatment
+        agents. Compose with ``TxDeliveryR(eligibility=..., supersedes=[...])`` to route or switch regimens.
+        """
+        strains = self.product.strains
+        spec = {strains.drug_idx[d]: bool(v) for d, v in per_drug.items()}
+        name = self.name
+        def _elig(sim):
+            dst = sim.interventions[name]
+            sel = dst.dst_tested.uids if require_tested else sim.people.alive.uids
+            if len(sel) == 0:
+                return sel
+            prof = np.asarray(dst.dst_profile[sel])
+            mask = np.ones(len(sel), dtype=bool)
+            for di, want in spec.items():
+                bit = ((prof >> di) & 1).astype(bool)
+                mask &= bit if want else ~bit
+            out = sel[mask]
+            if exclude_on_treatment and len(out):
+                tb = get_tb(sim, which=TBResistant)
+                out = out[tb.state[out] != TBS.TREATMENT]
+            return out
+        _elig.__name__ = 'dst_matches_' + '_'.join(f'{d}{"+" if v else "-"}' for d, v in per_drug.items())
+        return _elig
 
     def step(self):
         tb = get_tb(self.sim, which=TBResistant)

@@ -8,7 +8,7 @@ from ..tb import get_tb
 from .tb_resistant import TBResistant
 from .treatments import TxDeliveryR
 
-__all__ = ['ResistanceStats']
+__all__ = ['ResistanceStats', 'StrainResults']
 
 
 class ResistanceStats(ss.Analyzer):
@@ -63,3 +63,34 @@ class ResistanceStats(ss.Analyzer):
             flux_txacq=res.flux_txacq,
             flux_transmitted=res.flux_transmitted,
         )
+
+
+class StrainResults(ss.Analyzer):
+    """
+    Per-strain active-TB carrier counts — one result channel per strain, labeled by the strain's
+    resistance profile (e.g. ``n_active_pan``, ``n_active_RIF_FQ``). Complements ``TBResistant``'s
+    aggregate ``frac_resist``/``frac_resist_<drug>`` with resolution over individual strains.
+    """
+
+    def init_pre(self, sim):
+        # Resolve strain names before super().init_pre() triggers init_results(), which needs them.
+        self.tb = get_tb(sim, which=TBResistant)
+        self._names = [f"n_active_{lab.replace('+', '_')}" for lab in self.tb.strains.labels]
+        super().init_pre(sim)
+        return
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(*[
+            ss.Result(nm, dtype=int, label=f'Active TB carrying strain {lab}')
+            for nm, lab in zip(self._names, self.tb.strains.labels)
+        ])
+        return
+
+    def step(self):
+        active = self.tb.active_tb.uids
+        if len(active):
+            counts = self.tb.strains.carried(self.tb.strain_mask[active]).sum(0)  # (m,)
+            for j, nm in enumerate(self._names):
+                self.results[nm][self.ti] = int(counts[j])
+        return

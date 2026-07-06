@@ -1,0 +1,134 @@
+"""
+Strain-aware TB preventive therapy (TPT).
+
+``TPTRx`` extends the base ``tbsim.TPTTx`` product so that sterilization is applied
+*per strain*: only strains susceptible to every drug in the TPT regimen are cleared;
+resistant strains remain and may then progress to disease and transmit (the spec's
+"TPT clears a susceptible strain → resistant strain goes on to progress/transmit"
+dynamic). An agent moves to ``CLEARED`` only once all carried strains are removed.
+
+TPT drug pressure can also *select* resistance among agents for whom TPT was ineffective
+(neither cleared nor protected): a susceptible carried strain mutates to its resistant
+counterpart with probability ``p_tpt_acq[drug]`` × a per-TB-state RR (spec: highest for
+ASYMPTOMATIC/SYMPTOMATIC, low-medium for NON_INFECTIOUS, very low for INFECTION).
+
+Wrap ``TPTRx`` in any TPT delivery (e.g. ``tbsim.TPTSimple(product=TPTRx(...))``); set the
+product's ``p_sterilize`` > 0 so the strain-aware sterilization path is exercised.
+"""
+
+import numpy as np
+import starsim as ss
+
+from ..interventions.tpt import TPTTx
+from ..tb import TBS
+from .tb_resistant import TBResistant
+
+__all__ = ['TPTRx']
+
+
+class TPTRx(TPTTx):
+    """
+    Strain-aware TPT product. See module docstring for the mechanism.
+
+    Args:
+        strains (Strains): the strain registry (e.g. ``tb.strains``).
+        regimen_drugs (list): drugs in the TPT regimen (default: all drugs in ``strains``).
+            A strain is cleared by sterilization only if susceptible to *every* regimen drug.
+        p_tpt_acq (dict): per-drug ``{drug: prob}`` of a susceptible strain acquiring resistance
+            under TPT drug pressure (replacement). Default none (off).
+        acq_state_rr (dict): per-TB-state multiplier on ``p_tpt_acq``. Default follows the spec:
+            INFECTION 0.05, NON_INFECTIOUS 0.5, ASYMPTOMATIC 1.0, SYMPTOMATIC 1.0.
+        pars, **kwargs: forwarded to :class:`tbsim.TPTTx` (``efficacy``, ``p_sterilize``, durations, …).
+    """
+
+    # Spec §"TPT": acquisition risk varies by TB state at time of TPT failure.
+    DEFAULT_ACQ_STATE_RR = {
+        int(TBS.INFECTION):      0.05,
+        int(TBS.NON_INFECTIOUS): 0.5,
+        int(TBS.ASYMPTOMATIC):   1.0,
+        int(TBS.SYMPTOMATIC):    1.0,
+    }
+
+    def __init__(self, strains, regimen_drugs=None, p_tpt_acq=None, acq_state_rr=None, pars=None, **kwargs):
+        super().__init__(pars=pars, **kwargs)
+        self.strains = strains
+        self.regimen_drugs = list(regimen_drugs) if regimen_drugs is not None else list(strains.drugs)
+        self.p_tpt_acq = dict(p_tpt_acq) if p_tpt_acq else {}
+        self.acq_state_rr = dict(self.DEFAULT_ACQ_STATE_RR)
+        if acq_state_rr:
+            self.acq_state_rr.update({int(k): float(v) for k, v in acq_state_rr.items()})
+
+        # Bitmask of strains cleared by the regimen = strains susceptible to every regimen drug.
+        cols = [strains.drug_idx[d] for d in self.regimen_drugs]
+        covered = ~strains.profile[:, cols].any(axis=1)  # (m,) True = cleared by regimen
+        self._covered_mask = int(sum(1 << j for j in range(strains.m) if covered[j]))
+
+        # One independent uniform stream per regimen drug for TPT-driven acquisition.
+        self._acq_rngs = [ss.random(name=f'tpt_acq_{d}') for d in self.regimen_drugs]
+        return
+
+    def _tb(self):
+        return self.sim.diseases[self.pars.disease]
+
+    def _acquire(self, uids):
+        """TPT drug pressure selects resistance: a susceptible carried strain mutates to its
+        resistant counterpart (replacement) with prob ``p_tpt_acq[drug]`` × per-state RR."""
+        if len(uids) == 0 or not self.p_tpt_acq:
+            return
+        tb = self._tb()
+        m = self.strains
+        rr = np.array([self.acq_state_rr.get(int(s), 0.0) for s in tb.state[uids]], dtype=float)
+        surv = tb.strain_mask[uids].copy()
+        for di, drug in enumerate(self.regimen_drugs):
+            p = self.p_tpt_acq.get(drug, 0.0)
+            if p <= 0:
+                continue
+            dcol = m.drug_idx[drug]
+            bit = m.drug_bit(drug)
+            sus_ids = [j for j in range(m.m) if not m.profile[j, dcol]]  # strains susceptible to this drug
+            u = np.asarray(self._acq_rngs[di].rvs(uids), dtype=float)
+            hit = u < (p * rr)
+            if not hit.any():
+                continue
+            sub = surv[hit].copy()
+            done = np.zeros(len(sub), dtype=bool)  # replace only the first susceptible carried strain
+            for j in sus_ids:
+                has_j = (((sub >> j) & 1).astype(bool)) & ~done
+                if not has_j.any():
+                    continue
+                sub[has_j] = (sub[has_j] & ~(1 << j)) | (1 << (j | bit))
+                done |= has_j
+            surv[hit] = sub
+        tb.strain_mask[uids] = surv
+        return
+
+    def _apply_sterilization(self, uids):
+        """Per-strain sterilization: regimen-susceptible strains are cleared for still-latent agents;
+        an agent left carrying no strain moves to CLEARED, while resistant strains persist and may
+        later progress/transmit (the spec's TPT resistance-unmasking dynamic)."""
+        tb = self._tb()
+        if not isinstance(tb, TBResistant):
+            return super()._apply_sterilization(uids)  # non-strain TB: fall back to whole-agent clearance
+
+        # Regimen-susceptible strains are cleared only for agents still latent (base TPT semantics).
+        still = uids[tb.state[uids] == TBS.INFECTION]
+        if len(still):
+            tb.strain_mask[still] &= ~self._covered_mask
+            cleared = still[tb.strain_mask[still] == 0]
+            if len(cleared):
+                tb.state[cleared] = TBS.CLEARED
+                tb.rr_reinfection[cleared] = tb.pars.rr_reinfection_cleared
+                if tb.pars.dur_reinfection_protection is not None:
+                    tb.ti_rr_reinfection_wane[cleared] = self.ti + tb.pars.dur_reinfection_protection.rvs(cleared)
+                tb.infected[cleared] = False
+                tb.susceptible[cleared] = True
+        self.tpt_resolved[uids] = True
+        return
+
+    def _apply_neither_branch(self, uids):
+        """TPT completely ineffective → run an acquisition trial against the regimen drugs, then resolve."""
+        tb = self._tb()
+        if isinstance(tb, TBResistant):
+            self._acquire(uids)
+        self.tpt_resolved[uids] = True
+        return

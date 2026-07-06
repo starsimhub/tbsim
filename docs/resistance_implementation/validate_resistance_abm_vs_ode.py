@@ -76,11 +76,11 @@ def run_abm(beta_edge, two_strain, r_treat_sym, seed=0, years=YEARS):
     if two_strain:
         tb = tbsim.TBResistant(rel_fitness={'TX': FIT_B},
                                pars=dict(tb_kw, init_strains=[1 - INIT_B_FRAC, INIT_B_FRAC],
-                                         q_prog=TX['q_prog'], prog_resist_mode='mixed'))
+                                         p_rand={'TX': TX['q_prog']}, prog_resist_mode='mixed'))
         interventions = tbsim.TxDeliveryR(
             product=tbsim.TxR(strains=tb.strains, base_efficacy=TX['eff_a'],
                               resist_penalty={'TX': TX['eff_b'] / TX['eff_a']},
-                              adherence=1.0, q_acq=TX['q_treat']),
+                              adherence=1.0, q_acq={'TX': TX['q_treat']}),
             rate_sym=ss.peryear(r_treat_sym), rate_asym=ss.peryear(TX['r_treat_asym']),
             dur_treatment=ss.months(6))
     else:
@@ -92,7 +92,7 @@ def run_abm(beta_edge, two_strain, r_treat_sym, seed=0, years=YEARS):
                  demographics=demog, dt=DT, start=ss.date(f'{START}-01-01'),
                  stop=ss.date(f'{START + years}-01-01'), rand_seed=seed, verbose=0)
     sim.run()
-    r = sim.results.tbresistant
+    r = sim.results.tb
     n_alive = np.array(sim.results.n_alive)
     t = START + np.arange(len(n_alive)) * (30 / 365.25)
     return sc.objdict(t=t, prev_active=np.array(r['prevalence_active']),

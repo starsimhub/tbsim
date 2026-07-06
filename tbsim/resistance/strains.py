@@ -8,7 +8,7 @@ possible strains, enumerated as integer ids ``0..m-1`` (id 0 = pan-susceptible).
 An *agent* carries a subset of the ``m`` strains, stored elsewhere as a single
 integer ``strain_mask`` (bit ``j`` set = carries strain ``j``); see
 ``tbsim.resistance.TBResistant``. This registry holds the strain-level lookups
-(fitness, resistance profiles) and the bit helpers used to reason about masks.
+(fitness, resistance profiles, labels) and the bit helpers used to reason about masks.
 
 The two-strain reference (``model-tests.md``, ``ode.r``) is the ``n=1`` special
 case: ``drugs=['TX']`` gives strain 0 = A (susceptible) and strain 1 = B (resistant).
@@ -36,14 +36,25 @@ class Strains:
         m (int): number of possible strains (``2**n``).
         profile (np.ndarray): ``(m, n)`` bool; ``profile[j, i]`` = strain ``j`` resistant to drug ``i``.
         fitness (np.ndarray): length-``m`` float; per-strain transmission fitness.
+        labels (list): length-``m`` human-readable strain labels (e.g. ``'pan'``, ``'RIF+FQ'``).
     """
 
     def __init__(self, drugs, rel_fitness=None):
         self.drugs = list(drugs)
         self.n = len(self.drugs)
+        if self.n == 0:
+            raise ValueError('Strains requires at least one drug.')
+        if len(set(self.drugs)) != self.n:
+            raise ValueError(f'Duplicate drug names in {self.drugs}.')
         self.m = 2 ** self.n
         self.drug_idx = {d: i for i, d in enumerate(self.drugs)}
+
         rel_fitness = rel_fitness or {}
+        for d, f in rel_fitness.items():
+            if d not in self.drug_idx:
+                raise ValueError(f'rel_fitness drug {d!r} not in drugs {self.drugs}.')
+            if not 0.0 <= float(f) <= 1.0:
+                raise ValueError(f'rel_fitness[{d!r}]={f!r} must be in [0, 1].')
 
         # profile[j, i] = bit i of strain id j
         ids = np.arange(self.m)
@@ -52,7 +63,15 @@ class Strains:
         # Per-drug cost r_i, then per-strain fitness = product over resistant drugs.
         self.cost = np.array([rel_fitness.get(d, 1.0) for d in self.drugs], dtype=float)  # (n,)
         self.fitness = np.array([self.cost[self.profile[j]].prod() for j in range(self.m)])  # (m,)
+
+        # Readable labels (id 0 -> 'pan'; otherwise '+'-joined resisted drugs, e.g. 'RIF+FQ').
+        self.labels = [self._label(j) for j in range(self.m)]
         return
+
+    def _label(self, j):
+        """Human-readable label for strain id ``j``."""
+        resisted = [self.drugs[i] for i in range(self.n) if self.profile[j, i]]
+        return '+'.join(resisted) if resisted else 'pan'
 
     def drug_bit(self, drug):
         """Resistance-profile bit (within a strain id) for a drug name."""

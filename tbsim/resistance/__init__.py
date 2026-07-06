@@ -5,3 +5,4 @@ from .tb_resistant import *
 from .analyzers import *
 from .treatments import *
 from .dst import *
+from .tpt import *
