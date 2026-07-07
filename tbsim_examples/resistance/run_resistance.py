@@ -135,7 +135,8 @@ def build_sim(scenario=None, spars=None):
     
     dst     = DSTDelivery(
                 product=DSTDx(tb._strain_catalog, drugs=DRUGS,
-                            sensitivity=0.95, specificity=0.99))
+                            sensitivity=0.95, specificity=0.99,
+                            p_sample=1.0, p_culture=1.0))
 
     interventions = [hsb, confirm, treat, dst]
     tpt = scenario.get('tpt')

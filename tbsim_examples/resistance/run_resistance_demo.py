@@ -46,6 +46,8 @@ DEFAULT_SCENARIO = dict(
     p_random_acquisition=P_RANDOM_ACQ,
     p_multi=1.0,
     p_strain_obs=None,
+    p_sample=1.0,
+    p_culture=1.0,
     first_line_acq=dict(RIF=0.01, FQ=0.01),
     bpal_acq=dict(BDQ=0.01, FQ=0.005),
     bpal_adherence=0.90,
@@ -511,6 +513,29 @@ def tpt_3hp(tb, scenario=None):
     )
 
 
+def monitor_switch_tx(tb, scenario=None):
+    """BPaL-like switch for monitoring positives; cancels in-flight first-line Tx."""
+    scenario = sc.objdict(sc.mergedicts(DEFAULT_SCENARIO, scenario or {}))
+    regimen = Regimen(
+        'bpal_like',
+        drugs=['BDQ', 'FQ'],
+        per_drug_efficacy={'BDQ': 0.85, 'FQ': 0.80},
+        combine='parallel',
+    )
+    product = StrainAwareTx(
+        regimen=regimen,
+        catalog=tb._strain_catalog,
+        p_selective_acquisition=scenario.bpal_acq,
+        adherence=scenario.bpal_adherence,
+    )
+    return StrainAwareTxDelivery(
+        name='monitor_switch_tx',
+        product=product,
+        cancel_delivery='first_line_tx',
+        eligibility=lambda sim: sim.interventions['monitor'].still_positive.uids,
+    )
+
+
 def treatment_monitor(scenario):
     """Treatment-monitoring diagnostic gated by time on first-line treatment."""
     return tbsim.DxDelivery(
@@ -570,6 +595,8 @@ def get_scenarios():
         'dst_dropout': dict(
             label=LABEL_DST_DROPOUT,
             dst_coverage=0.95,
+            p_sample=0.85,
+            p_culture=0.70,
             p_strain_obs=0.35,
             bpal=True,
         ),
@@ -614,6 +641,8 @@ def build_sim(scenario, spars=None, seed=1):
             sensitivity=0.95,
             specificity=0.99,
             p_strain_obs=scenario.p_strain_obs,
+            p_sample=scenario.p_sample,
+            p_culture=scenario.p_culture,
         ),
         coverage=scenario.dst_coverage,
     )
@@ -626,6 +655,7 @@ def build_sim(scenario, spars=None, seed=1):
     ]
     if scenario.monitoring:
         interventions.append(treatment_monitor(scenario))
+        interventions.append(monitor_switch_tx(tb, scenario))
     if scenario.bpal:
         interventions.append(bpal_tx(tb, dst, scenario))
 

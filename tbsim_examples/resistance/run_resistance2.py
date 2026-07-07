@@ -258,6 +258,8 @@ def _build_sim(
                     sensitivity=0.98,
                     specificity=0.99,
                     p_strain_obs=1.0,
+                    p_sample=1.0,
+                    p_culture=1.0,
                 ),
                 coverage=0.95,
             )

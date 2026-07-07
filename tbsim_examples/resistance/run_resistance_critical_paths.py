@@ -34,6 +34,8 @@ CRITICAL_PATH_SCENARIOS = [
     dict(
         key='dst_dropout',
         label=demo.LABEL_DST_DROPOUT,
+        p_sample=0.85,
+        p_culture=0.70,
         p_strain_obs=0.35,
         dst_coverage=0.95,
         bpal=True,
