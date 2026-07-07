@@ -226,8 +226,9 @@ class AcquisitionResolver:
             profile (AgentStrains): Per-agent strain carriage on MultiStrainTB.
             uids (ss.uids): Agents that just progressed.
         """
+        n_acquired = 0
         if len(uids) == 0 or not self.p_random:
-            return
+            return n_acquired
         catalog = profile.catalog
         for drug, p in self.p_random.items():
             if p <= 0 or drug not in catalog.drugs:
@@ -251,8 +252,8 @@ class AcquisitionResolver:
                 if len(hit) == 0:
                     continue
                 # ADD the resistant variant (does not remove the original).
-                profile.add_strain(hit, target_idx)
-        return
+                n_acquired += len(profile.add_strain(hit, target_idx))
+        return n_acquired
 
     def selective_acquisition(self, profile, uids, drugs_used, tb=None):
         """Acquire resistance on treatment failure for surviving susceptible strains.
@@ -269,8 +270,9 @@ class AcquisitionResolver:
                 reference. When provided, per-agent state modifiers (``self.state_modifiers``) scale the base
                 ``p_selective`` for each agent.
         """
+        n_acquired = 0
         if len(uids) == 0 or not self.p_selective:
-            return
+            return n_acquired
         # Per-agent state modifier (1.0 if tb not supplied).
         if tb is not None:
             mod = self._state_modifier_array(tb, uids)
@@ -285,8 +287,8 @@ class AcquisitionResolver:
             hit = uids[u < eff_p]
             if len(hit) == 0:
                 continue
-            self._apply_acquisition(profile, hit, drug)
-        return
+            n_acquired += self._apply_acquisition(profile, hit, drug)
+        return n_acquired
 
     def _apply_acquisition(self, profile, uids, drug):
         """For each *uid* carrying a strain susceptible to *drug*, replace one such
@@ -295,7 +297,7 @@ class AcquisitionResolver:
         """
         catalog = profile.catalog
         if drug not in catalog.drugs:
-            return
+            return 0
         drug_col = catalog.drugs.index(drug)
 
         # Identify, per uid, the first susceptible carried strain.
@@ -317,4 +319,4 @@ class AcquisitionResolver:
                 continue
             profile.replace_strain(sub, old=s_idx, new=target_idx)
             applied = applied.union(sub)
-        return
+        return len(applied)

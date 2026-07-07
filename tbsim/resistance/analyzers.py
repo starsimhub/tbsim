@@ -5,9 +5,10 @@ disease module with ``agent_strains`` configured.
 """
 
 import numpy as np
+import sciris as sc
 import starsim as ss
 
-__all__ = ['StrainResults', 'DuplicateStrainAnalyzer']
+__all__ = ['StrainResults', 'DuplicateStrainAnalyzer', 'ResistanceStats']
 
 
 class StrainResults(ss.Analyzer):
@@ -120,3 +121,83 @@ class DuplicateStrainAnalyzer(ss.Analyzer):
             self.results['n_duplicate_blocked'][:]
         )
         return
+
+
+class ResistanceStats(ss.Analyzer):
+    """
+    Record ODE-facing aggregate resistance observables.
+
+    This analyzer mirrors the compact output shape used by the two-strain ODE
+    validation prototype while reading from the production ``MultiStrainTB``
+    representation:
+
+    - ``frac_resist``: fraction of active TB carrying any resistant strain.
+    - ``frac_super``: fraction of active TB carrying two or more strains.
+    - ``flux_denovo``: new resistance from random/de-novo acquisition.
+    - ``flux_txacq``: new resistance from treatment or TPT-driven acquisition.
+    - ``flux_transmitted``: new resistant strains acquired via transmission.
+
+    Args:
+        disease (str): TB disease module key. Default ``'tb'``.
+    """
+
+    def __init__(self, disease='tb', **kwargs):
+        super().__init__(**kwargs)
+        self.disease = disease
+        return
+
+    def init_pre(self, sim):
+        tb = sim.diseases[self.disease]
+        if getattr(tb, 'agent_strains', None) is None:
+            raise RuntimeError(
+                'ResistanceStats requires the TB disease module to have a strain overlay '
+                'configured (MultiStrainTB(strains=[...])).'
+            )
+        super().init_pre(sim)
+        return
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('frac_resist', dtype=float, scale=False, label='Resistant fraction of active TB'),
+            ss.Result('frac_super', dtype=float, scale=False, label='Superinfected fraction of active TB'),
+            ss.Result('flux_denovo', dtype=int, label='New resistance: de-novo mutation'),
+            ss.Result('flux_txacq', dtype=int, label='New resistance: treatment/TPT-acquired'),
+            ss.Result('flux_transmitted', dtype=int, label='New resistance: transmitted'),
+        )
+        return
+
+    def step(self):
+        from ..tb import TBS
+        tb = self.sim.diseases[self.disease]
+        profile = tb.agent_strains
+        active = ((tb.state == TBS.NON_INFECTIOUS) | (tb.state == TBS.ASYMPTOMATIC)
+                  | (tb.state == TBS.SYMPTOMATIC)).uids
+        ti = self.sim.ti
+
+        if len(active):
+            n_strains = profile.n_strains_per_agent(active)
+            resistant = np.zeros(len(active), dtype=bool)
+            for s_idx, name in enumerate(profile.names):
+                if not profile.catalog.resistance[s_idx].any():
+                    continue
+                resistant |= np.asarray(getattr(tb, name)[active], dtype=bool)
+            self.results.frac_resist[ti] = float(resistant.mean())
+            self.results.frac_super[ti] = float((n_strains >= 2).mean())
+
+        self.results.flux_denovo[ti]      = int(getattr(tb, '_n_denovo_resistance_this_step', 0))
+        self.results.flux_txacq[ti]       = int(getattr(tb, '_n_txacq_resistance_this_step', 0))
+        self.results.flux_transmitted[ti] = int(getattr(tb, '_n_transmitted_resistance_this_step', 0))
+        return
+
+    def to_df(self, sim):
+        """Return recorded observables as a dataframe indexed by sim time."""
+        res = sim.results[self.name]
+        return sc.dataframe(
+            time=sim.results.timevec,
+            frac_resist=res.frac_resist,
+            frac_super=res.frac_super,
+            flux_denovo=res.flux_denovo,
+            flux_txacq=res.flux_txacq,
+            flux_transmitted=res.flux_transmitted,
+        )

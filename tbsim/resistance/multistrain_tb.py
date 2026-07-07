@@ -74,6 +74,9 @@ class MultiStrainTB(TB):
         self._rng_strain_pick = ss.random(name='tb_rng_strain_pick')
         self._rng_strain_init = ss.random(name='tb_rng_strain_init')
         self._n_duplicate_blocked_this_step = 0
+        self._n_denovo_resistance_this_step = 0
+        self._n_txacq_resistance_this_step = 0
+        self._n_transmitted_resistance_this_step = 0
         self._progression_resolver = ProgressionResolver(
             mode=kwargs.pop('progression_mode', 'bottleneck'),
             p_multi=kwargs.pop('p_multi', 1.0),
@@ -212,6 +215,9 @@ class MultiStrainTB(TB):
     def step(self):
         """Reset strain counters, then advance the TB state machine."""
         self._n_duplicate_blocked_this_step = 0
+        self._n_denovo_resistance_this_step = 0
+        self._n_txacq_resistance_this_step = 0
+        self._n_transmitted_resistance_this_step = 0
         return super().step()
 
     def step_die(self, uids):
@@ -241,7 +247,8 @@ class MultiStrainTB(TB):
         if self._progression_resolver is not None and len(activating):
             self._progression_resolver.resolve(self.agent_strains, activating)
         if self._acquisition_resolver is not None and not activating_only:
-            self._acquisition_resolver.random_acquisition(self.agent_strains, uids)
+            n_denovo = self._acquisition_resolver.random_acquisition(self.agent_strains, uids)
+            self._n_denovo_resistance_this_step += int(n_denovo)
         return
 
     def _assign_transmitted_strains(self, uids, sources):
@@ -250,6 +257,7 @@ class MultiStrainTB(TB):
         catalog = self._strain_catalog
         n = len(uids)
         picks = np.full(n, -1, dtype=int)
+        transmitted = np.zeros(n, dtype=bool)
 
         if sources is not None and not np.isscalar(sources):
             try:
@@ -264,6 +272,7 @@ class MultiStrainTB(TB):
                         src_uids, self._rng_strain_pick,
                     )
                     picks[real] = src_picks
+                    transmitted[real] = True
 
         need_fallback = picks < 0
         if need_fallback.any():
@@ -295,5 +304,8 @@ class MultiStrainTB(TB):
             new = target[~already]
             if len(new):
                 arr[new] = True
+                is_resistant = bool(catalog.resistance[idx].any())
+                if is_resistant:
+                    self._n_transmitted_resistance_this_step += int(transmitted[sel][~already].sum())
         self._n_duplicate_blocked_this_step += n_blocked
         return

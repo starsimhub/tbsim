@@ -105,9 +105,10 @@ class StrainAwareTPTTx(TPTTx):
         # still present would be regimen-resistant and have nothing to mutate.
         # Runs on the full uids cohort so per-state ω modifiers actually
         # apply to non-INFECTION agents (NI/ASY/SYM) per spec.
-        self._acq_resolver.selective_acquisition(
+        n_acquired = self._acq_resolver.selective_acquisition(
             profile, uids, self.regimen.drugs, tb=tb,
         )
+        tb._n_txacq_resistance_this_step += int(n_acquired)
 
         # Sterilization (strain removal + state → CLEARED) only applies to
         # agents still in INFECTION — sterilize→CLEARED is a latent-only
@@ -151,7 +152,8 @@ class StrainAwareTPTTx(TPTTx):
         tb = self.sim.diseases[self.pars.disease]
         profile = getattr(tb, 'agent_strains', None)
         if profile is not None and len(uids) > 0:
-            self._acq_resolver.selective_acquisition(
+            n_acquired = self._acq_resolver.selective_acquisition(
                 profile, uids, self.regimen.drugs, tb=tb,
             )
+            tb._n_txacq_resistance_this_step += int(n_acquired)
         return super()._apply_neither_branch(uids)

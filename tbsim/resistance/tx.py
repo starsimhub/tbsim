@@ -259,10 +259,11 @@ class StrainAwareTxDelivery(TxDelivery):
                     if len(sub):
                         tb.agent_strains.remove_strain(sub, int(s_idx))
             # Selective acquisition on the regimen drugs — state-dependent ω
-            self.product._acq_resolver.selective_acquisition(
+            n_acquired = self.product._acq_resolver.selective_acquisition(
                 tb.agent_strains, failure_uids, self.product.regimen.drugs,
                 tb=tb,
             )
+            tb._n_txacq_resistance_this_step += int(n_acquired)
         super().step_failures()
         return
 
@@ -283,10 +284,11 @@ class StrainAwareTxDelivery(TxDelivery):
 
             # Updated spec: relapse is an unsuccessful treatment outcome that
             # can drive selective acquisition under regimen pressure.
-            self.product._acq_resolver.selective_acquisition(
+            n_acquired = self.product._acq_resolver.selective_acquisition(
                 tb.agent_strains, relapsed, self.product.regimen.drugs,
                 tb=tb,
             )
+            tb._n_txacq_resistance_this_step += int(n_acquired)
 
         # Drop snapshots for agents whose relapse episode is no longer pending
         # (due and resolved, ineligible, dead, etc.).

@@ -15,7 +15,7 @@ Package layout:
 Architecture and tests: ``tbsim/resistance/docs/``.
 """
 
-from .analyzers import DuplicateStrainAnalyzer, StrainResults
+from .analyzers import DuplicateStrainAnalyzer, ResistanceStats, StrainResults
 from .connector import ResistanceConnector
 from .diagnostics import (
     DSTDelivery,
@@ -36,5 +36,5 @@ __all__ = [
     'Regimen', 'ProgressionResolver', 'AcquisitionResolver',
     'StrainAwareTx', 'StrainAwareTxDelivery', 'StrainAwareTPTTx',
     'DSTDx', 'DSTDelivery', 'RegimenRouter', 'treatment_monitoring_eligibility',
-    'StrainResults', 'DuplicateStrainAnalyzer',
+    'StrainResults', 'DuplicateStrainAnalyzer', 'ResistanceStats',
 ]
