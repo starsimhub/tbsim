@@ -1,10 +1,14 @@
-"""Strain-aware TB treatment product and delivery."""
+"""Strain-aware TB treatment product and delivery.
+
+Requires :class:`~tbsim.resistance.multistrain_tb.MultiStrainTB` with
+:attr:`~tbsim.resistance.multistrain_tb.MultiStrainTB.agent_strains` configured.
+"""
 
 import numpy as np
 import starsim as ss
-import tbsim
-from tbsim import TBS
-from tbsim.interventions.treatments import Tx, TxDelivery
+
+from ..interventions.treatments import Tx, TxDelivery
+from ..tb import TBS, get_tb
 from .regimens import Regimen
 
 __all__ = ['StrainAwareTx', 'StrainAwareTxDelivery']
@@ -67,7 +71,7 @@ class StrainAwareTx(Tx):
         }
         self.define_pars(**per_strain)
 
-        # Acquisition resolver — state-dependent ω_R,d (Phase 4).
+        # Acquisition resolver — state-dependent ω_R,d.
         from .resolvers import AcquisitionResolver
         self._acq_resolver = AcquisitionResolver(
             p_selective=p_selective_acquisition,
@@ -88,7 +92,7 @@ class StrainAwareTx(Tx):
         # Agent-level adherence draw (correlated across strains).
         adherent_mask = np.asarray(self.pars.p_adherence.rvs(uids), dtype=bool)
 
-        tb = tbsim.get_tb(sim)
+        tb = get_tb(sim)
         profile = tb.agent_strains
 
         # Per-strain cure rolls, gated by adherence and carrier status.
@@ -220,7 +224,7 @@ class StrainAwareTxDelivery(TxDelivery):
         strain whose catalog phenotype is susceptible to every drug in the
         regimen is cleared. Resistant strains persist.
         """
-        tb = tbsim.get_tb(self.sim)
+        tb = get_tb(self.sim)
         profile = tb.agent_strains
         catalog = profile.catalog
         regimen = self.product.regimen

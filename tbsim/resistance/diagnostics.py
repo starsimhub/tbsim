@@ -14,7 +14,8 @@ The product/delivery split here mirrors ``tbsim/interventions/diagnostics.py``
 
 import numpy as np
 import starsim as ss
-import tbsim
+
+from ..tb import get_tb
 
 __all__ = ['DSTDx', 'DSTDelivery', 'RegimenRouter',
            'treatment_monitoring_eligibility']
@@ -157,7 +158,7 @@ class DSTDx(ss.Product):
         """
         if len(uids) == 0:
             return {}
-        tb = tbsim.get_tb(sim)
+        tb = get_tb(sim)
         n = len(uids)
         results = {drug: np.zeros(n, dtype=bool) for drug in self.drugs}
         profile = tb.agent_strains
@@ -403,7 +404,7 @@ class RegimenRouter:
         if self.require_dst_tested:
             elig = elig.intersect(self.dst.tested_dst.uids)
         # Exclude agents already on treatment
-        tb = tbsim.get_tb(sim)
+        tb = get_tb(sim)
         elig = elig.intersect(tb.on_treatment.false())
         return elig
 
@@ -496,7 +497,7 @@ def treatment_monitoring_eligibility(tx_delivery_name, after_steps=4, every_step
         tx = sim.interventions.get(tx_delivery_name)
         if tx is None:
             return ss.uids()
-        tb = tbsim.get_tb(sim)
+        tb = get_tb(sim)
         # On-treatment agents (TB-state, not just intervention bookkeeping)
         on_tx_uids = tb.on_treatment.uids
         if len(on_tx_uids) == 0:

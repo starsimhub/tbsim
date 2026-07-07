@@ -1,9 +1,14 @@
-"""Strain-aware TPT treatment product."""
+"""Strain-aware TPT treatment product.
+
+Requires :class:`~tbsim.resistance.multistrain_tb.MultiStrainTB` with
+:attr:`~tbsim.resistance.multistrain_tb.MultiStrainTB.agent_strains` configured.
+"""
 
 import numpy as np
 import starsim as ss
-from tbsim.interventions.tpt import TPTTx
-from tbsim import TBS
+
+from ..interventions.tpt import TPTTx
+from ..tb import TBS
 from .regimens import Regimen
 
 __all__ = ['StrainAwareTPTTx']

@@ -1,8 +1,11 @@
-"""Resistance analyzers and per-strain result tracking."""
+"""Resistance analyzers and per-strain result tracking.
+
+Analyzers expect a :class:`~tbsim.resistance.multistrain_tb.MultiStrainTB`
+disease module with ``agent_strains`` configured.
+"""
 
 import numpy as np
 import starsim as ss
-import tbsim
 
 __all__ = ['StrainResults', 'DuplicateStrainAnalyzer']
 
@@ -52,8 +55,8 @@ class StrainResults(ss.Analyzer):
         return
 
     def step(self):
+        from ..tb import TBS
         tb = self.sim.diseases[self.disease]
-        from tbsim import TBS
         # Active-TB UIDs via Starsim UID operators (union of three BoolArr-ish queries)
         active_uids = ((tb.state == TBS.NON_INFECTIOUS) | (tb.state == TBS.ASYMPTOMATIC)
                        | (tb.state == TBS.SYMPTOMATIC)).uids
@@ -77,7 +80,8 @@ class DuplicateStrainAnalyzer(ss.Analyzer):
     Count duplicate-strain superinfection events (Decision 3 in the findings).
 
     Reads the precise per-step counter
-    ``tb._n_duplicate_blocked_this_step`` that ``TB`` increments inside
+    ``MultiStrainTB._n_duplicate_blocked_this_step`` that
+    :class:`~tbsim.resistance.multistrain_tb.MultiStrainTB` increments inside
     ``_assign_transmitted_strains`` each time a transmitted strain is
     silently dropped because the recipient already carries it.
 
