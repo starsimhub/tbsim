@@ -45,6 +45,12 @@ class DSTDx(ss.Product):
             observed at all by DST before applying sens/spec. If ``None``
             (default), uses strain fitness per catalog entry. If float,
             applies one strain-agnostic value to all strains.
+        p_sample (float): Probability that sample collection succeeds for an
+            eligible DST (default 1.0). Models the first lab-process dropout.
+        p_culture (float): Probability that culture/amplification succeeds
+            given a collected sample (default 1.0). Models the second lab-process
+            dropout. Combined with ``p_sample`` and ``p_strain_obs`` before
+            applying per-drug sensitivity/specificity.
 
     Example::
 
@@ -55,7 +61,8 @@ class DSTDx(ss.Product):
     """
 
     def __init__(self, catalog, drugs=None, sensitivity=0.95,
-                 specificity=0.99, p_strain_obs=None, **kwargs):
+                 specificity=0.99, p_strain_obs=None,
+                 p_sample=1.0, p_culture=1.0, **kwargs):
         super().__init__()
         self.catalog = catalog
         if drugs is None:
@@ -92,6 +99,9 @@ class DSTDx(ss.Product):
             )
         if np.any((strain_obs < 0.0) | (strain_obs > 1.0)):
             raise ValueError(f'p_strain_obs values must be in [0, 1]; got {strain_obs}')
+        for name, val in (('p_sample', p_sample), ('p_culture', p_culture)):
+            if not (0.0 <= float(val) <= 1.0):
+                raise ValueError(f'{name} must be in [0, 1]; got {val!r}')
 
         # Define per-drug Bernoullis as proper Starsim pars. ``strict=False``
         # allows DSTDx to be invoked standalone (e.g. from tests that build
@@ -110,6 +120,8 @@ class DSTDx(ss.Product):
             bernoulli_pars[f'p_obs_strain_{s_idx}'] = ss.bernoulli(
                 p=float(strain_obs[s_idx]), strict=False,
             )
+        bernoulli_pars['p_sample'] = ss.bernoulli(p=float(p_sample), strict=False)
+        bernoulli_pars['p_culture'] = ss.bernoulli(p=float(p_culture), strict=False)
         self.define_pars(**bernoulli_pars)
         self.update_pars(**kwargs)
 
@@ -173,11 +185,20 @@ class DSTDx(ss.Product):
 
         uid_to_pos = {int(uid): i for i, uid in enumerate(uids)}
         drug_cols = {drug: self.catalog.drugs.index(drug) for drug in self.drugs}
+        sample_ok = np.asarray(self.pars.p_sample.rvs(n), dtype=bool)
+        culture_ok = np.asarray(self.pars.p_culture.rvs(n), dtype=bool)
+        lab_ok = sample_ok & culture_ok
 
         # Apply DST at strain level, then aggregate to agent-level phenotype.
         for s_idx in range(self.catalog.n):
             strain_arr = getattr(profile._tb, profile.names[s_idx])
             carrier_uids = strain_arr.uids.intersect(uids)
+            if len(carrier_uids) == 0:
+                continue
+
+            carrier_pos = np.array([uid_to_pos[int(uid)] for uid in carrier_uids], dtype=int)
+            carrier_lab_ok = lab_ok[carrier_pos]
+            carrier_uids = carrier_uids[carrier_lab_ok]
             if len(carrier_uids) == 0:
                 continue
 
@@ -462,7 +483,8 @@ def treatment_monitoring_eligibility(tx_delivery_name, after_steps=4, every_step
     ``after_steps`` simulation steps. Use as ``eligibility=`` on a standard
     ``DxDelivery`` to gate a "still bacteriologically positive" check. The
     output of that Dx can in turn gate a regimen-switch
-    :class:`StrainAwareTxDelivery`.
+    :class:`StrainAwareTxDelivery` with ``cancel_delivery`` set to the
+    superseded course name.
 
     Args:
         tx_delivery_name (str): The ``name`` of the TxDelivery to monitor.
@@ -490,6 +512,7 @@ def treatment_monitoring_eligibility(tx_delivery_name, after_steps=4, every_step
             switch = StrainAwareTxDelivery(
                 product=second_line,
                 name='second_line',
+                cancel_delivery='first_line',
                 eligibility=lambda sim: sim.interventions['monitor'].still_positive.uids,
             )
     """
