@@ -130,6 +130,9 @@ class StrainAwareTxDelivery(TxDelivery):
     TxDelivery that updates strain profiles per the spec.
 
     On treatment start, per-strain cure outcomes are pre-rolled by the product.
+    Latent (``INFECTION``) treatment clears susceptible strains immediately;
+    residual resistant carriers may undergo selective acquisition (ω). Active
+    disease follows the standard pre-roll / resolve-at-completion flow.
     On treatment completion, cured strains are removed from the recipient.
     On treatment failure (any strain remains), the agent reverts to their
     prior TB state, the resolver applies selective acquisition for the regimen

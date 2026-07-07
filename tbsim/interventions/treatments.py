@@ -129,7 +129,8 @@ class TxDelivery(ss.Intervention):
     Delivers a treatment product to eligible (diagnosed, active-TB) agents.
 
     Handles eligibility, treatment initiation via the TB module, success/failure
-    outcomes from the product, and failure retry logic.
+    outcomes from the product, failure retry logic, and optional in-flight
+    course cancellation via :meth:`cancel_treatment`.
 
     Args:
         product: A Tx product instance.
