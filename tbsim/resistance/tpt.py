@@ -23,9 +23,9 @@ class StrainAwareTPTTx(TPTTx):
     moves to ``CLEARED`` only when *all* carried strains have been removed
     (Decision 10 in the findings).
 
-    Suppression (rr_*) modifiers continue to apply at the agent level; the
-    spec's per-strain suppression option is not yet implemented and would
-    require strain-level rr_* arrays.
+    Suppression (``rr_*``) modifiers scale with the fraction of carried strains
+    covered by the regimen: agents carrying only resistant strains receive no
+    suppression benefit; mixed infections receive partial protection.
 
     TPT-driven acquisition (a configurable per-drug acquisition probability
     on TPT failure) is delegated to an :class:`AcquisitionResolver`.
@@ -75,6 +75,39 @@ class StrainAwareTPTTx(TPTTx):
         if not cols:
             return np.zeros(catalog.n, dtype=bool)
         return np.all(catalog.resistance[:, cols] == 0, axis=1)
+
+    def _suppression_weight(self, uids):
+        """Per-agent fraction of carried strains covered by the TPT regimen."""
+        tb = self.sim.diseases[self.pars.disease]
+        profile = getattr(tb, 'agent_strains', None)
+        if profile is None or len(uids) == 0:
+            return np.ones(len(uids), dtype=float)
+        n_carried = profile.n_strains_per_agent(uids).astype(float)
+        n_covered = np.zeros(len(uids), dtype=float)
+        for s_idx in np.where(self._cover_mask)[0]:
+            n_covered += profile.carries(int(s_idx), uids).astype(float)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            return np.where(n_carried > 0, n_covered / n_carried, 0.0)
+
+    def apply_protection(self):
+        """Apply rr_* modifiers scaled by per-strain regimen coverage."""
+        protected = self.tpt_protected.uids
+        if len(protected) == 0:
+            return
+        tb = self.sim.diseases[self.pars.disease]
+        if getattr(tb, 'agent_strains', None) is None:
+            return super().apply_protection()
+        weights = self._suppression_weight(protected)
+        act = self.tpt_activation_modifier_applied[protected]
+        clr = self.tpt_clearance_modifier_applied[protected]
+        dth = self.tpt_death_modifier_applied[protected]
+        eff_act = 1.0 - weights * (1.0 - act)
+        eff_clr = 1.0 - weights * (1.0 - clr)
+        eff_dth = 1.0 - weights * (1.0 - dth)
+        tb.rr_activation[protected] *= eff_act
+        tb.rr_clearance[protected] *= eff_clr
+        tb.rr_death[protected] *= eff_dth
+        return
 
     def _apply_sterilization(self, uids):
         """Per-strain sterilization: clear susceptible strains; resistant strains remain.
