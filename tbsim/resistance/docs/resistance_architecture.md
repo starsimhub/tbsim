@@ -712,7 +712,9 @@ corrected against the spec's worked example.
 | Adherence (scalar)        | `StrainAwareTx.adherence`                                                                                    |
 | Adherence (distribution)  | `StrainAwareTx.administer` — one Bernoulli draw per agent gates every per-strain cure roll, so a callable `p` on `ss.bernoulli` yields agent-level heterogeneity correlated across all strains in the regimen |
 | Cure one strain at a time | `StrainAwareTxDelivery.step_outcomes` removes cured strains, leaves remaining                                |
+| Latent partial clear + ω on residual | `StrainAwareTxDelivery.step_start_treatment` clears susceptible strains; `selective_acquisition` on carriers who remain in `INFECTION` |
 | `ω_R,d` per failure       | `AcquisitionResolver.selective_acquisition(uids, drugs_used, tb=tb)` invoked from `StrainAwareTxDelivery.step_failures` |
+| In-flight course cancel   | `TxDelivery.cancel_treatment`; `StrainAwareTxDelivery(cancel_delivery=...)` before switch start              |
 | Strain replacement        | `_apply_acquisition` uses `agent_strains.replace_strain`                                                            |
 | State-dependent `ω_R,d`   | `AcquisitionResolver.state_modifiers`; defaults: 0 for non-symptomatic, 1 for ASYMP/SYMP per spec   |
 
@@ -820,7 +822,9 @@ implemented via
 `StrainAwareTPTTx.DEFAULT_TPT_STATE_MODIFIERS` (INFECTION 0.05,
 NON_INFECTIOUS 0.5, ASYMPTOMATIC/SYMPTOMATIC 1.0), which matches the
 spec's expectation that risk is highest for active disease and very
-low for true latent infection.
+low for true latent infection. Per-strain suppression scales ``rr_*``
+modifiers by the fraction of carried strains covered by the regimen
+(`StrainAwareTPTTx.apply_protection`).
 
 ---
 
@@ -917,6 +921,8 @@ from tbsim.resistance    →  explicit public API
 | DST → regimen auto-routing | `RegimenRouter` builds DST-aware eligibility lambdas for `StrainAwareTxDelivery` |
 | State-dependent acquisition | `AcquisitionResolver.state_modifiers`; TPT defaults in `StrainAwareTPTTx` |
 | Treatment monitoring | `treatment_monitoring_eligibility` gates time-on-treatment Dx and regimen switch |
+| In-flight Tx cancel | `TxDelivery.cancel_treatment`; `StrainAwareTxDelivery.cancel_delivery` |
+| DST lab-process dropout | `DSTDx(p_sample=..., p_culture=..., p_strain_obs=...)` |
 
 **Test suites** (under `tbsim/resistance/docs/`):
 
@@ -955,15 +961,19 @@ the test numbering in the spec.
 | Adherence scalar                                                  | `tx.StrainAwareTx.adherence`                                           | ✅        |          |
 | Adherence distribution (correlated across strains)                | `StrainAwareTx.administer` — one Bernoulli draw per agent gates every per-strain cure roll. Heterogeneity via callable `p` on `ss.bernoulli`. | ✅ | |
 | Selective acquisition ω_R,d at treatment failure                  | `resolvers.AcquisitionResolver.selective_acquisition` from `tx.StrainAwareTxDelivery.step_failures` | ✅ | #4 |
+| Selective acquisition ω on latent Tx residual                     | `StrainAwareTxDelivery.step_start_treatment` (INFECTION partial clear) | ✅ | |
+| In-flight Tx cancel / regimen switch                              | `TxDelivery.cancel_treatment`; `StrainAwareTxDelivery(cancel_delivery=...)` | ✅ | |
 | Selective acquisition REPLACES susceptible strain                 | `_apply_acquisition` (via `agent_strains.replace_strain`)                    | ✅        |          |
 | State-dependent ω_R,d                                             | `AcquisitionResolver.state_modifiers`; `selective_acquisition(..., tb=tb)` | ✅ | |
 | TPT per-strain efficacy + acquisition                             | `tpt.StrainAwareTPTTx`                                                 | ✅        |          |
+| TPT per-strain suppression (`rr_*` scaled by coverage)            | `StrainAwareTPTTx.apply_protection`                                    | ✅        |          |
 | State-dependent TPT acquisition                                   | `StrainAwareTPTTx.DEFAULT_TPT_STATE_MODIFIERS` (INFECTION 0.05, NON_INFECTIOUS 0.5, ASYMP/SYMP 1.0) | ✅ | |
 | DST per-drug sens/spec → observed phenotype                       | `diagnostics.DSTDx`, `diagnostics.DSTDelivery`                         | ✅        |          |
+| DST lab-process dropout (`p_sample`, `p_culture`, `p_strain_obs`) | `DSTDx.administer`                                                     | ✅        |          |
 | DST eligibility immediate / on failure                            | configurable lambda; `treatment_monitoring_eligibility` for failure-conditional | ✅ | |
 | Time since last treatment initiation                              | `TxDelivery.ti_treatment_start` (existing) + `treatment_monitoring_eligibility` helper | ✅ | |
 | Treatment provision gated by observed DST                         | `RegimenRouter.matches(...)` → eligibility lambdas for `StrainAwareTxDelivery` | ✅ | |
-| Treatment monitoring (time-under-treatment Dx + regimen switch)   | `treatment_monitoring_eligibility('tx', after_steps=N)` on a `DxDelivery` whose `diagnosed` flag gates a second `StrainAwareTxDelivery` | ✅ | |
+| Treatment monitoring (time-under-treatment Dx + regimen switch)   | `treatment_monitoring_eligibility('tx', after_steps=N)` on a `DxDelivery` whose `diagnosed` flag gates a second `StrainAwareTxDelivery` with `cancel_delivery` | ✅ | |
 | Per-strain analyzer                                               | `analyzers.StrainResults`                                              | ✅        |          |
 
 Legend: ✅ implemented · ⚠ partial · ⏳ planned
