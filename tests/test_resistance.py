@@ -14,6 +14,12 @@ from tbsim.resistance import (
     StrainCatalog,
     StrainSpec,
     MultiStrainTB,
+    ResistanceSim,
+    build_care_cascade,
+    build_spec_sim,
+    get_spec_scenario_configs,
+    strain_preset_spec,
+    strain_preset_two,
 )
 
 
@@ -340,6 +346,70 @@ class TestResistanceSim:
         all_uids = ss.uids(np.arange(len(tb.sim.people)))
         counts = tb.agent_strains.n_strains_per_agent(all_uids)
         assert counts.max() <= tb.agent_strains.catalog.n
+
+
+class TestResistanceSimWrapper:
+    def test_minimal_overlay_runs(self):
+        sim = ResistanceSim(n_agents=120, strain_preset='two_strain', analyzers=False)
+        sim.run()
+        tb = sim.get_multistrain_tb()
+        assert tb.agent_strains is not None
+        assert any(isinstance(c, ResistanceConnector) for c in sim.connectors.values())
+
+    def test_basic_cascade_wires_interventions(self):
+        sim = ResistanceSim(
+            n_agents=80,
+            strain_preset='standard',
+            cascade='basic',
+            analyzers=False,
+        )
+        sim.init()
+        assert sim.get_dx(result_state='diagnosed') is not None
+        assert sim.get_dst() is not None
+        assert 'first_line_tx' in sim.interventions
+
+    def test_routed_cascade_runs(self):
+        sim = ResistanceSim(
+            n_agents=100,
+            strain_preset='standard',
+            cascade='routed',
+            analyzers=False,
+            sim_pars=dict(start=ss.date('2000-01-01'), stop=ss.date('2000-06-01')),
+        )
+        sim.run()
+        assert 'second_line_tx' in sim.interventions
+
+    def test_build_care_cascade_returns_list(self):
+        tb = MultiStrainTB(strains=strain_preset_two())
+        cascade = build_care_cascade(tb, mode='basic')
+        assert len(cascade) >= 4
+
+    def test_spec_scenarios_build(self):
+        for cfg in get_spec_scenario_configs():
+            sim = build_spec_sim(cfg['name'], sim_pars=dict(n_agents=40, stop=ss.date('2000-06-01')))
+            assert sim.label == cfg['name']
+
+    def test_spec_baseline_no_resistance(self):
+        sim = build_spec_sim(
+            'A_baseline_no_resistance',
+            sim_pars=dict(n_agents=60, stop=ss.date('2001-01-01')),
+        )
+        sim.run()
+        assert sim.get_multistrain_tb() is None
+
+    def test_spec_overlay_runs(self):
+        sim = build_spec_sim(
+            'B_resistance_overlay_enabled',
+            sim_pars=dict(n_agents=80, stop=ss.date('2001-01-01')),
+        )
+        sim.run()
+        assert sim.get_multistrain_tb() is not None
+
+    def test_spec_cascade_modes(self):
+        tb = MultiStrainTB(strains=strain_preset_spec())
+        for mode in ('tx_pressure', 'uniform_no_dst', 'dst_routed_inh'):
+            cascade = build_care_cascade(tb, mode=mode)
+            assert len(cascade) >= 1
 
 
 if __name__ == '__main__':
