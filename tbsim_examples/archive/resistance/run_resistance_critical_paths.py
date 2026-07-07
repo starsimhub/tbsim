@@ -3,7 +3,7 @@
 Scenario names and parameterizations follow ``resistance_spec_pseudocode.md``
 Critical Paths 11–21 and 23 (baseline, intervention, sensitivity, comparator).
 Plot and summary style follows Cohen/Ryckman TB modeling conventions via
-``run_resistance_demo``.
+``run_resistance_program_demo``.
 """
 
 import re
@@ -12,7 +12,7 @@ import pandas as pd
 import sciris as sc
 import starsim as ss
 
-import run_resistance_demo as demo
+import tbsim_examples.archive.resistance.run_resistance_program_demo as demo
 
 
 CRITICAL_PATH_SCENARIOS = [
