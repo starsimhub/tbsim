@@ -69,6 +69,7 @@ This document lists TBsim features and validates whether each can be combined wi
 | `StrainAwareTx` | `resistance/tx.py` | **Native** | Per-strain ψ, adherence, selective acquisition on failure/relapse | `Regimen` + `catalog` | Tested |
 | `StrainAwareTxDelivery` | `resistance/tx.py` | **Native** | Latent partial clear, active pre-roll, relapse strain restore | DST-routed eligibility optional | Tested |
 | `Regimen` | `resistance/regimens.py` | **Native** | Min-effective-drug cure model (`max` / `parallel`) | Drug list must match catalog | Tested |
+| `Regimen(resistance_penalty=...)` | `resistance/regimens.py` | **Native** | Reduced-but-nonzero per-drug efficacy against resistant strains | Optional per-drug multiplier in [0, 1] | Tested |
 | `drug_params` presets | `treatments.py` | **Compatible†** | Reference data only; wire into `Regimen` manually | Map to `StrainAwareTx` | Partial |
 | `HealthSeekingBehavior` | `health_seeking.py` | **Compatible** | Care-seeking unchanged; enables Dx cascade | Standard | Tested (integration) |
 | Latent Tx selective acquisition | `resistance/tx.py` | **Gap** | Latent clears susceptible strains only; ω on latent failure deferred | — | Documented |
@@ -124,24 +125,30 @@ This document lists TBsim features and validates whether each can be combined wi
 ## 9. Resistance engine (strain model)
 
 All three strain data-model classes live in `tbsim/resistance/strains.py`
-(see [resistance_architecture.md §1.1](resistance_architecture.md#11-strainspec-vs-straincatalog-vs-agentstrains)):
+(see [resistance_architecture.md §1.1](resistance_architecture.md#11-strainspec-vs-straincatalog-vs-agentstrains)).
+The classes are structurally generic over "a strain is a named entity with a
+binary phenotype vector and a fitness weight". TB drug resistance is the
+primary use case; the same classes can back other multi-strain overlays
+(e.g. HIV subtypes) by using `phenotype`/`markers` in place of the TB
+`resistance`/`drugs` aliases.
 
 | Class | Role |
 |-------|------|
-| `StrainSpec` | One strain's blueprint (resistance bits, fitness, `init_prev`) — pure config |
-| `StrainCatalog` | Catalog of all specs as indexed numpy tables for fast lookup |
-| `AgentStrains` | Per-agent runtime state (`carries_<uid>` `ss.BoolArr` on `MultiStrainTB`) |
+| `StrainSpec` | One strain's blueprint (phenotype bits, fitness, `init_prev`) — pure config. Accepts `phenotype=` (generic) or `resistance=` (TB alias). |
+| `StrainCatalog` | Catalog of all specs as indexed numpy tables for fast lookup. Accepts `markers=` (generic) or `drugs=` (TB alias); exposes `phenotype`/`resistance` and `markers`/`drugs`. |
+| `AgentStrains` | Per-agent runtime state (`carries_<uid>` `ss.BoolArr` on `MultiStrainTB`). Disease-agnostic. |
 
 | Feature | File | Combine? | Resistance impact | Required wiring | Validation |
 |---------|------|----------|-------------------|-----------------|------------|
-| `StrainSpec` / `StrainCatalog` | `resistance/strains.py` | **Native** | Strain catalog | Required | Tested |
+| `StrainSpec` / `StrainCatalog` | `resistance/strains.py` | **Native** | Strain catalog with generic `phenotype`/`markers` and TB `resistance`/`drugs` aliases | Required | Tested |
 | `AgentStrains` | `resistance/strains.py` | **Native** | Per-agent `carries_*` flags | Auto on `MultiStrainTB` | Tested |
 | Bitmask prototype | Historical prototype | **N/A** | Reference/prototype representation only; not runtime state in this branch | Use named `AgentStrains` BoolArrs instead | Tested by design guard |
 | `ProgressionResolver` | `resistance/resolvers.py` | **Native** | Bottleneck at activation (`p_multi`) | `progression_mode='bottleneck'` | Tested |
 | `AcquisitionResolver` | `resistance/resolvers.py` | **Native** | Random (add) + selective (replace) acquisition | `p_random_acquisition` / Tx/TPT ω | Tested |
 | `StrainResults` | `resistance/analyzers.py` | **Native** | Per-strain prevalence/incidence | Analyzer on sim | Tested |
 | `DuplicateStrainAnalyzer` | `resistance/analyzers.py` | **Native** | Blocked duplicate superinfection count | Optional analyzer | Tested |
-| `ResistanceStats` ODE summary | `resistance/analyzers.py` | **Native** | ODE-facing `frac_resist`, `frac_super`, and origin fluxes | Optional analyzer on `MultiStrainTB` sims | Tested |
+| Per-step acquisition counters | `resistance/multistrain_tb.py` | **Native** | `_n_denovo_*`, `_n_txacq_*`, `_n_transmitted_*` counters incremented by resolvers, Tx, TPT, and transmission | Auto on `MultiStrainTB`; consumed by `ResistanceStats` | Tested |
+| `ResistanceStats` ODE summary | `resistance/analyzers.py` | **Native** | ODE-facing `frac_resist`, `frac_super`, and origin fluxes (de-novo / tx-acquired / transmitted) | Optional analyzer on `MultiStrainTB` sims | Tested |
 | Zero-fitness transmission | `connector.py` | **Native** | Carriers with only `fitness=0` strains get multiplier 0; legacy no-strain agents unchanged | `ResistanceConnector` + `carries_any` | Tested |
 | `init_prev` fallback | `resistance/multistrain_tb.py` | **Native** | Unresolved source + zero weights → no strain assigned + warning | `seed_strains` / transmission fallback | Tested |
 | Missing `ResistanceConnector` | `resistance/multistrain_tb.py` | **Native** | `MultiStrainTB.init_post` warns if connector absent | Add `ResistanceConnector()` | Tested |
@@ -189,7 +196,7 @@ All three strain data-model classes live in `tbsim/resistance/strains.py`
 
 | Category | Count | Features |
 |----------|-------|----------|
-| **Native / strain-aware** | 18 | `MultiStrainTB`, connector, `strains.py` (Spec/Registry/Profile), resolvers, regimen, strain Tx/TPT/DST, router, monitoring helper, strain analyzers |
+| **Native / strain-aware** | 21 | `MultiStrainTB`, connector, `strains.py` (Spec/Registry/Profile with generic phenotype), resolvers, regimen (+`resistance_penalty`), strain Tx/TPT/DST, router, monitoring helper, per-step acquisition counters, strain analyzers (`StrainResults`/`DuplicateStrainAnalyzer`/`ResistanceStats`) |
 | **Compatible (no code change)** | 12 | Plain `TB` comparator, `get_tb`, HSB, base plotting, `demo`, explicit `tbsim.resistance` imports, `choice2d`, etc. |
 | **Compatible† (works, behavior changes)** | 22 | All base Dx products, networks, comorbidities, BCG, beta, migration, births/deaths, `tbsim.Sim`, parallel runs |
 | **Requires swap to strain-aware** | 6 | `Tx`/`TxDelivery`, `TPTTx` alone, `DOTS`/presets, compartmental N/A |
