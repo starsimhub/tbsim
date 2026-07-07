@@ -62,6 +62,17 @@ Interventions in [tbsim/interventions/](tbsim/interventions/) follow a product/d
 
 [tbsim/analyzers.py](tbsim/analyzers.py) provides `DwellTime` (time spent in each disease state) and `HouseholdStats` (household-level transmission analysis).
 
+### Drug Resistance Overlay
+
+Optional multi-strain drug resistance lives in [tbsim/resistance/](tbsim/resistance/):
+
+- **MultiStrainTB** ([multistrain_tb.py](tbsim/resistance/multistrain_tb.py)) — strain-aware subclass of `TB`; import via `from tbsim.resistance import MultiStrainTB` (not re-exported on `tbsim`)
+- **Strain data model** ([strains.py](tbsim/resistance/strains.py)) — `StrainSpec`, `StrainCatalog`, `AgentStrains`
+- **Interventions** — strain-aware `StrainAwareTx`, `StrainAwareTPTTx`, `DSTDx`/`DSTDelivery`, `RegimenRouter`
+- **Connector** — `ResistanceConnector` applies fitness-weighted transmissibility
+
+Base [tb.py](tbsim/tb.py) has no resistance imports. Resistance tests live in four files under `tbsim/resistance/docs/test_resistance_*.py` (natural history, interventions, wiring, scenarios); data-model unit tests in `tests/test_resistance.py`. Architecture docs: `tbsim/resistance/docs/resistance_architecture.md`.
+
 ## Style Conventions
 
 - Follows the [Starsim style guide](https://github.com/starsimhub/styleguide) (Google Python style with exceptions)

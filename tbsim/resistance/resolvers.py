@@ -1,9 +1,11 @@
 """
-Strain-level resolvers used by :class:`tbsim.TB` and strain-aware interventions.
+Strain-level resolvers used by :class:`~tbsim.resistance.multistrain_tb.MultiStrainTB`
+and strain-aware interventions.
 
-These are lightweight helper classes that operate on a TB module's
-:class:`AgentStrains` to apply the spec's progression and acquisition rules.
-They do not hold state of their own and are safe to instantiate per call.
+These are lightweight helper classes that operate on a disease module's
+:class:`~tbsim.resistance.strains.AgentStrains` to apply the spec's progression
+and acquisition rules. They do not hold state of their own and are safe to
+instantiate per call.
 """
 
 import numpy as np
@@ -52,7 +54,7 @@ class ProgressionResolver:
         Apply the bottleneck (in-place) to *uids* that just activated.
 
         Args:
-            profile (AgentStrains): Per-agent strain carriage on TB.
+            profile (AgentStrains): Per-agent strain carriage on MultiStrainTB.
             uids (ss.uids): UIDs that just activated to ``ASYMPTOMATIC``.
 
         Returns:
@@ -221,7 +223,7 @@ class AcquisitionResolver:
         - A strain already resistant to drug *d* gets no trial for *d*.
 
         Args:
-            profile (AgentStrains): Per-agent strain carriage on TB.
+            profile (AgentStrains): Per-agent strain carriage on MultiStrainTB.
             uids (ss.uids): Agents that just progressed.
         """
         if len(uids) == 0 or not self.p_random:
@@ -263,8 +265,8 @@ class AcquisitionResolver:
             profile (AgentStrains): Per-agent strain carriage to mutate.
             uids (ss.uids): Agents who failed treatment.
             drugs_used (list[str]): Drugs in the failed regimen.
-            tb: Optional TB module reference. When provided, per-agent state
-                modifiers (``self.state_modifiers``) scale the base
+            tb: Optional :class:`~tbsim.resistance.multistrain_tb.MultiStrainTB`
+                reference. When provided, per-agent state modifiers (``self.state_modifiers``) scale the base
                 ``p_selective`` for each agent.
         """
         if len(uids) == 0 or not self.p_selective:

@@ -23,7 +23,7 @@ class StrainSpec:
         init_prev    (float): Initial population prevalence of this strain at sim start.
             Default 0.0. Used only when AgentStrains seeds initial infections.
         acquisition  (dict):  Optional per-drug random acquisition probabilities for this strain.
-            Reserved for Phase 2. Default None.
+            Used by :class:`~tbsim.resistance.resolvers.AcquisitionResolver`. Default None.
         label        (str):   Optional human-readable label for plots. Defaults to uid.
 
     Example:
@@ -195,11 +195,11 @@ class StrainCatalog:
 
 class AgentStrains:
     """
-    Per-agent strain presence state attached to a :class:`tbsim.TB` instance.
+    Per-agent strain presence state attached to :class:`~tbsim.resistance.multistrain_tb.MultiStrainTB`.
 
     For each strain in the catalog, allocates one :class:`ss.BoolArr` named
-    ``carries_<uid>``. The arrays are defined on TB via
-    ``tb.define_states(...)`` so Starsim handles agent growth automatically.
+    ``carries_<uid>``. The arrays are defined on :class:`MultiStrainTB` via
+    ``define_states(...)`` so Starsim handles agent growth automatically.
 
     All agent indexing goes through Starsim's ``ss.uids`` /
     ``BoolArr.uids`` / ``intersect()`` APIs rather than raw NumPy.
@@ -224,16 +224,16 @@ class AgentStrains:
         return
 
     def state_defs(self):
-        """Return ``ss.BoolArr`` definitions to be added to TB.define_states()."""
+        """Return ``ss.BoolArr`` definitions to be added to MultiStrainTB.define_states()."""
         return [ss.BoolArr(name, default=False) for name in self.names]
 
     def attach(self, tb):
-        """Attach to a TB module after its states have been defined."""
+        """Attach to a MultiStrainTB module after its states have been defined."""
         self._tb = tb
         for name in self.names:
             if not hasattr(tb, name):
                 raise RuntimeError(
-                    f'AgentStrains state {name!r} not found on TB; '
+                    f'AgentStrains state {name!r} not found on MultiStrainTB; '
                     f'did you forget to include agent_strains.state_defs() in define_states()?'
                 )
         return
@@ -243,7 +243,7 @@ class AgentStrains:
     def _arr(self, strain):
         """Return the ``ss.BoolArr`` for *strain* (by uid or idx)."""
         if self._tb is None:
-            raise RuntimeError('AgentStrains is not attached to a TB module.')
+            raise RuntimeError('AgentStrains is not attached to a MultiStrainTB module.')
         return getattr(self._tb, self.names[self._to_idx(strain)])
 
     def _to_idx(self, strain):
@@ -283,7 +283,7 @@ class AgentStrains:
         when ``uids`` is supplied the result is in the same order as ``uids``.
         """
         if self._tb is None:
-            raise RuntimeError('AgentStrains is not attached to a TB module.')
+            raise RuntimeError('AgentStrains is not attached to a MultiStrainTB module.')
         if uids is None:
             n_alive = len(self._tb.sim.people.auids)
             total = np.zeros(n_alive, dtype=np.int32)
@@ -342,7 +342,7 @@ class AgentStrains:
         zero if none).
         """
         if self._tb is None:
-            raise RuntimeError('AgentStrains is not attached to a TB module.')
+            raise RuntimeError('AgentStrains is not attached to a MultiStrainTB module.')
         if len(uids) == 0:
             return np.zeros(0, dtype=float)
         fit = self.catalog.fitness
@@ -360,7 +360,7 @@ class AgentStrains:
         Sources carrying no strain return -1.
         """
         if self._tb is None:
-            raise RuntimeError('AgentStrains is not attached to a TB module.')
+            raise RuntimeError('AgentStrains is not attached to a MultiStrainTB module.')
         n = len(source_uids)
         if n == 0:
             return np.zeros(0, dtype=int)

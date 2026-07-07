@@ -128,8 +128,9 @@ class Sim(ss.Sim):
         Get the TB disease module from this sim.
 
         Args:
-            which (type, optional): Class of TB module to find (e.g. TB).
-                If None, returns the first BaseTB subclass found.
+            which (type, optional): Class of TB module to find (e.g. ``TB`` or
+                :class:`~tbsim.resistance.multistrain_tb.MultiStrainTB``).
+                If None, returns the first :class:`~tbsim.tb.BaseTB` subclass found.
 
         Returns:
             The TB disease module instance.
