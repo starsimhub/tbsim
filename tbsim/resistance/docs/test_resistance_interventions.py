@@ -656,3 +656,143 @@ class TestTPTSterilizeBranchStateCoverage:
         )
         assert not bool(tb.infected[uid][0])
 
+
+class TestResidualGapsClosed:
+    """Previously documented engine gaps: cancel, latent ω, per-strain suppress, DST lab."""
+
+    def test_cancel_in_flight_treatment(self):
+        strains = default_strains()
+        tb = MultiStrainTB(strains=strains, pars=dict(init_prev=ss.bernoulli(0.0)))
+        catalog = tb._strain_catalog
+        regimen = Regimen('first_line', drugs=['INH', 'RIF'])
+        tx1 = StrainAwareTxDelivery(
+            product=StrainAwareTx(regimen=regimen, catalog=catalog, adherence=1.0, p_relapse=0.0),
+            name='first_line',
+        )
+        tx2 = StrainAwareTxDelivery(
+            product=StrainAwareTx(regimen=regimen, catalog=catalog, adherence=1.0, p_relapse=0.0),
+            name='second_line',
+            cancel_delivery='first_line',
+        )
+        sim = tbsim.Sim(
+            n_agents=20, tb_model=tb, interventions=[tx1, tx2],
+            connectors=ResistanceConnector(),
+            start=ss.date('2000-01-01'), stop=ss.date('2000-03-01'),
+            dt=ss.days(14),
+        )
+        sim.pars.verbose = 0
+        sim.init()
+        tb = tbsim.get_tb(sim)
+        tx1 = sim.interventions['first_line']
+        tx2 = sim.interventions['second_line']
+        uid = sim.people.auids[:1]
+        tb.agent_strains.add_strain(uid, 'mdr')
+        tb.state[uid] = TBS.SYMPTOMATIC
+        tb.infected[uid] = True
+        tb.susceptible[uid] = False
+
+        tx1._elig_uids = uid
+        tx1.step_start_treatment()
+        assert bool(tb.on_treatment[uid][0])
+        assert bool(tx1.pending_failure[uid][0] | tx1.pending_success[uid][0])
+
+        tx2._elig_uids = uid
+        tx2.step_start_treatment()
+        assert not bool(tx1.pending_success[uid][0])
+        assert not bool(tx1.pending_failure[uid][0])
+        assert bool(tx2.pending_success[uid][0] | tx2.pending_failure[uid][0])
+
+    def test_latent_tx_selective_acquisition_on_partial_clear(self):
+        strains = default_strains()
+        tb = MultiStrainTB(strains=strains, pars=dict(init_prev=ss.bernoulli(0.0)))
+        catalog = tb._strain_catalog
+        regimen = Regimen('first_line', drugs=['INH', 'RIF'])
+        product = StrainAwareTx(
+            regimen=regimen,
+            catalog=catalog,
+            p_selective_acquisition={'RIF': 1.0},
+            acq_state_modifiers={
+                'infection': 1.0, 'non_infectious': 0.0,
+                'asymptomatic': 1.0, 'symptomatic': 1.0,
+                'treatment': 0.0, 'cleared': 0.0,
+            },
+            adherence=1.0,
+            p_relapse=0.0,
+        )
+        delivery = StrainAwareTxDelivery(product=product, name='tx_latent')
+        sim = tbsim.Sim(
+            n_agents=40, tb_model=tb, interventions=[delivery],
+            connectors=ResistanceConnector(),
+            start=ss.date('2000-01-01'), stop=ss.date('2000-03-01'),
+            dt=ss.days(14),
+        )
+        sim.pars.verbose = 0
+        sim.init()
+        tb = tbsim.get_tb(sim)
+        delivery = sim.interventions['tx_latent']
+        uid = sim.people.auids[:1]
+        profile = tb.agent_strains
+        profile.clear_all(uid)
+        profile.add_strain(uid, 'pan')
+        profile.add_strain(uid, 'inh_r')
+        tb.state[uid] = TBS.INFECTION
+        tb.infected[uid] = True
+        tb.susceptible[uid] = False
+
+        delivery._elig_uids = uid
+        delivery.step_start_treatment()
+
+        assert not profile.carries('pan', uid).any()
+        assert profile.carries('mdr', uid).any()
+
+    def test_per_strain_tpt_suppression_weights(self):
+        strains = default_strains()
+        tb = MultiStrainTB(strains=strains, pars=dict(init_prev=ss.bernoulli(0.0)))
+        catalog = tb._strain_catalog
+        regimen = Regimen('inh_tpt', drugs=['INH'])
+        tpt_product = StrainAwareTPTTx(regimen=regimen, catalog=catalog)
+        sim = tbsim.Sim(
+            n_agents=20, tb_model=tb,
+            interventions=[tbsim.TPTSimple(product=tpt_product)],
+            connectors=ResistanceConnector(),
+            start=ss.date('2000-01-01'), stop=ss.date('2000-03-01'),
+            dt=ss.days(14),
+        )
+        sim.pars.verbose = 0
+        sim.init()
+        tpt = sim.interventions['tptsimple'].product
+        tb = tbsim.get_tb(sim)
+        uid = sim.people.auids[:2]
+        profile = tb.agent_strains
+        profile.clear_all(uid)
+        profile.add_strain(uid[:1], 'pan')
+        profile.add_strain(uid[1:], 'pan')
+        profile.add_strain(uid[1:], 'mdr')
+        weights = tpt._suppression_weight(uid)
+        assert weights[0] == pytest.approx(1.0)
+        assert weights[1] == pytest.approx(0.5)
+
+    def test_dst_lab_pipeline_dropout(self):
+        sim = make_ss_sim(n_agents=40)
+        sim.init()
+        tb = tbsim.get_tb(sim)
+        target = ss.uids(np.array([0], dtype=int))
+        tb.agent_strains.clear_all(target)
+        tb.agent_strains.add_strain(target, 'inh_r')
+
+        dst_blocked = DSTDx(
+            default_catalog(), drugs=['INH'],
+            sensitivity=1.0, specificity=1.0,
+            p_strain_obs=1.0, p_sample=0.0, p_culture=1.0,
+        )
+        out = dst_blocked.administer(sim, target)
+        np.testing.assert_array_equal(out['INH'], [False])
+
+        dst_blocked = DSTDx(
+            default_catalog(), drugs=['INH'],
+            sensitivity=1.0, specificity=1.0,
+            p_strain_obs=1.0, p_sample=1.0, p_culture=0.0,
+        )
+        out = dst_blocked.administer(sim, target)
+        np.testing.assert_array_equal(out['INH'], [False])
+
