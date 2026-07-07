@@ -183,7 +183,7 @@ class TestAgentStrainsRepresentation:
 
         tb = tbsim.get_tb(sim)
         assert isinstance(tb.agent_strains, AgentStrains), 'Expected MultiStrainTB to attach AgentStrains runtime state'
-        assert not hasattr(tb, 'strain_mask'), 'Expected no ck_resistance-style integer strain_mask state on MultiStrainTB'
+        assert not hasattr(tb, 'strain_mask'), 'Expected no integer bitmask strain state on MultiStrainTB'
         assert tb.agent_strains.names == ['carries_pan', 'carries_inh_r'], 'Expected one named BoolArr state per StrainSpec uid'
         assert hasattr(tb, 'carries_pan') and hasattr(tb, 'carries_inh_r'), 'Expected named strain BoolArrs on MultiStrainTB'
 

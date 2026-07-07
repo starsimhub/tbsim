@@ -136,7 +136,7 @@ All three strain data-model classes live in `tbsim/resistance/strains.py`
 |---------|------|----------|-------------------|-----------------|------------|
 | `StrainSpec` / `StrainCatalog` | `resistance/strains.py` | **Native** | Strain catalog | Required | Tested |
 | `AgentStrains` | `resistance/strains.py` | **Native** | Per-agent `carries_*` flags | Auto on `MultiStrainTB` | Tested |
-| Bitmask `strain_mask` prototype | `ck_resistance/tbsim/resistance/*` | **N/A** | Reference/prototype representation only; not runtime state in this branch | Use named `AgentStrains` BoolArrs instead | Tested by design guard |
+| Bitmask prototype | Historical prototype | **N/A** | Reference/prototype representation only; not runtime state in this branch | Use named `AgentStrains` BoolArrs instead | Tested by design guard |
 | `ProgressionResolver` | `resistance/resolvers.py` | **Native** | Bottleneck at activation (`p_multi`) | `progression_mode='bottleneck'` | Tested |
 | `AcquisitionResolver` | `resistance/resolvers.py` | **Native** | Random (add) + selective (replace) acquisition | `p_random_acquisition` / Tx/TPT ω | Tested |
 | `StrainResults` | `resistance/analyzers.py` | **Native** | Per-strain prevalence/incidence | Analyzer on sim | Tested |
