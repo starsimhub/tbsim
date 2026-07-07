@@ -192,8 +192,9 @@ primary use case; the same classes can back other multi-strain overlays
 | Feature | File | Combine? | Resistance impact | Required wiring | Validation |
 |---------|------|----------|-------------------|-----------------|------------|
 | `tbsim.Sim` | `sim.py` | **Compatible†** | Routes params; `get_dx()`, `get_tb()` for cascades | `tb_model=MultiStrainTB(...)`, `connectors`, `copy_inputs=False` for DST router | Tested |
+| `ResistanceSim` | `resistance/sim.py` | **Native** | One-liner wrapper: strains + connector + optional cascade/analyzers; spec matrix via `build_spec_sim()` | `from tbsim.resistance import ResistanceSim, build_spec_sim` | Tested |
 | `ss.Sim` (raw) | Starsim | **Compatible†** | Works but loses `get_dx()` helpers | Prefer `tbsim.Sim` | Partial |
-| `ss.parallel()` / `MultiSim` | Starsim | **Compatible†** | Example scripts use parallel scenarios; analyzer lookup needs name-based `_find` | See `run_resistance_demo.py` | Tested |
+| `ss.parallel()` / `MultiSim` | Starsim | **Compatible†** | Example scripts use parallel scenarios; analyzer lookup needs name-based `_find` | See `run_resistance_program_demo.py` | Tested |
 | `demo()` | `sim.py` | **Compatible** | Plain `TB` only; no resistance | — | N/A |
 | `ProductMulti` / `TBProductRoutine` | `interventions/` | **Compatible†** | Generic delivery; strain logic in products | — | Partial |
 | Resistance namespace | `tbsim.resistance` | **Native** | Not re-exported on `tbsim`; import explicitly from subpackage. Acyclic: `resistance/*` uses `from ..tb import …`, never `import tbsim`. | `from tbsim.resistance import MultiStrainTB` | Tested |
@@ -204,9 +205,10 @@ primary use case; the same classes can back other multi-strain overlays
 
 | Script | Combine? | Role vs resistance | Validation |
 |--------|----------|-------------------|------------|
+| `run_resistance.py` | **Native** | Minimal disease-stack demo (strains→MultiStrainTB→connector→Tx/TPT/DST→analyzers) | Smoke tested |
 | `run_resistance.py` | **Native** | INH/BDQ TPT trade-off (5 strains) | Smoke tested |
 | `run_resistance2.py` | **Native** | Spec sensitivity matrix + DST routing | Tested (directional) |
-| `run_resistance_demo.py` | **Native** | Full RIF/BDQ/FQ program arms | Manual smoke |
+| `run_resistance_program_demo.py` | **Native** | Full RIF/BDQ/FQ program arms | Manual smoke |
 | `run_resistance_critical_paths.py` | **Native** | 23 path scenarios vs baseline | Manual smoke |
 | Other `tbsim_examples/*` | **Requires swap** | Use base `TB` + base Tx unless adapted | Not validated with resistance |
 
