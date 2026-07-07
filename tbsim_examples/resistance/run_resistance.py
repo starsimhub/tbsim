@@ -8,8 +8,19 @@ import starsim as ss
 
 import tbsim
 from tbsim.plots import _normalize_results
-from tbsim.resistance import ( DSTDelivery, DSTDx, DuplicateStrainAnalyzer, MultiStrainTB, Regimen, ResistanceConnector,
-                               StrainAwareTPTTx, StrainAwareTx, StrainAwareTxDelivery, StrainResults, StrainSpec)
+from tbsim.resistance import (
+    DSTDelivery,
+    DSTDx,
+    DuplicateStrainAnalyzer,
+    MultiStrainTB,
+    Regimen,
+    ResistanceConnector,
+    StrainAwareTPTTx,
+    StrainAwareTx,
+    StrainAwareTxDelivery,
+    StrainResults,
+    StrainSpec,
+)
 
 DRUGS = ['INH', 'RIF', 'BDQ']
 
