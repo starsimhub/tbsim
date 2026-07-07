@@ -224,6 +224,57 @@ keeps strain names visible in results and debugging, and supports arbitrary
 The bitmask implementation remains useful as a reference for ODE-facing
 operator tests, but it is not the runtime representation in this branch.
 
+#### Generic strain classes (TB drug resistance is one use case)
+
+`StrainSpec`, `StrainCatalog`, and `AgentStrains` are structurally generic
+over "a strain is a named entity with a binary phenotype vector and a
+fitness weight". They were introduced to model TB drug resistance, but the
+same three classes can back other multi-strain disease overlays — for
+example, HIV subtype models or ART-resistance profiles — by treating the
+phenotype dict as generic strain markers rather than drug-resistance bits.
+
+To keep the TB code stable while enabling this reuse, the classes expose
+generic names (`phenotype`, `markers`) alongside the original TB names
+(`resistance`, `drugs`) as aliases:
+
+| Generic (any disease) | TB alias (drug resistance) | Meaning                                                    |
+| --------------------- | -------------------------- | ---------------------------------------------------------- |
+| `StrainSpec(phenotype=...)` | `StrainSpec(resistance=...)` | Dict of marker → {0, 1}                                |
+| `StrainSpec.phenotype`      | `StrainSpec.resistance`      | The marker dict (same object)                          |
+| `StrainSpec.markers`        | `StrainSpec.drugs`           | Ordered marker names                                   |
+| `StrainCatalog(markers=...)`| `StrainCatalog(drugs=...)`   | Ordered column names                                   |
+| `StrainCatalog.phenotype`   | `StrainCatalog.resistance`   | `(n_strains, n_markers)` uint8 array                   |
+| `StrainCatalog.markers`     | `StrainCatalog.drugs`        | Ordered marker names                                   |
+
+The two names refer to the same underlying data; TB code (regimens, DST,
+resolvers, Tx/TPT) continues to use `resistance`/`drugs`, while non-TB
+users can write in the more neutral `phenotype`/`markers` idiom.
+
+**Why this split and not a rename?** The TB-facing modules interpret the
+phenotype as *drug resistance* — they multiply per-drug efficacies, gate
+DST outcomes, and drive treatment-acquired resistance. Renaming the
+attribute would either break every TB script and test or force those
+modules to grow parallel APIs. Keeping `resistance` as an alias of
+`phenotype` (rather than a separate field) means:
+
+* TB scripts, tests, and existing intervention code keep working unchanged.
+* Non-TB overlays can build directly on `StrainSpec`/`StrainCatalog`
+  without carrying "resistance" language into their own vocabulary.
+* Only the *strain data model* is generic. Disease-specific behaviour
+  (what a marker *does*) still lives in disease-specific modules —
+  another HIV overlay would supply its own connector, resolvers, and
+  interventions rather than reusing `ResistanceConnector`.
+
+**What is a phenotype?** Here "phenotype" is used in the modelling sense:
+the observable/modelled traits of a strain that the simulator cares
+about — a fixed-length 0/1 vector — rather than the underlying genotype.
+For TB it is the drug-resistance profile; for HIV it could be subtype or
+ART-resistance flags.
+
+`AgentStrains` was already disease-agnostic (it only tracks per-strain
+`carries_<uid>` boolean state and fitness-weighted transmission) and did
+not need changes to support this generalization.
+
 #### How they fit together
 
 ```
