@@ -138,15 +138,21 @@ class StrainAwareTxDelivery(TxDelivery):
     This class subclasses :class:`tbsim.TxDelivery` and only overrides the
     pieces that need strain logic, so existing eligibility and HSB integration
     continue to work unchanged.
+
+    Args:
+        cancel_delivery (str|None): Name of another :class:`TxDelivery` whose
+            in-flight course should be cancelled before starting treatment on
+            the same agents (regimen-switch / monitoring workflows).
     """
 
-    def __init__(self, product, **kwargs):
+    def __init__(self, product, cancel_delivery=None, **kwargs):
         if not isinstance(product, StrainAwareTx):
             raise TypeError(
                 f'StrainAwareTxDelivery requires a StrainAwareTx product; '
                 f'got {type(product).__name__}'
             )
         super().__init__(product=product, **kwargs)
+        self.cancel_delivery = cancel_delivery
         self._pending_per_strain = None  # set on each start
         # Snapshot of strain identities for scheduled relapses.
         # Key: uid (int) -> tuple[strain_idx, ...]
@@ -156,6 +162,11 @@ class StrainAwareTxDelivery(TxDelivery):
     def step_start_treatment(self):
         tb = self.sim.get_tb()
         uids = self._elig_uids
+
+        if self.cancel_delivery and len(uids):
+            prior = self.sim.interventions.get(self.cancel_delivery)
+            if prior is not None and hasattr(prior, 'cancel_treatment'):
+                prior.cancel_treatment(uids)
 
         if tb.agent_strains is None:
             # Fall through to the base behavior; should be configured though.
@@ -174,8 +185,11 @@ class StrainAwareTxDelivery(TxDelivery):
                     tb.ti_rr_reinfection_wane[cleared] = self.ti + tb.pars.dur_reinfection_protection.rvs(cleared)
                 tb.infected[cleared] = False
                 tb.susceptible[cleared] = True
-            # `still` agents remain in INFECTION carrying resistant strain(s); selective
-            # acquisition for latent treatment is a future extension.
+            if len(still):
+                n_acquired = self.product._acq_resolver.selective_acquisition(
+                    tb.agent_strains, still, self.product.regimen.drugs, tb=tb,
+                )
+                tb._n_txacq_resistance_this_step += int(n_acquired)
 
         # Active TB: same flow as base, but using the per-strain administer.
         active = uids[np.isin(tb.state[uids], [TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC, TBS.SYMPTOMATIC])]
@@ -236,6 +250,23 @@ class StrainAwareTxDelivery(TxDelivery):
         for s_idx in np.where(covered)[0]:
             profile.remove_strain(uids, int(s_idx))
         return
+
+    def cancel_treatment(self, uids):
+        """Cancel in-flight course and clear strain-aware pending state."""
+        cancelled = super().cancel_treatment(uids)
+        if len(cancelled) == 0:
+            return cancelled
+        if self._pending_per_strain:
+            for s_idx in list(self._pending_per_strain):
+                cured = self._pending_per_strain[s_idx]
+                keep = cured.remove(cancelled)
+                if len(keep) == 0:
+                    self._pending_per_strain.pop(s_idx, None)
+                else:
+                    self._pending_per_strain[s_idx] = keep
+        for uid in cancelled:
+            self._relapse_strains_by_uid.pop(int(uid), None)
+        return cancelled
 
     def step_success(self):
         """Clear all remaining strains for successful agents (full cure)."""
