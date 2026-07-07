@@ -1,8 +1,8 @@
-# TBsim Resistance Spec Plain-English Pseudocode
+# TBsim Resistance Step-by-Step Guide
 
-This document translates the resistance technical specification into English-only pseudocode. It is intended to answer two questions:
+This document translates the resistance technical specification into plain-language, step-by-step guidance. It is intended to answer two questions:
 
-- What needs to happen in the model at each critical path?
+- What needs to happen in the model at each analysis workflow?
 - Where should that behavior be covered: engine, example scenario, analyzer, or test?
 
 The model keeps one TB natural-history state per person. Drug resistance is an overlay beside that state. A person can carry zero, one, or multiple resistance profiles. The word "strain" below means a modeled resistance profile, such as pan-susceptible, RIF-resistant, BDQ-resistant, or RIF plus FQ resistant.
@@ -11,31 +11,31 @@ The model keeps one TB natural-history state per person. Drug resistance is an o
 
 - [Strain data model (`tbsim/resistance/strains.py`)](#strain-data-model-tbsimresistancestrainspy)
 - [Coverage Summary](#coverage-summary)
-- [Critical Path 1: Build The Resistance Catalog](#critical-path-1-build-the-resistance-catalog)
-- [Critical Path 2: Initialize Person-Level Strain State](#critical-path-2-initialize-person-level-strain-state)
-- [Critical Path 3: Transmission From A Single-Strain Infector](#critical-path-3-transmission-from-a-single-strain-infector)
-- [Critical Path 4: Transmission From A Superinfected Infector](#critical-path-4-transmission-from-a-superinfected-infector)
-- [Critical Path 5: Recipient Is Fully Susceptible](#critical-path-5-recipient-is-fully-susceptible)
-- [Critical Path 6: Recipient Is Already Infected And Eligible For Superinfection](#critical-path-6-recipient-is-already-infected-and-eligible-for-superinfection)
-- [Critical Path 7: Duplicate-Strain Superinfection Attempt](#critical-path-7-duplicate-strain-superinfection-attempt)
-- [Critical Path 8: Progression From Early Infection To Non-Infectious TB](#critical-path-8-progression-from-early-infection-to-non-infectious-tb)
-- [Critical Path 9: Progression From Early Or Non-Infectious TB To Active TB](#critical-path-9-progression-from-early-or-non-infectious-tb-to-active-tb)
-- [Critical Path 10: Natural Clearance And Death](#critical-path-10-natural-clearance-and-death)
-- [Critical Path 11: Random Endogenous Acquisition](#critical-path-11-random-endogenous-acquisition)
-- [Critical Path 12: Treatment Eligibility](#critical-path-12-treatment-eligibility)
-- [Critical Path 13: Treatment Product Effect](#critical-path-13-treatment-product-effect)
-- [Critical Path 14: Treatment Success Resolution](#critical-path-14-treatment-success-resolution)
-- [Critical Path 15: Treatment Failure Resolution And Selective Acquisition](#critical-path-15-treatment-failure-resolution-and-selective-acquisition)
-- [Critical Path 16: TPT Eligibility](#critical-path-16-tpt-eligibility)
-- [Critical Path 17: TPT Sterilization And Partial Clearance](#critical-path-17-tpt-sterilization-and-partial-clearance)
-- [Critical Path 18: TPT Suppression Or Ineffective TPT](#critical-path-18-tpt-suppression-or-ineffective-tpt)
-- [Critical Path 19: DST Sampling](#critical-path-19-dst-sampling)
-- [Critical Path 20: DST-Based Regimen Routing](#critical-path-20-dst-based-regimen-routing)
-- [Critical Path 21: Treatment Monitoring](#critical-path-21-treatment-monitoring)
-- [Critical Path 22: Results And Analyzers](#critical-path-22-results-and-analyzers)
-- [Critical Path 23: Baseline And Intervention Scenarios](#critical-path-23-baseline-and-intervention-scenarios)
-- [Critical Path 24: Validation And Regression Testing](#critical-path-24-validation-and-regression-testing)
-- [Critical Path 25: Known Residual Items](#critical-path-25-known-residual-items)
+- [Analysis Workflow 1: Build The Resistance Catalog](#analysis-workflow-1-build-the-resistance-catalog)
+- [Analysis Workflow 2: Initialize Person-Level Strain State](#analysis-workflow-2-initialize-person-level-strain-state)
+- [Analysis Workflow 3: Transmission From A Single-Strain Infector](#analysis-workflow-3-transmission-from-a-single-strain-infector)
+- [Analysis Workflow 4: Transmission From A Superinfected Infector](#analysis-workflow-4-transmission-from-a-superinfected-infector)
+- [Analysis Workflow 5: Recipient Is Fully Susceptible](#analysis-workflow-5-recipient-is-fully-susceptible)
+- [Analysis Workflow 6: Recipient Is Already Infected And Eligible For Superinfection](#analysis-workflow-6-recipient-is-already-infected-and-eligible-for-superinfection)
+- [Analysis Workflow 7: Duplicate-Strain Superinfection Attempt](#analysis-workflow-7-duplicate-strain-superinfection-attempt)
+- [Analysis Workflow 8: Progression From Early Infection To Non-Infectious TB](#analysis-workflow-8-progression-from-early-infection-to-non-infectious-tb)
+- [Analysis Workflow 9: Progression From Early Or Non-Infectious TB To Active TB](#analysis-workflow-9-progression-from-early-or-non-infectious-tb-to-active-tb)
+- [Analysis Workflow 10: Natural Clearance And Death](#analysis-workflow-10-natural-clearance-and-death)
+- [Analysis Workflow 11: Random Endogenous Acquisition](#analysis-workflow-11-random-endogenous-acquisition)
+- [Analysis Workflow 12: Treatment Eligibility](#analysis-workflow-12-treatment-eligibility)
+- [Analysis Workflow 13: Treatment Product Effect](#analysis-workflow-13-treatment-product-effect)
+- [Analysis Workflow 14: Treatment Success Resolution](#analysis-workflow-14-treatment-success-resolution)
+- [Analysis Workflow 15: Treatment Failure Resolution And Selective Acquisition](#analysis-workflow-15-treatment-failure-resolution-and-selective-acquisition)
+- [Analysis Workflow 16: TPT Eligibility](#analysis-workflow-16-tpt-eligibility)
+- [Analysis Workflow 17: TPT Sterilization And Partial Clearance](#analysis-workflow-17-tpt-sterilization-and-partial-clearance)
+- [Analysis Workflow 18: TPT Suppression Or Ineffective TPT](#analysis-workflow-18-tpt-suppression-or-ineffective-tpt)
+- [Analysis Workflow 19: DST Sampling](#analysis-workflow-19-dst-sampling)
+- [Analysis Workflow 20: DST-Based Regimen Routing](#analysis-workflow-20-dst-based-regimen-routing)
+- [Analysis Workflow 21: Treatment Monitoring](#analysis-workflow-21-treatment-monitoring)
+- [Analysis Workflow 22: Results And Analyzers](#analysis-workflow-22-results-and-analyzers)
+- [Analysis Workflow 23: Baseline And Intervention Scenarios](#analysis-workflow-23-baseline-and-intervention-scenarios)
+- [Analysis Workflow 24: Validation And Regression Testing](#analysis-workflow-24-validation-and-regression-testing)
+- [Analysis Workflow 25: Known Residual Items](#analysis-workflow-25-known-residual-items)
 - [Recommended Next Example Additions](#recommended-next-example-additions)
 - [Bottom Line](#bottom-line)
 
@@ -58,9 +58,9 @@ StrainSpec (×N)  →  StrainCatalog  →  AgentStrains (on MultiStrainTB)
     exist?"              fast lookup"         pan + inh_r"
 ```
 
-Critical-path mapping:
+Analysis-workflow mapping:
 
-| Critical path (below) | Primary class(es) |
+| Analysis workflow (below) | Primary class(es) |
 |-----------------------|-------------------|
 | 1 — Build the resistance catalog | `StrainSpec`, `StrainCatalog` |
 | 2 — Initialize person-level strain state | `AgentStrains` (+ `MultiStrainTB`) |
@@ -76,9 +76,9 @@ The full spec is larger than one example script. Complete coverage should be spl
 - Example coverage: scenario scripts that demonstrate how to configure and compare baseline and intervention arms.
 - Test coverage: deterministic checks for the spec's quantitative rules and regression checks for scenario-level behavior.
 
-Current engine and test coverage is broad. The critical-path example now includes baseline, intervention, sensitivity, no-resistance comparator, and optional multi-seed uncertainty workflows. Treatment monitoring supports scheduled diagnostics plus in-flight course cancellation via ``cancel_delivery`` on ``StrainAwareTxDelivery``.
+Current engine and test coverage is broad. The analysis-workflow example now includes baseline, intervention, sensitivity, no-resistance comparator, and optional multi-seed uncertainty workflows. Treatment monitoring supports scheduled diagnostics plus in-flight course cancellation via ``cancel_delivery`` on ``StrainAwareTxDelivery``.
 
-## Critical Path 1: Build The Resistance Catalog
+## Analysis Workflow 1: Build The Resistance Catalog
 
 Plain-English pseudocode:
 
@@ -108,7 +108,17 @@ Current status:
 - Covered for alternative drug sets in tests and other resistance examples.
 - Engine: `StrainSpec` + `StrainCatalog` in `tbsim/resistance/strains.py`.
 
-## Critical Path 2: Initialize Person-Level Strain State
+Example snippet:
+```python
+drugs = ["INH", "RIF"]
+strain_specs = [
+    StrainSpec(uid="pan", resistance={"INH": 0, "RIF": 0}, fitness=1.0, init_prev=0.95),
+    StrainSpec(uid="rif_r", resistance={"INH": 0, "RIF": 1}, fitness=0.9, init_prev=0.04),
+]
+catalog = StrainCatalog(strain_specs)
+```
+
+## Analysis Workflow 2: Initialize Person-Level Strain State
 
 Plain-English pseudocode:
 
@@ -130,7 +140,15 @@ Current status:
 - Engine: `AgentStrains` in `tbsim/resistance/strains.py` (one `ss.BoolArr`
   per strain on `MultiStrainTB`).
 
-## Critical Path 3: Transmission From A Single-Strain Infector
+Example snippet:
+```python
+infected = sim.people.tb_inf
+seeded = sim.rng.binomial(1, catalog.init_prev, size=(infected.sum(), len(catalog.uids))).astype(bool)
+for j, uid in enumerate(catalog.uids):
+    tb.agent_strains.set_strain(infected, uid, seeded[:, j])
+```
+
+## Analysis Workflow 3: Transmission From A Single-Strain Infector
 
 Plain-English pseudocode:
 
@@ -151,7 +169,15 @@ Current status:
 - Covered by the resistance connector and `AgentStrains` transmission logic.
 - Demonstrated indirectly in examples through fitness-cost scenarios.
 
-## Critical Path 4: Transmission From A Superinfected Infector
+Example snippet:
+```python
+uid = tb.agent_strains.sample_transmitting_strain(src_uid)
+p_tx = tb.beta * catalog.fitness[catalog.uid_to_index[uid]]
+if sim.rng.random() < p_tx:
+    tb.agent_strains.add_strain(dst_uid, uid)
+```
+
+## Analysis Workflow 4: Transmission From A Superinfected Infector
 
 Plain-English pseudocode:
 
@@ -175,7 +201,15 @@ Current status:
 - Covered by engine logic and spec example tests.
 - Demonstrated by superinfection tracking in the scenario example, but the current example may not produce many superinfected agents in one seed.
 
-## Critical Path 5: Recipient Is Fully Susceptible
+Example snippet:
+```python
+uids = tb.agent_strains.strains_for_agent(src_uid)
+weights = [catalog.fitness[catalog.uid_to_index[u]] for u in uids]
+uid = sim.rng.choice(uids, p=np.array(weights) / np.sum(weights))
+tb.agent_strains.add_strain(dst_uid, uid)
+```
+
+## Analysis Workflow 5: Recipient Is Fully Susceptible
 
 Plain-English pseudocode:
 
@@ -195,7 +229,16 @@ Current status:
 
 - Covered.
 
-## Critical Path 6: Recipient Is Already Infected And Eligible For Superinfection
+Example snippet:
+```python
+if tb.susceptible[dst_uid] and transmitted_uid is not None:
+    tb.set_state(dst_uid, TBS.INF)
+    tb.ti_inf[dst_uid] = sim.t
+    tb.agent_strains.clear(dst_uid)
+    tb.agent_strains.add_strain(dst_uid, transmitted_uid)
+```
+
+## Analysis Workflow 6: Recipient Is Already Infected And Eligible For Superinfection
 
 Plain-English pseudocode:
 
@@ -222,7 +265,15 @@ Current status:
 - Covered in engine and tests.
 - Example coverage exists through superinfection tracking, but more explicit high-superinfection scenarios would make this easier to inspect.
 
-## Critical Path 7: Duplicate-Strain Superinfection Attempt
+Example snippet:
+```python
+if tb.is_superinfection_eligible(dst_uid):
+    if sim.rng.random() < tb.superinfection_prob(dst_uid):
+        tb.agent_strains.add_strain(dst_uid, transmitted_uid)
+        # State/timers are preserved for superinfection events.
+```
+
+## Analysis Workflow 7: Duplicate-Strain Superinfection Attempt
 
 Plain-English pseudocode:
 
@@ -244,7 +295,17 @@ Current status:
 
 - Covered by the duplicate-profile analyzer and shown in scenario summaries.
 
-## Critical Path 8: Progression From Early Infection To Non-Infectious TB
+Example snippet:
+```python
+already_has = tb.agent_strains.has_strain(dst_uid, transmitted_uid)
+if already_has:
+    analyzers.dup.counter_step += 1
+    analyzers.dup.counter_total += 1
+else:
+    tb.agent_strains.add_strain(dst_uid, transmitted_uid)
+```
+
+## Analysis Workflow 8: Progression From Early Infection To Non-Infectious TB
 
 Plain-English pseudocode:
 
@@ -262,7 +323,16 @@ Current status:
 
 - Covered.
 
-## Critical Path 9: Progression From Early Or Non-Infectious TB To Active TB
+Example snippet:
+```python
+prog = tb.progressing_to_noninfectious
+# Preserve carried strains during this progression step.
+for uid in np.where(prog)[0]:
+    tb.agent_strains.sync_agent(uid)
+tb.acquisition.resolve_random(prog)
+```
+
+## Analysis Workflow 9: Progression From Early Or Non-Infectious TB To Active TB
 
 Plain-English pseudocode:
 
@@ -289,7 +359,16 @@ Current status:
 - Covered in engine and tests.
 - Covered in the expanded example by the progression bottleneck sensitivity arm.
 
-## Critical Path 10: Natural Clearance And Death
+Example snippet:
+```python
+uids = tb.agent_strains.strains_for_agent(uid)
+if len(uids) > 1 and sim.rng.random() > tb.p_mixed_active:
+    keep = sim.rng.choice(uids)
+    tb.agent_strains.keep_only(uid, keep)
+tb.set_state(uid, TBS.ASYM)
+```
+
+## Analysis Workflow 10: Natural Clearance And Death
 
 Plain-English pseudocode:
 
@@ -308,7 +387,14 @@ Current status:
 
 - Covered.
 
-## Critical Path 11: Random Endogenous Acquisition
+Example snippet:
+```python
+to_clear = tb.cleared | tb.died
+for uid in np.where(to_clear)[0]:
+    tb.agent_strains.clear(uid)
+```
+
+## Analysis Workflow 11: Random Endogenous Acquisition
 
 Plain-English pseudocode:
 
@@ -335,7 +421,16 @@ Current status:
 - Covered in engine and tests.
 - Demonstrated in the high-acquisition-pressure example scenario.
 
-## Critical Path 12: Treatment Eligibility
+Example snippet:
+```python
+for uid in np.where(tb.left_inf_state)[0]:
+    for s in tb.agent_strains.strains_for_agent(uid):
+        for drug in catalog.drugs:
+            if catalog.resistance[s, drug] == 0 and sim.rng.random() < p_acq[drug]:
+                tb.agent_strains.add_strain(uid, catalog.acquired_uid(s, drug))
+```
+
+## Analysis Workflow 12: Treatment Eligibility
 
 Plain-English pseudocode:
 
@@ -359,7 +454,16 @@ Current status:
 - Covered in the scenario example through RIF-based first-line versus BPaL-like routing.
 - Regimen router helper exists for more general observed-phenotype routing.
 
-## Critical Path 13: Treatment Product Effect
+Example snippet:
+```python
+eligible = hs.eligible_for_treatment & tb.alive & (~tb.on_treatment)
+if require_dst:
+    eligible &= dst.has_result
+first_line = eligible & (~dst.obs_resistant["RIF"])
+second_line = eligible & dst.obs_resistant["RIF"]
+```
+
+## Analysis Workflow 13: Treatment Product Effect
 
 Plain-English pseudocode:
 
@@ -386,7 +490,15 @@ Current status:
 - Covered in engine and tests.
 - Demonstrated in first-line and BPaL-like example regimens.
 
-## Critical Path 14: Treatment Success Resolution
+Example snippet:
+```python
+for uid in tx_starts:
+    strains = tb.agent_strains.strains_for_agent(uid)
+    cured = [s for s in strains if regimen.cures(s, catalog, adherence=draw_adherence(uid))]
+    tx_state.store_episode(uid, cured=cured, surviving=[s for s in strains if s not in cured])
+```
+
+## Analysis Workflow 14: Treatment Success Resolution
 
 Plain-English pseudocode:
 
@@ -405,7 +517,16 @@ Current status:
 
 - Covered.
 
-## Critical Path 15: Treatment Failure Resolution And Selective Acquisition
+Example snippet:
+```python
+success = tx_state.episode_success
+for uid in np.where(success)[0]:
+    tb.agent_strains.clear(uid)
+    tb.set_state(uid, TBS.CLEARED)
+    tx_state.schedule_relapse(uid)
+```
+
+## Analysis Workflow 15: Treatment Failure Resolution And Selective Acquisition
 
 Plain-English pseudocode:
 
@@ -433,7 +554,15 @@ Current status:
 - Covered in engine and tests.
 - Demonstrated in high-acquisition-pressure scenarios.
 
-## Critical Path 16: TPT Eligibility
+Example snippet:
+```python
+fail = tx_state.episode_failed
+for uid in np.where(fail)[0]:
+    tb.agent_strains.set_strains(uid, tx_state.surviving_strains(uid))
+    tb.acquisition.resolve_selective(uid, regimen=tx_state.regimen(uid))
+```
+
+## Analysis Workflow 16: TPT Eligibility
 
 Plain-English pseudocode:
 
@@ -453,7 +582,14 @@ Current status:
 
 - Covered in TPT scale-up examples.
 
-## Critical Path 17: TPT Sterilization And Partial Clearance
+Example snippet:
+```python
+eligible = tpt_delivery.eligibility(sim.people)
+selected = eligible & (sim.rng.random(sim.n) < tpt_delivery.coverage)
+tpt_delivery.start(selected)
+```
+
+## Analysis Workflow 17: TPT Sterilization And Partial Clearance
 
 Plain-English pseudocode:
 
@@ -478,7 +614,16 @@ Current status:
 
 - Covered in engine and demonstrated by TPT scenarios.
 
-## Critical Path 18: TPT Suppression Or Ineffective TPT
+Example snippet:
+```python
+for uid in tpt_on:
+    covered = tpt.regimen_covered_strains(uid, tb.agent_strains, catalog)
+    if tb.in_early_infection(uid):
+        tb.agent_strains.remove_strains(uid, covered)
+        if not tb.agent_strains.any(uid): tb.set_state(uid, TBS.CLEARED)
+```
+
+## Analysis Workflow 18: TPT Suppression Or Ineffective TPT
 
 Plain-English pseudocode:
 
@@ -504,7 +649,14 @@ Current status:
 - Covered in engine (`StrainAwareTPTTx.apply_protection` scales ``rr_*`` by covered-strain fraction).
 - Current example forces sterilization to make the resistance contrast visible. A non-sterilizing TPT sensitivity scenario should be added for complete example coverage.
 
-## Critical Path 19: DST Sampling
+Example snippet:
+```python
+covered_frac = tpt.covered_fraction(uid, tb.agent_strains, catalog)
+tb.rr_inf[uid] *= (1 - covered_frac * tpt.effectiveness)
+tb.acquisition.resolve_tpt(uid, state_modifier=tb.state_modifier(uid))
+```
+
+## Analysis Workflow 19: DST Sampling
 
 Plain-English pseudocode:
 
@@ -533,7 +685,14 @@ Current status:
 - Covered in engine and tests (`DSTDx` with `p_sample`, `p_culture`, `p_strain_obs`).
 - Covered in the expanded example by the DST strain dropout sensitivity arm.
 
-## Critical Path 20: DST-Based Regimen Routing
+Example snippet:
+```python
+if sim.rng.random() < p_sample and sim.rng.random() < p_culture:
+    observed = dst.observe_strains(uid, p_strain_obs)
+    dst.obs_resistant[uid] = dst.to_person_level_phenotype(observed, sens=dst.sens, spec=dst.spec)
+```
+
+## Analysis Workflow 20: DST-Based Regimen Routing
 
 Plain-English pseudocode:
 
@@ -556,7 +715,15 @@ Current status:
 - Covered by direct RIF routing in the example.
 - General helper exists for multi-drug phenotype routing.
 
-## Critical Path 21: Treatment Monitoring
+Example snippet:
+```python
+for uid in tx_candidates:
+    profile = dst.obs_resistant[uid]
+    regimen = router.select(profile)
+    tx_delivery_by_regimen[regimen].start(uid)
+```
+
+## Analysis Workflow 21: Treatment Monitoring
 
 Plain-English pseudocode:
 
@@ -583,7 +750,16 @@ Current status:
 - In-flight cancellation is covered via ``TxDelivery.cancel_treatment`` and ``StrainAwareTxDelivery(cancel_delivery=...)``.
 - Covered in the expanded example by the treatment monitoring pathway arm. In the default seed, monitoring is configured and counted, but produces zero positives.
 
-## Critical Path 22: Results And Analyzers
+Example snippet:
+```python
+due = tx.time_on_treatment() >= monitor.after_days
+positive = monitor_test.apply(due)
+to_switch = due & positive
+second_line_delivery.cancel_delivery = first_line_delivery
+second_line_delivery.start(to_switch)
+```
+
+## Analysis Workflow 22: Results And Analyzers
 
 Plain-English pseudocode:
 
@@ -609,7 +785,14 @@ Current status:
 - Covered for per-profile counts, duplicate blocks, and superinfection in examples.
 - Treatment and DST summaries can be expanded in the example output.
 
-## Critical Path 23: Baseline And Intervention Scenarios
+Example snippet:
+```python
+results.strain_prev[t] = analyzers.strain_results.active_by_uid(tb)
+results.dup_blocks[t] = analyzers.dup.counter_step
+results.res_by_drug[t] = analyzers.resistance_stats.by_drug(tb, catalog)
+```
+
+## Analysis Workflow 23: Baseline And Intervention Scenarios
 
 Plain-English pseudocode:
 
@@ -639,7 +822,15 @@ Current status:
 - Current example covers baseline, TPT scale-up, DST plus BPaL, combined BPaL plus TPT, acquisition pressure, fitness cost, progression bottleneck, DST dropout, and treatment monitoring.
 - Current example also includes a no-resistance comparator and optional replicate uncertainty workflow.
 
-## Critical Path 24: Validation And Regression Testing
+Example snippet:
+```python
+scenarios = [baseline, tpt_scaleup, dst_plus_second_line, combined]
+runs = [ResistanceSim(pars=s) for s in scenarios]
+for sim_i in runs: sim_i.run()
+plot_compare(runs, metrics=["active_tb", "resistant_share"])
+```
+
+## Analysis Workflow 24: Validation And Regression Testing
 
 Plain-English pseudocode:
 
@@ -671,9 +862,17 @@ Current status:
 
 - Most deterministic and scenario-level tests exist.
 - Example smoke validation exists.
-- Multi-seed uncertainty plots are available through the critical-path example's uncertainty mode.
+- Multi-seed uncertainty plots are available through the analysis-workflow example's uncertainty mode.
 
-## Critical Path 25: Known Residual Items
+Example snippet:
+```python
+base = run_scenario(pars_base)
+res = run_scenario(pars_with_resistance)
+assert abs(res.tb_mortality.mean() - base.tb_mortality.mean()) < tol
+assert run_scenario(pars_high_acq).rif_r_share[-1] > res.rif_r_share[-1]
+```
+
+## Analysis Workflow 25: Known Residual Items
 
 These are not hidden requirements. They are explicit implementation or example coverage items that should be addressed or documented.
 
@@ -687,7 +886,7 @@ These are not hidden requirements. They are explicit implementation or example c
 
 ## Recommended Next Example Additions
 
-The critical-path scenario runner now includes these arms:
+The analysis-workflow scenario runner now includes these arms:
 
 1. No-resistance comparator.
 2. Baseline resistance program.
@@ -703,4 +902,13 @@ The critical-path scenario runner now includes these arms:
 
 ## Bottom Line
 
-The spec can be implemented as an opt-in resistance overlay with clear critical paths. The engine should own transmission, superinfection, progression, clearance, acquisition, treatment effects, TPT effects, DST, routing helpers, monitoring helpers, and analyzers. The example suite now exercises every major configurable path with baseline, intervention, sensitivity, no-resistance, and uncertainty scenarios. Residual work is mainly example-grade uncertainty calibration and scientific defaults (e.g. non-infectious superinfection α).
+The spec can be implemented as an opt-in resistance overlay with clear analysis workflows. The engine should own transmission, superinfection, progression, clearance, acquisition, treatment effects, TPT effects, DST, routing helpers, monitoring helpers, and analyzers. The example suite now exercises every major configurable path with baseline, intervention, sensitivity, no-resistance, and uncertainty scenarios. Residual work is mainly example-grade uncertainty calibration and scientific defaults (e.g. non-infectious superinfection alpha).
+
+Example snippet:
+```python
+if monitor_positives == 0:
+    notes.append("Monitoring arm underpowered in this seed")
+if n_seeds < 20:
+    notes.append("Increase seeds for decision-grade uncertainty")
+```
+

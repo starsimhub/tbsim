@@ -133,7 +133,7 @@ def get_spec_scenario_configs():
     """
     Return validation scenarios for the tech-spec **Testing** section (PDF p.10).
 
-    These operationalize ``resistance_spec_pseudocode.md`` **Critical Path 24**
+    These operationalize ``resistance_step_by_step_guide.md`` **Critical Path 24**
     (overlay burden + directional sensitivity).
 
     For the full **Critical Path 23** intervention matrix, use

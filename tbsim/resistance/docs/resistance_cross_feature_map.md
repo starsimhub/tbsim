@@ -146,21 +146,18 @@ This document lists TBsim features and validates whether each can be combined wi
 
 All three strain data-model classes live in `tbsim/resistance/strains.py`
 (see [resistance_architecture.md §1.1](resistance_architecture.md#11-strainspec-vs-straincatalog-vs-agentstrains)).
-The classes are structurally generic over "a strain is a named entity with a
-binary phenotype vector and a fitness weight". TB drug resistance is the
-primary use case; the same classes can back other multi-strain overlays
-(e.g. HIV subtypes) by using `phenotype`/`markers` in place of the TB
-`resistance`/`drugs` aliases.
+The classes are intentionally TB-focused in this branch and use one naming
+path (`resistance`, `drugs`) for lower API complexity.
 
 | Class | Role |
 |-------|------|
-| `StrainSpec` | One strain's blueprint (phenotype bits, fitness, `init_prev`) — pure config. Accepts `phenotype=` (generic) or `resistance=` (TB alias). |
-| `StrainCatalog` | Catalog of all specs as indexed numpy tables for fast lookup. Accepts `markers=` (generic) or `drugs=` (TB alias); exposes `phenotype`/`resistance` and `markers`/`drugs`. |
+| `StrainSpec` | One strain's blueprint (resistance bits, fitness, `init_prev`) — pure config. |
+| `StrainCatalog` | Catalog of all specs as indexed numpy tables for fast lookup (`drugs`, `uids`, `resistance`, `fitness`, `init_prev`). |
 | `AgentStrains` | Per-agent runtime state (`carries_<uid>` `ss.BoolArr` on `MultiStrainTB`). Disease-agnostic. |
 
 | Feature | File | Combine? | Resistance impact | Required wiring | Validation |
 |---------|------|----------|-------------------|-----------------|------------|
-| `StrainSpec` / `StrainCatalog` | `resistance/strains.py` | **Native** | Strain catalog with generic `phenotype`/`markers` and TB `resistance`/`drugs` aliases | Required | Tested |
+| `StrainSpec` / `StrainCatalog` | `resistance/strains.py` | **Native** | TB strain catalog (`resistance`/`drugs`) | Required | Tested |
 | `AgentStrains` | `resistance/strains.py` | **Native** | Per-agent `carries_*` flags | Auto on `MultiStrainTB` | Tested |
 | Bitmask prototype | Historical prototype | **N/A** | Reference/prototype representation only; not runtime state in this branch | Use named `AgentStrains` BoolArrs instead | Tested by design guard |
 | `ProgressionResolver` | `resistance/resolvers.py` | **Native** | Bottleneck at activation (`p_multi`) | `progression_mode='bottleneck'` | Tested |
@@ -252,4 +249,4 @@ Comparator:  TB() on parallel arm (no connector, no strain analyzers)
 ## Related docs
 
 - [resistance_architecture.md](resistance_architecture.md) — implementation architecture (§1.1: StrainSpec / StrainCatalog / AgentStrains)
-- [resistance_spec_pseudocode.md](resistance_spec_pseudocode.md) — spec-aligned pseudocode and coverage status
+- [resistance_step_by_step_guide.md](resistance_step_by_step_guide.md) — step-by-step behavior guide and coverage status

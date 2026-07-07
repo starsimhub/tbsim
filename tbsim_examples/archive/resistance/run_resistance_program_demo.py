@@ -80,7 +80,7 @@ STRAIN_COLORS = {
     'BDQ+FQ-R':     '#DA8BC3',
 }
 
-# Critical Path 23 scenario vocabulary (``resistance_spec_pseudocode.md``).
+# Critical Path 23 scenario vocabulary (``resistance_step_by_step_guide.md``).
 LABEL_NO_RESISTANCE = 'No-resistance comparator'
 LABEL_BASELINE = 'Baseline program'
 LABEL_TPT_SCALEUP = 'TPT scale-up'

@@ -9,30 +9,6 @@
 
 ---
 
-## Table of contents
-
-- [0. Big picture](#0-big-picture)
-- [1. Strain profile (spec §"Individual strain resistance profiles")](#1-strain-profile-spec-individual-strain-resistance-profiles)
-- [2. Multi-strain infections (spec §"Allow for multi-strain infections")](#2-multi-strain-infections-spec-allow-for-multi-strain-infections)
-- [3. Transmission (spec §"Transmission")](#3-transmission-spec-transmission)
-- [4. Strain competition and protection against reinfection (spec §"Strain competition")](#4-strain-competition-and-protection-against-reinfection-spec-strain-competition)
-- [5. Progression to disease (spec §"Progression to disease")](#5-progression-to-disease-spec-progression-to-disease)
-- [6. Clearance (spec §"Clearance")](#6-clearance-spec-clearance)
-- [7. Random (endogenous) acquisition (spec §"(Random) Acquisition")](#7-random-endogenous-acquisition-spec-random-acquisition)
-- [8. Treatment & selective acquisition (spec §"Treatment & (Selective) Acquisition")](#8-treatment--selective-acquisition-spec-treatment--selective-acquisition)
-- [9. TPT (spec §"TPT")](#9-tpt-spec-tpt)
-- [10. Diagnostics & treatment modification (spec §"Diagnostics & Treatment Modification")](#10-diagnostics--treatment-modification-spec-diagnostics--treatment-modification)
-- [11. Package layout, import boundaries, and test coverage](#11-package-layout-import-boundaries-and-test-coverage)
-- [12. Spec → code traceability table](#12-spec--code-traceability-table)
-- [13. Module map](#13-module-map)
-- [14. Starsim base-class and pattern alignment](#14-starsim-base-class-and-pattern-alignment)
-- [15. Upstream candidates for Starsim](#15-upstream-candidates-for-starsim)
-- [16. Notation](#16-notation)
-- [17. Testing](#17-testing)
-- [18. Updated Spec Delta (2026-06)](#18-updated-spec-delta-2026-06)
-- [19. References (carried over from the spec)](#19-references-carried-over-from-the-spec)
-
----
 
 ## 0. Big picture
 
@@ -226,79 +202,17 @@ agent_strains.add_strain(infected_uids, 'pan')   # assign strain to agents
 agent_strains.carriers('inh_r')                  # uids currently carrying inh_r
 ```
 
-#### Why `AgentStrains` is not a bitmask
+#### Strain model scope
 
-An earlier two-strain prototype stored each agent's carried strains in a
-single integer bitmask. In that representation, bit `j` meant
-"this agent carries strain `j`"; for example, binary `0101` meant the agent
-carried strains 0 and 2. This is compact and fast for a small, fixed, fully
-enumerated strain universe.
+The strain data model in this branch is intentionally TB-specific and keeps
+one naming path:
 
-The production overlay uses named `ss.BoolArr` state instead:
+* `StrainSpec(..., resistance=...)` for per-drug resistance bits.
+* `StrainCatalog(..., drugs=...)` for catalog column ordering.
+* `catalog.resistance` as the canonical strain-by-drug matrix.
 
-```text
-carries_pan
-carries_inh_r
-carries_mdr
-...
-```
-
-This is less compact than one integer, but it matches Starsim's state model,
-keeps strain names visible in results and debugging, and supports arbitrary
-`StrainSpec` catalogs without forcing users to reason about binary encodings.
-The bitmask implementation remains useful as a reference for ODE-facing
-operator tests, but it is not the runtime representation in this branch.
-
-#### Generic strain classes (TB drug resistance is one use case)
-
-`StrainSpec`, `StrainCatalog`, and `AgentStrains` are structurally generic
-over "a strain is a named entity with a binary phenotype vector and a
-fitness weight". They were introduced to model TB drug resistance, but the
-same three classes can back other multi-strain disease overlays — for
-example, HIV subtype models or ART-resistance profiles — by treating the
-phenotype dict as generic strain markers rather than drug-resistance bits.
-
-To keep the TB code stable while enabling this reuse, the classes expose
-generic names (`phenotype`, `markers`) alongside the original TB names
-(`resistance`, `drugs`) as aliases:
-
-| Generic (any disease) | TB alias (drug resistance) | Meaning                                                    |
-| --------------------- | -------------------------- | ---------------------------------------------------------- |
-| `StrainSpec(phenotype=...)` | `StrainSpec(resistance=...)` | Dict of marker → {0, 1}                                |
-| `StrainSpec.phenotype`      | `StrainSpec.resistance`      | The marker dict (same object)                          |
-| `StrainSpec.markers`        | `StrainSpec.drugs`           | Ordered marker names                                   |
-| `StrainCatalog(markers=...)`| `StrainCatalog(drugs=...)`   | Ordered column names                                   |
-| `StrainCatalog.phenotype`   | `StrainCatalog.resistance`   | `(n_strains, n_markers)` uint8 array                   |
-| `StrainCatalog.markers`     | `StrainCatalog.drugs`        | Ordered marker names                                   |
-
-The two names refer to the same underlying data; TB code (regimens, DST,
-resolvers, Tx/TPT) continues to use `resistance`/`drugs`, while non-TB
-users can write in the more neutral `phenotype`/`markers` idiom.
-
-**Why this split and not a rename?** The TB-facing modules interpret the
-phenotype as *drug resistance* — they multiply per-drug efficacies, gate
-DST outcomes, and drive treatment-acquired resistance. Renaming the
-attribute would either break every TB script and test or force those
-modules to grow parallel APIs. Keeping `resistance` as an alias of
-`phenotype` (rather than a separate field) means:
-
-* TB scripts, tests, and existing intervention code keep working unchanged.
-* Non-TB overlays can build directly on `StrainSpec`/`StrainCatalog`
-  without carrying "resistance" language into their own vocabulary.
-* Only the *strain data model* is generic. Disease-specific behaviour
-  (what a marker *does*) still lives in disease-specific modules —
-  another HIV overlay would supply its own connector, resolvers, and
-  interventions rather than reusing `ResistanceConnector`.
-
-**What is a phenotype?** Here "phenotype" is used in the modelling sense:
-the observable/modelled traits of a strain that the simulator cares
-about — a fixed-length 0/1 vector — rather than the underlying genotype.
-For TB it is the drug-resistance profile; for HIV it could be subtype or
-ART-resistance flags.
-
-`AgentStrains` was already disease-agnostic (it only tracks per-strain
-`carries_<uid>` boolean state and fitness-weighted transmission) and did
-not need changes to support this generalization.
+`AgentStrains` remains the per-agent carriage container (`carries_<uid>`
+arrays on `MultiStrainTB`) and is unchanged by this simplification.
 
 #### How they fit together
 
@@ -860,7 +774,7 @@ modifiers by the fraction of carried strains covered by the regimen
 
 ---
 
-## 11. Package layout, import boundaries, and test coverage
+## 11. Package layout and import boundaries
 
 All spec capabilities from the original roadmap are implemented. The
 subpackage is organized by responsibility (not build phase):
@@ -888,20 +802,17 @@ subpackage is organized by responsibility (not build phase):
 flowchart TB
     classDef core fill:#dbeafe,stroke:#1e40af,stroke-width:1.5px,color:#1e3a8a
     classDef pkg fill:#dcfce7,stroke:#15803d,stroke-width:1.5px,color:#14532d
-    classDef test fill:#fef3c7,stroke:#b45309,stroke-width:1.5px,color:#7c2d12
 
     tbpy["tbsim/tb.py<br/>TB · TBS · get_tb"]:::core
     mst["multistrain_tb.py<br/>MultiStrainTB"]:::pkg
     strains["strains.py"]:::pkg
     resolvers["resolvers.py"]:::pkg
     interv["tx · tpt · diagnostics"]:::pkg
-    tests["docs/test_resistance_*.py<br/>4 files by area"]:::test
 
     tbpy -. subclass .-> mst
     strains --> mst
     resolvers --> mst
     mst --> interv
-    tests -. validates .-> mst
 ```
 
 **Import graph (acyclic)**
@@ -924,94 +835,16 @@ from tbsim.resistance    →  explicit public API
 | In-flight Tx cancel | `TxDelivery.cancel_treatment`; `StrainAwareTxDelivery.cancel_delivery` |
 | DST lab-process dropout | `DSTDx(p_sample=..., p_culture=..., p_strain_obs=...)` |
 
-**Test suites** (under `tbsim/resistance/docs/`):
-
-| File | Category |
-| ---- | -------- |
-| `test_resistance_natural_history.py` | Transmission, superinfection, progression, acquisition |
-| `test_resistance_interventions.py` | Regimen, strain-aware Tx/DST/TPT, routing, monitoring |
-| `test_resistance_wiring.py` | Analyzers, init_prev, connector, migration regressions |
-| `test_resistance_scenarios.py` | Epidemiological scenarios and sensitivity |
-
-Data-model unit tests remain in `tests/test_resistance.py`.
-
 ---
 
-## 12. Spec → code traceability table
+## 12. Implementation cross-reference
 
-A condensed cross-reference for code review. The column "ODE test" matches
-the test numbering in the spec.
+To avoid duplicating the same mappings in multiple formats, use:
 
-| Spec section / behaviour                                          | Code location                                                          | Status   | ODE test |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------- | -------- | -------- |
-| Strain profile (per-drug binary, per-strain)                      | `strains.StrainSpec`, `strains.StrainCatalog`                         | ✅        |          |
-| Multi-strain carriage                                             | `strains.AgentStrains` (`ss.BoolArr` per strain)                      | ✅        |          |
-| Transmission: `f_i` multiplicative                                | `connector.ResistanceConnector`                                        | ✅        |          |
-| Transmission: super-infector → fittest strain's prob, multinomial | `strains.AgentStrains.effective_rel_trans`, `strains.AgentStrains.sample_transmitted_strain` | ✅        | #5       |
-| α_super protection (active in `MultiStrainTB.infect()`)           | `MultiStrainTB._alpha_super`, `MultiStrainTB._alpha_act`, `MultiStrainTB.infect()` | ✅ | — |
-| No duplicate strain superinfection                                | `MultiStrainTB._assign_transmitted_strains` skip + counter            | ✅        |          |
-| Duplicate-block analyzer                                          | `analyzers.DuplicateStrainAnalyzer`                                    | ✅        |          |
-| Progression: agent-level NH                                       | Base `TB.transition` unchanged; hooks on `MultiStrainTB`               | ✅        | #1       |
-| Bottleneck `p_multi` w/ equal-prob pick                           | `resolvers.ProgressionResolver`                                        | ✅ (fixed) | #2       |
-| Superinfection while active (α_act_*)                             | `MultiStrainTB._alpha_act`, applied in `MultiStrainTB.infect()`        | ✅ | #3 |
-| Clearance wipes all strains                                       | `MultiStrainTB.transition` and `MultiStrainTB.step_die` call `agent_strains.clear_all` on CLEARED/death        | ✅        |          |
-| Random acquisition: per-strain Bernoulli μ_d at progression       | `resolvers.AcquisitionResolver.random_acquisition`                     | ✅ (fixed) |          |
-| Random acquisition ADDS resistant variant                         | `AcquisitionResolver.random_acquisition` (via `agent_strains.add_strain`)                    | ✅ (fixed) |          |
-| Per-strain regimen efficacy ψ_R,s                                 | `regimens.Regimen.strain_cure_probs`                                           | ✅        |          |
-| Adherence scalar                                                  | `tx.StrainAwareTx.adherence`                                           | ✅        |          |
-| Adherence distribution (correlated across strains)                | `StrainAwareTx.administer` — one Bernoulli draw per agent gates every per-strain cure roll. Heterogeneity via callable `p` on `ss.bernoulli`. | ✅ | |
-| Selective acquisition ω_R,d at treatment failure                  | `resolvers.AcquisitionResolver.selective_acquisition` from `tx.StrainAwareTxDelivery.step_failures` | ✅ | #4 |
-| Selective acquisition ω on latent Tx residual                     | `StrainAwareTxDelivery.step_start_treatment` (INFECTION partial clear) | ✅ | |
-| In-flight Tx cancel / regimen switch                              | `TxDelivery.cancel_treatment`; `StrainAwareTxDelivery(cancel_delivery=...)` | ✅ | |
-| Selective acquisition REPLACES susceptible strain                 | `_apply_acquisition` (via `agent_strains.replace_strain`)                    | ✅        |          |
-| State-dependent ω_R,d                                             | `AcquisitionResolver.state_modifiers`; `selective_acquisition(..., tb=tb)` | ✅ | |
-| TPT per-strain efficacy + acquisition                             | `tpt.StrainAwareTPTTx`                                                 | ✅        |          |
-| TPT per-strain suppression (`rr_*` scaled by coverage)            | `StrainAwareTPTTx.apply_protection`                                    | ✅        |          |
-| State-dependent TPT acquisition                                   | `StrainAwareTPTTx.DEFAULT_TPT_STATE_MODIFIERS` (INFECTION 0.05, NON_INFECTIOUS 0.5, ASYMP/SYMP 1.0) | ✅ | |
-| DST per-drug sens/spec → observed phenotype                       | `diagnostics.DSTDx`, `diagnostics.DSTDelivery`                         | ✅        |          |
-| DST lab-process dropout (`p_sample`, `p_culture`, `p_strain_obs`) | `DSTDx.administer`                                                     | ✅        |          |
-| DST eligibility immediate / on failure                            | configurable lambda; `treatment_monitoring_eligibility` for failure-conditional | ✅ | |
-| Time since last treatment initiation                              | `TxDelivery.ti_treatment_start` (existing) + `treatment_monitoring_eligibility` helper | ✅ | |
-| Treatment provision gated by observed DST                         | `RegimenRouter.matches(...)` → eligibility lambdas for `StrainAwareTxDelivery` | ✅ | |
-| Treatment monitoring (time-under-treatment Dx + regimen switch)   | `treatment_monitoring_eligibility('tx', after_steps=N)` on a `DxDelivery` whose `diagnosed` flag gates a second `StrainAwareTxDelivery` with `cancel_delivery` | ✅ | |
-| Per-strain analyzer                                               | `analyzers.StrainResults`                                              | ✅        |          |
+- Sections `1`-`10` in this file for spec-to-implementation details by topic.
+- Section `11` for package layout and import boundaries.
 
-Legend: ✅ implemented · ⚠ partial · ⏳ planned
-
-All items from the original baseline specification are implemented.
-The updated June 2026 specification introduced additional requirements;
-see section 18 for the updated delta status.
-
----
-
-## 13. Module map
-
-| File              | Responsibility                                                                | Public symbols                              |
-| ----------------- | ----------------------------------------------------------------------------- | ------------------------------------------- |
-| `multistrain_tb.py` | Strain-aware `TB` subclass: transmission, progression, clearance, superinfection hooks | `MultiStrainTB`                             |
-| `strains.py`      | Strain specs, catalog, and per-agent multi-strain state                       | `StrainSpec`, `StrainCatalog`, `AgentStrains` |
-| `connector.py`    | Applies fittest-strain fitness to `MultiStrainTB.rel_trans` for infectious agents | `ResistanceConnector`                       |
-| `regimens.py`     | Drug-combination model with per-strain cure probabilities (ψ_R,s)              | `Regimen`                                   |
-| `resolvers.py`    | Progression bottleneck (equal-prob) and random / selective acquisition         | `ProgressionResolver`, `AcquisitionResolver`|
-| `tx.py`           | Strain-aware first-line / second-line treatment product + delivery            | `StrainAwareTx`, `StrainAwareTxDelivery`    |
-| `sim.py`          | Convenience :class:`ResistanceSim` wrapper + :func:`build_care_cascade`       | `ResistanceSim`, `build_care_cascade`, strain presets |
-| `tpt.py`          | Strain-aware preventive therapy (per-strain sterilise / suppress)             | `StrainAwareTPTTx`                          |
-| `diagnostics.py`  | DST product + delivery, regimen router, treatment-monitoring helper           | `DSTDx`, `DSTDelivery`, `RegimenRouter`, `treatment_monitoring_eligibility` |
-| `analyzers.py`    | Per-strain result channels + duplicate-block diagnostic                       | `StrainResults`, `DuplicateStrainAnalyzer`  |
-
-`MultiStrainTB` hooks in `multistrain_tb.py`:
-
-- `MultiStrainTB.__init__` accepts `strains=`, `progression_mode=`, `p_multi=`,
-  `p_random_acquisition=`, `alpha_super=`, `alpha_act=`.
-- `MultiStrainTB.define_states` adds one `ss.BoolArr` per strain.
-- `MultiStrainTB.set_prognoses` → `_assign_transmitted_strains`.
-- `MultiStrainTB.transition` → `_apply_strain_progression` (bottleneck + random
-  acquisition); strain wipe on CLEARED.
-- `MultiStrainTB.step_die` clears strains on death/removal.
-
----
-
-## 14. Starsim base-class and pattern alignment
+## 13. Starsim base-class and pattern alignment
 
 Every resistance class that participates in the Starsim runtime subclasses
 the canonical Starsim primitive used elsewhere in `tbsim/interventions/`:
@@ -1055,7 +888,7 @@ the same surface area in the same shape.
 
 ---
 
-## 15. Upstream candidates for Starsim
+## 14. Upstream candidates for Starsim
 
 A subset of this overlay would arguably benefit every multi-strain
 infectious-disease model built on Starsim — not just TB. Below is a
@@ -1186,7 +1019,7 @@ natural history and clinical pathways* (tbsim).
 
 ---
 
-## 16. Notation
+## 15. Notation
 
 The spec notes that software may diverge from the spec's algebraic
 notation in whichever way makes most sense. The implementation chose
@@ -1208,28 +1041,7 @@ paths. Both forms are interchangeable in user-facing API calls.
 
 ---
 
-## 17. Testing
-
-```
-tests/test_resistance.py                              # Data model (StrainSpec, catalog, AgentStrains, connector)
-tbsim/resistance/docs/resistance_helpers.py           # Shared sim builders and test utilities
-tbsim/resistance/docs/test_resistance_natural_history.py  # Transmission, progression, acquisition
-tbsim/resistance/docs/test_resistance_interventions.py    # Tx, DST/routing, TPT, regimens
-tbsim/resistance/docs/test_resistance_wiring.py           # Analyzers, init_prev, connector, migration
-tbsim/resistance/docs/test_resistance_scenarios.py        # Epidemiological scenario & sensitivity checks
-```
-
-Current state at this revision:
-
-- Resistance-focused suites pass, including updated scenario-level tests.
-- No linter errors in any overlay module.
-- Default-sim regression test
-  (`test_default_sim_runs_without_strains`) guarantees the overlay is
-  genuinely opt-in.
-
----
-
-## 18. Updated Spec Delta (2026-06)
+## 16. Updated Spec Delta (2026-06)
 
 Cross-reference against `tbsim-resistance-tech-spec -UPDATED.docx`:
 
@@ -1293,7 +1105,7 @@ Residual open items from the updated spec:
 
 ---
 
-## 19. References (carried over from the spec)
+## 17. References (carried over from the spec)
 
 1. Cohen T, Lipsitch M, Walensky RP, Murray M. *Beneficial and perverse
    effects of isoniazid preventive therapy for latent tuberculosis

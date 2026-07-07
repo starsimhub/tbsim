@@ -1,6 +1,6 @@
 """One-scenario-at-a-time resistance critical-path comparisons (MultiStrainTB).
 
-Scenario names and parameterizations follow ``resistance_spec_pseudocode.md``
+Scenario names and parameterizations follow ``resistance_step_by_step_guide.md``
 Critical Paths 11–21 and 23 (baseline, intervention, sensitivity, comparator).
 Plot and summary style follows Cohen/Ryckman TB modeling conventions via
 ``run_resistance_program_demo``.

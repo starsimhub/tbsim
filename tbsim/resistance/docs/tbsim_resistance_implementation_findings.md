@@ -332,39 +332,14 @@ Start with a strain catalog and a fixed per-agent presence matrix for Phase I. R
 
 #### 2a. Generalizing the strain classes beyond TB
 
-`StrainSpec`, `StrainCatalog`, and `AgentStrains` were designed for TB drug
-resistance but are structurally generic: each strain is a named entity with a
-binary phenotype vector and a fitness weight. The classes have been extended
-in place (not forked) so that other multi-strain overlays — e.g. HIV subtypes
-or ART-resistance profiles — can reuse them.
+The strain classes are now intentionally TB-specific and simpler:
 
-Change summary:
+- `StrainSpec(..., resistance=...)` is the only constructor path.
+- `StrainCatalog(..., drugs=...)` is the only catalog column path.
+- `catalog.resistance` is the canonical strain-by-drug matrix.
 
-- `StrainSpec` accepts `phenotype=` (generic) as an alias for `resistance=`
-  (TB). Internally the data is stored on `self.phenotype`; `self.resistance`,
-  `self.drugs`, and `self.markers` are aliases that return the same dict.
-- `StrainCatalog` accepts `markers=` as an alias for `drugs=`, and exposes
-  both `self.phenotype`/`self.resistance` (2D array) and
-  `self.markers`/`self.drugs` (column names).
-- `AgentStrains` needed no changes — its per-strain `carries_<uid>` state
-  and fitness-weighted transmission are already disease-agnostic.
-
-Why aliases instead of a rename:
-
-- TB code (regimens, DST, resolvers, Tx/TPT) actively interprets the
-  phenotype as drug resistance. Renaming would either break every TB
-  script/test or force parallel APIs in those modules.
-- Non-TB overlays can build directly on the strain classes without
-  carrying "resistance" language into their vocabulary.
-- Only the *strain data model* is made generic. Disease-specific behaviour
-  still lives in disease-specific modules — a hypothetical HIV overlay
-  supplies its own connector, resolvers, and interventions rather than
-  reusing `ResistanceConnector`.
-
-"Phenotype" is used here in the modelling sense: the observable / modelled
-traits of a strain — a fixed-length 0/1 vector — rather than the underlying
-genotype. For TB it is the drug-resistance profile; for HIV it could be
-subtype or ART-resistance flags.
+`AgentStrains` remains unchanged — it tracks per-agent `carries_<uid>` state
+and provides the same carriage and transmission helpers.
 
 ### 3. Duplicate-Strain Superinfection
 
