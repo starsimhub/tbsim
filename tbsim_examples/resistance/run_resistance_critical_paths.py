@@ -1,4 +1,4 @@
-"""One-scenario-at-a-time resistance critical-path comparisons.
+"""One-scenario-at-a-time resistance critical-path comparisons (MultiStrainTB).
 
 Scenario names and parameterizations follow ``resistance_spec_pseudocode.md``
 Critical Paths 11–21 and 23 (baseline, intervention, sensitivity, comparator).

@@ -1,3 +1,4 @@
+"""Full RIF/BDQ/FQ resistance program demo with MultiStrainTB, DST routing, and parallel arms."""
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,7 @@ from tbsim.resistance import (
     DSTDx,
     DSTDelivery,
     DuplicateStrainAnalyzer,
+    MultiStrainTB,
     Regimen,
     ResistanceConnector,
     StrainAwareTPTTx,
@@ -363,7 +365,7 @@ def build_strains(fitness=None):
 
 def build_tb(scenario=None):
     scenario = sc.objdict(sc.mergedicts(DEFAULT_SCENARIO, scenario or {}))
-    return tbsim.MultiStrainTB(
+    return MultiStrainTB(
         strains=build_strains(fitness=scenario.fitness),
         pars=dict(
             init_prev=ss.bernoulli(0.21),

@@ -1,6 +1,6 @@
 """
 Tests for the drug-resistance overlay (StrainSpec, StrainCatalog, AgentStrains,
-ResistanceConnector, and the strain hooks added to TB).
+ResistanceConnector, and MultiStrainTB).
 """
 
 import numpy as np
@@ -13,6 +13,7 @@ from tbsim.resistance import (
     AgentStrains,
     StrainCatalog,
     StrainSpec,
+    MultiStrainTB,
 )
 
 
@@ -34,7 +35,7 @@ def make_default_strains(init_prev_pan=0.05):
 def make_resistance_sim(n_agents=200, **kwargs):
     """Build a small TB sim with the resistance overlay enabled."""
     strains = kwargs.pop('strains', None) or make_default_strains()
-    tb = tbsim.MultiStrainTB(strains=strains, pars=dict(init_prev=ss.bernoulli(0.05)))
+    tb = MultiStrainTB(strains=strains, pars=dict(init_prev=ss.bernoulli(0.05)))
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=30))
     sim = ss.Sim(
         n_agents=n_agents,
@@ -178,12 +179,12 @@ class TestTBStrainHook:
         assert not hasattr(tb, 'agent_strains')
 
     def test_agent_strains_created_when_configured(self):
-        tb = tbsim.MultiStrainTB(strains=make_default_strains())
+        tb = MultiStrainTB(strains=make_default_strains())
         assert isinstance(tb.agent_strains, AgentStrains)
         assert tb.agent_strains.catalog.n == 3
 
     def test_strain_states_registered_on_tb(self):
-        tb = tbsim.MultiStrainTB(strains=make_default_strains())
+        tb = MultiStrainTB(strains=make_default_strains())
         for name in tb.agent_strains.names:
             assert name.startswith('carries_')
 
@@ -331,8 +332,7 @@ class TestResistanceSim:
         assert (counts == 0).all()
 
     def test_no_duplicate_strains_per_agent_no_superinfection(self):
-        # Without overlay-driven superinfection logic in Phase 1, each carrier
-        # array is boolean: an agent carries a strain at most once per strain.
+        # Boolean carries_<uid> arrays: an agent carries each strain at most once.
         sim = make_resistance_sim(n_agents=150)
         sim.run()
         tb = tbsim.get_tb(sim)

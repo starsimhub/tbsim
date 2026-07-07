@@ -1,3 +1,4 @@
+"""INH/BDQ TPT trade-off example using MultiStrainTB and strain-aware interventions."""
 
 import numpy as np
 import pandas as pd
@@ -7,7 +8,7 @@ import starsim as ss
 
 import tbsim
 from tbsim.plots import _normalize_results
-from tbsim.resistance import ( DSTDelivery, DSTDx, DuplicateStrainAnalyzer, Regimen, ResistanceConnector,
+from tbsim.resistance import ( DSTDelivery, DSTDx, DuplicateStrainAnalyzer, MultiStrainTB, Regimen, ResistanceConnector,
                                StrainAwareTPTTx, StrainAwareTx, StrainAwareTxDelivery, StrainResults, StrainSpec)
 
 DRUGS = ['INH', 'RIF', 'BDQ']
@@ -42,7 +43,7 @@ def build_strains():
 
 def build_tb():
     """TB module with bottleneck strain progression and a tiny background acquisition rate."""
-    return tbsim.MultiStrainTB(
+    return MultiStrainTB(
         strains=build_strains(),
         pars=dict(
             init_prev=ss.bernoulli(0.06),     # ~6% initial latent/active TB

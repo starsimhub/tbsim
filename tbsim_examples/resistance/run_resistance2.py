@@ -25,6 +25,7 @@ from tbsim.plots import _normalize_results
 from tbsim.resistance import (
     DSTDx,
     DSTDelivery,
+    MultiStrainTB,
     Regimen,
     RegimenRouter,
     ResistanceConnector,
@@ -155,7 +156,7 @@ def _build_sim(
                 init_prev=resistant_init_prev,
             ),
         ]
-        tb = tbsim.MultiStrainTB(
+        tb = MultiStrainTB(
             strains=strains,
             pars=dict(init_prev=ss.bernoulli(0.05), beta=ss.permonth(0.22)),
             p_random_acquisition=p_random_acquisition,
