@@ -994,6 +994,7 @@ see section 18 for the updated delta status.
 | `regimens.py`     | Drug-combination model with per-strain cure probabilities (ψ_R,s)              | `Regimen`                                   |
 | `resolvers.py`    | Progression bottleneck (equal-prob) and random / selective acquisition         | `ProgressionResolver`, `AcquisitionResolver`|
 | `tx.py`           | Strain-aware first-line / second-line treatment product + delivery            | `StrainAwareTx`, `StrainAwareTxDelivery`    |
+| `sim.py`          | Convenience :class:`ResistanceSim` wrapper + :func:`build_care_cascade`       | `ResistanceSim`, `build_care_cascade`, strain presets |
 | `tpt.py`          | Strain-aware preventive therapy (per-strain sterilise / suppress)             | `StrainAwareTPTTx`                          |
 | `diagnostics.py`  | DST product + delivery, regimen router, treatment-monitoring helper           | `DSTDx`, `DSTDelivery`, `RegimenRouter`, `treatment_monitoring_eligibility` |
 | `analyzers.py`    | Per-strain result channels + duplicate-block diagnostic                       | `StrainResults`, `DuplicateStrainAnalyzer`  |
