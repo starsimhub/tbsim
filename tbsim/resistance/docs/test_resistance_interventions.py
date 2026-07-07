@@ -80,6 +80,23 @@ class TestRegimen:
         with pytest.raises(ValueError):
             r.strain_cure_probs(catalog)
 
+    def test_resistance_penalty_allows_partial_resistant_efficacy(self):
+        """ODE reference: resistant strains can have reduced-but-nonzero efficacy."""
+        _, catalog = two_strain_catalog()
+        regimen = Regimen(
+            'inh_partial',
+            drugs=['INH'],
+            per_drug_efficacy={'INH': 0.75},
+            resistance_penalty={'INH': 0.4},
+        )
+        probs = regimen.strain_cure_probs(catalog)
+        assert probs[catalog.index('pan')] == pytest.approx(0.75)
+        assert probs[catalog.index('inh_r')] == pytest.approx(0.30)
+
+    def test_resistance_penalty_rejects_unknown_drug(self):
+        with pytest.raises(ValueError):
+            Regimen('bad_penalty', drugs=['INH'], resistance_penalty={'RIF': 0.5})
+
 
 class TestRegimenPerStrainEfficacy:
     """Spec §Treatment: per-strain clinical efficacy ψ_{R,j}."""
@@ -160,6 +177,108 @@ class TestStrainAwareTxFlow:
 
         assert not profile.carries('pan', target).any()
         assert profile.carries('mdr', target).all()
+
+
+class TestODEReferenceTreatmentOperator:
+    """Two-strain ODE π(m→s) treatment operator checks."""
+
+    @staticmethod
+    def _make_operator_sim(e_pan=0.75, e_res=0.30, q_acq=0.10, n_agents=30000):
+        strains, catalog = two_strain_catalog()
+        tb = MultiStrainTB(
+            strains=strains,
+            pars=dict(init_prev=ss.bernoulli(0.0), beta=ss.peryear(0.0)),
+        )
+        regimen = Regimen(
+            'inh_ode_reference',
+            drugs=['INH'],
+            per_drug_efficacy={'INH': e_pan},
+            resistance_penalty={'INH': e_res / e_pan},
+        )
+        product = StrainAwareTx(
+            regimen=regimen,
+            catalog=catalog,
+            p_selective_acquisition={'INH': q_acq},
+            adherence=1.0,
+            p_relapse=0.0,
+        )
+        delivery = StrainAwareTxDelivery(product=product, name='tx_ode_reference')
+        sim = tbsim.Sim(
+            tb_model=tb,
+            sim_pars=dict(
+                n_agents=n_agents,
+                start=ss.date('2000-01-01'),
+                stop=ss.date('2000-02-01'),
+                dt=ss.days(14),
+                rand_seed=4,
+            ),
+            interventions=[delivery],
+            connectors=ResistanceConnector(),
+            networks=ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=1), dur=30)),
+        )
+        sim.pars.verbose = 0
+        sim.init()
+        return sim, tbsim.get_tb(sim), sim.interventions['tx_ode_reference'].product
+
+    @staticmethod
+    def _mask_counts(tb, uids):
+        profile = tb.agent_strains
+        pan = profile.carries('pan', uids)
+        inh_r = profile.carries('inh_r', uids)
+        masks = pan.astype(int) + 2 * inh_r.astype(int)
+        return {mask: float(np.mean(masks == mask)) for mask in (0, 1, 2, 3)}
+
+    def _outcome_dist(self, tb, product, strain_names):
+        uids = tb.sim.people.auids
+        profile = tb.agent_strains
+        tb.state[uids] = TBS.SYMPTOMATIC
+        tb.infected[uids] = True
+        tb.susceptible[uids] = False
+        profile.clear_all(uids)
+        for name in strain_names:
+            profile.add_strain(uids, name)
+
+        outcomes = product.administer(tb.sim, uids)
+        failure_uids = outcomes['failure']
+
+        for s_idx, cured_mask in outcomes['per_strain'].items():
+            cured_uids = uids[cured_mask].intersect(failure_uids)
+            if len(cured_uids):
+                profile.remove_strain(cured_uids, int(s_idx))
+
+        product._acq_resolver.selective_acquisition(
+            profile,
+            failure_uids,
+            product.regimen.drugs,
+            tb=tb,
+        )
+        profile.clear_all(outcomes['success'])
+        return self._mask_counts(tb, uids)
+
+    def test_treatment_outcome_operator_matches_ode_pi_table(self):
+        """Per-strain cure plus replacement acquisition matches the ODE π table."""
+        e_pan, e_res, q = 0.75, 0.30, 0.10
+        _, tb, product = self._make_operator_sim(e_pan=e_pan, e_res=e_res, q_acq=q)
+
+        mono_pan = self._outcome_dist(tb, product, ['pan'])
+        assert mono_pan[0] == pytest.approx(e_pan, abs=0.02)
+        assert mono_pan[1] == pytest.approx((1 - e_pan) * (1 - q), abs=0.02)
+        assert mono_pan[2] == pytest.approx((1 - e_pan) * q, abs=0.02)
+
+        mono_res = self._outcome_dist(tb, product, ['inh_r'])
+        assert mono_res[0] == pytest.approx(e_res, abs=0.02)
+        assert mono_res[2] == pytest.approx(1 - e_res, abs=0.02)
+
+        mixed = self._outcome_dist(tb, product, ['pan', 'inh_r'])
+        assert mixed[0] == pytest.approx(e_pan * e_res, abs=0.02)
+        assert mixed[1] == pytest.approx((1 - e_pan) * e_res * (1 - q), abs=0.02)
+        pi_ab_to_b = (
+            e_pan * (1 - e_res)
+            + (1 - e_pan) * e_res * q
+            + (1 - e_pan) * (1 - e_res) * q
+        )
+        assert mixed[2] == pytest.approx(pi_ab_to_b, abs=0.02)
+        assert mixed[3] == pytest.approx((1 - e_pan) * (1 - e_res) * (1 - q), abs=0.02)
 
 
 class TestAdherenceCorrelation:

@@ -9,21 +9,27 @@ class Regimen:
     """
     A regimen is a set of drug/class names plus per-strain efficacy.
 
-    Per-strain cure probability is computed as a *minimum-effective-drug* model:
-    among the drugs in the regimen, a strain is exposed to those drugs it is
-    *not* resistant to. The per-strain cure probability is then::
+    Per-strain cure probability is computed as a drug-level efficacy model:
+    among the drugs in the regimen, each drug contributes its configured
+    efficacy, optionally reduced by a resistance penalty if the strain is
+    resistant to that drug. The per-strain cure probability is then::
 
-        p_cure(strain) = base_efficacy * f(susceptible_drugs)
+        p_cure(strain) = base_efficacy * f(effective_drug_efficacies)
 
-    where ``f`` defaults to ``max`` over per-drug efficacies (best drug in the
-    regimen drives the cure). Strains that are resistant to every regimen drug
-    have ``p_cure = 0``.
+    where ``f`` defaults to ``max`` over effective per-drug efficacies (best
+    drug in the regimen drives the cure). By default resistant drugs contribute
+    zero efficacy, preserving the historical "fully resistant means uncovered"
+    behavior. Set ``resistance_penalty`` to allow reduced-but-nonzero efficacy
+    against resistant strains, as in the two-strain ODE reference operator.
 
     Args:
         name (str): Regimen label, e.g. ``'first_line'``.
         drugs (list[str]): Drug/class names in this regimen.
         per_drug_efficacy (dict): Per-drug cure probability (0-1) for a
             strain susceptible to that drug. Default: 1.0 for each drug.
+        resistance_penalty (dict): Optional per-drug multiplier applied to the
+            drug's efficacy when a strain is resistant to that drug. Default:
+            0.0 for each drug (resistant drug contributes no efficacy).
         base_efficacy (float): Multiplicative top-level efficacy applied to all
             strains. Default 1.0.
         combine (str): How to combine per-drug efficacies for strains
@@ -44,8 +50,8 @@ class Regimen:
 
     COMBINE_MODES = ('max', 'parallel')
 
-    def __init__(self, name, drugs, per_drug_efficacy=None, base_efficacy=1.0,
-                 combine='max'):
+    def __init__(self, name, drugs, per_drug_efficacy=None,
+                 resistance_penalty=None, base_efficacy=1.0, combine='max'):
         if not isinstance(name, str) or not name:
             raise ValueError(f'Regimen name must be a non-empty string; got {name!r}')
         drugs = list(drugs)
@@ -71,10 +77,22 @@ class Regimen:
                     raise ValueError(
                         f'per_drug_efficacy[{d!r}] must be in [0, 1]; got {p!r}'
                     )
+        if resistance_penalty is None:
+            resistance_penalty = {}
+        for d, p in resistance_penalty.items():
+            if d not in drugs:
+                raise ValueError(
+                    f'resistance_penalty[{d!r}] references a drug not in regimen {drugs}'
+                )
+            if not (0.0 <= float(p) <= 1.0):
+                raise ValueError(
+                    f'resistance_penalty[{d!r}] must be in [0, 1]; got {p!r}'
+                )
 
         self.name = name
         self.drugs = drugs
         self.per_drug_efficacy = dict(per_drug_efficacy)
+        self.resistance_penalty = {d: float(resistance_penalty.get(d, 0.0)) for d in drugs}
         self.base_efficacy = float(base_efficacy)
         self.combine = combine
         return
@@ -101,14 +119,11 @@ class Regimen:
             ) from exc
 
         per_drug = np.array([self.per_drug_efficacy[d] for d in self.drugs], dtype=float)
+        penalties = np.array([self.resistance_penalty[d] for d in self.drugs], dtype=float)
 
         for s_idx in range(catalog.n):
             phenotype = catalog.resistance[s_idx, drug_idx]  # 1 = resistant
-            susceptible = phenotype == 0
-            if not susceptible.any():
-                probs[s_idx] = 0.0
-                continue
-            eff = per_drug[susceptible]
+            eff = per_drug * np.where(phenotype == 1, penalties, 1.0)
             if self.combine == 'max':
                 p = float(eff.max())
             else:  # parallel
