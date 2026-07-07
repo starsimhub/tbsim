@@ -501,19 +501,19 @@ The TPT section is the most important under-specified part of the spec.
 
 Implementation comment:
 
-The LAI BDQ decision depends on TPT. The current code has a strong starting point because it already separates sterilization and suppression, but it acts at agent level. Resistance requires per-strain TPT effects.
+The LAI BDQ decision depends on TPT. Sterilization and acquisition are per-strain; suppression scales ``rr_*`` modifiers by the fraction of carried strains covered by the regimen (`StrainAwareTPTTx.apply_protection`).
 
 Decision needed:
 
-- Does TPT clear all susceptible strains or only one targeted strain?
-- Does TPT suppression apply to all strains or only susceptible strains?
-- Does a resistant strain remain unaffected by regimen-specific TPT?
-- Does TPT failure create resistance in latent, non-infectious, asymptomatic, and symptomatic states at different rates?
-- Does post-TPT protection persist after selective strain clearance?
+- Does TPT clear all susceptible strains or only one targeted strain? **Resolved:** sterilization clears all regimen-covered strains.
+- Does TPT suppression apply to all strains or only susceptible strains? **Resolved:** suppression benefit scales with covered-strain fraction.
+- Does a resistant strain remain unaffected by regimen-specific TPT? **Yes** for sterilization; suppression is attenuated when resistant strains dominate.
+- Does TPT failure create resistance in latent, non-infectious, asymptomatic, and symptomatic states at different rates? **Yes** via `acq_state_modifiers`.
+- Does post-TPT protection persist after selective strain clearance? **Open** for spec authors.
 
 Recommendation:
 
-Create a dedicated TPT resistance subsection in the spec. Do not implement TPT resistance from the current short paragraph.
+Create a dedicated TPT resistance subsection in the spec. Engine behaviour for sterilization, suppression weighting, and acquisition is implemented.
 
 ### 11. DST and Treatment Routing
 
@@ -540,16 +540,16 @@ The spec suggests treatment monitoring may extend or change regimens while treat
 
 Implementation comment:
 
-Current `TxDelivery` pre-rolls treatment outcomes and resolves them at treatment completion. Premature regimen switching would require canceling or superseding pending outcomes.
+`TxDelivery` pre-rolls treatment outcomes and resolves them at treatment completion. In-flight regimen switching is supported via `TxDelivery.cancel_treatment` and `StrainAwareTxDelivery(cancel_delivery=...)`, which clears pending success/failure/relapse schedules and restores `prior_state` before a switch delivery starts a new course.
 
 Decision needed:
 
-- Is in-flight regimen switching required in v1?
-- If so, how should pending success/failure/relapse states be invalidated?
+- Is in-flight regimen switching required in v1? **Implemented** when `cancel_delivery` is wired.
+- If so, how should pending success/failure/relapse states be invalidated? **Via `cancel_treatment`.**
 
 Recommendation:
 
-Defer treatment monitoring and in-flight switching unless required for the first LAI analysis. Implement resistance biology first.
+Wire monitoring → switch deliveries with `cancel_delivery` when a new regimen supersedes an active course.
 
 ## Questions for Spec Authors
 

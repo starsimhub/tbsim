@@ -76,7 +76,7 @@ The full spec is larger than one example script. Complete coverage should be spl
 - Example coverage: scenario scripts that demonstrate how to configure and compare baseline and intervention arms.
 - Test coverage: deterministic checks for the spec's quantitative rules and regression checks for scenario-level behavior.
 
-Current engine and test coverage is broad. The critical-path example now includes baseline, intervention, sensitivity, no-resistance comparator, and optional multi-seed uncertainty workflows. Treatment monitoring is represented as a scheduled diagnostic pathway; full cancellation of an in-flight treatment course remains a future engine feature.
+Current engine and test coverage is broad. The critical-path example now includes baseline, intervention, sensitivity, no-resistance comparator, and optional multi-seed uncertainty workflows. Treatment monitoring supports scheduled diagnostics plus in-flight course cancellation via ``cancel_delivery`` on ``StrainAwareTxDelivery``.
 
 ## Critical Path 1: Build The Resistance Catalog
 
@@ -482,7 +482,7 @@ Current status:
 
 Plain-English pseudocode:
 
-1. If TPT suppresses rather than sterilizes, apply the usual agent-level TPT protection effects.
+1. If TPT suppresses rather than sterilizes, apply TPT protection effects scaled by the fraction of carried profiles covered by the regimen.
 2. Keep carried profiles unless the regimen explicitly clears them.
 3. If TPT is ineffective, leave carried profiles in place.
 4. For ineffective TPT, run TPT-driven acquisition if configured.
@@ -501,7 +501,7 @@ Coverage target:
 
 Current status:
 
-- Covered in engine.
+- Covered in engine (`StrainAwareTPTTx.apply_protection` scales ``rr_*`` by covered-strain fraction).
 - Current example forces sterilization to make the resistance contrast visible. A non-sterilizing TPT sensitivity scenario should be added for complete example coverage.
 
 ## Critical Path 19: DST Sampling
@@ -512,13 +512,15 @@ Plain-English pseudocode:
 2. Eligibility can be immediate after diagnosis, after treatment failure, or after treatment monitoring, depending on the scenario.
 3. Apply DST coverage.
 4. For each selected person, read all carried profiles.
-5. For each carried profile, draw whether that strain is observed by the sample.
-6. If strain observability is not explicitly configured, use profile fitness as the default observation probability.
-7. For every observed strain, apply sensitivity and specificity for each drug.
-8. Convert strain-level observations into one person-level observed phenotype.
-9. If any observed strain is reported resistant to a drug, mark the person as observed resistant to that drug.
-10. Do not expose which specific profile caused the resistant result.
-11. Store the observed drug-level phenotype on the DST delivery state.
+5. Optionally model lab-process dropout before strain observation:
+   - sample collection success (`p_sample`),
+   - culture/amplification success (`p_culture`),
+   - strain detection (`p_strain_obs`, defaulting to strain fitness when not configured).
+6. For every observed strain, apply per-drug sensitivity and specificity.
+7. Convert strain-level observations into one person-level observed phenotype.
+8. If any observed strain is reported resistant to a drug, mark the person as observed resistant to that drug.
+9. Do not expose which specific profile caused the resistant result.
+10. Store the observed drug-level phenotype on the DST delivery state.
 
 Coverage target:
 
@@ -528,7 +530,7 @@ Coverage target:
 
 Current status:
 
-- Covered in engine and tests.
+- Covered in engine and tests (`DSTDx` with `p_sample`, `p_culture`, `p_strain_obs`).
 - Covered in the expanded example by the DST strain dropout sensitivity arm.
 
 ## Critical Path 20: DST-Based Regimen Routing
@@ -566,8 +568,8 @@ Plain-English pseudocode:
 6. The follow-up action may be DST, regimen extension, or regimen change.
 7. A regimen extension should be represented as a new treatment product.
 8. A regimen change should be represented as another treatment delivery gated by the monitoring result.
-9. If the new treatment is intended to replace an active treatment course, the model needs a cancellation or superseding rule for the old pending outcome.
-10. If no cancellation rule is implemented, document that the new treatment starts while the previous scheduled outcome still exists.
+9. If the new treatment is intended to replace an active treatment course, cancel the superseded delivery's pending outcome via ``cancel_delivery``.
+10. The switch delivery starts a new course after cancellation restores the agent to their pre-treatment TB state.
 
 Coverage target:
 
@@ -578,7 +580,7 @@ Coverage target:
 Current status:
 
 - Time-on-treatment eligibility helper is covered in engine and tests.
-- Full premature in-flight regimen cancellation is not yet a built-in mechanism.
+- In-flight cancellation is covered via ``TxDelivery.cancel_treatment`` and ``StrainAwareTxDelivery(cancel_delivery=...)``.
 - Covered in the expanded example by the treatment monitoring pathway arm. In the default seed, monitoring is configured and counted, but produces zero positives.
 
 ## Critical Path 22: Results And Analyzers
