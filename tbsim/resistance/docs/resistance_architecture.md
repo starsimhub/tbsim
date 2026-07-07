@@ -343,7 +343,7 @@ resistant strain.
 
 `AgentStrains` (`tbsim/resistance/strains.py`) attaches one
 `ss.BoolArr` per strain directly to `MultiStrainTB` under the name
-`carries_<strain_name>`:
+`carries_<uid>`:
 
 ```mermaid
 %%{init: {
@@ -708,10 +708,10 @@ corrected against the spec's worked example.
 
 | Spec concept              | Code symbol                                                                                                  |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `ψ_R,s`                   | `Regimen.cure_prob(strain_idx)` (`tbsim/resistance/regimens.py`); derived from `per_drug_efficacy` + `combine` |
+| `ψ_R,s`                   | `Regimen.strain_cure_probs(catalog)[strain_idx]` (`tbsim/resistance/regimens.py`); derived from `per_drug_efficacy` + `combine` |
 | Adherence (scalar)        | `StrainAwareTx.adherence`                                                                                    |
 | Adherence (distribution)  | `StrainAwareTx.administer` — one Bernoulli draw per agent gates every per-strain cure roll, so a callable `p` on `ss.bernoulli` yields agent-level heterogeneity correlated across all strains in the regimen |
-| Cure one strain at a time | `StrainAwareTxDelivery.step_outcomes` removes cured strains, leaves remaining                                |
+| Cure one strain at a time | `StrainAwareTx.administer` pre-rolls per-strain outcomes; `StrainAwareTxDelivery.step_failures` removes cured strains while leaving remaining strains                                |
 | Latent partial clear + ω on residual | `StrainAwareTxDelivery.step_start_treatment` clears susceptible strains; `selective_acquisition` on carriers who remain in `INFECTION` |
 | `ω_R,d` per failure       | `AcquisitionResolver.selective_acquisition(uids, drugs_used, tb=tb)` invoked from `StrainAwareTxDelivery.step_failures` |
 | In-flight course cancel   | `TxDelivery.cancel_treatment`; `StrainAwareTxDelivery(cancel_delivery=...)` before switch start              |
@@ -949,15 +949,15 @@ the test numbering in the spec.
 | Transmission: `f_i` multiplicative                                | `connector.ResistanceConnector`                                        | ✅        |          |
 | Transmission: super-infector → fittest strain's prob, multinomial | `strains.AgentStrains.effective_rel_trans`, `strains.AgentStrains.sample_transmitted_strain` | ✅        | #5       |
 | α_super protection (active in `MultiStrainTB.infect()`)           | `MultiStrainTB._alpha_super`, `MultiStrainTB._alpha_act`, `MultiStrainTB.infect()` | ✅ | — |
-| No duplicate strain superinfection                                | `multistrain_tb._assign_transmitted_strains` skip + counter            | ✅        |          |
+| No duplicate strain superinfection                                | `MultiStrainTB._assign_transmitted_strains` skip + counter            | ✅        |          |
 | Duplicate-block analyzer                                          | `analyzers.DuplicateStrainAnalyzer`                                    | ✅        |          |
 | Progression: agent-level NH                                       | Base `TB.transition` unchanged; hooks on `MultiStrainTB`               | ✅        | #1       |
 | Bottleneck `p_multi` w/ equal-prob pick                           | `resolvers.ProgressionResolver`                                        | ✅ (fixed) | #2       |
 | Superinfection while active (α_act_*)                             | `MultiStrainTB._alpha_act`, applied in `MultiStrainTB.infect()`        | ✅ | #3 |
-| Clearance wipes all strains                                       | `MultiStrainTB.step` calls `agent_strains.clear_all` on CLEARED        | ✅        |          |
+| Clearance wipes all strains                                       | `MultiStrainTB.transition` and `MultiStrainTB.step_die` call `agent_strains.clear_all` on CLEARED/death        | ✅        |          |
 | Random acquisition: per-strain Bernoulli μ_d at progression       | `resolvers.AcquisitionResolver.random_acquisition`                     | ✅ (fixed) |          |
-| Random acquisition ADDS resistant variant                         | `_apply_acquisition_add` (via `agent_strains.add_strain`)                    | ✅ (fixed) |          |
-| Per-strain regimen efficacy ψ_R,s                                 | `regimens.Regimen.cure_prob`                                           | ✅        |          |
+| Random acquisition ADDS resistant variant                         | `AcquisitionResolver.random_acquisition` (via `agent_strains.add_strain`)                    | ✅ (fixed) |          |
+| Per-strain regimen efficacy ψ_R,s                                 | `regimens.Regimen.strain_cure_probs`                                           | ✅        |          |
 | Adherence scalar                                                  | `tx.StrainAwareTx.adherence`                                           | ✅        |          |
 | Adherence distribution (correlated across strains)                | `StrainAwareTx.administer` — one Bernoulli draw per agent gates every per-strain cure roll. Heterogeneity via callable `p` on `ss.bernoulli`. | ✅ | |
 | Selective acquisition ω_R,d at treatment failure                  | `resolvers.AcquisitionResolver.selective_acquisition` from `tx.StrainAwareTxDelivery.step_failures` | ✅ | #4 |
@@ -1202,7 +1202,7 @@ paths. Both forms are interchangeable in user-facing API calls.
 | $\alpha_{\text{super}}$ | `MultiStrainTB._alpha_super`                 |
 | $\alpha_{\text{act,*}}$ | `MultiStrainTB._alpha_act = {non_infectious, asymptomatic, symptomatic}` |
 | $\mu_d$                 | `p_random_acquisition[d]`                    |
-| $\psi_{R,s}$            | `Regimen.cure_prob(s)` for regimen `R`       |
+| $\psi_{R,s}$            | `Regimen.strain_cure_probs(catalog)[s]` for regimen `R`       |
 | $\omega_{R,d}$          | `StrainAwareTx.p_selective_acquisition[d]`   |
 | $\hat{r}^{obs}_A$       | `DSTDelivery.observed_<drug>_resistant[uid]` |
 
