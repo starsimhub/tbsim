@@ -1,4 +1,18 @@
-"""Strain specifications, catalog, and per-agent profile for the TB resistance overlay."""
+"""Strain specifications, catalog, and per-agent profile for the TB resistance overlay.
+
+The three classes here (:class:`StrainSpec`, :class:`StrainCatalog`,
+:class:`AgentStrains`) are structurally generic over "a strain is a named
+entity with a binary phenotype vector and a fitness weight". They are used
+by TB drug resistance today, but the same classes can back other multi-strain
+disease models (e.g. HIV subtypes or ART-resistance profiles) by treating the
+phenotype dict as strain markers rather than drug-resistance bits.
+
+To keep the TB code stable while enabling this reuse, this module exposes
+generic names (``phenotype``, ``markers``) alongside the original TB names
+(``resistance``, ``drugs``) as aliases. TB-specific *interpretation* of the
+phenotype (drug resistance, DST, treatment efficacy, acquisition) still lives
+in the TB-facing modules (regimens, DST, resolvers, Tx/TPT).
+"""
 
 import numpy as np
 import starsim as ss
@@ -8,41 +22,66 @@ __all__ = ['StrainSpec', 'StrainCatalog', 'AgentStrains']
 
 class StrainSpec:
     """
-    Declarative specification for a single TB strain.
+    Declarative specification for a single strain.
 
     A StrainSpec is pure configuration: it does not own any simulation state.
     Per-agent state is stored in :class:`AgentStrains`. Per-step behavior is
     applied by :class:`ResistanceConnector` and (later) by progression,
     clearance, and acquisition resolvers.
 
+    The class is generic over "a strain is a named entity with a binary
+    phenotype vector and a fitness weight". For TB drug resistance the
+    phenotype dict maps drug/class names to {0, 1} (1 = resistant). For
+    other diseases (e.g. HIV) the same dict can be used to record arbitrary
+    binary markers (e.g. subtype flags, ART-resistance categories). The TB
+    name ``resistance`` and the generic name ``phenotype`` refer to the same
+    underlying dict and can be used interchangeably.
+
     Args:
         uid          (str):   Unique identifier for the strain (e.g. 'pan_sus', 'rif_r').
-        resistance   (dict):  Mapping of drug/class name to {0, 1}; 1 means resistant.
+        resistance   (dict):  Deprecated alias for ``phenotype``. Mapping of
+            marker name to {0, 1}. Retained for backward compatibility with
+            existing TB scripts and tests.
+        phenotype    (dict):  Mapping of marker name to {0, 1}. Preferred
+            keyword for non-TB uses. Mutually exclusive with ``resistance``.
         fitness      (float): Multiplicative reduction on relative transmissibility (0-1).
             Default 1.0 (no fitness cost).
         init_prev    (float): Initial population prevalence of this strain at sim start.
             Default 0.0. Used only when AgentStrains seeds initial infections.
-        acquisition  (dict):  Optional per-drug random acquisition probabilities for this strain.
-            Used by :class:`~tbsim.resistance.resolvers.AcquisitionResolver`. Default None.
+        acquisition  (dict):  Optional per-marker random acquisition probabilities
+            for this strain. Used by
+            :class:`~tbsim.resistance.resolvers.AcquisitionResolver`. Default None.
         label        (str):   Optional human-readable label for plots. Defaults to uid.
 
     Example:
         ::
 
+            # TB-flavoured usage (drug resistance):
             pan = StrainSpec(uid='pan_sus', resistance={'INH': 0, 'RIF': 0, 'BDQ': 0})
             inh = StrainSpec(uid='inh_r',   resistance={'INH': 1, 'RIF': 0, 'BDQ': 0}, fitness=0.95)
+
+            # Generic usage (arbitrary phenotype markers, e.g. HIV):
+            b   = StrainSpec(uid='HIV_B',    phenotype={'B': 1, 'C': 0}, fitness=1.0)
+            c   = StrainSpec(uid='HIV_C',    phenotype={'B': 0, 'C': 1}, fitness=0.98)
     """
 
-    def __init__(self, uid, resistance, fitness=1.0, init_prev=0.0,
-                 acquisition=None, label=None):
+    def __init__(self, uid, resistance=None, fitness=1.0, init_prev=0.0,
+                 acquisition=None, label=None, phenotype=None):
         if not isinstance(uid, str) or not uid:
             raise ValueError(f'StrainSpec uid must be a non-empty string; got {uid!r}')
-        if not isinstance(resistance, dict) or not resistance:
-            raise ValueError(f'StrainSpec resistance must be a non-empty dict; got {resistance!r}')
-        for drug, val in resistance.items():
+        if resistance is not None and phenotype is not None:
+            raise ValueError(
+                'StrainSpec accepts either resistance= or phenotype= (aliases), not both.'
+            )
+        pheno = resistance if resistance is not None else phenotype
+        if not isinstance(pheno, dict) or not pheno:
+            raise ValueError(
+                f'StrainSpec phenotype/resistance must be a non-empty dict; got {pheno!r}'
+            )
+        for marker, val in pheno.items():
             if val not in (0, 1, True, False):
                 raise ValueError(
-                    f'StrainSpec resistance values must be 0 or 1; got {drug}={val!r}'
+                    f'StrainSpec phenotype values must be 0 or 1; got {marker}={val!r}'
                 )
         if not (0.0 <= float(fitness) <= 1.0):
             raise ValueError(f'StrainSpec fitness must be in [0, 1]; got {fitness!r}')
@@ -50,7 +89,7 @@ class StrainSpec:
             raise ValueError(f'StrainSpec init_prev must be in [0, 1]; got {init_prev!r}')
 
         self.uid = uid
-        self.resistance = {drug: int(bool(v)) for drug, v in resistance.items()}
+        self.phenotype = {marker: int(bool(v)) for marker, v in pheno.items()}
         self.fitness = float(fitness)
         self.init_prev = float(init_prev)
         self.acquisition = dict(acquisition) if acquisition else {}
@@ -58,17 +97,27 @@ class StrainSpec:
         return
 
     @property
-    def drugs(self):
-        """Tuple of drug/class names this strain declares resistance for."""
-        return tuple(self.resistance.keys())
+    def resistance(self):
+        """TB-flavoured alias for :attr:`phenotype` (shared dict; edits reflect on both)."""
+        return self.phenotype
 
-    def is_resistant_to(self, drug):
-        """True if this strain is phenotypically resistant to *drug*."""
-        return bool(self.resistance.get(drug, 0))
+    @property
+    def markers(self):
+        """Tuple of marker names declared by this strain (generic name for :attr:`drugs`)."""
+        return tuple(self.phenotype.keys())
+
+    @property
+    def drugs(self):
+        """Tuple of drug/class names this strain declares resistance for (TB alias for :attr:`markers`)."""
+        return tuple(self.phenotype.keys())
+
+    def is_resistant_to(self, marker):
+        """True if this strain is phenotypically positive for *marker* (TB: resistant to drug)."""
+        return bool(self.phenotype.get(marker, 0))
 
     def __repr__(self):
-        bits = ''.join(str(self.resistance[d]) for d in self.resistance)
-        return f"StrainSpec(uid={self.uid!r}, resistance={bits}, fitness={self.fitness:g})"
+        bits = ''.join(str(self.phenotype[d]) for d in self.phenotype)
+        return f"StrainSpec(uid={self.uid!r}, phenotype={bits}, fitness={self.fitness:g})"
 
 
 class StrainCatalog:
@@ -76,18 +125,25 @@ class StrainCatalog:
     Catalog of strains used by a simulation.
 
     The catalog expands a list of :class:`StrainSpec` into ordered numpy
-    arrays for fast indexing during transmission and progression.
+    arrays for fast indexing during transmission and progression. The catalog
+    is disease-agnostic: the "columns" are called *markers* generically and
+    *drugs* for the TB drug-resistance use case.
 
     Args:
         strains (list[StrainSpec]): The strains to register.
-        drugs   (list[str]):        Optional ordered list of drug/class names.
-            If None, drugs are inferred from the union of all strain resistance keys.
+        drugs   (list[str]):        TB-flavoured alias for ``markers``. Optional
+            ordered list of marker/drug names. If both are None, markers are
+            inferred from the union of all strain phenotype keys.
+        markers (list[str]):        Optional ordered list of marker names
+            (generic name for ``drugs``). Mutually exclusive with ``drugs``.
 
     Attributes:
-        drugs        (list[str]):           Ordered drug/class names.
+        markers      (list[str]):           Ordered marker names (generic).
+        drugs        (list[str]):           TB alias for ``markers``.
         uids         (list[str]):           Strain uids in registration order.
         n            (int):                 Number of strains.
-        resistance   (np.ndarray):          Shape (n_strains, n_drugs), 0/1.
+        phenotype    (np.ndarray):          Shape (n_strains, n_markers), 0/1.
+        resistance   (np.ndarray):          TB alias for ``phenotype``.
         fitness      (np.ndarray):          Shape (n_strains,), float.
         init_prev    (np.ndarray):          Shape (n_strains,), float.
 
@@ -101,7 +157,11 @@ class StrainCatalog:
             reg.index('inh_r')   # -> 1
     """
 
-    def __init__(self, strains, drugs=None):
+    def __init__(self, strains, drugs=None, markers=None):
+        if drugs is not None and markers is not None:
+            raise ValueError('StrainCatalog accepts either drugs= or markers= (aliases), not both.')
+        if drugs is None:
+            drugs = markers
         if not strains:
             raise ValueError('StrainCatalog requires at least one StrainSpec.')
 
@@ -148,9 +208,11 @@ class StrainCatalog:
                 f'each agent can only be seeded with at most one initial strain.'
             )
 
+        self.markers = drugs
         self.drugs = drugs
         self.uids = uids
         self.n = n
+        self.phenotype = resistance
         self.resistance = resistance
         self.fitness = fitness
         self.init_prev = init_prev
@@ -179,8 +241,8 @@ class StrainCatalog:
         return self._specs[int(uid_or_idx)]
 
     def phenotype_bits(self, idx):
-        """Return resistance vector for strain *idx* as a numpy array of 0/1."""
-        return self.resistance[int(idx)].copy()
+        """Return phenotype vector for strain *idx* as a numpy array of 0/1."""
+        return self.phenotype[int(idx)].copy()
 
     def __iter__(self):
         return iter(self._specs)
@@ -189,7 +251,7 @@ class StrainCatalog:
         return self.n
 
     def __repr__(self):
-        return (f"StrainCatalog(n={self.n}, drugs={self.drugs}, "
+        return (f"StrainCatalog(n={self.n}, markers={self.markers}, "
                 f"uids={self.uids})")
 
 
