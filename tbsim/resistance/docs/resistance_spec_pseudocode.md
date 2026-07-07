@@ -675,8 +675,10 @@ Current status:
 
 These are not hidden requirements. They are explicit implementation or example coverage items that should be addressed or documented.
 
-1. Treatment monitoring can identify people ready for follow-up diagnostics, but the model does not yet have a full built-in cancellation mechanism for prematurely stopping an already scheduled treatment course.
-2. DST strain dropout uses a single strain-observation probability. It does not yet model separate bottlenecks for sample collection, culture growth, sequencing, or other lab processes.
+1. Treatment monitoring plus regimen switch uses `cancel_delivery` on
+   `StrainAwareTxDelivery` to supersede an in-flight course.
+2. DST lab dropout is modeled as `p_sample` × `p_culture` × `p_strain_obs`
+   on `DSTDx` before per-drug sensitivity/specificity.
 3. Non-infectious superinfection defaults may need a final scientific default. The engine allows configuration.
 4. The current monitoring scenario demonstrates eligibility and diagnostic scheduling, but the default seed may produce zero monitoring positives.
 5. The uncertainty workflow is example-grade; decision-grade analysis should use larger populations and more seeds.
@@ -699,4 +701,4 @@ The critical-path scenario runner now includes these arms:
 
 ## Bottom Line
 
-The spec can be implemented as an opt-in resistance overlay with clear critical paths. The engine should own transmission, superinfection, progression, clearance, acquisition, treatment effects, TPT effects, DST, routing helpers, monitoring helpers, and analyzers. The example suite now exercises every major configurable path with baseline, intervention, sensitivity, no-resistance, and uncertainty scenarios. The main residual model feature is full cancellation or superseding of in-flight treatment when a monitoring diagnostic triggers an early regimen change.
+The spec can be implemented as an opt-in resistance overlay with clear critical paths. The engine should own transmission, superinfection, progression, clearance, acquisition, treatment effects, TPT effects, DST, routing helpers, monitoring helpers, and analyzers. The example suite now exercises every major configurable path with baseline, intervention, sensitivity, no-resistance, and uncertainty scenarios. Residual work is mainly example-grade uncertainty calibration and scientific defaults (e.g. non-infectious superinfection α).

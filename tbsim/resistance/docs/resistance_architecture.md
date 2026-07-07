@@ -1266,21 +1266,19 @@ Residual open items from the updated spec:
   bitmask prototype API to `MultiStrainTB`/`AgentStrains`. The deterministic
   ODE model and ODE-facing ABM observables now exist; the remaining work is
   scenario-script translation and calibration.
-- ⚠ DST drop-out currently supports a fitness default or user override, but
-  does not yet model richer lab-process bottlenecks beyond a single
-  strain-observation Bernoulli.
+- ⚠ DST drop-out supports a three-stage lab pipeline on
+  `DSTDx` (`p_sample`, `p_culture`, `p_strain_obs`) before per-drug
+  sensitivity/specificity. Finer-grained per-process sequencing models remain
+  a future extension if needed.
 - ⚠ Superinfection defaults for `NON_INFECTIOUS` remain configurable and may
   need calibration against the final agreed value in the updated spec text.
   The spec states a nonzero default (rationale: NON_INFECTIOUS substitutes for
   a second latent state; blocking superinfection there may under-represent
   prevalence of superinfection in typical TB models). Current code defaults to
   `alpha_act['non_infectious'] = 0.0`; override via `TB(alpha_act={'non_infectious': <value>})`.
-- ⚠ Premature regimen switch (spec §"Treatment monitoring": "we may need a
-  way to prematurely stop/change an ongoing treatment regimen"): no built-in
-  mechanism to interrupt an in-progress treatment course. A subsequent
-  `StrainAwareTxDelivery` can start a new regimen, but the superseded course
-  continues to its scheduled outcome. This is noted as a potential future
-  requirement, not a hard spec mandate.
+- ✅ Premature regimen switch: `StrainAwareTxDelivery(cancel_delivery=...)`
+  cancels a superseded in-flight course via `TxDelivery.cancel_treatment`
+  before starting the switch regimen (monitoring workflow).
 
 ---
 

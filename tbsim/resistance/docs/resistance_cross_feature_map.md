@@ -71,12 +71,12 @@ This document lists TBsim features and validates whether each can be combined wi
 |---------|------|----------|-------------------|-----------------|------------|
 | `Dx` / `Xpert` / `OralSwab` / `FujiLAM` / `CAD` | `diagnostics.py` | **Compatible†** | Agent-level TB diagnosis; no drug resistance phenotype | Upstream of DST in cascade | Tested (integration) |
 | `DxDelivery` | `diagnostics.py` | **Compatible†** | Sets `diagnosed`; gates DST and Tx eligibility | HSB → confirm → DST → Tx | Tested |
-| `DSTDx` | `resistance/diagnostics.py` | **Native** | Per-drug observed resistance (sens/spec, `p_strain_obs`) | `catalog` + drug list | Tested |
+| `DSTDx` | `resistance/diagnostics.py` | **Native** | Per-drug observed resistance (sens/spec, `p_strain_obs`, `p_sample`, `p_culture`) | `catalog` + drug list | Tested |
 | `DSTDelivery` | `resistance/diagnostics.py` | **Native** | Delivers DST; writes `observed_*_resistant` | After `DxDelivery` | Tested |
 | `RegimenRouter` | `resistance/diagnostics.py` | **Native** | Routes Tx by observed phenotype | `StrainAwareTxDelivery` + `copy_inputs=False` if shared refs | Tested |
 | `treatment_monitoring_eligibility` | `resistance/diagnostics.py` | **Native** | Gates monitoring Dx by time on Tx | Named `StrainAwareTxDelivery` + monitor `DxDelivery` | Tested |
 | FujiLAM + HIV stratification | `diagnostics.py` | **Compatible†** | HIV affects Dx sens/spec, not strain assignment | HIV + `MultiStrainTB` independent | Untested |
-| Monitoring → regimen switch | — | **Gap** | Monitoring selects agents; **cannot cancel in-flight Tx** | Second `StrainAwareTxDelivery` only | Partial |
+| Monitoring → regimen switch | `resistance/tx.py` | **Native** | `cancel_delivery=` on `StrainAwareTxDelivery` cancels superseded in-flight course | Wire switch delivery with `cancel_delivery='first_line'` | Tested |
 
 ---
 
@@ -92,8 +92,8 @@ This document lists TBsim features and validates whether each can be combined wi
 | `Regimen(resistance_penalty=...)` | `resistance/regimens.py` | **Native** | Reduced-but-nonzero per-drug efficacy against resistant strains | Optional per-drug multiplier in [0, 1] | Tested |
 | `drug_params` presets | `treatments.py` | **Compatible†** | Reference data only; wire into `Regimen` manually | Map to `StrainAwareTx` | Partial |
 | `HealthSeekingBehavior` | `health_seeking.py` | **Compatible** | Care-seeking unchanged; enables Dx cascade | Standard | Tested (integration) |
-| Latent Tx selective acquisition | `resistance/tx.py` | **Gap** | Latent clears susceptible strains only; ω on latent failure deferred | — | Documented |
-| Overlapping Tx courses | — | **Gap** | New regimen can start while prior course still scheduled | — | Documented |
+| Latent Tx selective acquisition | `resistance/tx.py` | **Native** | Latent clears susceptible strains; ω on residual resistant carriers | `p_selective_acquisition` on `StrainAwareTx` | Tested |
+| Overlapping Tx courses | `resistance/tx.py` | **Native** | `cancel_delivery=` clears prior pending course before starting new regimen | Set on switch `StrainAwareTxDelivery` | Tested |
 
 ---
 
@@ -107,7 +107,7 @@ This document lists TBsim features and validates whether each can be combined wi
 | `HouseholdContactTracing` | `tpt.py` | **Compatible†** | Flags contacts; downstream TPT/Dx strain-agnostic unless swapped | Strain-aware products downstream | Untested |
 | `TPTDelivery` | `tpt.py` | **Compatible†** | Delivery layer OK if product is `StrainAwareTPTTx` | — | Partial |
 | `_apply_neither_branch` hook | `tpt.py` | **Native** | Base hook; `StrainAwareTPTTx` runs acquisition on ineffective TPT | Must keep hook in base `TPTTx` | Tested |
-| Per-strain TPT suppression (`rr_*`) | `resistance/tpt.py` | **Gap** | Only agent-level suppression implemented | — | Documented |
+| Per-strain TPT suppression (`rr_*`) | `resistance/tpt.py` | **Native** | `rr_*` scaled by fraction of carried strains covered by regimen | `StrainAwareTPTTx.apply_protection` | Tested |
 
 ---
 
@@ -216,11 +216,10 @@ primary use case; the same classes can back other multi-strain overlays
 
 | Category | Count | Features |
 |----------|-------|----------|
-| **Native / strain-aware** | 21 | `MultiStrainTB`, connector, `strains.py` (Spec/Registry/Profile with generic phenotype), resolvers, regimen (+`resistance_penalty`), strain Tx/TPT/DST, router, monitoring helper, per-step acquisition counters, strain analyzers (`StrainResults`/`DuplicateStrainAnalyzer`/`ResistanceStats`) |
+| **Native / strain-aware** | 25 | `MultiStrainTB`, connector, `strains.py` (Spec/Registry/Profile with generic phenotype), resolvers, regimen (+`resistance_penalty`), strain Tx/TPT/DST (incl. cancel/switch, latent ω, per-strain suppress, lab dropout), router, monitoring helper, per-step acquisition counters, strain analyzers |
 | **Compatible (no code change)** | 12 | Plain `TB` comparator, `get_tb`, HSB, base plotting, `demo`, explicit `tbsim.resistance` imports, `choice2d`, etc. |
 | **Compatible† (works, behavior changes)** | 22 | All base Dx products, networks, comorbidities, BCG, beta, migration, births/deaths, `tbsim.Sim`, parallel runs |
 | **Requires swap to strain-aware** | 6 | `Tx`/`TxDelivery`, `TPTTx` alone, `DOTS`/presets, compartmental N/A |
-| **Known gaps** | 4 | In-flight Tx cancel, per-strain TPT suppress, latent Tx ω, DST lab pipeline |
 
 ---
 
@@ -244,7 +243,7 @@ Comparator:  TB() on parallel arm (no connector, no strain analyzers)
 - **Treatment, TPT, and DST must use strain-aware variants** (`StrainAwareTx`, `StrainAwareTPTTx`, `DSTDx`/`DSTDelivery`) for resistance to matter clinically.
 - **Comorbidities, BCG, migration, household networks, and base diagnostics** are compatible but **largely untested** with the overlay; they modify agent-level risk or care pathways, not strain identity.
 - **Compartmental models (`TB_ODE`/`TB_SS`) cannot combine** with the current resistance implementation.
-- **Four documented gaps** remain where spec intent and engine behavior may diverge (in-flight Tx cancel, per-strain TPT suppression, latent Tx selective acquisition, richer DST dropout).
+- **Previously documented engine gaps are now closed**: in-flight Tx cancel via `cancel_delivery`, per-strain TPT suppression weighting, latent Tx selective acquisition, and multi-stage DST dropout (`p_sample` / `p_culture` / `p_strain_obs`).
 
 ---
 
