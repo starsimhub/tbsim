@@ -136,10 +136,12 @@ All three strain data-model classes live in `tbsim/resistance/strains.py`
 |---------|------|----------|-------------------|-----------------|------------|
 | `StrainSpec` / `StrainCatalog` | `resistance/strains.py` | **Native** | Strain catalog | Required | Tested |
 | `AgentStrains` | `resistance/strains.py` | **Native** | Per-agent `carries_*` flags | Auto on `MultiStrainTB` | Tested |
+| Bitmask `strain_mask` prototype | `ck_resistance/tbsim/resistance/*` | **N/A** | Reference/prototype representation only; not runtime state in this branch | Use named `AgentStrains` BoolArrs instead | Tested by design guard |
 | `ProgressionResolver` | `resistance/resolvers.py` | **Native** | Bottleneck at activation (`p_multi`) | `progression_mode='bottleneck'` | Tested |
 | `AcquisitionResolver` | `resistance/resolvers.py` | **Native** | Random (add) + selective (replace) acquisition | `p_random_acquisition` / Tx/TPT ω | Tested |
 | `StrainResults` | `resistance/analyzers.py` | **Native** | Per-strain prevalence/incidence | Analyzer on sim | Tested |
 | `DuplicateStrainAnalyzer` | `resistance/analyzers.py` | **Native** | Blocked duplicate superinfection count | Optional analyzer | Tested |
+| `ResistanceStats` ODE summary | `resistance/analyzers.py` | **Native** | ODE-facing `frac_resist`, `frac_super`, and origin fluxes | Optional analyzer on `MultiStrainTB` sims | Tested |
 | Zero-fitness transmission | `connector.py` | **Native** | Carriers with only `fitness=0` strains get multiplier 0; legacy no-strain agents unchanged | `ResistanceConnector` + `carries_any` | Tested |
 | `init_prev` fallback | `resistance/multistrain_tb.py` | **Native** | Unresolved source + zero weights → no strain assigned + warning | `seed_strains` / transmission fallback | Tested |
 | Missing `ResistanceConnector` | `resistance/multistrain_tb.py` | **Native** | `MultiStrainTB.init_post` warns if connector absent | Add `ResistanceConnector()` | Tested |
@@ -154,6 +156,7 @@ All three strain data-model classes live in `tbsim/resistance/strains.py`
 | `HouseholdStats` | `analyzers.py` | **Compatible** | Household mixing stats; no strain dimension | — | Untested |
 | `tbsim.plot()` / `Sim.plot()` | `plots.py`, `sim.py` | **Compatible†** | Default panels are agent-level TB; strain plots need custom/`StrainResults` | Example scripts plot strain series | Partial |
 | `StrainResults` time series | `resistance/analyzers.py` | **Native** | Per-strain carriers/active/new | Required for strain dashboards | Tested |
+| `TwoStrainODE` reference | `compartmental/two_strain_ode.py` | **Native** | Deterministic two-strain ABM-vs-ODE validation target | Translate old helper/scenario scripts as needed | Tested |
 
 ---
 

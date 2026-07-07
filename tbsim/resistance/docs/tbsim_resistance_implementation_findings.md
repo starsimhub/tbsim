@@ -34,6 +34,31 @@ Resistance is implemented as `AgentStrains` (`MultiStrainTB.agent_strains`) — 
 
 The largest implementation risk is not the amount of code, but committing too early to defaults that encode unresolved scientific decisions. Once treatment, TPT, DST, results, and analyzers depend on a strain representation, changing the core assumptions will be expensive.
 
+### Notes from the `ck_resistance` prototype
+
+The `ck_resistance` implementation is useful as a compact mathematical prototype, especially for two-strain ODE validation, but it should not replace the production overlay architecture in this branch.
+
+Its core representation is a bitmask: a single integer `strain_mask` per agent where bit `j` means "carries strain `j`". For example, binary `0101` means the agent carries strains 0 and 2. This is efficient for a small, fixed strain universe, and it makes some ODE operator tests concise.
+
+This branch deliberately uses named Starsim state arrays instead:
+
+- `AgentStrains` creates one `ss.BoolArr` per strain (`carries_pan`, `carries_inh_r`, etc.).
+- `StrainSpec` keeps strain definitions explicit and named.
+- `StrainCatalog` provides indexed tables for fast lookup without exposing users to binary encodings.
+
+Recovered or recoverable pieces from `ck_resistance`:
+
+- `ResistanceStats`, the ODE-facing analyzer that collates `frac_resist`, `frac_super`, `flux_denovo`, `flux_txacq`, and `flux_transmitted` — now implemented in `tbsim/resistance/analyzers.py` against `MultiStrainTB`.
+- `TwoStrainODE`, the deterministic reference model for ABM-vs-ODE validation — now ported to `tbsim/compartmental/two_strain_ode.py`.
+- The validation scripts and directional ODE tests remain recoverable after translating from `TBResistant`/`strain_mask` to `MultiStrainTB`/`AgentStrains`.
+- Compact operator tests such as the two-strain treatment outcome table; the treatment-operator requirement has already been recovered through `Regimen(resistance_penalty=...)` and intervention tests.
+
+Do not recover wholesale:
+
+- `TBResistant` as a replacement for `MultiStrainTB`.
+- The bitmask `Strains`/`strain_mask` runtime state.
+- Treatment, DST, or TPT code directly, since those implementations are tightly coupled to the bitmask representation.
+
 The most important unresolved decisions are:
 
 1. Whether INH is included in the first implementation.

@@ -201,6 +201,29 @@ agent_strains.add_strain(infected_uids, 'pan')   # assign strain to agents
 agent_strains.carriers('inh_r')                  # uids currently carrying inh_r
 ```
 
+#### Why `AgentStrains` is not a bitmask
+
+The earlier `ck_resistance` prototype stored each agent's carried strains in a
+single integer bitmask (`strain_mask`). In that representation, bit `j` meant
+"this agent carries strain `j`"; for example, binary `0101` meant the agent
+carried strains 0 and 2. This is compact and fast for a small, fixed, fully
+enumerated strain universe.
+
+The production overlay uses named `ss.BoolArr` state instead:
+
+```text
+carries_pan
+carries_inh_r
+carries_mdr
+...
+```
+
+This is less compact than one integer, but it matches Starsim's state model,
+keeps strain names visible in results and debugging, and supports arbitrary
+`StrainSpec` catalogs without forcing users to reason about binary encodings.
+The bitmask implementation remains useful as a reference for ODE-facing
+operator tests, but it is not the runtime representation in this branch.
+
 #### How they fit together
 
 ```
@@ -1144,9 +1167,30 @@ Cross-reference against `tbsim-resistance-tech-spec -UPDATED.docx`:
   - Directional sensitivity for **treatment rate / treatment efficacy against
     resistant strains**
     (`test_treatment_eliminates_susceptible_strains_increasing_resistant_share`).
+- ✅ Two-strain treatment ODE operator: `Regimen(resistance_penalty=...)` supports
+  reduced-but-nonzero efficacy against resistant strains, and
+  `test_treatment_outcome_operator_matches_ode_pi_table` checks the ODE
+  `π(m → s)` table for susceptible, resistant, and mixed infections.
+- ✅ Representation guard: `AgentStrains` uses named `ss.BoolArr` states on
+  `MultiStrainTB`; the bitmask `strain_mask` design from `ck_resistance` remains
+  a reference/prototype only and is not runtime state in this branch.
+- ✅ `ResistanceStats` now provides ODE-facing observability channels:
+  `frac_resist`, `frac_super`, `flux_denovo`, `flux_txacq`, and
+  `flux_transmitted`. Supporting per-step counters live on `MultiStrainTB`
+  and are incremented by transmission, random acquisition, and strain-aware
+  Tx/TPT acquisition hooks.
+- ✅ `TwoStrainODE` is ported to `tbsim/compartmental/two_strain_ode.py` and
+  exported via `tbsim.compartmental`. It provides deterministic
+  `prev_active`, `frac_resist`, `frac_super`, and strain-collapsed TB
+  compartments for ABM-vs-ODE validation.
 
 Residual open items from the updated spec:
 
+- ⚠ Full ABM-vs-ODE trajectory scripts from `ck_resistance` still need API
+  translation from `TBResistant`/`strain_mask` to
+  `MultiStrainTB`/`AgentStrains`. The deterministic ODE model and ODE-facing
+  ABM observables now exist; the remaining work is scenario-script translation
+  and calibration.
 - ⚠ DST drop-out currently supports a fitness default or user override, but
   does not yet model richer lab-process bottlenecks beyond a single
   strain-observation Bernoulli.
