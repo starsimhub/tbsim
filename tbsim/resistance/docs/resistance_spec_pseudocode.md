@@ -7,6 +7,38 @@ This document translates the resistance technical specification into English-onl
 
 The model keeps one TB natural-history state per person. Drug resistance is an overlay beside that state. A person can carry zero, one, or multiple resistance profiles. The word "strain" below means a modeled resistance profile, such as pan-susceptible, RIF-resistant, BDQ-resistant, or RIF plus FQ resistant.
 
+## Table of contents
+
+- [Strain data model (`tbsim/resistance/strains.py`)](#strain-data-model-tbsimresistancestrainspy)
+- [Coverage Summary](#coverage-summary)
+- [Critical Path 1: Build The Resistance Catalog](#critical-path-1-build-the-resistance-catalog)
+- [Critical Path 2: Initialize Person-Level Strain State](#critical-path-2-initialize-person-level-strain-state)
+- [Critical Path 3: Transmission From A Single-Strain Infector](#critical-path-3-transmission-from-a-single-strain-infector)
+- [Critical Path 4: Transmission From A Superinfected Infector](#critical-path-4-transmission-from-a-superinfected-infector)
+- [Critical Path 5: Recipient Is Fully Susceptible](#critical-path-5-recipient-is-fully-susceptible)
+- [Critical Path 6: Recipient Is Already Infected And Eligible For Superinfection](#critical-path-6-recipient-is-already-infected-and-eligible-for-superinfection)
+- [Critical Path 7: Duplicate-Strain Superinfection Attempt](#critical-path-7-duplicate-strain-superinfection-attempt)
+- [Critical Path 8: Progression From Early Infection To Non-Infectious TB](#critical-path-8-progression-from-early-infection-to-non-infectious-tb)
+- [Critical Path 9: Progression From Early Or Non-Infectious TB To Active TB](#critical-path-9-progression-from-early-or-non-infectious-tb-to-active-tb)
+- [Critical Path 10: Natural Clearance And Death](#critical-path-10-natural-clearance-and-death)
+- [Critical Path 11: Random Endogenous Acquisition](#critical-path-11-random-endogenous-acquisition)
+- [Critical Path 12: Treatment Eligibility](#critical-path-12-treatment-eligibility)
+- [Critical Path 13: Treatment Product Effect](#critical-path-13-treatment-product-effect)
+- [Critical Path 14: Treatment Success Resolution](#critical-path-14-treatment-success-resolution)
+- [Critical Path 15: Treatment Failure Resolution And Selective Acquisition](#critical-path-15-treatment-failure-resolution-and-selective-acquisition)
+- [Critical Path 16: TPT Eligibility](#critical-path-16-tpt-eligibility)
+- [Critical Path 17: TPT Sterilization And Partial Clearance](#critical-path-17-tpt-sterilization-and-partial-clearance)
+- [Critical Path 18: TPT Suppression Or Ineffective TPT](#critical-path-18-tpt-suppression-or-ineffective-tpt)
+- [Critical Path 19: DST Sampling](#critical-path-19-dst-sampling)
+- [Critical Path 20: DST-Based Regimen Routing](#critical-path-20-dst-based-regimen-routing)
+- [Critical Path 21: Treatment Monitoring](#critical-path-21-treatment-monitoring)
+- [Critical Path 22: Results And Analyzers](#critical-path-22-results-and-analyzers)
+- [Critical Path 23: Baseline And Intervention Scenarios](#critical-path-23-baseline-and-intervention-scenarios)
+- [Critical Path 24: Validation And Regression Testing](#critical-path-24-validation-and-regression-testing)
+- [Critical Path 25: Known Residual Items](#critical-path-25-known-residual-items)
+- [Recommended Next Example Additions](#recommended-next-example-additions)
+- [Bottom Line](#bottom-line)
+
 ## Strain data model (`tbsim/resistance/strains.py`)
 
 Three classes sit at different layers. See

@@ -2,6 +2,26 @@
 
 This document lists TBsim features and validates whether each can be combined with or is impacted by the drug resistance implementation (`MultiStrainTB` + `tbsim/resistance/`).
 
+## Table of contents
+
+- [Legend](#legend)
+- [1. Core disease models](#1-core-disease-models)
+- [2. Transmission & networks](#2-transmission--networks)
+- [3. Diagnostics](#3-diagnostics)
+- [4. Treatment](#4-treatment)
+- [5. TPT (preventive therapy)](#5-tpt-preventive-therapy)
+- [6. Vaccination & prevention](#6-vaccination--prevention)
+- [7. Comorbidities](#7-comorbidities)
+- [8. Demographics & migration](#8-demographics--migration)
+- [9. Resistance engine (strain model)](#9-resistance-engine-strain-model)
+- [10. Analyzers & plotting](#10-analyzers--plotting)
+- [11. Sim wrapper & infrastructure](#11-sim-wrapper--infrastructure)
+- [12. Example / scenario scripts](#12-example--scenario-scripts)
+- [Summary matrix (by combination type)](#summary-matrix-by-combination-type)
+- [Recommended wiring for a full resistance sim](#recommended-wiring-for-a-full-resistance-sim)
+- [Bottom line](#bottom-line)
+- [Related docs](#related-docs)
+
 ## Legend
 
 | Status | Meaning |

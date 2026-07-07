@@ -9,6 +9,31 @@
 
 ---
 
+## Table of contents
+
+- [0. Big picture](#0-big-picture)
+- [1. Strain profile (spec §"Individual strain resistance profiles")](#1-strain-profile-spec-individual-strain-resistance-profiles)
+- [2. Multi-strain infections (spec §"Allow for multi-strain infections")](#2-multi-strain-infections-spec-allow-for-multi-strain-infections)
+- [3. Transmission (spec §"Transmission")](#3-transmission-spec-transmission)
+- [4. Strain competition and protection against reinfection (spec §"Strain competition")](#4-strain-competition-and-protection-against-reinfection-spec-strain-competition)
+- [5. Progression to disease (spec §"Progression to disease")](#5-progression-to-disease-spec-progression-to-disease)
+- [6. Clearance (spec §"Clearance")](#6-clearance-spec-clearance)
+- [7. Random (endogenous) acquisition (spec §"(Random) Acquisition")](#7-random-endogenous-acquisition-spec-random-acquisition)
+- [8. Treatment & selective acquisition (spec §"Treatment & (Selective) Acquisition")](#8-treatment-selective-acquisition-spec-treatment-selective-acquisition)
+- [9. TPT (spec §"TPT")](#9-tpt-spec-tpt)
+- [10. Diagnostics & treatment modification (spec §"Diagnostics & Treatment Modification")](#10-diagnostics-treatment-modification-spec-diagnostics-treatment-modification)
+- [11. Package layout, import boundaries, and test coverage](#11-package-layout-import-boundaries-and-test-coverage)
+- [12. Spec → code traceability table](#12-spec-code-traceability-table)
+- [13. Module map](#13-module-map)
+- [14. Starsim base-class and pattern alignment](#14-starsim-base-class-and-pattern-alignment)
+- [15. Upstream candidates for Starsim](#15-upstream-candidates-for-starsim)
+- [16. Notation](#16-notation)
+- [17. Testing](#17-testing)
+- [18. Updated Spec Delta (2026-06)](#18-updated-spec-delta-2026-06)
+- [19. References (carried over from the spec)](#19-references-carried-over-from-the-spec)
+
+---
+
 ## 0. Big picture
 
 ```mermaid

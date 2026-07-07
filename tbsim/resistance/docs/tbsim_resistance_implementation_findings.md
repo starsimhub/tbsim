@@ -11,6 +11,21 @@ It focuses on:
 
 The review assumes resistance should be added as a multi-strain overlay on the existing `TB` natural-history model, not as a replacement for the current `TBS` state machine.
 
+## Table of contents
+
+- [Context](#context)
+- [Executive Summary](#executive-summary)
+- [Visual Overview](#visual-overview)
+- [Current Codebase Pressure Points](#current-codebase-pressure-points)
+- [Must-Close Decisions Before Core Refactor](#must-close-decisions-before-core-refactor)
+- [Questions for Spec Authors](#questions-for-spec-authors)
+- [Recommended Architecture](#recommended-architecture)
+- [Suggested Build Order](#suggested-build-order)
+- [Priority Findings](#priority-findings)
+- [Implementation Comments for the Spec](#implementation-comments-for-the-spec)
+- [Proposed Near-Term Meeting Agenda](#proposed-near-term-meeting-agenda)
+- [Bottom Line](#bottom-line)
+
 ## Context
 
 The resistance spec is written by TB researchers/modelers and is scientifically detailed, but several parts are not yet implementation-ready. The main gap is that the spec describes general-purpose drug resistance machinery, while the near-term decision appears to be much more specific: evaluating whether long-acting injectable, bedaquiline-based TPT could increase drug-resistant TB incidence.
