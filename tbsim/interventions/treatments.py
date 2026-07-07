@@ -266,6 +266,39 @@ class TxDelivery(ss.Intervention):
         self._newly_treated = active
         return
 
+    def cancel_treatment(self, uids):
+        """Cancel in-flight treatment courses managed by this delivery.
+
+        Clears pending success/failure/relapse schedules and restores agents
+        in ``TREATMENT`` to their recorded ``prior_state``. Used when a
+        monitoring-triggered regimen switch supersedes an ongoing course.
+
+        Returns:
+            ss.uids: Agents whose pending course was cancelled.
+        """
+        if len(uids) == 0:
+            return ss.uids()
+        uids = ss.uids(uids)
+        tb = self.sim.get_tb()
+        pending = uids[
+            (self.pending_success[uids] | self.pending_failure[uids])
+            & tb.on_treatment[uids]
+        ]
+        if len(pending) == 0:
+            return ss.uids()
+
+        in_treatment = pending[tb.state[pending] == TBS.TREATMENT]
+        if len(in_treatment):
+            tb.state[in_treatment] = self.prior_state[in_treatment]
+            tb.on_treatment[in_treatment] = False
+
+        self.pending_success[pending] = False
+        self.pending_failure[pending] = False
+        self.pending_relapse[pending] = False
+        self.ti_treatment_end[pending] = np.nan
+        self.ti_relapse[pending] = np.nan
+        return pending
+
     def step_check_completion(self):
         """ Find agents whose treatment course has completed this step """
         tb = self.sim.get_tb()
