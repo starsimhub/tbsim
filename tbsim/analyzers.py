@@ -552,7 +552,7 @@ class HouseholdStats(ss.Analyzer):
     Track household size, age, and contact-mixing statistics over time.
 
     Works with any network that exposes a ``household_ids`` state (e.g.
-    ``starsim.HouseholdNet``).  At each timestep the
+    ``ss.library.HouseholdNet``).  At each timestep the
     analyzer counts alive agents per household and records summary statistics.
 
     Args:
@@ -579,11 +579,10 @@ class HouseholdStats(ss.Analyzer):
     Example::
 
         import starsim as ss
-        import starsim_examples as sse
         import tbsim
 
         dhs_data = ...  # pandas DataFrame with hh_id and ages columns
-        net = ss.HouseholdNet(dhs_data=dhs_data)
+        net = ss.library.HouseholdNet(dhs_data=dhs_data)
         analyzer = tbsim.HouseholdStats(network_name='householdnet')
         sim = ss.Sim(
             diseases='sis', networks=net,

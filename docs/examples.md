@@ -72,12 +72,18 @@ sim.run()
 Using household-based social networks:
 
 ```python
-from tbsim.networks import HouseholdNet
-from tbsim import TB
 import starsim as ss
+import sciris as sc
+from tbsim import TB
 
-# Create household network and TB
-households = HouseholdNet()
+# Synthetic DHS-style household data (hh_id + comma-separated ages per household)
+dhs_data = sc.dataframe(
+    hh_id=[0, 1, 2],
+    ages=['72, 17, 30', '37', '13, 55, 36'],
+)
+
+# Create household network and TB (static households; no Pregnancy module required)
+households = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 tb = TB()
 
 sim = ss.Sim(
@@ -101,9 +107,9 @@ sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
 sim.run()
 
 # Create plots from the analyzer
-sim.analyzers[0].plot('sankey')
 sim.analyzers[0].plot('histogram')
 sim.analyzers[0].plot('kaplan_meier')
+sim.analyzers[0].plot('network')
 ```
 
 ## Parameter Sweeps

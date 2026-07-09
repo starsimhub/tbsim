@@ -2,6 +2,13 @@
 
 All notable changes to the codebase are documented in this file.
 
+## Version 0.9.0 (2026-07-09)
+- Added read-only boolean views of TB `state` (`latent`, `non_infectious`, `asymptomatic`, `symptomatic`, `active_tb`, `terminal`), giving the Starsim boolean idiom at call sites while keeping the categorical `state` as the single source of truth.
+- Replaced the `TBS` static-method state groups with tuple constants (`TBS.ACTIVE`, `TBS.TERMINAL`, `TBS.CARE_SEEKING`) used via `state.isin(...)`; added `HIVState.INFECTED` similarly.
+- Made `TBS` enum values contiguous (0–8) so per-state result counts use a single-pass `np.bincount`, replacing per-state `==`/`np.isin` scans and the every-step re-derivation of `infected`/`susceptible`/`on_treatment`.
+- Updated for Starsim 3.5.1: `ss.library.HouseholdNet` (replacing `ss.HouseholdNet`).
+- Raised minimum Starsim dependency to `>=3.5.1`.
+
 ## Version 0.8.1 (2026-06-10)
 - Fixed a UID/position confusion bug (#425) where several interventions identified agents by running `np.where`/`np.flatnonzero` over a starsim `Arr`'s compact, alive-only `.values` view and then treating the resulting positions as UIDs. Once any agents had died (so UIDs no longer matched compact positions), this silently selected the wrong agents. Affected `HouseholdContactTracing.step`, `TPTHousehold.check_eligibility`, `TxDelivery._get_eligible`, `Migration._members_by_household_id`, and `HealthSeekingBehavior.step`. All now use native starsim filtering (`arr.auids[mask]`) so positions map back to real UIDs.
 - Added regression tests covering household contact tracing, treatment eligibility, care-seeking, and diagnostic administration after agent deaths.

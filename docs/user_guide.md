@@ -174,12 +174,19 @@ Basic simulation workflow:
 
 ```python
 import starsim as ss
+import sciris as sc
 import tbsim
+
+# Synthetic DHS-style household data (hh_id + comma-separated ages per household)
+dhs_data = sc.dataframe(
+    hh_id=[0, 1, 2],
+    ages=['72, 17, 30', '37', '13, 55, 36'],
+)
 
 # Create simulation with TB model and analyzer
 sim = ss.Sim(
     diseases=[tbsim.TB()],
-    networks=tbsim.HouseholdNet(),
+    networks=ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False),
     analyzers=[tbsim.DwellTime(scenario_name="Baseline")]
 )
 sim.run()

@@ -33,7 +33,7 @@ DEFAULT_MIGRATION_PARS = dict(
 
 
 def _make_household_dhs_data(n_agents, rand_seed):
-    """Create a synthetic DHS household table for ``ss.HouseholdNet``."""
+    """Create a synthetic DHS household table for ``ss.library.HouseholdNet``."""
     rng = np.random.default_rng(rand_seed)
     hh_id = []
     ages = []
@@ -69,7 +69,7 @@ def build_sim(scenario=None, spars=None):
     include_households = bool(scenario.get('use_households', True))
     networks = [ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))]
     if include_households:
-        networks.append(ss.HouseholdNet(dhs_data=_make_household_dhs_data(n_agents=spars.n_agents, rand_seed=spars.rand_seed), dynamic=False))
+        networks.append(ss.library.HouseholdNet(dhs_data=_make_household_dhs_data(n_agents=spars.n_agents, rand_seed=spars.rand_seed), dynamic=False))
 
     return tbsim.Sim(
         label=scenario.get('name', 'scenario'),

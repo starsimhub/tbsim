@@ -176,7 +176,7 @@ class TxDelivery(ss.Intervention):
             return ss.uids()
         diagnosed_uids = (self._dx.diagnosed & sim.people.alive).uids
         tb = tbsim.get_tb(sim)
-        active_tb_uids = tb.state.auids[np.isin(tb.state, TBS.active_tb_states())]
+        active_tb_uids = tb.active_tb.uids
         return diagnosed_uids & active_tb_uids
 
     def init_results(self):
@@ -219,7 +219,7 @@ class TxDelivery(ss.Intervention):
         uids = self._elig_uids
 
         # INFECTION: clear immediately (no treatment course needed)
-        latent = uids[np.isin(tb.state[uids], [TBS.INFECTION])]
+        latent = uids[tb.latent[uids]]
         tb.state[latent] = TBS.CLEARED
         tb.rr_reinfection[latent] = tb.pars.rr_reinfection_cleared
         if tb.pars.dur_reinfection_protection is not None and len(latent):
@@ -228,7 +228,7 @@ class TxDelivery(ss.Intervention):
         tb.susceptible[latent] = True
 
         # Active TB: put on treatment
-        active = uids[np.isin(tb.state[uids], [TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC, TBS.SYMPTOMATIC])]
+        active = uids[tb.active_tb[uids]]
         if len(active) == 0:
             self._newly_treated = ss.uids()
             return

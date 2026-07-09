@@ -120,7 +120,7 @@ def test_get_eligible_correct_after_deaths():
     assert index_uid[0] in elig, "Diagnosed active-TB agent must be eligible"
     # ...and every selected agent must really be diagnosed + active TB + alive.
     assert np.all(np.asarray(dx.diagnosed[elig])), "All eligible must be diagnosed"
-    assert np.all(np.isin(np.asarray(tb.state[elig]), TBS.active_tb_states())), \
+    assert np.all(np.isin(tb.state[elig], TBS.ACTIVE)), \
         "All eligible must have active TB"
     assert np.all(np.asarray(people.alive[elig])), "All eligible must be alive"
 

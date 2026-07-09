@@ -28,7 +28,7 @@ def test_householdstats():
     hh_ids = np.arange(50)
     ages = [sc.strjoin(np.random.randint(1, 70, np.random.randint(2, 6))) for _ in hh_ids]
     dhs = sc.dataframe(hh_id=hh_ids, ages=ages)
-    net = ss.HouseholdNet(dhs_data=dhs, dynamic=False)
+    net = ss.library.HouseholdNet(dhs_data=dhs, dynamic=False)
     az = tbsim.HouseholdStats(save_at=['2001-01-01', '2004-01-01'])
     sim = make_sim(analyzers=az, networks=net, copy_inputs=False)
     sim.run()

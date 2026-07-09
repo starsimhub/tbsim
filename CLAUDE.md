@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TBsim is an agent-based tuberculosis (TB) model built on the [Starsim](https://github.com/starsimhub/starsim) framework. It simulates TB transmission, disease progression, and treatment outcomes in populations. Currently in alpha (v0.7.0). Python >=3.11.
+TBsim is an agent-based tuberculosis (TB) model built on the [Starsim](https://github.com/starsimhub/starsim) framework. It simulates TB transmission, disease progression, and treatment outcomes in populations. Currently in alpha (v0.8.2). Python >=3.11.
 
 ## Build & Development Commands
 
@@ -74,6 +74,6 @@ Interventions in [tbsim/interventions/](tbsim/interventions/) follow a product/d
 
 ## Key Dependencies
 
-- **starsim** (>=3.2.1) — ABM framework; disease models extend `ss.Disease`, interventions extend `ss.Intervention`
+- **starsim** (>=3.5.0) — ABM framework; use `ss.library.HouseholdNet`
 - **sciris** (>=3.1.0) — Utility library used throughout (`sc.objdict`, `sc.mergedicts`, etc.)
 - **pandas** (>=2.0.0) — Used heavily in diagnostic product definitions (DataFrame-based)

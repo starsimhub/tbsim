@@ -16,7 +16,7 @@ class Migration(ss.Demographics):
     emigration (existing agents leaving). Each timestep, arrivals are drawn
     from a Poisson process and departures are sampled from the active
     population. Immigrants are assigned an age, a TB disease state, and
-    (when a ``HouseholdNet`` is present) a household. Emigrants are removed
+    (when ``ss.library.HouseholdNet`` is present) a household. Emigrants are removed
     from the disease model and from household networks. Setting
     ``emigration_rate=0`` gives an immigration-only module.
 
@@ -72,7 +72,7 @@ class Migration(ss.Demographics):
         n_emigrants: Number of departures in the last step.
         net_migration: ``n_immigrants - n_emigrants`` for the last step.
 
-    **Household integration**: When a ``HouseholdNet`` is present in the sim,
+    **Household integration**: When ``ss.library.HouseholdNet`` is present in the sim,
     immigrants are added to existing households (weighted by household size)
     and connected via complete-graph edges. Emigrants are removed from their
     household membership and edges.
@@ -113,7 +113,7 @@ class Migration(ss.Demographics):
         self.dist_n_emigrants = ss.poisson(lam=self._emigrants_per_timestep)
         self.dist_age_bin = ss.choice(a=[0], p=[1.0])     # Which immigration age bin
         self.dist_age_uniform = ss.random()               # Position within an age bin, or scaled to max_age
-        self.dist_tb_state = ss.choice(a=[-1], p=[1.0])    # Immigrant entry TB state
+        self.dist_tb_state = ss.choice(a=[0], p=[1.0])     # Immigrant entry TB state (placeholder; a/p set in init)
         self.dist_household = ss.random()                  # Household assignment for immigrants
         self.dist_emigrant = ss.random()                   # Emigrant selection scores
         self.dist_age_data = None
@@ -355,7 +355,7 @@ class Migration(ss.Demographics):
 
     def _active_pop_uids(self):
         """UIDs of alive agents that are not in a terminal TB state."""
-        active = ~np.isin(self.tb.state, [*TBS.terminal_states()])
+        active = ~self.tb.terminal.values
         return self.tb.state.auids[active]
 
     def _count_active_pop(self):
@@ -389,7 +389,7 @@ class Migration(ss.Demographics):
             return self._bound_ages(self.dist_age_data.rvs(n))
         if self.age_lows is None or self.age_highs is None:
             return self._bound_ages(self.dist_age_uniform.rvs(n) * float(self.pars.max_age))
-        age_bin = self.dist_age_bin.rvs(n).astype(int)
+        age_bin = self.dist_age_bin.rvs(n)  # ss.choice over an int-typed `a` already returns int
         within_bin = self.dist_age_uniform.rvs(n)
         return self._bound_ages(self.age_lows[age_bin] + within_bin * (self.age_highs[age_bin] - self.age_lows[age_bin]))
 
@@ -507,9 +507,9 @@ class Migration(ss.Demographics):
     def _init_tb_states(self, new_uids):
         """Assign immigrant entry TB states and the dependent TB flags/timers, returning the states."""
         tb = self.tb
-        entry_states = self.dist_tb_state.rvs(len(new_uids)).astype(int)
+        entry_states = self.dist_tb_state.rvs(len(new_uids))  # ss.choice over an int-typed `a` already returns int
         susceptible_like = [TBS.SUSCEPTIBLE, TBS.CLEARED]
-        infected_mask = ~np.isin(entry_states, [*susceptible_like, *TBS.terminal_states()])
+        infected_mask = ~np.isin(entry_states, [*susceptible_like, *TBS.TERMINAL])
 
         tb.state[new_uids] = entry_states
         tb.infected[new_uids] = infected_mask
