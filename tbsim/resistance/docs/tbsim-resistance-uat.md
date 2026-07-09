@@ -2,14 +2,60 @@
 
 Companion to [tbsim-resistance-tech-spec.md](tbsim-resistance-tech-spec.md).
 One user acceptance validation (UAT) per feature section of the technical specification, plus follow-on UATs for requirements called out inside those sections that are not yet implemented.
-Each UAT states the acceptance criterion, plain-English steps, and either a code snippet against the current `tbsim.resistance` API or a `NOT IMPLEMENTED` placeholder.
+Each UAT states the acceptance criterion, plain-English steps, and either a code snippet against the current `tbsim.resistance` API or a `NOT IMPLEMENTED (TODO)` placeholder.
 
 **Scope:** Resistance profiles, multi-strain infection, transmission, competition/reinfection protection, progression, clearance, de-novo acquisition, treatment, TPT, DST / treatment monitoring, notation, and testing.
 
 **Related code:** `tbsim/resistance/`; automated checks in `tbsim/resistance/devtests/`.
 
+## Table of contents
+
+1. [UAT-01 — Individual strain resistance profiles](#uat-01)
+2. [UAT-02 — Multi-strain infections (superinfection)](#uat-02)
+3. [UAT-03 — Transmission (fitness + single-strain pass)](#uat-03)
+4. [UAT-04 — Strain competition / protection against reinfection](#uat-04)
+5. [UAT-05 — Identical-strain carriage counts (alternative model) (TODO)](#uat-05)
+6. [UAT-06 — Progression to disease](#uat-06)
+7. [UAT-07 — Time-varying progression risk (reset the clock) (TODO)](#uat-07)
+8. [UAT-08 — Clearance](#uat-08)
+9. [UAT-09 — Random (de novo) acquisition](#uat-09)
+10. [UAT-10 — Treatment & selective acquisition](#uat-10)
+11. [UAT-11 — Adherence as a per-agent distribution (TODO)](#uat-11)
+12. [UAT-12 — LTFU as a separate treatment outcome (TODO)](#uat-12)
+13. [UAT-13 — TPT](#uat-13)
+14. [UAT-14 — Diagnostics & treatment modification (DST + monitoring)](#uat-14)
+15. [UAT-15 — DST indeterminate outcomes (TODO)](#uat-15)
+16. [UAT-16 — Treatment failure vs new case (time since last treatment) (TODO)](#uat-16)
+17. [UAT-17 — Notation / drug naming](#uat-17)
+18. [UAT-18 — Testing / burden & parameter-effect acceptance](#uat-18)
+19. [UAT-19 — Burden table on `tb_LAI_TPT` parameters (TODO)](#uat-19)
+
 ---
 
+## Requirement-to-UAT mapping (verified)
+
+This crosswalk is verified against the requirement sections in
+`tbsim-resistance-tech-spec -UPDATED.pdf`.
+
+| Requirement section in PDF | UAT coverage |
+|---|---|
+| Individual strain resistance profiles | UAT-01 |
+| Allow for multi-strain infections (superinfections) | UAT-02 |
+| Transmission | UAT-03 |
+| Strain competition and protection against reinfection | UAT-04, UAT-05 (TODO) |
+| Progression to disease | UAT-06, UAT-07 (TODO) |
+| Clearance | UAT-08 |
+| (Random) Acquisition | UAT-09 |
+| Treatment & (Selective) Acquisition | UAT-10, UAT-11 (TODO), UAT-12 (TODO) |
+| TPT | UAT-13 |
+| Diagnostics & Treatment Modification (DST + treatment monitoring) | UAT-14, UAT-15 (TODO), UAT-16 (TODO) |
+| Notation | UAT-17 |
+| Testing | UAT-18, UAT-19 (TODO) |
+| Sources | Informational references (intentionally out of scope for software UAT) |
+
+---
+
+<a id="uat-01"></a>
 ## UAT-01 — Individual strain resistance profiles
 
 **Spec section:** Individual strain resistance profiles
@@ -42,6 +88,7 @@ assert np.isclose(s.fitness[5], 0.5 * 0.9)
 
 ---
 
+<a id="uat-02"></a>
 ## UAT-02 — Multi-strain infections (superinfection)
 
 **Spec section:** Allow for multi-strain infections (i.e., superinfections)
@@ -78,6 +125,7 @@ assert carried[1].sum() == 2 and carried[1, 0] and carried[1, 5]
 
 ---
 
+<a id="uat-03"></a>
 ## UAT-03 — Transmission (fitness + single-strain pass)
 
 **Spec section:** Transmission
@@ -112,18 +160,19 @@ assert set(np.where(tp > 0)[0]).issubset({1, 3})
 
 ---
 
+<a id="uat-04"></a>
 ## UAT-04 — Strain competition / protection against reinfection
 
 **Spec section:** Strain competition and protection against reinfection
 
 **Status:** Implemented
 
-**Accept when:** Superinfection risk depends on disease state (`INFECTION` / `NON_INFECTIOUS` allowed; `ASYMPTOMATIC` / `SYMPTOMATIC` blocked by default via `rr_reinfection_asy` / `rr_reinfection_sym` = 0). Protection is strain-agnostic and count-agnostic. Identical-strain re-exposure does not add a second copy; blocked events are countable. Defaults couple `rr_reinfection_inf` → `rr_reinfection_rec` and `rr_reinfection_non` → `rr_reinfection_inf`.
+**Accept when:** Superinfection risk depends on disease state (`INFECTION` / `NON_INFECTIOUS` allowed; `ASYMPTOMATIC` / `SYMPTOMATIC` blocked by default via `rr_reinfection_asy` / `rr_reinfection_sym` = 0; `TREATMENT` not superinfectable). Protection is strain-agnostic and count-agnostic. Identical-strain re-exposure does not add a second copy; blocked events are countable. Defaults couple `rr_reinfection_inf` → `rr_reinfection_rec` and `rr_reinfection_non` → `rr_reinfection_inf`.
 
 **Steps**
 
 1. Run with `rr_reinfection_inf > 0`, `rr_reinfection_non > 0`, ASY/SYM RR = 0.
-2. Confirm agents in ASY/SYM do not gain a new strain under default parameters.
+2. Confirm agents in ASY/SYM (and agents currently in TREATMENT) do not gain a new strain under default parameters.
 3. Confirm an already-superinfected agent is not *more* protected than a mono-infected agent against a third distinct strain.
 4. Force re-exposure to an already-carried strain; confirm mask unchanged and `new_blocked_superinf` increments.
 
@@ -152,11 +201,12 @@ assert tb.pars.rr_reinfection_asy == 0.0 and tb.pars.rr_reinfection_sym == 0.0
 
 ---
 
-## UAT-05 — Identical-strain carriage counts (alternative model)
+<a id="uat-05"></a>
+## UAT-05 — Identical-strain carriage counts (alternative model) (TODO)
 
 **Spec section:** Strain competition — alternative to blocking identical strains
 
-**Status:** NOT IMPLEMENTED
+**Status:** NOT IMPLEMENTED (TODO)
 
 **Accept when:** As an alternative to blocking superinfection with identical strains, the model can count how many instances of each strain an agent carries, and use those counts when deciding which strains progress and/or get transmitted — without requiring a continuous relative-frequency declaration.
 
@@ -168,13 +218,14 @@ assert tb.pars.rr_reinfection_asy == 0.0 and tb.pars.rr_reinfection_sym == 0.0
 4. Compare bias toward low-prevalence strains vs the current block-identical-strains rule (using the blocked-event analyzer as a baseline).
 
 ```
-NOT IMPLEMENTED
+NOT IMPLEMENTED (TODO)
 ```
 
 **Notes:** Spec flags this as the main decision not yet tested with an ODE. Current implementation blocks identical-strain superinfection and counts blocked events via `new_blocked_superinf`; count-based carriage is not implemented.
 
 ---
 
+<a id="uat-06"></a>
 ## UAT-06 — Progression to disease
 
 **Spec section:** Progression to disease
@@ -210,11 +261,12 @@ assert bin(int(tb.strain_mask[uid])).count('1') == 2
 
 ---
 
-## UAT-07 — Time-varying progression risk (reset the clock)
+<a id="uat-07"></a>
+## UAT-07 — Time-varying progression risk (reset the clock) (TODO)
 
 **Spec section:** Progression to disease — time-varying risk
 
-**Status:** NOT IMPLEMENTED
+**Status:** NOT IMPLEMENTED (TODO)
 
 **Accept when:** When time-varying risk of disease progression is enabled, each new infection resets the individual’s time-since-infection clock. Ideally, successful exposure to a strain the agent already carries also resets the clock even if the strain profile does not change. The number of previously infecting strains does not change the temporal pattern of progression risk.
 
@@ -227,13 +279,14 @@ assert bin(int(tb.strain_mask[uid])).count('1') == 2
 5. Confirm 0→1 and 1→2 infection transitions follow the same temporal progression pattern.
 
 ```
-NOT IMPLEMENTED
+NOT IMPLEMENTED (TODO)
 ```
 
 **Notes:** `ti_infected` is reset on successful and blocked exposures (hook exists), but a full time-varying progression hazard driven by that clock is not modeled yet.
 
 ---
 
+<a id="uat-08"></a>
 ## UAT-08 — Clearance
 
 **Spec section:** Clearance
@@ -268,6 +321,7 @@ tb.strain_mask[u] = (1 << 0) | (1 << 1)
 
 ---
 
+<a id="uat-09"></a>
 ## UAT-09 — Random (de novo) acquisition
 
 **Spec section:** (Random) Acquisition
@@ -302,6 +356,7 @@ assert tb.results['new_denovo_resistance'].sum() > 0
 
 ---
 
+<a id="uat-10"></a>
 ## UAT-10 — Treatment & selective acquisition
 
 **Spec section:** Treatment & (Selective) Acquisition
@@ -350,11 +405,12 @@ assert sim.results['first_line'].n_acquired.sum() >= 0
 
 ---
 
-## UAT-11 — Adherence as a per-agent distribution
+<a id="uat-11"></a>
+## UAT-11 — Adherence as a per-agent distribution (TODO)
 
 **Spec section:** Treatment & (Selective) Acquisition — adherence
 
-**Status:** NOT IMPLEMENTED
+**Status:** NOT IMPLEMENTED (TODO)
 
 **Accept when:** Adherence can be specified as a regimen-level **distribution** that varies by agent (not only a single Bernoulli probability). One draw per agent per treatment course is applied across all of that agent’s strains, inducing agent-level correlation in treatment efficacy.
 
@@ -366,18 +422,19 @@ assert sim.results['first_line'].n_acquired.sum() >= 0
 4. Confirm a scalar adherence probability remains supported as a special case of the distribution.
 
 ```
-NOT IMPLEMENTED
+NOT IMPLEMENTED (TODO)
 ```
 
 **Notes:** Current `TxR` uses a single per-agent Bernoulli (`adherence` float). Spec asks for a regimen-level distribution that varies by agent and is applied across all strains during a given treatment course.
 
 ---
 
-## UAT-12 — LTFU as a separate treatment outcome
+<a id="uat-12"></a>
+## UAT-12 — LTFU as a separate treatment outcome (TODO)
 
 **Spec section:** Treatment & (Selective) Acquisition — unsuccessful outcomes
 
-**Status:** NOT IMPLEMENTED
+**Status:** NOT IMPLEMENTED (TODO)
 
 **Accept when:** Loss to follow-up (LTFU) can be modeled as a distinct unsuccessful treatment outcome (separate from failure and relapse). Acquisition risk `q_{l,i}` can apply on LTFU when that outcome is enabled, once per treatment episode, consistent with other unsuccessful outcomes.
 
@@ -389,13 +446,14 @@ NOT IMPLEMENTED
 4. Confirm acquisition still occurs at most once per treatment episode and uses replacement for surviving susceptible strains.
 
 ```
-NOT IMPLEMENTED
+NOT IMPLEMENTED (TODO)
 ```
 
 **Notes:** Spec notes LTFU is not currently a separate outcome in TBsim. Today acquisition applies on unsuccessful resolution of the course (failure path) without a distinct LTFU state.
 
 ---
 
+<a id="uat-13"></a>
 ## UAT-13 — TPT
 
 **Spec section:** TPT
@@ -434,20 +492,22 @@ product = tbsim.TPTRx(
 
 ---
 
+<a id="uat-14"></a>
 ## UAT-14 — Diagnostics & treatment modification (DST + monitoring)
 
 **Spec section:** Diagnostics & Treatment Modification
 
 **Status:** Implemented (partial — see UAT-15, UAT-16)
 
-**Accept when:** DST produces an observed **n-drug** profile (not strain IDs). Sensitivity/specificity apply per strain, then aggregate. `p_strain_obs` (default = strain fitness) can drop strains from observation. Multi-strain carriage with `p_strain_obs=1` raises detection of a shared phenotype; `p_strain_obs < 1` lowers overall sensitivity. Treatment can be routed on the observed profile. Treatment monitoring can interrupt/switch an ongoing regimen after time-on-treatment.
+**Accept when:** DST produces an observed **n-drug** profile (not strain IDs). Sensitivity/specificity apply per strain, then aggregate. `p_strain_obs` (default = strain fitness) can drop strains from observation. Multi-strain carriage with `p_strain_obs=1` raises detection of a shared phenotype; `p_strain_obs < 1` lowers overall sensitivity. DST eligibility can be configured as immediate-after-diagnosis or treatment-failure-triggered. Treatment can be routed on the observed profile. Treatment monitoring can interrupt/switch an ongoing regimen after time-on-treatment.
 
 **Steps**
 
 1. Run DST on mono- vs multi-strain carriers; with `p_strain_obs=1`, multi-strain detection of a shared phenotype is higher.
 2. Lower `p_strain_obs` and confirm detection falls.
 3. Route second-line `TxDeliveryR` with `eligibility=` from `DSTDelivery.observed_resistant` / `matches`.
-4. After N steps on first-line, use `treatment_monitoring_eligibility` + `supersedes=` to switch regimens mid-course; confirm first-line is interrupted and second-line starts.
+4. Validate both DST eligibility modes: immediate testing after diagnosis and deferred testing after treatment failure logic (when configured).
+5. After N steps on first-line, use `treatment_monitoring_eligibility` + `supersedes=` to switch regimens mid-course; confirm first-line is interrupted and second-line starts.
 
 ```python
 import tbsim
@@ -487,11 +547,12 @@ sim.run()
 
 ---
 
-## UAT-15 — DST indeterminate outcomes
+<a id="uat-15"></a>
+## UAT-15 — DST indeterminate outcomes (TODO)
 
 **Spec section:** Diagnostics & Treatment Modification — DST
 
-**Status:** NOT IMPLEMENTED
+**Status:** NOT IMPLEMENTED (TODO)
 
 **Accept when:** For each drug/class, DST can return user-defined observed outcomes including at least positive (resistant), negative (susceptible), and **indeterminate**, not only a binary resistant/susceptible call.
 
@@ -503,18 +564,19 @@ sim.run()
 4. Confirm treatment routing can treat indeterminate separately from resistant and susceptible (e.g. do not auto-switch regimen on indeterminate alone).
 
 ```
-NOT IMPLEMENTED
+NOT IMPLEMENTED (TODO)
 ```
 
 **Notes:** Current `DST` aggregates to a binary n-bit observed profile (`dst_profile`). Indeterminate is not a supported call.
 
 ---
 
-## UAT-16 — Treatment failure vs new case (time since last treatment)
+<a id="uat-16"></a>
+## UAT-16 — Treatment failure vs new case (time since last treatment) (TODO)
 
 **Spec section:** Diagnostics & Treatment Modification — DST eligibility
 
-**Status:** NOT IMPLEMENTED
+**Status:** NOT IMPLEMENTED (TODO)
 
 **Accept when:** The model tracks time since last treatment initiation and uses it to classify a later presentation as treatment failure (eligible for DST / second-line) versus a new case.
 
@@ -526,13 +588,14 @@ NOT IMPLEMENTED
 4. Confirm DST eligibility and regimen choice can depend on that classification.
 
 ```
-NOT IMPLEMENTED
+NOT IMPLEMENTED (TODO)
 ```
 
 **Notes:** `TxDeliveryR` tracks `ti_treatment_start` for the current course (used by monitoring), but there is no durable “time since last treatment initiation” used to distinguish failure vs new case.
 
 ---
 
+<a id="uat-17"></a>
 ## UAT-17 — Notation / drug naming
 
 **Spec section:** Notation
@@ -560,6 +623,7 @@ assert s2.m == 2 * s.m
 
 ---
 
+<a id="uat-18"></a>
 ## UAT-18 — Testing / burden & parameter-effect acceptance
 
 **Spec section:** Testing
@@ -587,11 +651,12 @@ assert s2.m == 2 * s.m
 
 ---
 
-## UAT-19 — Burden table on `tb_LAI_TPT` parameters
+<a id="uat-19"></a>
+## UAT-19 — Burden table on `tb_LAI_TPT` parameters (TODO)
 
 **Spec section:** Testing — before/after burden comparison
 
-**Status:** NOT IMPLEMENTED
+**Status:** NOT IMPLEMENTED (TODO)
 
 **Accept when:** A documented comparison table exists for overall TB disease prevalence per 100,000, annual incidence of new asymptomatic disease per 100,000, and annual TB mortality per 100,000, using the best-fitting parameter set / configuration from `tb_LAI_TPT`, before vs after resistance/multi-strain is enabled. Material shifts are interrogated and explained.
 
@@ -603,7 +668,7 @@ assert s2.m == 2 * s.m
 4. Confirm differences are small, or document why/under what conditions they are not.
 
 ```
-NOT IMPLEMENTED
+NOT IMPLEMENTED (TODO)
 ```
 
 **Notes:** ABM↔ODE validation and directional parameter-effect tests exist (South Africa / reference-ODE set). The LAI_TPT burden-per-100k before-vs-after table has not been produced.
@@ -618,20 +683,20 @@ NOT IMPLEMENTED
 | UAT-02 | Superinfection | Implemented | `TBResistant.strain_mask` |
 | UAT-03 | Transmission | Implemented | `max_fitness`, `transmit_probs` |
 | UAT-04 | Competition / reinfection | Implemented | `rr_reinfection_*`, `new_blocked_superinf` |
-| UAT-05 | Strain carriage counts | NOT IMPLEMENTED | block + counter only |
+| UAT-05 | Strain carriage counts | NOT IMPLEMENTED (TODO) | block + counter only |
 | UAT-06 | Progression | Implemented | `p_multi`, bottleneck |
-| UAT-07 | Time-varying progression | NOT IMPLEMENTED | `ti_infected` hook only |
+| UAT-07 | Time-varying progression | NOT IMPLEMENTED (TODO) | `ti_infected` hook only |
 | UAT-08 | Clearance | Implemented | natural clear → `strain_mask=0` |
 | UAT-09 | De novo acquisition | Implemented | `p_rand`, `prog_resist_mode` |
 | UAT-10 | Treatment | Implemented (partial) | `TxR`, `TxDeliveryR` |
-| UAT-11 | Adherence distribution | NOT IMPLEMENTED | still Bernoulli only |
-| UAT-12 | LTFU outcome | NOT IMPLEMENTED | not a separate outcome |
+| UAT-11 | Adherence distribution | NOT IMPLEMENTED (TODO) | still Bernoulli only |
+| UAT-12 | LTFU outcome | NOT IMPLEMENTED (TODO) | not a separate outcome |
 | UAT-13 | TPT | Implemented | `TPTRx` |
 | UAT-14 | DST + monitoring | Implemented (partial) | `DST`, `DSTDelivery`, monitoring helpers |
-| UAT-15 | DST indeterminate | NOT IMPLEMENTED | binary `dst_profile` only |
-| UAT-16 | Failure vs new case | NOT IMPLEMENTED | no durable time-since-last-Tx |
+| UAT-15 | DST indeterminate | NOT IMPLEMENTED (TODO) | binary `dst_profile` only |
+| UAT-16 | Failure vs new case | NOT IMPLEMENTED (TODO) | no durable time-since-last-Tx |
 | UAT-17 | Notation | Implemented | name-keyed dicts / `drug_idx` |
 | UAT-18 | Testing | Implemented (partial) | `devtests/` + ODE validation |
-| UAT-19 | LAI_TPT burden table | NOT IMPLEMENTED | table not produced |
+| UAT-19 | LAI_TPT burden table | NOT IMPLEMENTED (TODO) | table not produced |
 
 **Out of scope for UAT:** Sources section (background papers only; not a software requirement).
