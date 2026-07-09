@@ -5,5 +5,5 @@ Version and license information.
 __all__ = ['__version__', '__versiondate__', '__license__']
 
 __version__ = '0.9.0'
-__versiondate__ = '2026-07-05'
+__versiondate__ = '2026-07-09'
 __license__ = f'TBsim {__version__} ({__versiondate__}) — © 2023-2026 by IDM'
