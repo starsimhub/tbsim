@@ -552,7 +552,7 @@ class HouseholdStats(ss.Analyzer):
     Track household size, age, and contact-mixing statistics over time.
 
     Works with any network that exposes a ``household_ids`` state (e.g.
-    ``starsim.library.networks.HouseholdNet``).  At each timestep the
+    ``ss.library.HouseholdNet``).  At each timestep the
     analyzer counts alive agents per household and records summary statistics.
 
     Args:

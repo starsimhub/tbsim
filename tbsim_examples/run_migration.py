@@ -33,7 +33,7 @@ DEFAULT_MIGRATION_PARS = dict(
 
 
 def _make_household_dhs_data(n_agents, rand_seed):
-    """Create a synthetic DHS household table for ``starsim.library.networks.HouseholdNet``."""
+    """Create a synthetic DHS household table for ``ss.library.HouseholdNet``."""
     rng = np.random.default_rng(rand_seed)
     hh_id = []
     ages = []
