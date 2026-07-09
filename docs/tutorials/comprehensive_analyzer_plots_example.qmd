@@ -81,13 +81,13 @@ analyzer.plot('validation')
 ```
 
 ## 5. Loading from file
-You can also create a DwellTime instance from a saved CSV file.
+You can save the collected dwell-time data to a CSV file and later create a `DwellTime` instance from it.
 
 ```{python}
 from tbsim.analyzers import DwellTime
 
-file_path = analyzer.file_path
-print(f'Generated data file: {file_path}')
+file_path = analyzer.save('dwelltime.csv')
+print(f'Saved data file: {file_path}')
 
 plotter = DwellTime(file_path=file_path)
 plotter.plot('histogram')
