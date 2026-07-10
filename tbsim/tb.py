@@ -56,7 +56,8 @@ class TB(BaseTB):
     Args (pars):
         *Transmission and reinfection*
 
-        - ``init_prev``:   Initial seed infections (prevalence).
+        - ``init_prev``:   Initial seed infections into latent ``INFECTION`` (prevalence).
+        - ``init_prev_active``: Initial seed infections into active ``SYMPTOMATIC`` TB (prevalence). Default 0. Mirrors the ODE model's symptomatic seeding, so that both models can start from identical active-TB prevalence.
         - ``beta``:        Transmission rate per year.
         - ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (kappa)
         - ``rr_reinfection_rec``:     Relative risk of reinfection after recovering from NON_INFECTIOUS. (pi)
@@ -138,7 +139,8 @@ class TB(BaseTB):
 
         # --- Transmission and reinfection ---
         self.define_pars(
-            init_prev=ss.bernoulli(0.05),       # Initial seed infections (prevalence)
+            init_prev=ss.bernoulli(0.05),       # Initial seed infections into latent INFECTION (prevalence)
+            init_prev_active=ss.bernoulli(0.0), # Initial seed infections into active SYMPTOMATIC TB (prevalence); mirrors the ODE's symptomatic seeding
             beta=ss.permonth(0.2),              # Transmission rate per month
             trans_asymp=0.82,                   # κ kappa: rel. transmissibility asymptomatic vs symptomatic
             rr_reinfection_rec=0.21,            # π pi: RR reinfection after NON_INFECTIOUS → CLEARED
@@ -254,6 +256,25 @@ class TB(BaseTB):
         self.ti_infected[uids] = self.ti
         self.state[uids] = TBS.INFECTION
 
+        return
+
+    def init_post(self):
+        """
+        Seed initial infections, then (optionally) promote a fraction to active TB.
+
+        The base `starsim.Infection.init_post` seeds ``init_prev`` cases into latent
+        ``INFECTION`` (via `set_prognoses`). We additionally seed ``init_prev_active``
+        cases directly into ``SYMPTOMATIC`` active TB, matching the compartmental ODE,
+        which seeds its initial cases as symptomatic rather than latent. Active seeding
+        draws from agents still susceptible after latent seeding, so the two seeds do
+        not overlap.
+        """
+        super().init_post()
+
+        active_cases = self.pars.init_prev_active.filter(self.susceptible.uids)
+        if len(active_cases):
+            self.set_prognoses(active_cases)                # sets infection flags + ti_infected (state → INFECTION)
+            self.state[active_cases] = TBS.SYMPTOMATIC      # override latent → symptomatic active TB
         return
 
     def transition(self, uids, to, rng):
