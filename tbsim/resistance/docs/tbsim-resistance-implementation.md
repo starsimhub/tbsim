@@ -117,10 +117,10 @@ This is the reuse-the-FOI design in full (spec §"Transmission", §"Strain compe
 - `susceptible` — set True for states eligible to (super)infect: SUSCEPTIBLE, CLEARED, INFECTION, NON_INFECTIOUS, and (only if their σ > 0) ASYMPTOMATIC / SYMPTOMATIC.
 - `rel_sus` — the state-dependent superinfection susceptibility σ: `rr_reinfection_inf` (σ_L) for INFECTION, `rr_reinfection_non` (σ_N) for NON_INFECTIOUS, `rr_reinfection_asy`/`rr_reinfection_sym` for active disease, and the reinfection multiplier for CLEARED. σ is strain- and count-agnostic (a superinfected agent gains no extra protection).
 
-**`set_prognoses(uids, sources)` resolves which strain moves.** For transmission events it draws the transmitted strain from each source's carried strains ∝ fitness (`Strains.transmit_probs`, sampled with the CRN-safe `tbsim.choice2d`), then:
+**`set_prognoses(uids, sources)` resolves which strain moves.** For transmission events it draws the transmitted strain from each source's carried strains ∝ `count × fitness` (`Strains.transmit_probs`, sampled with the CRN-safe `tbsim.choice2d`), then:
 
-- **identical-strain blocking** — if the target already carries the drawn strain, nothing changes except the infection clock resets; the event is counted in `new_blocked_superinf` (the analyzer the spec requested).
-- otherwise the strain is OR-ed into the target's `strain_mask`; a previously-uninfected target enters INFECTION, while an already-infected target keeps its current state (superinfection).
+- **identical-strain superinfection** — if the target already carries the drawn strain, its per-strain **count** is incremented (previously this was blocked); the infection clock resets and the event is counted in `new_identical_superinf`.
+- otherwise the strain is OR-ed into the target's `strain_mask` at count 1; a previously-uninfected target enters INFECTION, while an already-infected target keeps its current state (superinfection).
 
 The two spec constraints — infectees acquire only strains the source carries, and no resistance emerges during transmission — hold by construction. The design reproduces the spec's worked table exactly (a source carrying `{RIF}` and `{RIF,BDQ}` transmits at rate `r_RIF·β`, split 56% / 44%); see `devtests/test_transmission.py::test_transmission_split_matches_spec_table`.
 
@@ -144,8 +144,8 @@ Treatment follows TBsim's product/delivery split (spec §"Treatment & (Selective
 
 **`TxR`** (product) holds the regimen's per-strain efficacy and acquisition rules:
 
-- `eff_by_id[j]` = `base_efficacy` × ∏ `resist_penalty[d]` over the *regimen* drugs `d` that strain `j` resists. Resistance to a drug **outside** the regimen does not reduce efficacy.
-- `adherence` is a single per-agent Bernoulli that gates the whole course, inducing the spec's agent-level correlation across strains (a non-adherent agent clears nothing).
+- `eff_by_id[j]` = `base_efficacy` × ∏ `resist_penalty[d]` over the *regimen* drugs `d` that strain `j` resists. Resistance to a drug **outside** the regimen does not reduce efficacy. An explicit `efficacy_by_strain` vector (the spec's `T_l`) bypasses this derivation and sets `eff_by_id` verbatim.
+- `adherence` gates the whole course through one per-agent completion draw, inducing the spec's agent-level correlation across strains (a non-completer clears nothing). It is either a float (one regimen-level probability shared by all agents) or a callable `uids -> per-agent probability` — the spec's "regimen-level distribution that varies by agent"; the callable's output is fed to the completion draw via `adherence_distribution`.
 - `roll_survivors(tb, uids)` pre-rolls the surviving strain mask: for each carried strain, adherent carriers are cured with probability `eff_by_id`.
 - `acquire(uids, surv, states)` applies acquisition-on-failure as **replacement**: once per agent per regimen drug, a surviving strain susceptible to that drug becomes resistant, with probability `q_acq[drug]` scaled by a per-TB-state RR (`acq_state_rr`, default 1 for ASYMPTOMATIC/SYMPTOMATIC and 0 elsewhere — the spec's state-varying `q`).
 
@@ -182,7 +182,7 @@ TPT-driven resistance **acquisition** is applied to the "TPT was ineffective" co
 
 ## 11. Results and analyzers
 
-`TBResistant` records, alongside the standard TB results: `frac_resist` (resistant fraction of active TB), `frac_super` (superinfected fraction), `frac_resist_<drug>` (per drug), and the three per-step flux counters `new_blocked_superinf`, `new_denovo_resistance`, `new_transmitted_resistance`.
+`TBResistant` records, alongside the standard TB results: `frac_resist` (resistant fraction of active TB), `frac_super` (superinfected fraction), `frac_resist_<drug>` (per drug), and the three per-step flux counters `new_identical_superinf`, `new_denovo_resistance`, `new_transmitted_resistance`.
 
 Two analyzers add cross-cutting views:
 
@@ -235,16 +235,16 @@ The spec's "questions of interest" (model-tests.md §10) are each a knob on this
 | 3b | Superinfection during active disease | `rr_reinfection_asy`, `rr_reinfection_sym` | ✅ implemented |
 | 4 | De-novo acquisition mechanism (mixed vs replacement) | `prog_resist_mode` | ✅ implemented |
 | 5 | Transmission bottleneck vs independence | — | ⚠️ bottleneck only |
-| 6 | Repeated/identical-strain superinfection | — | ⏸️ deprioritized (counted via `new_blocked_superinf`) |
+| 6 | Repeated/identical-strain superinfection | — | ✅ per-strain count (`new_identical_superinf`) |
 
-**Q5 is the one deliberate gap.** The bitmask + reuse-FOI design implements only the transmission *bottleneck* (a superinfected source transmits at its fittest strain's rate, then one strain is drawn ∝ fitness). Fully independent per-strain transmission would require per-strain FOI channels, which the shared-engine design does not provide; it remains available in the ODE (`transmission_independent`) as the reference for that question. Q6 is deprioritized per the spec, but the identical-strain block count it asks about is recorded.
+**Q5 is the one deliberate gap.** The bitmask + reuse-FOI design implements only the transmission *bottleneck* (a superinfected source transmits at its fittest strain's rate, then one strain is drawn ∝ `count × fitness`). Fully independent per-strain transmission would require per-strain FOI channels, which the shared-engine design does not provide; it remains available in the ODE (`transmission_independent`) as the reference for that question. Q6 is now implemented: identical-strain re-exposure increments a per-strain multiplicity count (rather than being blocked), feeding the transmission multinomial and the progression bottleneck.
 
 ## 15. Design decisions and known limitations
 
 - **Bitmask vs. declared strains.** The `2ⁿ` bitmask matches the spec's model exactly and guarantees that de-novo/acquired resistance always has a target strain (no silently-dropped emergence). The cost is that the strain-membership decode is `O(m)`; this is negligible for the spec's realistic drug counts (`n ≈ 2–4` → 4–16 strains) but would grow for many independent drugs.
-- **Adherence** is a single per-agent Bernoulli, not yet the fuller "regimen-level distribution that varies by agent" the spec floats as an option.
+- **Adherence** supports both a single regimen-level probability (float) and a per-agent distribution (callable) applied across all of an agent's strains — the spec's "regimen-level distribution that varies by agent."
 - **Within-strain DST correlation.** Sensitivity/specificity for the several drugs of one strain share that strain's call draw (a minor, deliberate correlation); independence *across* strains — what drives the multi-strain detection boost — is preserved.
 - **Rate-based treatment delivery.** `TxDeliveryR` initiates at state-specific rates (which cleanly matches the ODE and supports DST-routing / switching via `eligibility` + `supersedes`); it does not retrofit the full HealthSeekingBehavior → Dx → Tx cascade, though a custom `eligibility` callable can bridge to it.
-- **`tb_LAI_TPT` burden validation.** A before/after burden-per-100,000 table on the `tb_LAI_TPT` parameter set (spec §"Testing") remains a follow-up study rather than code.
+- **Burden validation.** A resistance-off vs resistance-on burden-per-100,000 comparison (spec §"Testing") is generated by `codex_review/make_burden_validation.py` → `lai_tpt_burden_validation.csv`.
 
 See [resistance_comparison.md](resistance_comparison.md) for how these choices compare to the alternative PR #430 implementation.

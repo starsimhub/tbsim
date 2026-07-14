@@ -261,6 +261,41 @@ tb.strains.validate_drugs(['RIF'], where='my check')       # OK, no error
 
 ---
 
+## 10. Spec-compliance treatment additions: explicit efficacy, adherence distributions, retreatment classification
+
+Three treatment/diagnostics items from the tech spec are now first-class (see `codex_review/spec_compliance_review.md` for the audit that motivated them).
+
+**Explicit per-strain efficacy vector `T_l`.** When the constrained `base_efficacy × ∏ resist_penalty` form can't express the cure profile you want, pass `efficacy_by_strain` — a length-`m` vector used verbatim as the per-strain cure probabilities (and overriding `base_efficacy`/`resist_penalty`).
+
+**Adherence as a per-agent distribution.** `adherence` now accepts a callable `uids -> per-agent probability` (not just a float), making completion a regimen-level *distribution that varies by agent*, applied across all of that agent's strains through a single correlated draw.
+
+```python
+import numpy as np
+import starsim as ss
+import tbsim
+
+tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+prod = tbsim.TxR(
+    strains=tb.strains,
+    efficacy_by_strain=[0.9, 0.2],                 # explicit T_l: pan 0.9, RIF-resistant 0.2
+    adherence=lambda uids: 0.6 + 0.3 * (np.asarray(uids) % 2),  # per-agent adherence distribution
+)
+print('eff_by_id:', prod.eff_by_id)                # array([0.9, 0.2])
+print('adherence is a distribution:', callable(prod.adherence_distribution))
+```
+
+**Retreatment vs new case.** Every `TxDeliveryR` stamps a durable, cross-regimen `tb.ti_last_treatment` at initiation. `TxDeliveryR.failure_case_eligibility(within=<ss.dur>)` returns a `sim -> uids` classifier: agents whose last treatment was within `within` are managed as a **treatment failure / retreatment** (route to DST / second-line); pass `new_case=True` for the complement.
+
+```python
+failed = tbsim.TxDeliveryR.failure_case_eligibility(within=ss.years(2))
+second_line = tbsim.TxDeliveryR(name='second', eligibility=failed, supersedes=['first'],
+                                product=tbsim.TxR(strains=tb.strains, regimen_drugs=['BDQ']))
+```
+
+A matched resistance-off vs resistance-on **burden comparison** (prevalence / asymptomatic incidence / TB mortality per 100k) is produced by `codex_review/make_burden_validation.py` → `lai_tpt_burden_validation.csv`.
+
+---
+
 ## Deferred (not in this update)
 
 Two spec items are intentionally left for a later pass because they need modeling-team input (see `implementation-decisions.md` D-DEFER):

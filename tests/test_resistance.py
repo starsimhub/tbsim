@@ -276,6 +276,73 @@ def test_dst_router_matches_observed_profile():
     assert rif_not_bdq == set(rif_only)           # RIF-resistant, BDQ-susceptible only
 
 
+# --------------------------------------------------------------------------- explicit efficacy vector / adherence distribution / retreatment classifier
+def test_treatment_explicit_efficacy_vector():
+    """TxR(efficacy_by_strain=...) uses the given per-strain vector T_l verbatim as the cure probabilities
+    (spec §Treatment), overriding the base_efficacy × penalty parameterization."""
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+    eff = np.array([0.9, 0.2])  # pan, RIF-resistant
+    prod = tbsim.TxR(strains=tb.strains, efficacy_by_strain=eff, adherence=1.0)
+    sim = make_sim(tb, n=20000, interventions=tbsim.TxDeliveryR(product=prod)); sim.init()
+    tb = sim.get_tb(); prod = _product(sim, tbsim.TxDeliveryR).product
+    assert np.allclose(prod.eff_by_id, eff)
+    u = ss.uids(np.arange(20000))
+    tb.strain_mask[ss.uids(np.arange(10000))] = 1        # pan
+    tb.strain_mask[ss.uids(np.arange(10000, 20000))] = 2  # RIF-resistant
+    surv = prod.roll_survivors(tb, u)
+    assert np.isclose(np.mean(surv[:10000] == 0), 0.9, atol=0.02)   # pan cured at t_pan
+    assert np.isclose(np.mean(surv[10000:] == 0), 0.2, atol=0.02)   # resistant cured at t_res
+
+
+def test_treatment_adherence_distribution():
+    """adherence as a callable makes completion a per-agent distribution applied across all the agent's
+    strains (spec §Treatment): non-completers clear nothing that course."""
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+    adh = lambda uids: np.where(np.asarray(uids) < 5000, 1.0, 0.0)  # first half fully adherent, rest never
+    prod = tbsim.TxR(strains=tb.strains, base_efficacy=1.0, adherence=adh)
+    sim = make_sim(tb, n=10000, interventions=tbsim.TxDeliveryR(product=prod)); sim.init()
+    tb = sim.get_tb(); prod = _product(sim, tbsim.TxDeliveryR).product
+    assert callable(prod.adherence_distribution)
+    u = ss.uids(np.arange(10000)); tb.strain_mask[u] = 1
+    surv = prod.roll_survivors(tb, u)
+    assert np.mean(surv[:5000] == 0) == 1.0   # adherent + efficacy 1 → all cured
+    assert np.mean(surv[5000:] == 0) == 0.0   # non-adherent → none cured
+
+
+def test_failure_vs_new_case_classification():
+    """TxDeliveryR.failure_case_eligibility partitions active TB by time since last treatment initiation
+    (durable tb.ti_last_treatment): recent → treatment failure/retreatment, old or never-treated → new
+    case (spec §Diagnostics)."""
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0))
+    sim = make_sim(tb, n=600); sim.init()
+    tb = sim.get_tb(); ti = sim.ti
+    tb.state[ss.uids(np.arange(300))] = TBS.SYMPTOMATIC  # candidate pool = active TB (uids 0-299)
+    recent, old = ss.uids(np.arange(100)), ss.uids(np.arange(100, 200))
+    tb.ti_last_treatment[recent] = ti          # treated now → failure/retreatment
+    tb.ti_last_treatment[old] = ti - 100       # treated long ago → new case; uids 200-299 never treated (nan)
+    failed = tbsim.TxDeliveryR.failure_case_eligibility(within=ss.years(2))
+    newcase = tbsim.TxDeliveryR.failure_case_eligibility(within=ss.years(2), new_case=True)
+    assert set(failed(sim).tolist()) == set(range(100))
+    assert set(newcase(sim).tolist()) == set(range(100, 300))
+
+
+# --------------------------------------------------------------------------- per-strain counter
+def test_strain_counter_and_count_weighting():
+    """Identical-strain re-exposure increments the per-strain count (previously blocked) and the
+    transmission multinomial is weighted by count × fitness (spec updates §1)."""
+    s = tbsim.Strains(['TX'], rel_fitness=None)  # neutral fitness
+    tp = s.transmit_probs(np.array([0b11]), counts=np.array([[2, 1]]))[0]
+    assert np.allclose(tp, [2/3, 1/3]) and s.max_fitness(np.array([0b11]))[0] == 1.0  # split by count, infectiousness count-free
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0))
+    sim = make_sim(tb, n=200); sim.init(); tb = sim.get_tb()
+    tgt, src = ss.uids(np.arange(50)), ss.uids(np.arange(50, 100))
+    for u in (tgt, src):
+        tb.strain_mask[u] = 1; tb.strain_counts[0][u] = 1; tb.state[u] = TBS.INFECTION
+    tb.set_prognoses(tgt, sources=src)
+    assert (tb.strain_mask[tgt] == 1).all()                    # carried set unchanged
+    assert (np.asarray(tb.strain_counts[0][tgt]) == 2).all()   # count incremented 1 → 2
+
+
 # --------------------------------------------------------------------------- ODE reference self-checks (model-tests.md §8)
 def test_ode_conservation():
     """Summed over all 22 compartments the population is conserved at N."""

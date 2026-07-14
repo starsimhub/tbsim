@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TBsim is an agent-based tuberculosis (TB) model built on the [Starsim](https://github.com/starsimhub/starsim) framework. It simulates TB transmission, disease progression, and treatment outcomes in populations. Currently in alpha (v0.8.2). Python >=3.11.
+TBsim is an agent-based tuberculosis (TB) model built on the [Starsim](https://github.com/starsimhub/starsim) framework. It simulates TB transmission, disease progression, and treatment outcomes in populations. Currently in alpha (v0.10.0). Python >=3.11.
 
 ## Build & Development Commands
 
@@ -41,6 +41,10 @@ The TB natural history model lives in `tbsim/`:
 - **TB** ([tb.py](tbsim/tb.py)) — LSHTM "spectrum of disease" approach with states: SUSCEPTIBLE → INFECTION → NON_INFECTIOUS → ASYMPTOMATIC → SYMPTOMATIC → TREATMENT (or CLEARED/DEAD). State enum is `TBS`.
 
 Extends `ss.Disease` from Starsim.
+
+### Multi-strain / drug-resistance extension
+
+[tbsim/resistance/](tbsim/resistance/) adds a multi-strain, drug-resistance overlay. `TBResistant` (in [tb_resistant.py](tbsim/resistance/tb_resistant.py)) is a drop-in `TB` subclass that encodes `2ⁿ` strains over `n` named drugs as a per-agent bitmask (`strain_mask`) plus a per-strain multiplicity counter, with per-strain fitness costs, superinfection, and de-novo resistance. It ships strain-aware product/delivery interventions — `TxR`/`TxDeliveryR` (treatment), `DST`/`DSTDelivery` (diagnostics), `TPTRx` (preventive therapy) — the `ResistanceStats`/`StrainResults` analyzers, and a two-strain reference ODE (`tbsim.compartmental.TwoStrainODE`) for ABM↔ODE validation. All public entry points are re-exported on `tbsim`. CI coverage lives in [tests/test_resistance.py](tests/test_resistance.py); the broader dev suite is `tbsim/resistance/devtests/` (run manually, not collected by CI). Docs (user manual, updates guide, tech spec) are under `tbsim/resistance/docs/`.
 
 ### Sim Wrapper
 
@@ -79,6 +83,6 @@ Interventions in [tbsim/interventions/](tbsim/interventions/) follow a product/d
 
 ## Key Dependencies
 
-- **starsim** (>=3.5.0) — ABM framework; use `ss.library.HouseholdNet`
+- **starsim** (>=3.5.1) — ABM framework; use `ss.library.HouseholdNet`
 - **sciris** (>=3.1.0) — Utility library used throughout (`sc.objdict`, `sc.mergedicts`, etc.)
 - **pandas** (>=2.0.0) — Used heavily in diagnostic product definitions (DataFrame-based)
