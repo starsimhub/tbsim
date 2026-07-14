@@ -132,10 +132,12 @@ Expected layout for two drugs:
 
 | id | label | profile | fitness (example) |
 |----|-------|---------|-------------------|
-| 0 | pan | `{0,0}` | 1.00 |
-| 1 | RIF | `{1,0}` | 0.50 |
-| 2 | BDQ | `{0,1}` | 0.80 |
-| 3 | RIF+BDQ | `{1,1}` | 0.40 |
+| 0 | pan | `[0 0]` | 1.00 |
+| 1 | RIF | `[1 0]` | 0.50 |
+| 2 | BDQ | `[0 1]` | 0.80 |
+| 3 | RIF+BDQ | `[1 1]` | 0.40 |
+
+(The `profile` column shows `strains.profile[j].astype(int)` — a NumPy array over drugs in `drugs` order, bit `i` set = resistant to drug `i`.)
 
 Adding a third drug (e.g. `'FQ'`) only requires appending to `drugs`; `m` becomes `8`.
 
@@ -356,7 +358,7 @@ Use the product/delivery pair:
 - **`TxR`** — per-strain efficacy, adherence, acquisition-on-failure (`q_acq`)
 - **`TxDeliveryR`** — who starts treatment and when (rates from ASY/SYM, or a custom `eligibility` callable)
 
-Efficacy for strain `j` is `base_efficacy` × product of `resist_penalty` over **regimen** drugs that strain resists. Failed courses can acquire resistance to regimen drugs by **replacement**, once per episode, scaled by TB-state RR (`acq_state_rr`; default 1 for ASY/SYM, 0 elsewhere).
+Efficacy for strain `j` is `base_efficacy` × product of `resist_penalty` over **regimen** drugs that strain resists. Failed courses can acquire resistance to regimen drugs by **replacement** — one trial per regimen drug, at most once per treatment episode — scaled by TB-state RR (`acq_state_rr`; default 1 for ASY/SYM, 0 elsewhere).
 
 ```python
 import starsim as ss
@@ -635,6 +637,7 @@ Once resistance is established, **transmission** usually dominates cumulative ev
 | `acq_state_rr` | Scale `q_acq` by TB state at failure |
 | `regimen_drugs` | Which drugs the regimen contains |
 | `rate_asym` / `rate_sym` | Initiation rates |
+| `dur_treatment` | Course length before the outcome resolves (default `ss.months(6)`) |
 | `eligibility` | Optional `sim → uids` override |
 | `supersedes` | Names of deliveries to interrupt before starting |
 
@@ -642,12 +645,13 @@ Once resistance is established, **transmission** usually dominates cumulative ev
 
 | Parameter | Notes |
 |-----------|--------|
-| `sens` / `spec` | Scalar or per-drug dict |
-| `p_strain_obs` | `None` → use fitness; or scalar/dict |
-| `matches(**drugs)` | Eligibility from observed profile |
+| `sens` / `spec` (DST) | Scalar or per-drug dict |
+| `p_strain_obs` (DST) | `None` → use fitness; or scalar/dict |
+| `DSTDelivery.matches(**drugs)` | Eligibility from observed profile (delivery method, not `DST`) |
 | `regimen_drugs` (TPT) | Drugs that must all be susceptible for sterilization |
-| `p_tpt_acq` | Acquisition among ineffective TPT outcomes |
-| `p_sterilize` | Must be > 0 to exercise strain-aware clearance |
+| `p_tpt_acq` (TPT) | Acquisition among ineffective TPT outcomes |
+| `acq_state_rr` (TPT) | Scale `p_tpt_acq` by TB state |
+| `p_sterilize` (TPT) | Must be > 0 to exercise strain-aware clearance |
 
 ---
 

@@ -35,7 +35,7 @@ Each UAT states the acceptance criterion, plain-English steps, and either a code
 ## Requirement-to-UAT mapping (verified)
 
 This crosswalk is verified against the requirement sections in
-`tbsim-resistance-tech-spec -UPDATED.pdf`.
+[tbsim-resistance-tech-spec.md](tbsim-resistance-tech-spec.md).
 
 | Requirement section in PDF | UAT coverage |
 |---|---|
@@ -112,11 +112,12 @@ import numpy as np
 tb = tbsim.TBResistant(drugs=['RIF', 'BDQ', 'FQ'], init_prev=0)
 sim = ss.Sim(diseases=tb, n_agents=10, start='2000-01-01', stop='2000-01-08', dt=ss.days(7))
 sim.init()
+tb = sim.diseases.tb  # sim copies its modules at init; work with the live copy
 
 a, b = 0, 1
 tb.strain_mask[a] = 1 << 1                              # {1,0,0} RIF
 tb.strain_mask[b] = (1 << 0) | (1 << 5)                 # {0,0,0} + {1,0,1}
-carried = tb.strains.carried(tb.strain_mask[[a, b]])
+carried = tb.strains.carried(tb.strain_mask.values[[a, b]])
 assert carried[0].sum() == 1 and carried[0, 1]
 assert carried[1].sum() == 2 and carried[1, 0] and carried[1, 5]
 ```
@@ -193,6 +194,7 @@ tb = tbsim.TBResistant(
 )
 sim = ss.Sim(diseases=tb, n_agents=5000, start='2000-01-01', stop='2005-12-31', dt=ss.days(7))
 sim.run()
+tb = sim.diseases.tb  # sim copies its modules at init; read results off the live copy
 assert 'new_blocked_superinf' in tb.results
 assert tb.pars.rr_reinfection_asy == 0.0 and tb.pars.rr_reinfection_sym == 0.0
 ```
@@ -250,6 +252,7 @@ from tbsim import TBS
 tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], pars=dict(p_multi=0.0, prog_select='random'))
 sim = ss.Sim(diseases=tb, n_agents=20, start='2000-01-01', stop='2000-01-08', dt=ss.days(7))
 sim.init()
+tb = sim.diseases.tb  # sim copies its modules at init; work with the live copy
 uid = 0
 tb.state[uid] = TBS.INFECTION
 tb.strain_mask[uid] = (1 << 0) | (1 << 1)  # pan + RIF
@@ -310,6 +313,7 @@ from tbsim import TBS
 tb = tbsim.TBResistant(drugs=['RIF'], pars=dict(init_prev=0))
 sim = ss.Sim(diseases=tb, n_agents=5, start='2000-01-01', stop='2000-01-08', dt=ss.days(7))
 sim.init()
+tb = sim.diseases.tb  # sim copies its modules at init; work with the live copy
 u = 0
 tb.state[u] = TBS.NON_INFECTIOUS
 tb.strain_mask[u] = (1 << 0) | (1 << 1)
@@ -349,6 +353,7 @@ tb = tbsim.TBResistant(
 )
 sim = ss.Sim(diseases=tb, n_agents=2000, start='2000-01-01', stop='2010-12-31', dt=ss.days(7))
 sim.run()
+tb = sim.diseases.tb  # sim copies its modules at init; read results off the live copy
 assert tb.results['new_denovo_resistance'].sum() > 0
 ```
 
@@ -543,7 +548,7 @@ sim = ss.Sim(
 sim.run()
 ```
 
-**Existing coverage:** `test_diagnostics_tpt.py` (DST sens/spec, multi-strain boost, `p_strain_obs` bottleneck); treatment-monitoring switch covered in resistance tests / `TxDeliveryR.interrupt`.
+**Existing coverage:** `test_diagnostics_tpt.py` (`test_dst_recovers_sens_spec_mono`, `test_dst_multiple_strains_raise_detection`, `test_dst_p_strain_obs_bottleneck_lowers_detection`). The treatment-monitoring switch is implemented (`treatment_monitoring_eligibility` + `supersedes` → `TxDeliveryR.interrupt`) and exercised by the snippet above, but is not yet covered by a dedicated `devtests/` test.
 
 ---
 
