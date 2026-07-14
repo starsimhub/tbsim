@@ -404,17 +404,19 @@ Partial cure is supported: if only some strains clear, the agent returns to the 
 
 `DST` produces an **observed n-drug profile** (not strain identities). Sensitivity/specificity are applied at the strain level; `p_strain_obs` (default = strain fitness) can drop strains from the sample. `DSTDelivery.matches(...)` turns the observed profile into eligibility callables for regimen routing.
 
+A key point about `regimen_drugs`: it names the **drugs the regimen acts on**, i.e. which strains it can cure (a strain resistant to a regimen drug is cured only at the `resist_penalty`-reduced efficacy, or not at all if the penalty is 0). So a realistic second-line for RIF-resistant TB is built from a **different** drug the resistant strain is still susceptible to — not RIF. The example below uses a two-drug space (`RIF`, `BDQ`): first-line is a RIF regimen routed to observed RIF-susceptible cases, and second-line is a BDQ regimen routed to observed RIF-resistant cases (which are BDQ-susceptible here).
+
 ```python
 import starsim as ss
 import tbsim
 
 tb = tbsim.TBResistant(
-    drugs=['RIF'],
+    drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9},
     pars=dict(
         beta=ss.permonth(0.35),
         init_prev=ss.bernoulli(0.12),
-        init_strains=[0.8, 0.2],
+        init_strains=[0.8, 0.2, 0.0, 0.0],  # 80% pan-susceptible, 20% RIF-resistant (both BDQ-susceptible)
         rr_reinfection_inf=1.0,
         rr_reinfection_non=1.0,
     ),
@@ -424,24 +426,25 @@ dst = tbsim.DSTDelivery(
     product=tbsim.DST(strains=tb.strains, sens=0.95, spec=0.98),
     eligibility=lambda sim: tbsim.get_tb(sim, which=tbsim.TBResistant).active_tb.uids,
 )
-first = tbsim.TxDeliveryR(
+first = tbsim.TxDeliveryR(   # first-line: a RIF regimen for observed RIF-susceptible TB
     name='first',
     rate_sym=ss.peryear(1.0),
     eligibility=dst.matches(RIF=False),
     product=tbsim.TxR(
         strains=tb.strains,
         base_efficacy=0.85,
-        resist_penalty={'RIF': 0.1},
+        regimen_drugs=['RIF'],
+        resist_penalty={'RIF': 0.1},        # a misrouted RIF-resistant case is barely cured
     ),
 )
-second = tbsim.TxDeliveryR(
+second = tbsim.TxDeliveryR(  # second-line: a BDQ regimen for observed RIF-resistant TB
     name='second',
     rate_sym=ss.peryear(1.0),
     eligibility=dst.matches(RIF=True),
     product=tbsim.TxR(
         strains=tb.strains,
         base_efficacy=0.8,
-        regimen_drugs=['RIF'],
+        regimen_drugs=['BDQ'],              # acts on BDQ, which the RIF-resistant strain is susceptible to
     ),
 )
 sim = build_sim(tb, interventions=[dst, first, second], stop='2040-12-31')
@@ -451,7 +454,7 @@ print('First-line courses:', int(sim.results['first'].n_treated.sum()))
 print('Second-line (RIF-R):', int(sim.results['second'].n_treated.sum()))
 ```
 
-Also available: `dst.observed_resistant('RIF')` for a single-drug eligibility callable.
+Also available: `dst.observed_resistant('RIF')` for a single-drug eligibility callable. Both `matches(...)` and `observed_resistant(...)` accept `max_age=<ss.dur>` to require a *fresh* DST result; see §12 and the note on retreatment below.
 
 ---
 

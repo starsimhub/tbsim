@@ -99,6 +99,79 @@ def test_treatment_selects_for_resistance_matches_ode():
     assert ou.final_mean(a, 'frac_resist') > 0.5               # strongly selected under this pressure
 
 
+# --------------------------------------------------------------------------- §5: counter coupling / reset
+def test_treatment_efficacy_independent_of_count():
+    """Spec §5 coupling: treatment effectiveness does not depend on strain count (identical strains are
+    cured together). Two cohorts with the same strain but different counts are cured at the same rate."""
+    tb, prod = _init_product(ea=0.6, eb=0.6, q=0.0)
+    a, b = ss.uids(np.arange(15000)), ss.uids(np.arange(15000, 30000))
+    tb.strain_mask[a] = 1; tb.strain_counts[0][a] = 1
+    tb.strain_mask[b] = 1; tb.strain_counts[0][b] = 3
+    cure_a = float(np.mean(prod.roll_survivors(tb, a) == 0))
+    cure_b = float(np.mean(prod.roll_survivors(tb, b) == 0))
+    assert np.isclose(cure_a, cure_b, atol=0.03) and np.isclose(cure_a, 0.6, atol=0.03)
+
+
+def test_successful_cure_resets_count_survivor_unchanged():
+    """Spec §5: a successful cure of a strain resets its count to 0 (treatment clears all copies),
+    while a surviving (uncured) strain keeps its count. Set an agent carrying strain 0 (pan) ×2 and
+    strain 1 (resistant) ×1; a regimen that cures pan but not the resistant strain zeroes count[0] and
+    leaves count[1]."""
+    # base_efficacy=1 on the regimen drug, resist_penalty 0 → strain 0 always cured, strain 1 never.
+    tb = tbsim.TBResistant(rel_fitness={'TX': 1.0}, pars=dict(init_prev=ss.bernoulli(0.0)))
+    prod = tbsim.TxR(strains=tb.strains, base_efficacy=1.0, resist_penalty={'TX': 0.0}, adherence=1.0)
+    net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
+    sim = ss.Sim(n_agents=2000, networks=net, diseases=tb, interventions=tbsim.TxDeliveryR(product=prod),
+                 dt=ss.days(30), start=ss.date('2000-01-01'), stop=ss.date('2001-12-31'), rand_seed=0, verbose=0)
+    sim.init()
+    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tx = next(iv for iv in sim.interventions.values() if isinstance(iv, tbsim.TxDeliveryR))
+    prod = tx.product
+    u = ss.uids(np.arange(2000))
+    tb.state[u] = TBS.SYMPTOMATIC
+    tb.strain_mask[u] = (1 << 0) | (1 << 1)     # carries pan + resistant
+    tb.strain_counts[0][u] = 2                  # pan ×2
+    tb.strain_counts[1][u] = 1                  # resistant ×1
+    # Put them on a course and force it to complete this step, then resolve.
+    tx.prior_state[u] = tb.state[u]
+    tx.pending_surv[u] = prod.roll_survivors(tb, u)
+    tb.state[u] = TBS.TREATMENT
+    tx.ti_treatment_end[u] = -1                 # already ended → resolve now
+    tx._resolve()
+    assert (tb.strain_mask[u] == (1 << 1)).all()          # pan cured, resistant survives
+    assert (np.asarray(tb.strain_counts[0][u]) == 0).all()  # cured strain's count reset to 0
+    assert (np.asarray(tb.strain_counts[1][u]) == 1).all()  # surviving strain's count unchanged
+
+
+# --------------------------------------------------------------------------- L3: latent-treatment divergence
+def test_latent_treatment_divergence():
+    """L3 Option B: by default (treat_latent=False) latent agents selected for treatment are cleared
+    immediately (→CLEARED, no course), so they never enter TREATMENT and never acquire resistance —
+    matching base tbsim. With treat_latent=True the same agents run a course that here fails and
+    acquires resistance."""
+    def run(treat_latent):
+        tb = tbsim.TBResistant(pars=dict(init_prev=ss.bernoulli(0.3), beta=ss.permonth(0.0),  # seed latent, no transmission
+                                         init_strains=[1.0, 0.0]))
+        tx = tbsim.TxDeliveryR(name='tx', treat_latent=treat_latent, dur_treatment=ss.months(3),
+                               eligibility=lambda sim: tbsim.get_tb(sim, which=tbsim.TBResistant).latent.uids,
+                               product=tbsim.TxR(strains=tb.strains, base_efficacy=0.0, adherence=1.0,
+                                                 q_acq={'TX': 1.0}, acq_state_rr={int(TBS.INFECTION): 1.0}))
+        net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=1), dur=0))
+        sim = ss.Sim(n_agents=3000, networks=net, diseases=tb, interventions=tx, dt=ss.days(30),
+                     start=ss.date('2000-01-01'), stop=ss.date('2003-12-31'), rand_seed=0, verbose=0)
+        sim.run()
+        return sim
+    default, coursed = run(False), run(True)
+    r_def, r_crs = default.results['tx'], coursed.results['tx']
+    # Default: latent agents cleared immediately — no course, no acquisition, and they reach CLEARED.
+    assert int(np.sum(r_def.n_treated)) == 0
+    assert int(np.sum(r_def.n_acquired)) == 0
+    assert int(default.results.tb['n_CLEARED'][-1]) > 0
+    # treat_latent=True: latent agents run a course (n_treated>0) that fails and acquires resistance.
+    assert int(np.sum(r_crs.n_treated)) > 0
+    assert int(np.sum(r_crs.n_acquired)) > 0
+
+
 if __name__ == '__main__':
     import sys, pytest
     sys.exit(pytest.main([__file__, '-v']))

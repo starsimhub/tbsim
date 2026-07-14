@@ -111,7 +111,7 @@ def test_superinfection_requires_sigma():
                   rr_reinfection_inf=1.0, rr_reinfection_non=1.0))); on.run()
     assert off.results.tb['frac_super'][-1] == 0.0
     assert on.results.tb['frac_super'][-1] > 0.05
-    assert np.sum(on.results.tb['new_blocked_superinf']) > 0  # identical-strain re-exposures blocked
+    assert np.sum(on.results.tb['new_identical_superinf']) > 0  # identical-strain re-exposures now counted (spec §1)
 
 
 # --------------------------------------------------------------------------- de-novo acquisition

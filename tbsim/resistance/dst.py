@@ -34,6 +34,10 @@ class DST(ss.Product):
     def __init__(self, strains, sens=1.0, spec=1.0, p_strain_obs=None, **kwargs):
         super().__init__(**kwargs)
         self.strains = strains
+        # Fail-fast on mistyped drug names in per-drug sens/spec dicts (L8).
+        for nm, val in (('sens', sens), ('spec', spec)):
+            if isinstance(val, dict):
+                strains.validate_drugs(val, where=f'DST.{nm}')
         self.sens = np.array([_perdrug(sens, d, 1.0) for d in strains.drugs])
         self.spec = np.array([_perdrug(spec, d, 1.0) for d in strains.drugs])
         if p_strain_obs is None:
@@ -90,12 +94,17 @@ class DSTDelivery(ss.Intervention):
     Args:
         product (DST): the DST product.
         eligibility (callable): ``sim -> uids`` (default: active TB, alive, not yet tested).
+        result_validity (ss.dur): if set, a stored DST result older than this window is wiped each
+            step (``dst_tested`` reverts to ``False``) so the agent must be re-tested before it is
+            eligible again — the fix for perpetual re-treatment off a single stale test (L1).
+            Default ``None`` = results never expire (previous behavior).
     """
 
-    def __init__(self, product, eligibility=None, **kwargs):
+    def __init__(self, product, eligibility=None, result_validity=None, **kwargs):
         super().__init__()
         self.product = product
         self.eligibility = eligibility
+        self.result_validity = result_validity
         self.define_states(
             ss.IntArr('dst_profile', default=0),   # observed n-bit resistance profile
             ss.BoolArr('dst_tested', default=False),
@@ -105,29 +114,54 @@ class DSTDelivery(ss.Intervention):
         product.name = f'{self.name}_product'
         return
 
+    def _expire_stale(self):
+        """Wipe stored DST results older than ``result_validity`` so those agents are re-tested (L1)."""
+        if self.result_validity is None:
+            return
+        tested = self.dst_tested.uids
+        if len(tested) == 0:
+            return
+        window = self.result_validity / self.t.dt
+        stale = tested[(self.ti - self.ti_dst[tested]) >= window]
+        if len(stale):
+            self.dst_tested[stale] = False
+            self.dst_profile[stale] = 0
+            self.ti_dst[stale] = np.nan
+        return
+
     def _get_eligible(self, sim):
         if self.eligibility is not None:
             return ss.uids(self.eligibility(sim))
         tb = get_tb(sim, which=TBResistant)
         return (tb.active_tb & sim.people.alive & ~self.dst_tested).uids
 
-    def observed_resistant(self, drug):
-        """Return a callable ``sim -> uids`` selecting agents observed resistant to ``drug`` (for treatment eligibility)."""
+    def observed_resistant(self, drug, max_age=None):
+        """Return a callable ``sim -> uids`` selecting agents observed resistant to ``drug`` (for treatment eligibility).
+
+        If ``max_age`` (``ss.dur``) is given, only agents whose result is within that window of the
+        current step are selected (freshness gating; L1).
+        """
         di = self.product.strains.drug_idx[drug]
         name = self.name  # resolve the sim's own (copied) DST instance at call time
         def _elig(sim):
             dst = sim.interventions[name]
             obs = ((np.asarray(dst.dst_profile.values) >> di) & 1).astype(bool)
-            return dst.dst_profile.auids[obs]
+            sel = dst.dst_profile.auids[obs]
+            if max_age is not None and len(sel):
+                age = sim.ti - np.asarray(dst.ti_dst[sel], dtype=float)
+                sel = sel[age <= (max_age / dst.t.dt)]
+            return sel
         return _elig
 
-    def matches(self, require_tested=True, exclude_on_treatment=True, **per_drug):
+    def matches(self, require_tested=True, exclude_on_treatment=True, max_age=None, **per_drug):
         """Return an eligibility callable selecting agents whose observed DST profile matches ``per_drug``.
 
         E.g. ``matches(RIF=True, BDQ=False)`` selects observed-RIF-resistant, observed-BDQ-susceptible
         agents. The returned ``sim -> uids`` callable restricts to DST-tested (unless
         ``require_tested=False``) and, unless ``exclude_on_treatment=False``, not-currently-on-treatment
-        agents. Compose with ``TxDeliveryR(eligibility=..., supersedes=[...])`` to route or switch regimens.
+        agents. If ``max_age`` (``ss.dur``) is given, only agents whose result is within that window of
+        the current step match (freshness gating; L1). Compose with
+        ``TxDeliveryR(eligibility=..., supersedes=[...])`` to route or switch regimens.
         """
         strains = self.product.strains
         spec = {strains.drug_idx[d]: bool(v) for d, v in per_drug.items()}
@@ -142,6 +176,9 @@ class DSTDelivery(ss.Intervention):
             for di, want in spec.items():
                 bit = ((prof >> di) & 1).astype(bool)
                 mask &= bit if want else ~bit
+            if max_age is not None:
+                age = sim.ti - np.asarray(dst.ti_dst[sel], dtype=float)
+                mask &= age <= (max_age / dst.t.dt)
             out = sel[mask]
             if exclude_on_treatment and len(out):
                 tb = get_tb(sim, which=TBResistant)
@@ -152,6 +189,7 @@ class DSTDelivery(ss.Intervention):
 
     def step(self):
         tb = get_tb(self.sim, which=TBResistant)
+        self._expire_stale()
         elig = self._get_eligible(self.sim)
         self._n_tested = len(elig)
         if len(elig) == 0:

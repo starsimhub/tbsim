@@ -52,12 +52,17 @@ def test_natural_clearance_removes_all_strains():
     assert int(tb.strain_mask[cleared].sum()) == 0  # every cleared agent carries no strain
 
 
-def test_identical_strain_superinfection_blocked_and_counted():
-    """Spec: superinfection with an identical strain is a no-op but is counted (the requested
-    analyzer). Blocks should occur once σ>0 and a strain is common."""
+def test_identical_strain_superinfection_allowed_and_counted():
+    """Spec §1 (reversal): superinfection with an identical strain is now *allowed* — it leaves the
+    carried set unchanged but increments that strain's per-strain count, and the events are tallied in
+    ``new_identical_superinf``. Such events occur once σ>0 and a strain is common."""
     on = _abm(BETA_ODE and ou.calibrate_beta(BETA_ODE))
-    total_blocked = sum(int(np.sum(r.sim.results.tb['new_blocked_superinf'])) for r in on)
-    assert total_blocked > 0
+    total = sum(int(np.sum(r.sim.results.tb['new_identical_superinf'])) for r in on)
+    assert total > 0
+    # And the counter really recorded multiplicity >1 for some agent (a superinfected identical strain).
+    max_count = max(int(np.max(np.stack([c.values for c in r.sim.diseases.tb.strain_counts], axis=1)))
+                    for r in on)
+    assert max_count >= 2
 
 
 # --------------------------------------------------------------------------- Q1: ψ (rr_prog_super)
@@ -85,14 +90,22 @@ def test_q2a_bottleneck_reduces_superinfection():
 # --------------------------------------------------------------------------- Q2b: selection rule
 def test_q2b_fitness_selection_lowers_resistance():
     """Q2b: when the bottleneck picks one strain, fitness-weighted selection favors the fitter
-    (susceptible) strain over random 50/50, lowering the resistant fraction — ODE and ABM agree."""
+    (susceptible) strain, lowering the resistant fraction vs. count-only ("random") selection — ODE
+    and ABM agree in direction.
+
+    NB: with the per-strain counter (spec update §2) the bottleneck survivor is count-weighted even in
+    "random" mode, and count-weighted transmission + bottleneck amplify competitive exclusion, so a
+    less-fit strain is driven fully extinct by end-of-run in *both* modes (the ABM endpoint ties at 0,
+    unlike the count-less ODE). The fitness effect is therefore compared on the **time-averaged**
+    resistant fraction — fitness selection drives it down faster — which stays above the extinction floor."""
     be = ou.calibrate_beta(BETA_ODE)
     o_rand = _ode(pmulti=0.2, fit_b=0.7, select=0)
     o_fit = _ode(pmulti=0.2, fit_b=0.7, select=1)
     assert ou.late_mean(o_fit, 'frac_resist') < ou.late_mean(o_rand, 'frac_resist')
     a_rand = _abm(be, pmulti=0.2, fit_b=0.7, select=0)
     a_fit = _abm(be, pmulti=0.2, fit_b=0.7, select=1)
-    assert ou.final_mean(a_fit, 'frac_resist') < ou.final_mean(a_rand, 'frac_resist')
+    timeavg = lambda runs: float(np.mean([np.mean(r.frac_resist) for r in runs]))
+    assert timeavg(a_fit) < timeavg(a_rand)
 
 
 # --------------------------------------------------------------------------- Q3a: σ_N eligibility
