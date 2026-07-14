@@ -295,8 +295,6 @@ class TxDeliveryR(ss.Intervention):
                     if other is not None and len(switching):
                         other.interrupt(switching)
             start = start[tb.state[start] != TBS.TREATMENT]
-            # Safety gate: treatment initiation requires current active TB regardless of eligibility source.
-            start = start[tb.active_tb[start]]
         else:
             asy = tb.asymptomatic.uids
             sym = tb.symptomatic.uids

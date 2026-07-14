@@ -303,6 +303,40 @@ def test_dst_routed_treatment_does_not_start_on_cleared():
     assert tx._n_treated == len(active)
 
 
+def test_treat_latent_modes_diverge():
+    """Latent agents selected via eligibility are cleared (treat_latent=False) or run a course (treat_latent=True).
+
+    Regression guard: initiation must not strip latent (INFECTION) agents before the treat_latent
+    branch runs, otherwise both modes silently become no-ops for latent-targeted eligibility.
+    """
+    def run(treat_latent):
+        tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+        tx = tbsim.TxDeliveryR(
+            name='tx',
+            eligibility=lambda sim: sim.get_tb().latent.uids,
+            product=tbsim.TxR(strains=tb.strains, base_efficacy=0.0, adherence=1.0),
+            treat_latent=treat_latent,
+        )
+        sim = make_sim(tb, n=200, interventions=tx)
+        sim.init()
+        tb = sim.get_tb()
+        latent = ss.uids(np.arange(100))
+        tb.state[latent] = TBS.INFECTION
+        tb.strain_mask[latent] = 1
+        sim.interventions['tx']._initiate()
+        return sim.get_tb(), sim.interventions['tx'], latent
+
+    # treat_latent=False: latent agents are cleared immediately, not counted as treated.
+    tb_f, tx_f, latent = run(False)
+    assert tx_f._n_treated == 0
+    assert (tb_f.state[latent] == TBS.CLEARED).all()
+
+    # treat_latent=True: latent agents run a full course (state -> TREATMENT, counted as treated).
+    tb_t, tx_t, latent = run(True)
+    assert tx_t._n_treated == len(latent)
+    assert (tb_t.state[latent] == TBS.TREATMENT).all()
+
+
 # --------------------------------------------------------------------------- explicit efficacy vector / adherence distribution / retreatment classifier
 def test_treatment_explicit_efficacy_vector():
     """TxR(efficacy_by_strain=...) uses the given per-strain vector T_l verbatim as the cure probabilities
