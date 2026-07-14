@@ -145,6 +145,8 @@ class DwellTime(ss.Analyzer):
             max_dwell_time = state_data['dwell_time'].max()
             bin_size = max(1, max_dwell_time // 15)
             bins = np.arange(0, max_dwell_time + bin_size, bin_size)
+            if len(bins) < 2:  # Degenerate case (e.g. all dwell times 0): ensure at least one bin
+                bins = np.array([0, bin_size])
             bin_labels = [
                 f"{int(b)}-{int(b+bin_size)} step_time_units"
                 for b in bins[:-1]]
@@ -360,15 +362,21 @@ class DwellTime(ss.Analyzer):
             != tb.state[ss.uids(relevant_rows['agent_id'].values)])
         uids = ss.uids(
             relevant_rows['agent_id'].values[different_state_mask])
+        from_states = relevant_rows['last_state'].values[different_state_mask]
+        entry_times = relevant_rows['last_state_time'].values[
+            different_state_mask]
 
+        # Every agent is seeded into a -1 sentinel state; the transition out of
+        # it at ti=0 is not a real dwell period (dwell_time=0), so don't log it.
+        log_mask = from_states != -1
+        log_uids = uids[log_mask]
         self._log_dwell_time(
-            agent_ids=uids,
-            states=relevant_rows['last_state'].values[different_state_mask],
-            entry_times=relevant_rows['last_state_time'].values[
-                different_state_mask],
-            exit_times=np.full(len(uids), ti),
-            going_to_state_ids=tb.state[uids].copy(),
-            age=self.sim.people.age[uids].copy())
+            agent_ids=log_uids,
+            states=from_states[log_mask],
+            entry_times=entry_times[log_mask],
+            exit_times=np.full(len(log_uids), ti),
+            going_to_state_ids=tb.state[log_uids].copy(),
+            age=self.sim.people.age[log_uids].copy())
 
         self._latest_sts_df.loc[
             self._latest_sts_df['agent_id'].isin(uids),
@@ -473,10 +481,11 @@ class DwellTime(ss.Analyzer):
         return
 
     def save(self, filename='dwelltime.csv'):
-        """Save dwell time data to CSV and metadata files."""
+        """Save dwell time data to CSV and record the path in ``self.file_path``."""
         sc.makefilepath(filename, makedirs=True)
         self.data.to_csv(filename, index=False)
-        return
+        self.file_path = filename
+        return filename
 
     def validate_dwell_time_distributions(self, expected_distributions):
         """Validate dwell time distributions using KS tests."""
@@ -552,7 +561,7 @@ class HouseholdStats(ss.Analyzer):
     Track household size, age, and contact-mixing statistics over time.
 
     Works with any network that exposes a ``household_ids`` state (e.g.
-    ``starsim.library.networks.HouseholdNet``).  At each timestep the
+    ``ss.library.HouseholdNet``).  At each timestep the
     analyzer counts alive agents per household and records summary statistics.
 
     Args:
