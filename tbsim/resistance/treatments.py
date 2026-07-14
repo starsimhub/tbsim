@@ -36,8 +36,15 @@ class TxR(ss.Product):
         resist_penalty (dict): per-drug multiplicative efficacy penalty applied for each *regimen*
             drug a strain is resistant to, e.g. ``{'TX': 0.333}`` gives a resistant strain 1/3 the
             cure probability. Resistance to a drug outside the regimen does not reduce efficacy.
-        adherence (float): probability an agent completes the course; non-adherent agents clear no
-            strains this course (the mechanism correlating outcomes across an agent's strains).
+        efficacy_by_strain (array): optional explicit per-strain cure-probability vector
+            ``T_l = {t_1,l, ..., t_m,l}`` (length ``strains.m``, spec §"Treatment efficacy"). When given
+            it *is* the per-strain efficacy and ``base_efficacy``/``resist_penalty`` are ignored; use it
+            when the constrained ``base × ∏penalty`` parameterization cannot express the desired vector.
+        adherence (float or callable): per-course completion probability correlating outcomes across an
+            agent's strains (non-completers clear no strains this course). A float applies one regimen-level
+            probability to every agent; a callable ``uids -> per-agent probability`` makes adherence a
+            *regimen-level distribution that varies by agent* and is applied across all that agent's strains
+            (spec §"Treatment efficacy"), e.g. ``adherence=lambda uids: my_dist.rvs(uids)``.
         q_acq (dict): per-drug probability ``{drug: prob}`` that a surviving treatment-susceptible
             strain acquires resistance to that regimen drug on a failed course (always replacement).
             Default none (off).
@@ -50,8 +57,8 @@ class TxR(ss.Product):
             (∝ fitness). See L4 / implementation-decisions.md D-L4.
     """
 
-    def __init__(self, strains, base_efficacy=0.85, resist_penalty=None, adherence=1.0,
-                 q_acq=None, acq_state_rr=None, regimen_drugs=None, acq_select='random', **kwargs):
+    def __init__(self, strains, base_efficacy=0.85, resist_penalty=None, efficacy_by_strain=None,
+                 adherence=1.0, q_acq=None, acq_state_rr=None, regimen_drugs=None, acq_select='random', **kwargs):
         super().__init__(**kwargs)
         self.strains = strains
         self.base_efficacy = base_efficacy
@@ -69,16 +76,30 @@ class TxR(ss.Product):
         if acq_state_rr:
             self.acq_state_rr.update({int(k): float(v) for k, v in acq_state_rr.items()})
 
-        # Per-strain cure probability = base × ∏ penalty over the *regimen* drugs the strain resists
-        # (resistance to a non-regimen drug leaves this regimen's efficacy unchanged).
-        penalty = np.ones(strains.n)
-        for d, f in self.resist_penalty.items():
-            penalty[strains.drug_idx[d]] = f
-        in_regimen = np.array([d in self.regimen_drugs for d in strains.drugs])
-        self.eff_by_id = np.array([base_efficacy * penalty[strains.profile[j] & in_regimen].prod() for j in range(strains.m)])
+        # Per-strain cure-probability vector T_l = {t_1,l, ..., t_m,l}. Either taken verbatim from an
+        # explicit `efficacy_by_strain` (spec's arbitrary vector), or derived as base × ∏ penalty over
+        # the *regimen* drugs the strain resists (resistance to a non-regimen drug leaves efficacy
+        # unchanged) — the constrained parameterization that covers the common case.
+        if efficacy_by_strain is not None:
+            eff = np.asarray(efficacy_by_strain, dtype=float)
+            if eff.shape != (strains.m,):
+                raise ValueError(f'efficacy_by_strain must have length strains.m={strains.m}, got {eff.shape}.')
+            if np.any((eff < 0) | (eff > 1)):
+                raise ValueError(f'efficacy_by_strain values must be in [0, 1], got {eff}.')
+            self.eff_by_id = eff
+        else:
+            penalty = np.ones(strains.n)
+            for d, f in self.resist_penalty.items():
+                penalty[strains.drug_idx[d]] = f
+            in_regimen = np.array([d in self.regimen_drugs for d in strains.drugs])
+            self.eff_by_id = np.array([base_efficacy * penalty[strains.profile[j] & in_regimen].prod() for j in range(strains.m)])
 
+        # Adherence: a regimen-level probability (float) shared by all agents, or a regimen-level
+        # *distribution* (callable uids -> per-agent probability) that varies by agent. Either way a
+        # single per-agent completion draw correlates outcomes across all that agent's strains.
+        self.adherence_distribution = adherence if callable(adherence) else None
         # CRN distributions (a list of Dists is discovered by sc.search like any attribute).
-        self._adh_rng = ss.bernoulli(name='txr_adherence', p=adherence)
+        self._adh_rng = ss.bernoulli(name='txr_adherence', p=(0.5 if self.adherence_distribution else adherence))
         self._cure_rngs = [ss.bernoulli(name=f'txr_cure_{j}', p=float(self.eff_by_id[j])) for j in range(strains.m)]
         # One independent uniform stream per regimen drug for acquisition-on-failure (state-scaled at draw),
         # plus one choice stream per drug to pick which carried susceptible strain mutates (L4).
@@ -91,6 +112,8 @@ class TxR(ss.Product):
         m = self.strains
         masks = tb.strain_mask[uids]
         surv = masks.copy()
+        if self.adherence_distribution is not None:  # per-agent completion probability from the distribution
+            self._adh_rng.set(p=np.asarray(self.adherence_distribution(uids), dtype=float))
         adherent = self._adh_rng.rvs(uids)  # per-agent, position-aligned with uids
         for j in range(m.m):
             if self.eff_by_id[j] <= 0:
@@ -227,6 +250,38 @@ class TxDeliveryR(ss.Intervention):
         self.pending_surv[mine] = 0
         return mine
 
+    @staticmethod
+    def failure_case_eligibility(within, base=None, new_case=False):
+        """Classify a later treatment episode as *treatment failure/retreatment* vs a *new case*.
+
+        Implements the spec's requirement (§Diagnostics) to "track time since last treatment initiation
+        to inform whether later treatment is managed as treatment failure, with need for DST/second-line
+        treatments, or as a new case." Reads the durable, cross-regimen ``tb.ti_last_treatment`` written by
+        every :class:`TxDeliveryR` at initiation.
+
+        Returns a ``sim -> uids`` eligibility callable selecting agents whose most recent treatment
+        initiation was within ``within`` (an ``ss.dur``) of the current step — i.e. to be managed as a
+        treatment failure (route to DST / second-line). Pass ``new_case=True`` for the complement (agents
+        with no treatment within the window → managed as a new case). ``base`` optionally restricts the
+        candidate pool (default: current active TB), e.g. ``base=dst.matches(RIF=True)``.
+
+        Feed as ``eligibility=`` to a DST or ``TxDeliveryR`` (optionally via :func:`eligibility_all`)::
+
+            failed = TxDeliveryR.failure_case_eligibility(within=ss.years(2))
+            second_line = tbsim.TxDeliveryR(eligibility=failed, supersedes=['first'], product=...)
+        """
+        def _elig(sim):
+            tb = get_tb(sim, which=TBResistant)
+            cand = ss.uids(base(sim)) if base is not None else tb.active_tb.uids
+            if len(cand) == 0:
+                return cand
+            last = np.asarray(tb.ti_last_treatment[cand], dtype=float)
+            window = within / sim.t.dt
+            recent = np.isfinite(last) & ((sim.ti - last) <= window)
+            return cand[~recent] if new_case else cand[recent]
+        _elig.__name__ = 'new_case_eligibility' if new_case else 'failure_case_eligibility'
+        return _elig
+
     def _initiate(self):
         tb = get_tb(self.sim, which=TBResistant)
         if self.eligibility is not None:
@@ -279,6 +334,7 @@ class TxDeliveryR(ss.Intervention):
 
         self.prior_state[start] = tb.state[start]
         self.pending_surv[start] = self.product.roll_survivors(tb, start)
+        tb.ti_last_treatment[start] = self.ti  # durable cross-regimen history (failure-vs-new-case; spec §Diagnostics)
         tb.state[start] = TBS.TREATMENT
         dur_steps = self.pars.dur_treatment / self.t.dt
         self.ti_treatment_start[start] = self.ti

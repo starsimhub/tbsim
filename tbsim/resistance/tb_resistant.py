@@ -92,7 +92,12 @@ class TBResistant(TB):
         # of an already-carried strain; it feeds only the transmission multinomial and the progression
         # bottleneck, never DST / treatment / acquisition.
         self.strain_counts = [ss.IntArr(f'strain_count_{j}', default=0) for j in range(self.strains.m)]
-        self.define_states(ss.IntArr('strain_mask', default=0), *self.strain_counts)
+        # Durable, cross-regimen time of the agent's most recent treatment initiation (nan = never treated),
+        # written by every TxDeliveryR at initiation. Powers failure-vs-new-case classification for later
+        # DST / second-line routing (spec §"Diagnostics"); see TxDeliveryR.failure_case_eligibility.
+        self.define_states(ss.IntArr('strain_mask', default=0),
+                           ss.FloatArr('ti_last_treatment', default=np.nan),
+                           *self.strain_counts)
 
         # CRN-safe distributions. choice2d holds per-agent probabilities set each use.
         m = self.strains.m
