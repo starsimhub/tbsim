@@ -7,6 +7,12 @@ resistant strains remain and may then progress to disease and transmit (the spec
 "TPT clears a susceptible strain → resistant strain goes on to progress/transmit"
 dynamic). An agent moves to ``CLEARED`` only once all carried strains are removed.
 
+Suppression (the base product's ``rr_*`` progression-protection branch) is likewise applied
+*per strain*: the protection an agent receives is scaled by the fraction of its carried strains
+the regimen actually covers, so a surviving resistant strain is not shielded from progressing
+(spec §TPT: efficacy "varies by regimen and resistance/strain" — the same resistance-unmasking
+dynamic, via the progression channel rather than clearance).
+
 TPT drug pressure can also *select* resistance among agents for whom TPT was ineffective
 (neither cleared nor protected): a susceptible carried strain mutates to its resistant
 counterpart with probability ``p_tpt_acq[drug]`` × a per-TB-state RR (spec: highest for
@@ -58,9 +64,10 @@ class TPTRx(TPTTx):
         if acq_state_rr:
             self.acq_state_rr.update({int(k): float(v) for k, v in acq_state_rr.items()})
 
-        # Bitmask of strains cleared by the regimen = strains susceptible to every regimen drug.
+        # Strains covered by the regimen = strains susceptible to every regimen drug.
         cols = [strains.drug_idx[d] for d in self.regimen_drugs]
-        covered = ~strains.profile[:, cols].any(axis=1)  # (m,) True = cleared by regimen
+        covered = ~strains.profile[:, cols].any(axis=1)  # (m,) True = covered by regimen
+        self._covered_row = np.asarray(covered, dtype=bool)  # (m,) used to weight per-strain protection
         self._covered_mask = int(sum(1 << j for j in range(strains.m) if covered[j]))
 
         # One independent uniform stream per regimen drug for TPT-driven acquisition.
@@ -131,4 +138,34 @@ class TPTRx(TPTTx):
         if isinstance(tb, TBResistant):
             self._acquire(uids)
         self.tpt_resolved[uids] = True
+        return
+
+    def apply_protection(self):
+        """Scale TPT progression-protection by the fraction of an agent's carried strains the regimen covers.
+
+        Base :class:`tbsim.TPTTx` protects a suppressed agent as a whole, multiplying ``rr_activation`` /
+        ``rr_clearance`` / ``rr_death`` by the sampled modifiers. For a mixed infection that over-protects
+        any surviving *resistant* strain, muting the spec's resistance-unmasking dynamic
+        (§TPT: efficacy varies by regimen and resistance/strain). Here each modifier is blended toward 1
+        (no effect) by the uncovered fraction: with coverage weight ``w`` an agent carrying only
+        regimen-resistant strains (``w = 0``) gets no protection, an all-susceptible agent (``w = 1``) gets
+        full protection, and mixed infections get partial protection. ``w`` is recomputed each step from the
+        agent's current strains, so it tracks strain changes (bottleneck, de-novo acquisition)."""
+        tb = self._tb()
+        if not isinstance(tb, TBResistant):
+            return super().apply_protection()  # non-strain TB: whole-agent protection
+
+        protected = self.tpt_protected.uids
+        if len(protected) == 0:
+            return
+
+        # Coverage weight w = (carried strains susceptible to the whole regimen) / (carried strains).
+        carried = self.strains.carried(tb.strain_mask[protected])  # (k, m) bool
+        n_carried = carried.sum(axis=1)
+        n_covered = (carried & self._covered_row).sum(axis=1)
+        w = np.divide(n_covered, n_carried, out=np.zeros(len(protected)), where=n_carried > 0)
+
+        tb.rr_activation[protected] *= 1.0 - w * (1.0 - self.tpt_activation_modifier_applied[protected])
+        tb.rr_clearance[protected]  *= 1.0 - w * (1.0 - self.tpt_clearance_modifier_applied[protected])
+        tb.rr_death[protected]      *= 1.0 - w * (1.0 - self.tpt_death_modifier_applied[protected])
         return
