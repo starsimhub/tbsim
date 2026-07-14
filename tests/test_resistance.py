@@ -270,10 +270,71 @@ def test_dst_router_matches_observed_profile():
     dstd.dst_profile[rif_only] = 0b01   # observed RIF-resistant (bit 0 = RIF)
     dstd.dst_profile[both] = 0b11       # RIF + BDQ
     dstd.dst_profile[sus] = 0b00
-    any_rif = set(dstd.matches(RIF=True)(sim))
-    rif_not_bdq = set(dstd.matches(RIF=True, BDQ=False)(sim))
+    any_rif = set(dstd.matches(RIF=True, require_active_tb=False)(sim))
+    rif_not_bdq = set(dstd.matches(RIF=True, BDQ=False, require_active_tb=False)(sim))
     assert any_rif == set(rif_only) | set(both)   # all observed RIF-resistant
     assert rif_not_bdq == set(rif_only)           # RIF-resistant, BDQ-susceptible only
+
+
+def test_dst_routed_treatment_does_not_start_on_cleared():
+    """DST-routed treatment initiation should not start courses for CLEARED agents."""
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+    dst = tbsim.DSTDelivery(name='dst', product=tbsim.DST(strains=tb.strains))
+    tx = tbsim.TxDeliveryR(
+        name='tx',
+        eligibility=dst.matches(RIF=True),
+        product=tbsim.TxR(strains=tb.strains, base_efficacy=0.8, regimen_drugs=['RIF']),
+    )
+    sim = make_sim(tb, n=300, interventions=[dst, tx])
+    sim.init()
+    tb = sim.get_tb()
+    tx = sim.interventions['tx']
+    dstd = sim.interventions['dst']
+    all_uids = ss.uids(np.arange(300))
+    # Everyone has a tested positive DST profile.
+    dstd.dst_tested[all_uids] = True
+    dstd.dst_profile[all_uids] = 0b1
+    active = ss.uids(np.arange(150))
+    cleared = ss.uids(np.arange(150, 300))
+    tb.state[active] = TBS.SYMPTOMATIC
+    tb.state[cleared] = TBS.CLEARED
+    tx._initiate()
+    # Only active TB agents should be started.
+    assert tx._n_treated == len(active)
+
+
+def test_treat_latent_modes_diverge():
+    """Latent agents selected via eligibility are cleared (treat_latent=False) or run a course (treat_latent=True).
+
+    Regression guard: initiation must not strip latent (INFECTION) agents before the treat_latent
+    branch runs, otherwise both modes silently become no-ops for latent-targeted eligibility.
+    """
+    def run(treat_latent):
+        tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+        tx = tbsim.TxDeliveryR(
+            name='tx',
+            eligibility=lambda sim: sim.get_tb().latent.uids,
+            product=tbsim.TxR(strains=tb.strains, base_efficacy=0.0, adherence=1.0),
+            treat_latent=treat_latent,
+        )
+        sim = make_sim(tb, n=200, interventions=tx)
+        sim.init()
+        tb = sim.get_tb()
+        latent = ss.uids(np.arange(100))
+        tb.state[latent] = TBS.INFECTION
+        tb.strain_mask[latent] = 1
+        sim.interventions['tx']._initiate()
+        return sim.get_tb(), sim.interventions['tx'], latent
+
+    # treat_latent=False: latent agents are cleared immediately, not counted as treated.
+    tb_f, tx_f, latent = run(False)
+    assert tx_f._n_treated == 0
+    assert (tb_f.state[latent] == TBS.CLEARED).all()
+
+    # treat_latent=True: latent agents run a full course (state -> TREATMENT, counted as treated).
+    tb_t, tx_t, latent = run(True)
+    assert tx_t._n_treated == len(latent)
+    assert (tb_t.state[latent] == TBS.TREATMENT).all()
 
 
 # --------------------------------------------------------------------------- explicit efficacy vector / adherence distribution / retreatment classifier

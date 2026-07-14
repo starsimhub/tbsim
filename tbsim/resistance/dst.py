@@ -135,11 +135,12 @@ class DSTDelivery(ss.Intervention):
         tb = get_tb(sim, which=TBResistant)
         return (tb.active_tb & sim.people.alive & ~self.dst_tested).uids
 
-    def observed_resistant(self, drug, max_age=None):
+    def observed_resistant(self, drug, max_age=None, require_active_tb=True):
         """Return a callable ``sim -> uids`` selecting agents observed resistant to ``drug`` (for treatment eligibility).
 
         If ``max_age`` (``ss.dur``) is given, only agents whose result is within that window of the
-        current step are selected (freshness gating; L1).
+        current step are selected (freshness gating; L1). If ``require_active_tb`` is ``True``
+        (default), only currently active-TB agents are selected.
         """
         di = self.product.strains.drug_idx[drug]
         name = self.name  # resolve the sim's own (copied) DST instance at call time
@@ -150,17 +151,21 @@ class DSTDelivery(ss.Intervention):
             if max_age is not None and len(sel):
                 age = sim.ti - np.asarray(dst.ti_dst[sel], dtype=float)
                 sel = sel[age <= (max_age / dst.t.dt)]
+            if require_active_tb and len(sel):
+                tb = get_tb(sim, which=TBResistant)
+                sel = sel[tb.active_tb[sel]]
             return sel
         return _elig
 
-    def matches(self, require_tested=True, exclude_on_treatment=True, max_age=None, **per_drug):
+    def matches(self, require_tested=True, exclude_on_treatment=True, max_age=None, require_active_tb=True, **per_drug):
         """Return an eligibility callable selecting agents whose observed DST profile matches ``per_drug``.
 
         E.g. ``matches(RIF=True, BDQ=False)`` selects observed-RIF-resistant, observed-BDQ-susceptible
         agents. The returned ``sim -> uids`` callable restricts to DST-tested (unless
         ``require_tested=False``) and, unless ``exclude_on_treatment=False``, not-currently-on-treatment
-        agents. If ``max_age`` (``ss.dur``) is given, only agents whose result is within that window of
-        the current step match (freshness gating; L1). Compose with
+        agents. If ``require_active_tb`` is ``True`` (default), only currently active-TB agents match.
+        If ``max_age`` (``ss.dur``) is given, only agents whose result is within that window of the
+        current step match (freshness gating; L1). Compose with
         ``TxDeliveryR(eligibility=..., supersedes=[...])`` to route or switch regimens.
         """
         strains = self.product.strains
@@ -180,6 +185,9 @@ class DSTDelivery(ss.Intervention):
                 age = sim.ti - np.asarray(dst.ti_dst[sel], dtype=float)
                 mask &= age <= (max_age / dst.t.dt)
             out = sel[mask]
+            if require_active_tb and len(out):
+                tb = get_tb(sim, which=TBResistant)
+                out = out[tb.active_tb[out]]
             if exclude_on_treatment and len(out):
                 tb = get_tb(sim, which=TBResistant)
                 out = out[tb.state[out] != TBS.TREATMENT]
