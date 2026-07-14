@@ -24,14 +24,14 @@ def test_monitoring_require_and_will_fail():
     """L5: treatment_monitoring_eligibility(require=...) narrows monitoring to agents also matching a
     DST profile (via eligibility_all), and will_fail(tx) selects on-treatment agents whose pre-rolled
     course outcome is a failure."""
-    tb = tbsim.TBResistant(drugs=['RIF'], pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
     first = tbsim.TxDeliveryR(name='first', product=tbsim.TxR(strains=tb.strains, base_efficacy=0.5))
     dst = tbsim.DSTDelivery(name='dst', product=tbsim.DST(strains=tb.strains, sens=1.0, spec=1.0))
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=1), dur=0))
-    sim = ss.Sim(n_agents=400, networks=net, diseases=tb, interventions=[dst, first], dt=ss.days(30),
+    sim = tbsim.Sim(n_agents=400, networks=net, diseases=tb, demographics=[], interventions=[dst, first], dt=ss.days(30),
                  start=ss.date('2000-01-01'), stop=ss.date('2001-12-31'), rand_seed=0, verbose=0)
     sim.init()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     first, dst = sim.interventions['first'], sim.interventions['dst']
     coh = ss.uids(np.arange(200))
     tb.state[coh] = TBS.TREATMENT
@@ -62,7 +62,7 @@ def test_agnostic_reproduces_single_strain_tb():
     pars = dict(beta=ss.permonth(0.2), init_prev=ss.bernoulli(0.05))
     def build(tb):
         net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
-        return ss.Sim(n_agents=5000, networks=net, diseases=tb, dt=ss.days(30),
+        return tbsim.Sim(n_agents=5000, networks=net, diseases=tb, demographics=[], dt=ss.days(30),
                       start=ss.date('2000-01-01'), stop=ss.date('2035-12-31'), rand_seed=1, verbose=0)
     s_tb = build(tbsim.TB(name='tb', pars=pars)); s_tb.run()
     s_ag = build(tbsim.TBResistant.agnostic(pars=pars)); s_ag.run()
@@ -75,7 +75,7 @@ def test_agnostic_reproduces_single_strain_tb():
 # --------------------------------------------------------------------------- L8: drug-name validation
 def test_validate_drugs_raises_on_typos():
     """L8: mistyped drug names fail fast (instead of resolving silently via .get()) in TxR, TPTRx, DST."""
-    tb = tbsim.TBResistant(drugs=['RIF'], pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
     s = tb.strains
     with pytest.raises(ValueError, match='RIFF'):
         tbsim.TxR(strains=s, regimen_drugs=['RIFF'])            # typo in regimen_drugs

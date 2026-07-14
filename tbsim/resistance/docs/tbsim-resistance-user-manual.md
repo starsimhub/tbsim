@@ -43,19 +43,18 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.10),
-        init_strains=[0.85, 0.12, 0.03, 0.0],  # pan / RIF / BDQ / RIF+BDQ
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.10),
+    init_strains=[0.85, 0.12, 0.03, 0.0],  # pan / RIF / BDQ / RIF+BDQ
 )
 
 # 2) Small contact network + sim
 net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=8), dur=0))
-sim = ss.Sim(
+sim = tbsim.Sim(
     n_agents=2000,
     networks=net,
     diseases=tb,
+    demographics=[],
     dt=ss.days(30),
     start=ss.date('2000-01-01'),
     stop=ss.date('2030-12-31'),
@@ -82,10 +81,11 @@ def build_sim(tb, interventions=None, analyzers=None, n_agents=2000,
               start='2000-01-01', stop='2035-12-31', seed=0):
     """Small multi-strain TB sim on a random contact network."""
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=8), dur=0))
-    return ss.Sim(
+    return tbsim.Sim(
         n_agents=n_agents,
         networks=net,
         diseases=tb,
+        demographics=[],
         interventions=interventions,
         analyzers=analyzers,
         dt=ss.days(30),
@@ -154,16 +154,14 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.10),
-        # Superinfection susceptibility (σ); defaults couple to rr_reinfection_rec
-        rr_reinfection_inf=1.0,
-        rr_reinfection_non=1.0,
-        rr_reinfection_asy=0.0,   # no superinfection in active disease (default)
-        rr_reinfection_sym=0.0,
-        p_multi=1.0,              # keep all strains when progressing to ASY
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.10),
+    # Superinfection susceptibility (σ); defaults couple to rr_reinfection_rec
+    rr_reinfection_inf=1.0,
+    rr_reinfection_non=1.0,
+    rr_reinfection_asy=0.0,   # no superinfection in active disease (default)
+    rr_reinfection_sym=0.0,
+    p_multi=1.0,              # keep all strains when progressing to ASY
 )
 print(tb.strains.labels)
 ```
@@ -182,11 +180,9 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.10),
-        init_strains=[0.85, 0.12, 0.03, 0.0],
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.10),
+    init_strains=[0.85, 0.12, 0.03, 0.0],
 )
 sim = build_sim(tb, stop='2010-12-31')  # uses helper from §1
 sim.run()
@@ -216,11 +212,9 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.10),
-        init_strains=[0.85, 0.12, 0.03, 0.0],
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.10),
+    init_strains=[0.85, 0.12, 0.03, 0.0],
 )
 sim = build_sim(tb, stop='2015-12-31')  # uses helper from §1
 sim.run()
@@ -287,13 +281,11 @@ import tbsim
 def resist_over_time(sigma):
     tb = tbsim.TBResistant(
         rel_fitness={'TX': 0.7},  # single drug, 30% fitness cost
-        pars=dict(
-            beta=ss.permonth(0.35),
-            init_prev=ss.bernoulli(0.12),
-            init_strains=[0.7, 0.3],
-            rr_reinfection_inf=sigma,
-            rr_reinfection_non=sigma,
-        ),
+        beta=ss.permonth(0.35),
+        init_prev=ss.bernoulli(0.12),
+        init_strains=[0.7, 0.3],
+        rr_reinfection_inf=sigma,
+        rr_reinfection_non=sigma,
     )
     sim = build_sim(tb, stop='2050-12-31')
     sim.run()
@@ -330,15 +322,13 @@ import tbsim
 
 tb = tbsim.TBResistant(
     rel_fitness={'TX': 0.9},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.12),
-        init_strains=[1.0, 0.0],       # start 100% pan-susceptible
-        p_rand={'TX': 0.02},
-        prog_resist_mode='mixed',
-        rr_reinfection_inf=0.0,
-        rr_reinfection_non=0.0,
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.12),
+    init_strains=[1.0, 0.0],       # start 100% pan-susceptible
+    p_rand={'TX': 0.02},
+    prog_resist_mode='mixed',
+    rr_reinfection_inf=0.0,
+    rr_reinfection_non=0.0,
 )
 sim = build_sim(tb, stop='2050-12-31')
 sim.run()
@@ -366,13 +356,11 @@ import tbsim
 
 tb = tbsim.TBResistant(
     rel_fitness={'TX': 0.6},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.12),
-        init_strains=[0.95, 0.05],
-        rr_reinfection_inf=1.0,
-        rr_reinfection_non=1.0,
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.12),
+    init_strains=[0.95, 0.05],
+    rr_reinfection_inf=1.0,
+    rr_reinfection_non=1.0,
 )
 tx = tbsim.TxDeliveryR(
     name='tx',
@@ -413,18 +401,16 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.12),
-        init_strains=[0.8, 0.2, 0.0, 0.0],  # 80% pan-susceptible, 20% RIF-resistant (both BDQ-susceptible)
-        rr_reinfection_inf=1.0,
-        rr_reinfection_non=1.0,
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.12),
+    init_strains=[0.8, 0.2, 0.0, 0.0],  # 80% pan-susceptible, 20% RIF-resistant (both BDQ-susceptible)
+    rr_reinfection_inf=1.0,
+    rr_reinfection_non=1.0,
 )
 dst = tbsim.DSTDelivery(
     name='dst',
     product=tbsim.DST(strains=tb.strains, sens=0.95, spec=0.98),
-    eligibility=lambda sim: tbsim.get_tb(sim, which=tbsim.TBResistant).active_tb.uids,
+    eligibility=lambda sim: sim.get_tb().active_tb.uids,
 )
 first = tbsim.TxDeliveryR(   # first-line: a RIF regimen for observed RIF-susceptible TB
     name='first',
@@ -473,11 +459,9 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['INH', 'RIF'],
     rel_fitness={'INH': 0.95},
-    pars=dict(
-        beta=ss.permonth(0.3),
-        init_prev=ss.bernoulli(0.10),
-        init_strains=[0.5, 0.5, 0.0, 0.0],  # pan + INH-resistant
-    ),
+    beta=ss.permonth(0.3),
+    init_prev=ss.bernoulli(0.10),
+    init_strains=[0.5, 0.5, 0.0, 0.0],  # pan + INH-resistant
 )
 first = tbsim.TxDeliveryR(
     name='first',
@@ -523,13 +507,11 @@ def run_tpt(with_tpt):
     tb = tbsim.TBResistant(
         drugs=['INH'],
         rel_fitness={'INH': 0.9},
-        pars=dict(
-            beta=ss.permonth(0.35),
-            init_prev=ss.bernoulli(0.15),
-            init_strains=[0.8, 0.2],
-            rr_reinfection_inf=0.0,
-            rr_reinfection_non=0.0,
-        ),
+        beta=ss.permonth(0.35),
+        init_prev=ss.bernoulli(0.15),
+        init_strains=[0.8, 0.2],
+        rr_reinfection_inf=0.0,
+        rr_reinfection_non=0.0,
     )
     ivs = None
     if with_tpt:
@@ -574,14 +556,12 @@ import tbsim
 
 tb = tbsim.TBResistant(
     rel_fitness={'TX': 0.9},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.12),
-        init_strains=[0.9, 0.1],
-        p_rand={'TX': 0.01},
-        rr_reinfection_inf=1.0,
-        rr_reinfection_non=1.0,
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.12),
+    init_strains=[0.9, 0.1],
+    p_rand={'TX': 0.01},
+    rr_reinfection_inf=1.0,
+    rr_reinfection_non=1.0,
 )
 tx = tbsim.TxDeliveryR(
     product=tbsim.TxR(

@@ -184,13 +184,11 @@ import starsim as ss
 tb = tbsim.TBResistant(
     drugs=['RIF'],
     rel_fitness={'RIF': 0.7},
-    pars=dict(
-        rr_reinfection_inf=0.5,
-        rr_reinfection_non=0.5,
-        rr_reinfection_asy=0.0,
-        rr_reinfection_sym=0.0,
-        init_prev=0.2,
-    ),
+    rr_reinfection_inf=0.5,
+    rr_reinfection_non=0.5,
+    rr_reinfection_asy=0.0,
+    rr_reinfection_sym=0.0,
+    init_prev=0.2,
 )
 sim = ss.Sim(diseases=tb, n_agents=5000, start='2000-01-01', stop='2005-12-31', dt=ss.days(7))
 sim.run()
@@ -249,7 +247,7 @@ import tbsim
 import starsim as ss
 from tbsim import TBS
 
-tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], pars=dict(p_multi=0.0, prog_select='random'))
+tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], p_multi=0.0, prog_select='random')
 sim = ss.Sim(diseases=tb, n_agents=20, start='2000-01-01', stop='2000-01-08', dt=ss.days(7))
 sim.init()
 tb = sim.diseases.tb  # sim copies its modules at init; work with the live copy
@@ -310,7 +308,7 @@ import tbsim
 import starsim as ss
 from tbsim import TBS
 
-tb = tbsim.TBResistant(drugs=['RIF'], pars=dict(init_prev=0))
+tb = tbsim.TBResistant(drugs=['RIF'], init_prev=0)
 sim = ss.Sim(diseases=tb, n_agents=5, start='2000-01-01', stop='2000-01-08', dt=ss.days(7))
 sim.init()
 tb = sim.diseases.tb  # sim copies its modules at init; work with the live copy
@@ -349,7 +347,7 @@ import starsim as ss
 
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
-    pars=dict(p_rand={'BDQ': 1.0}, prog_resist_mode='mixed', init_prev=0.3),
+    p_rand={'BDQ': 1.0}, prog_resist_mode='mixed', init_prev=0.3,
 )
 sim = ss.Sim(diseases=tb, n_agents=2000, start='2000-01-01', stop='2010-12-31', dt=ss.days(7))
 sim.run()
@@ -382,7 +380,7 @@ assert tb.results['new_denovo_resistance'].sum() > 0
 import tbsim
 import starsim as ss
 
-tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], rel_fitness={'BDQ': 0.8}, pars=dict(init_prev=0.2))
+tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], rel_fitness={'BDQ': 0.8}, init_prev=0.2)
 tx = tbsim.TxR(
     strains=tb.strains,
     base_efficacy=0.85,
@@ -481,7 +479,7 @@ import starsim as ss
 tb = tbsim.TBResistant(
     drugs=['INH'],
     rel_fitness={'INH': 0.9},
-    pars=dict(p_multi=1.0, init_prev=0.3),
+    p_multi=1.0, init_prev=0.3,
 )
 product = tbsim.TPTRx(
     strains=tb.strains,
@@ -518,7 +516,7 @@ product = tbsim.TPTRx(
 import tbsim
 import starsim as ss
 
-tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], pars=dict(init_prev=0.2))
+tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], init_prev=0.2)
 dst = tbsim.DST(
     strains=tb.strains,
     sens={'RIF': 0.9, 'BDQ': 0.85},

@@ -30,7 +30,7 @@ def make_tx_sim(n_agents=50, **tb_pars):
         tb_pars=tb_pars or None,
     )
     sim.init()
-    return sim, tbsim.get_tb(sim), sim.interventions.txdelivery
+    return sim, sim.get_tb(), sim.interventions.txdelivery
 
 
 # --- step_start_treatment unit tests ---

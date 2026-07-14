@@ -71,7 +71,7 @@ This part of the code defines the parameters for the simulation and initializes 
     - **`stop = ss.date(2020,1,1)`**: This sets the ending date of the simulation to January 1, 2020.
 
 2. **Initializing the Simulation**:
-    - **`ss.Sim`**: This is a class from the `starsim` package used to create a simulation object.
+    - **`tbsim.Sim`**: This is a convenience subclass of `starsim`'s `ss.Sim`, used to create a simulation object (it adds TB-specific conveniences such as `sim.get_tb()`).
     - **Parameters**:
         - **`people=pop`**: Specifies the population object created earlier.
         - **`networks=net`**: Specifies the network object that describes how agents are connected.
@@ -121,10 +121,10 @@ def make_tb():
         start = ss.date(1990,1,1),
         stop = ss.date(2020,1,1),
         )
-    sim = ss.Sim(people=pop, 
-                 networks=net, 
-                 diseases=tb, 
-                 pars=sim_pars, 
+    sim = tbsim.Sim(people=pop,
+                 networks=net,
+                 diseases=tb,
+                 pars=sim_pars,
                  demographics=dems
                  )   # initialize the simulation
     sim.pars.verbose = 0 # Print status every 100 steps
@@ -141,7 +141,7 @@ Please note, at some point it may be convenient to parameterize the `make_tb` fu
 ```{python}
 
 # Create and run the first simulation
-sim = make_tb()  # Create the simulation - running make_tb returns a simulation of a type ss.Sim (from starsim library) therefore we can use all the methods of the ss.Sim class
+sim = make_tb()  # Create the simulation - running make_tb returns a tbsim.Sim (a subclass of ss.Sim from the starsim library), so we can use all the methods of the ss.Sim class as well as tbsim.Sim conveniences like sim.get_tb()
 sim.run()        # Run the simulation 
 ```
 
@@ -158,7 +158,7 @@ Let's first review the data that was generated (and is available in the results 
 For more detailed information, please refer to the official documentation at [Starsim Results API](https://docs.starsim.org/api/results.html).
 
 ```{python}
-tbr = tbsim.get_tb(sim).results
+tbr = sim.get_tb().results
 
 print("This is a dictionary of the results that you can plot: \n",tbr.keys())
 ```
@@ -186,7 +186,7 @@ sim.plot()
 ### Using TBSim plots:
 The `plot` function from tbsim can be used to create comprehensive plots:
 ```python
-tbsim.plot({'single simulation': sim.results.flatten(), 'tb only results': tbsim.get_tb(sim).results.flatten()})
+tbsim.plot({'single simulation': sim.results.flatten(), 'tb only results': sim.get_tb().results.flatten()})
 ```
 where each key represents a scenario that will be plotted with a different color.
 
@@ -194,7 +194,7 @@ For more information, see the `plot` function documentation.
 
 ```{python}
 # Create comprehensive plots using tbsim's plot function
-tbsim.plot({'ALL SIM metrics': sim.results.flatten(),'TB ONLY metrics': tbsim.get_tb(sim).results.flatten()}, n_cols=4, row_height=2 )
+tbsim.plot({'ALL SIM metrics': sim.results.flatten(),'TB ONLY metrics': sim.get_tb().results.flatten()}, n_cols=4, row_height=2 )
 ```
 
 ### Using your own function
@@ -204,7 +204,7 @@ Take a look at the sample below, it will show you how to access the results data
 ```{python}
 # Method 3: Custom plotting using TB results directly
 fig = plt.figure()
-tb_results = tbsim.get_tb(sim).results
+tb_results = sim.get_tb().results
 for rkey in ['n_INFECTION', 'n_NON_INFECTIOUS', 'n_ASYMPTOMATIC', 'n_SYMPTOMATIC', 'n_TREATMENT']:
     plt.plot(tb_results['timevec'], tb_results[rkey], label=rkey.replace('n_', '').replace('_', ' ').title())
 plt.legend()

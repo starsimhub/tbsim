@@ -40,13 +40,13 @@ def test_natural_clearance_removes_all_strains():
     """Spec §Clearance: natural clearance/resolution is immune-mediated → clears *all* strains
     (contrast with treatment). No CLEARED agent may carry a strain."""
     tb = tbsim.TBResistant(rel_fitness={'TX': 1.0},
-                           pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15),
-                                     init_strains=[0.5, 0.5], rr_reinfection_inf=1.0, rr_reinfection_non=1.0))
+                           beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15),
+                           init_strains=[0.5, 0.5], rr_reinfection_inf=1.0, rr_reinfection_non=1.0)
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=10), dur=0))
-    sim = ss.Sim(n_agents=3000, networks=net, diseases=tb, dt=ss.days(30),
+    sim = tbsim.Sim(n_agents=3000, networks=net, diseases=tb, demographics=[], dt=ss.days(30),
                  start=ss.date('2000-01-01'), stop=ss.date('2020-12-31'), rand_seed=0, verbose=0)
     sim.run()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     cleared = ss.uids(tb.state == TBS.CLEARED)
     assert len(cleared) > 0
     assert int(tb.strain_mask[cleared].sum()) == 0  # every cleared agent carries no strain

@@ -57,11 +57,11 @@ def test_denovo_per_drug_specificity():
     """Spec: p_rand is per drug (`p_rand_i`) and strain-agnostic except a strain cannot re-acquire a
     drug it already resists. With de-novo only on BDQ, active TB gains BDQ resistance but never RIF."""
     tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], rel_fitness={'BDQ': 0.9},
-                           pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                     init_strains=[1.0, 0.0, 0.0, 0.0], p_rand={'BDQ': 0.05},
-                                     rr_reinfection_inf=0.0, rr_reinfection_non=0.0))
+                           beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                           init_strains=[1.0, 0.0, 0.0, 0.0], p_rand={'BDQ': 0.05},
+                           rr_reinfection_inf=0.0, rr_reinfection_non=0.0)
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=10), dur=0))
-    sim = ss.Sim(n_agents=3000, networks=net, diseases=tb, dt=ss.days(30),
+    sim = tbsim.Sim(n_agents=3000, networks=net, diseases=tb, demographics=[], dt=ss.days(30),
                  start=ss.date('2000-01-01'), stop=ss.date('2050-12-31'), rand_seed=0, verbose=0)
     sim.run()
     r = sim.results.tb
@@ -73,13 +73,13 @@ def test_denovo_per_drug_specificity():
 def test_denovo_multistrain_each_strain_mutates():
     """Spec: each carried strain of a multi-strain agent can independently acquire resistance. Seed a
     single {pan,RIF} superinfection and confirm de-novo on BDQ can produce a strain carrying BDQ."""
-    tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], pars=dict(init_prev=ss.bernoulli(0.0),
-                           p_rand={'BDQ': 1.0}, prog_resist_mode='mixed'))  # p=1 → deterministic acquisition
+    tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], init_prev=ss.bernoulli(0.0),
+                           p_rand={'BDQ': 1.0}, prog_resist_mode='mixed')  # p=1 → deterministic acquisition
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0))
-    sim = ss.Sim(n_agents=200, networks=net, diseases=tb, dt=ss.days(30),
+    sim = tbsim.Sim(n_agents=200, networks=net, diseases=tb, demographics=[], dt=ss.days(30),
                  start=ss.date('2000-01-01'), stop=ss.date('2000-12-31'), rand_seed=0, verbose=0)
     sim.init()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     u = ss.uids(np.arange(100))
     tb.state[u] = TBS.INFECTION
     tb.strain_mask[u] = (1 << 0) | (1 << 1)     # carries pan (id0) and RIF (id1)
@@ -98,16 +98,16 @@ def test_resistance_origin_decomposition():
 
     def run(p_rand, tx):
         tb = tbsim.TBResistant(rel_fitness={'TX': 0.9},
-                               pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                         init_strains=[0.85, 0.15], rr_reinfection_inf=1.0,
-                                         rr_reinfection_non=1.0, p_rand=p_rand))
+                               beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                               init_strains=[0.85, 0.15], rr_reinfection_inf=1.0,
+                               rr_reinfection_non=1.0, p_rand=p_rand)
         ivs = None
         if tx:
             ivs = tbsim.TxDeliveryR(product=tbsim.TxR(strains=tb.strains, base_efficacy=0.8,
                                     resist_penalty={'TX': 0.1}, q_acq={'TX': 0.05}),
                                     rate_sym=ss.peryear(1.0))
         net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=10), dur=0))
-        sim = ss.Sim(n_agents=3000, networks=net, diseases=tb, interventions=ivs,
+        sim = tbsim.Sim(n_agents=3000, networks=net, diseases=tb, demographics=[], interventions=ivs,
                      analyzers=ResistanceStats(), dt=ss.days(30), start=ss.date('2000-01-01'),
                      stop=ss.date('2040-12-31'), rand_seed=0, verbose=0)
         sim.run()
@@ -130,13 +130,13 @@ def test_acquisition_strain_selection_is_random_not_lowest_id():
     resistance is chosen at random, not always the lowest-id one. An agent co-carrying strain 0 (pan)
     and strain 1 (RIF-R) that acquires FQ resistance lands on strain 2 (FQ) OR strain 3 (RIF+FQ) —
     the old lowest-id rule could only ever produce strain 2. (Fails before L4.)"""
-    tb = tbsim.TBResistant(drugs=['RIF', 'FQ'], pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(drugs=['RIF', 'FQ'], init_prev=ss.bernoulli(0.0))
     prod = tbsim.TxR(strains=tb.strains, base_efficacy=0.0, adherence=1.0, q_acq={'FQ': 1.0})  # q=1 → certain FQ hit
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
-    sim = ss.Sim(n_agents=8000, networks=net, diseases=tb, interventions=tbsim.TxDeliveryR(product=prod),
+    sim = tbsim.Sim(n_agents=8000, networks=net, diseases=tb, demographics=[], interventions=tbsim.TxDeliveryR(product=prod),
                  dt=ss.days(30), start=ss.date('2000-01-01'), stop=ss.date('2001-12-31'), rand_seed=0, verbose=0)
     sim.init()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     prod = next(iv for iv in sim.interventions.values() if isinstance(iv, tbsim.TxDeliveryR)).product
     u = ss.uids(np.arange(8000))
     tb.strain_mask[u] = (1 << 0) | (1 << 1)   # carries pan (id0) and RIF-R (id1); both FQ-susceptible
@@ -152,12 +152,12 @@ def test_denovo_acquisition_probability_independent_of_count():
     """§4 coupling: strain count does not change the de-novo acquisition probability, and identical
     strains acquire together (one bit per strain id → all copies mutate as one). Two cohorts identical
     except for strain count acquire BDQ resistance at the same rate."""
-    tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], pars=dict(init_prev=ss.bernoulli(0.0), p_rand={'BDQ': 0.3}))
+    tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], init_prev=ss.bernoulli(0.0), p_rand={'BDQ': 0.3})
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
-    sim = ss.Sim(n_agents=20000, networks=net, diseases=tb, dt=ss.days(30),
+    sim = tbsim.Sim(n_agents=20000, networks=net, diseases=tb, demographics=[], dt=ss.days(30),
                  start=ss.date('2000-01-01'), stop=ss.date('2000-06-30'), rand_seed=0, verbose=0)
     sim.init()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     a, b = ss.uids(np.arange(10000)), ss.uids(np.arange(10000, 20000))
     for u in (a, b):
         tb.state[u] = TBS.INFECTION
@@ -179,15 +179,15 @@ def test_tpt_acquired_resistance_counted_in_flux():
     from tbsim import ResistanceStats
 
     tb = tbsim.TBResistant(drugs=['INH'], rel_fitness={'INH': 0.9},
-                           pars=dict(beta=ss.permonth(0.3), init_prev=ss.bernoulli(0.2),
-                                     init_strains=[1.0, 0.0],  # pure-susceptible seed → resistance only via TPT
-                                     rr_reinfection_inf=0.0, rr_reinfection_non=0.0, p_rand=None))
+                           beta=ss.permonth(0.3), init_prev=ss.bernoulli(0.2),
+                           init_strains=[1.0, 0.0],  # pure-susceptible seed → resistance only via TPT
+                           rr_reinfection_inf=0.0, rr_reinfection_non=0.0, p_rand=None)
     tpt = tbsim.TPTSimple(product=tbsim.TPTRx(strains=tb.strains, regimen_drugs=['INH'],
                           p_tpt_acq={'INH': 1.0}, acq_state_rr={int(TBS.INFECTION): 1.0},  # strong signal on latent targets
                           pars=dict(efficacy=ss.bernoulli(0.6), p_sterilize=ss.bernoulli(0.0))),
                           pars=dict(coverage=ss.bernoulli(0.5)))
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=4), dur=0))
-    sim = ss.Sim(n_agents=3000, networks=net, diseases=tb, interventions=tpt, analyzers=ResistanceStats(),
+    sim = tbsim.Sim(n_agents=3000, networks=net, diseases=tb, demographics=[], interventions=tpt, analyzers=ResistanceStats(),
                  dt=ss.days(30), start=ss.date('2000-01-01'), stop=ss.date('2012-12-31'), rand_seed=0, verbose=0)
     sim.run()
     res = sim.results['resistancestats']

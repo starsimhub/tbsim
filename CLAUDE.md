@@ -44,7 +44,12 @@ Extends `ss.Disease` from Starsim.
 
 ### Sim Wrapper
 
-[tbsim/sim.py](tbsim/sim.py) provides `tbsim.Sim`, a convenience wrapper around `ss.Sim` that auto-routes flat parameters to the sim or TB module, and provides sensible defaults (demographics, random network, TB disease).
+[tbsim/sim.py](tbsim/sim.py) provides `tbsim.Sim`, a convenience wrapper around `ss.Sim` that auto-routes flat parameters to the sim or TB module, and provides sensible defaults (demographics, random network, TB disease). A pre-built TB module may be passed via either `tb_model=` or `diseases=` (both are respected — no default TB is added on top). Pass `demographics=[]` (or `networks=[]`) to suppress the default demographics/network for that slot.
+
+### Two conventions to follow
+
+- **Getting the TB module:** on a `tbsim.Sim`, call `sim.get_tb()` — do *not* use `tbsim.get_tb(sim)`, and don't pass `which=` (it auto-finds the TB module, including `TBResistant`). The module-level `tbsim.get_tb(sim, ...)` is only for library internals that must accept an arbitrary `ss.Sim`. In tests/docs/examples, build the sim as `tbsim.Sim(...)` so `sim.get_tb()` is available.
+- **Passing TB parameters:** pass TB/`TBResistant` parameters directly as keyword arguments (e.g. `tbsim.TBResistant(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.1))`) rather than wrapping them in `pars=dict(...)`. Only build a standalone `pars` dict when the *same* dict is reused across multiple module instances.
 
 ### Intervention Architecture (Product/Delivery Pattern)
 

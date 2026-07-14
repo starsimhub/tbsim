@@ -10,11 +10,12 @@ import tbsim
 def make_sim(n_agents=200, stop=ss.date("2005-12-31"), tb_pars=None, hsb_pars=None):
     tb_pars  = tb_pars  or {}
     hsb_pars = hsb_pars or {}
-    sim = ss.Sim(
+    sim = tbsim.Sim(
         people      = ss.People(n_agents=n_agents),
         networks    = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0)),
         diseases    = tbsim.TB(pars=tb_pars),
         interventions = tbsim.HealthSeekingBehavior(pars=hsb_pars),
+        demographics = [],
         dt    = ss.days(7),
         start = ss.date("2000-01-01"),
         stop  = stop,
@@ -96,7 +97,7 @@ def test_care_seeking_correct_after_deaths():
     sim.init()
     ppl = sim.people
     h = hsb(sim)
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
 
     # Kill a block of low-numbered agents so alive-array positions no longer
     # line up with UIDs (the precondition that triggers the bug).

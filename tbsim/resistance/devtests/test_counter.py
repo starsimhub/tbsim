@@ -15,10 +15,10 @@ from tbsim import TBS
 
 def _init(tb, n=400, stop='2000-06-30'):
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
-    sim = ss.Sim(n_agents=n, networks=net, diseases=tb, dt=ss.days(30),
+    sim = tbsim.Sim(n_agents=n, networks=net, diseases=tb, demographics=[], dt=ss.days(30),
                  start=ss.date('2000-01-01'), stop=ss.date(stop), rand_seed=0, verbose=0)
     sim.init()
-    return sim, tbsim.get_tb(sim, which=tbsim.TBResistant)
+    return sim, sim.get_tb()
 
 
 def _counts_col(tb, j, uids):
@@ -29,7 +29,7 @@ def _counts_col(tb, j, uids):
 def test_new_infection_starts_count_at_one_regardless_of_source():
     """Spec §1: a newly infected agent starts the founding strain at count 1, even when the source
     carries many copies of it."""
-    tb = tbsim.TBResistant(pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0))
     sim, tb = _init(tb)
     src = ss.uids(np.arange(50))
     tgt = ss.uids(np.arange(50, 100))
@@ -43,7 +43,7 @@ def test_new_infection_starts_count_at_one_regardless_of_source():
 def test_identical_superinfection_increments_count_mask_unchanged():
     """Spec §1 (reversal): re-exposure to a carried strain increments its count (previously blocked);
     the carried set (mask) is unchanged and the event is tallied."""
-    tb = tbsim.TBResistant(pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0))
     sim, tb = _init(tb)
     tgt = ss.uids(np.arange(50))
     src = ss.uids(np.arange(50, 100))
@@ -62,11 +62,11 @@ def test_clearance_and_death_reset_counts():
     """Spec §3: natural clearance zeroes both the strain mask and all per-strain counts; the same
     holds after death. Checked over a full run via the global invariant plus a direct CLEARED check."""
     tb = tbsim.TBResistant(rel_fitness={'TX': 1.0},
-                           pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15),
-                                     init_strains=[0.5, 0.5], rr_reinfection_inf=1.0, rr_reinfection_non=1.0))
+                           beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15),
+                           init_strains=[0.5, 0.5], rr_reinfection_inf=1.0, rr_reinfection_non=1.0)
     sim, tb = _init(tb, n=3000, stop='2015-12-31')
     sim.run()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     cleared = ss.uids(tb.state == TBS.CLEARED)
     assert len(cleared) > 0
     counts = tb._counts(cleared)
@@ -77,12 +77,12 @@ def test_count_invariant_holds_after_run():
     """Core invariant (D-COUNTER): count>0 ⟺ strain bit set, for every agent, after a full run that
     exercises seeding, transmission, superinfection, de-novo, bottleneck, and clearance."""
     tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], rel_fitness={'RIF': 0.9},
-                           pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15),
-                                     init_strains=[0.6, 0.2, 0.2, 0.0], rr_reinfection_inf=1.0,
-                                     rr_reinfection_non=1.0, p_multi=0.5, p_rand={'BDQ': 0.02}))
+                           beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15),
+                           init_strains=[0.6, 0.2, 0.2, 0.0], rr_reinfection_inf=1.0,
+                           rr_reinfection_non=1.0, p_multi=0.5, p_rand={'BDQ': 0.02})
     sim, tb = _init(tb, n=3000, stop='2015-12-31')
     sim.run()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     all_uids = tb.strain_mask.auids
     mask = np.asarray(tb.strain_mask[all_uids])
     bits = ((mask[:, None] >> np.arange(tb.strains.m)) & 1).astype(bool)
@@ -107,7 +107,7 @@ def test_transmission_multinomial_weighted_by_count():
 def test_transmission_count_split_realized_in_set_prognoses():
     """The count-weighted split is actually applied by set_prognoses: from sources with {pan:2, res:1}
     (neutral fitness) the passed strain is pan ~2/3 of the time."""
-    tb = tbsim.TBResistant(rel_fitness={'TX': 1.0}, pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(rel_fitness={'TX': 1.0}, init_prev=ss.bernoulli(0.0))
     sim, tb = _init(tb, n=12000)
     src = ss.uids(np.arange(6000))
     tgt = ss.uids(np.arange(6000, 12000))
@@ -124,7 +124,7 @@ def test_progression_bottleneck_weighted_by_count():
     """Spec §2: when p_multi<1 forces one strain through the bottleneck, the survivor is chosen ∝ count.
     Counts {pan:2, resistant:1} → survivor is pan ~2/3, resistant ~1/3."""
     tb = tbsim.TBResistant(rel_fitness={'TX': 1.0},
-                           pars=dict(init_prev=ss.bernoulli(0.0), p_multi=0.0, prog_select='random'))
+                           init_prev=ss.bernoulli(0.0), p_multi=0.0, prog_select='random')
     sim, tb = _init(tb, n=9000)
     u = ss.uids(np.arange(9000))
     tb.strain_mask[u] = 0b11

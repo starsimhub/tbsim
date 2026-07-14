@@ -14,9 +14,9 @@ import tbsim
 def demo_sim(tb, interventions=None, analyzers=None, n_agents=3000, stop='2020-12-31', lam=8, seed=0):
     """Build a small random-network sim around a TB(Resistant) module."""
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=lam), dur=0))
-    return ss.Sim(n_agents=n_agents, networks=net, diseases=tb, interventions=interventions,
-                  analyzers=analyzers, dt=ss.days(30), start=ss.date('2000-01-01'),
-                  stop=ss.date(stop), rand_seed=seed, verbose=0)
+    return tbsim.Sim(tb_model=tb, n_agents=n_agents, networks=net, demographics=[], interventions=interventions,
+                     analyzers=analyzers, dt=ss.days(30), start=ss.date('2000-01-01'),
+                     stop=ss.date(stop), rand_seed=seed, verbose=0)
 ```
 
 ---
@@ -30,11 +30,11 @@ The counter lives in `tb.strain_counts` — a list of one integer array per stra
 ```python
 tb = tbsim.TBResistant(
     rel_fitness={'TX': 1.0},
-    pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15), init_strains=[0.5, 0.5],
-              rr_reinfection_inf=1.0, rr_reinfection_non=1.0),  # allow superinfection
+    beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15), init_strains=[0.5, 0.5],
+    rr_reinfection_inf=1.0, rr_reinfection_non=1.0,  # allow superinfection
 )
 sim = demo_sim(tb); sim.run()
-tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+tb = sim.get_tb()
 
 # How many identical-strain superinfection events occurred (count increments)?
 print('identical-strain superinfections:', int(np.sum(sim.results.tb['new_identical_superinf'])))
@@ -70,9 +70,9 @@ When `p_multi < 1`, a multi-strain agent progressing to active disease may retai
 
 ```python
 tb = tbsim.TBResistant(rel_fitness={'TX': 1.0},
-                       pars=dict(init_prev=ss.bernoulli(0.0), p_multi=0.0, prog_select='random'))
+                       init_prev=ss.bernoulli(0.0), p_multi=0.0, prog_select='random')
 sim = demo_sim(tb, n_agents=9000, stop='2000-06-30'); sim.init()
-tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+tb = sim.get_tb()
 
 u = ss.uids(np.arange(9000))
 tb.strain_mask[u] = 0b11        # carries strain 0 and strain 1
@@ -98,12 +98,12 @@ A stored DST result used to live forever, so a patient who failed treatment and 
 
 ```python
 tb = tbsim.TBResistant(drugs=['RIF'],
-                       pars=dict(init_prev=ss.bernoulli(0.05), init_prev_active=ss.bernoulli(0.05)))
+                       init_prev=ss.bernoulli(0.05), init_prev_active=ss.bernoulli(0.05))
 dst = tbsim.DSTDelivery(
     name='dst',
     product=tbsim.DST(strains=tb.strains, sens=0.95, spec=0.98),
     result_validity=ss.months(12),                      # results go stale after a year → re-test
-    eligibility=lambda sim: tbsim.get_tb(sim, which=tbsim.TBResistant).active_tb.uids,
+    eligibility=lambda sim: sim.get_tb().active_tb.uids,
 )
 tx = tbsim.TxDeliveryR(
     name='tx',
@@ -126,8 +126,8 @@ TPT drug pressure can *select* for resistance (a susceptible strain mutates unde
 
 ```python
 tb = tbsim.TBResistant(drugs=['INH'], rel_fitness={'INH': 0.9},
-                       pars=dict(beta=ss.permonth(0.3), init_prev=ss.bernoulli(0.2),
-                                 init_strains=[1.0, 0.0], rr_reinfection_inf=0.0, rr_reinfection_non=0.0))
+                       beta=ss.permonth(0.3), init_prev=ss.bernoulli(0.2),
+                       init_strains=[1.0, 0.0], rr_reinfection_inf=0.0, rr_reinfection_non=0.0)
 tpt = tbsim.TPTSimple(
     product=tbsim.TPTRx(strains=tb.strains, regimen_drugs=['INH'], p_tpt_acq={'INH': 1.0},
                         pars=dict(efficacy=ss.bernoulli(0.6), p_sterilize=ss.bernoulli(0.0))),
@@ -150,11 +150,11 @@ If a custom (e.g. DST-routed) eligibility selects a **latent** (`INFECTION`) age
 
 ```python
 def run_latent(treat_latent):
-    tb = tbsim.TBResistant(pars=dict(init_prev=ss.bernoulli(0.3), beta=ss.permonth(0.0),
-                                     init_strains=[1.0, 0.0]))
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.3), beta=ss.permonth(0.0),
+                           init_strains=[1.0, 0.0])
     tx = tbsim.TxDeliveryR(
         name='tx', treat_latent=treat_latent, dur_treatment=ss.months(3),
-        eligibility=lambda sim: tbsim.get_tb(sim, which=tbsim.TBResistant).latent.uids,
+        eligibility=lambda sim: sim.get_tb().latent.uids,
         product=tbsim.TxR(strains=tb.strains, base_efficacy=0.0, q_acq={'TX': 1.0},
                           acq_state_rr={int(tbsim.TBS.INFECTION): 1.0}),
     )
@@ -176,11 +176,11 @@ The default rate-based eligibility never selects latent agents, so this only mat
 When a treatment (or TPT) course fails and selects for resistance, the model picks **one** carried strain that is susceptible to the hit drug and mutates it. Previously it always chose the lowest-id strain (a pan-leaning bias). Now it chooses **at random** among the carried susceptible strains (or `∝ fitness` with `acq_select='fitness'`), so acquisition can land on a strain that already carries other resistances.
 
 ```python
-tb = tbsim.TBResistant(drugs=['RIF', 'FQ'], pars=dict(init_prev=ss.bernoulli(0.0)))
+tb = tbsim.TBResistant(drugs=['RIF', 'FQ'], init_prev=ss.bernoulli(0.0))
 prod = tbsim.TxR(strains=tb.strains, base_efficacy=0.0, q_acq={'FQ': 1.0}, acq_select='random')
 sim = demo_sim(tb, interventions=tbsim.TxDeliveryR(product=prod), n_agents=8000, stop='2001-12-31')
 sim.init()
-tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+tb = sim.get_tb()
 prod = sim.interventions[0].product
 
 u = ss.uids(np.arange(8000))
@@ -203,10 +203,10 @@ Treatment monitoring / regimen switching can now be made contingent on more than
 
 ```python
 tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], rel_fitness={'RIF': 0.9},
-                       pars=dict(beta=ss.permonth(0.3), init_prev=ss.bernoulli(0.1),
-                                 init_strains=[0.7, 0.3, 0.0, 0.0], rr_reinfection_inf=1.0, rr_reinfection_non=1.0))
+                       beta=ss.permonth(0.3), init_prev=ss.bernoulli(0.1),
+                       init_strains=[0.7, 0.3, 0.0, 0.0], rr_reinfection_inf=1.0, rr_reinfection_non=1.0)
 dst = tbsim.DSTDelivery(name='dst', product=tbsim.DST(strains=tb.strains, sens=0.95, spec=0.98),
-                        eligibility=lambda sim: tbsim.get_tb(sim, which=tbsim.TBResistant).active_tb.uids)
+                        eligibility=lambda sim: sim.get_tb().active_tb.uids)
 first = tbsim.TxDeliveryR(name='first', rate_sym=ss.peryear(2.0),
                           product=tbsim.TxR(strains=tb.strains, base_efficacy=0.8, regimen_drugs=['RIF'],
                                             resist_penalty={'RIF': 0.1}))
@@ -249,7 +249,7 @@ This is a convenience recipe, not a true single-strain space (the bitmask needs 
 Mistyped drug names used to be silently ignored (they resolved through `.get()` and did nothing). Now `TxR`, `TPTRx`, and `DST` validate every drug name against the strain registry and raise a clear error.
 
 ```python
-tb = tbsim.TBResistant(drugs=['RIF'], pars=dict(init_prev=ss.bernoulli(0.0)))
+tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
 try:
     tbsim.TxR(strains=tb.strains, regimen_drugs=['RIFF'])   # typo!
 except ValueError as e:

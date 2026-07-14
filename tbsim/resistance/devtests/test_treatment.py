@@ -16,15 +16,15 @@ NSEEDS = 2
 
 def _init_product(ea, eb, q):
     """Build an initialized TxR (n=1: strain 0 = A susceptible, strain 1 = B resistant)."""
-    tb = tbsim.TBResistant(rel_fitness={'TX': 0.6}, pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(rel_fitness={'TX': 0.6}, init_prev=ss.bernoulli(0.0))
     prod = tbsim.TxR(strains=tb.strains, base_efficacy=ea, resist_penalty={'TX': eb / ea},
                      adherence=1.0, q_acq={'TX': q})
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
-    sim = ss.Sim(n_agents=30000, networks=net, diseases=tb,
+    sim = tbsim.Sim(n_agents=30000, networks=net, diseases=tb, demographics=[],
                  interventions=tbsim.TxDeliveryR(product=prod), dt=ss.days(30),
                  start=ss.date('2000-01-01'), stop=ss.date('2001-12-31'), rand_seed=0, verbose=0)
     sim.init()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     prod = next(iv for iv in sim.interventions.values() if isinstance(iv, tbsim.TxDeliveryR)).product
     return tb, prod
 
@@ -118,13 +118,13 @@ def test_successful_cure_resets_count_survivor_unchanged():
     strain 1 (resistant) ×1; a regimen that cures pan but not the resistant strain zeroes count[0] and
     leaves count[1]."""
     # base_efficacy=1 on the regimen drug, resist_penalty 0 → strain 0 always cured, strain 1 never.
-    tb = tbsim.TBResistant(rel_fitness={'TX': 1.0}, pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(rel_fitness={'TX': 1.0}, init_prev=ss.bernoulli(0.0))
     prod = tbsim.TxR(strains=tb.strains, base_efficacy=1.0, resist_penalty={'TX': 0.0}, adherence=1.0)
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
-    sim = ss.Sim(n_agents=2000, networks=net, diseases=tb, interventions=tbsim.TxDeliveryR(product=prod),
+    sim = tbsim.Sim(n_agents=2000, networks=net, diseases=tb, demographics=[], interventions=tbsim.TxDeliveryR(product=prod),
                  dt=ss.days(30), start=ss.date('2000-01-01'), stop=ss.date('2001-12-31'), rand_seed=0, verbose=0)
     sim.init()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     tx = next(iv for iv in sim.interventions.values() if isinstance(iv, tbsim.TxDeliveryR))
     prod = tx.product
     u = ss.uids(np.arange(2000))
@@ -150,14 +150,14 @@ def test_latent_treatment_divergence():
     matching base tbsim. With treat_latent=True the same agents run a course that here fails and
     acquires resistance."""
     def run(treat_latent):
-        tb = tbsim.TBResistant(pars=dict(init_prev=ss.bernoulli(0.3), beta=ss.permonth(0.0),  # seed latent, no transmission
-                                         init_strains=[1.0, 0.0]))
+        tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.3), beta=ss.permonth(0.0),  # seed latent, no transmission
+                               init_strains=[1.0, 0.0])
         tx = tbsim.TxDeliveryR(name='tx', treat_latent=treat_latent, dur_treatment=ss.months(3),
-                               eligibility=lambda sim: tbsim.get_tb(sim, which=tbsim.TBResistant).latent.uids,
+                               eligibility=lambda sim: sim.get_tb().latent.uids,
                                product=tbsim.TxR(strains=tb.strains, base_efficacy=0.0, adherence=1.0,
                                                  q_acq={'TX': 1.0}, acq_state_rr={int(TBS.INFECTION): 1.0}))
         net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=1), dur=0))
-        sim = ss.Sim(n_agents=3000, networks=net, diseases=tb, interventions=tx, dt=ss.days(30),
+        sim = tbsim.Sim(n_agents=3000, networks=net, diseases=tb, demographics=[], interventions=tx, dt=ss.days(30),
                      start=ss.date('2000-01-01'), stop=ss.date('2003-12-31'), rand_seed=0, verbose=0)
         sim.run()
         return sim
