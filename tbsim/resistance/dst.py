@@ -163,7 +163,10 @@ class DSTDelivery(ss.Intervention):
         E.g. ``matches(RIF=True, BDQ=False)`` selects observed-RIF-resistant, observed-BDQ-susceptible
         agents. The returned ``sim -> uids`` callable restricts to DST-tested (unless
         ``require_tested=False``) and, unless ``exclude_on_treatment=False``, not-currently-on-treatment
-        agents. If ``require_active_tb`` is ``True`` (default), only currently active-TB agents match.
+        agents. If ``require_active_tb`` is ``True`` (default), only agents who currently have active TB
+        match — agents on treatment count as active here (they are being treated for active TB), so
+        ``exclude_on_treatment`` alone governs whether they are kept (letting the treatment-monitoring
+        pattern ``matches(..., exclude_on_treatment=False)`` select on-treatment agents).
         If ``max_age`` (``ss.dur``) is given, only agents whose result is within that window of the
         current step match (freshness gating; L1). Compose with
         ``TxDeliveryR(eligibility=..., supersedes=[...])`` to route or switch regimens.
@@ -185,12 +188,15 @@ class DSTDelivery(ss.Intervention):
                 age = sim.ti - np.asarray(dst.ti_dst[sel], dtype=float)
                 mask &= age <= (max_age / dst.t.dt)
             out = sel[mask]
-            if require_active_tb and len(out):
+            if (require_active_tb or exclude_on_treatment) and len(out):
                 tb = get_tb(sim, which=TBResistant)
-                out = out[tb.active_tb[out]]
-            if exclude_on_treatment and len(out):
-                tb = get_tb(sim, which=TBResistant)
-                out = out[tb.state[out] != TBS.TREATMENT]
+                if require_active_tb:
+                    # Agents on treatment have active TB (they are being treated for it), so keep them
+                    # here; whether to drop them is governed solely by exclude_on_treatment below. This
+                    # lets the treatment-monitoring pattern matches(..., exclude_on_treatment=False) work.
+                    out = out[tb.active_tb[out] | (tb.state[out] == TBS.TREATMENT)]
+                if exclude_on_treatment and len(out):
+                    out = out[tb.state[out] != TBS.TREATMENT]
             return out
         _elig.__name__ = 'dst_matches_' + '_'.join(f'{d}{"+" if v else "-"}' for d, v in per_drug.items())
         return _elig

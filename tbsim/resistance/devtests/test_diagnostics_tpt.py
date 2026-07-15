@@ -76,8 +76,12 @@ def test_dst_p_strain_obs_bottleneck_lowers_detection():
 def test_tpt_unmasks_and_selects_resistance():
     """Spec §TPT (Mills–Cohen): a susceptible-strain-clearing TPT applied to a mixed epidemic tilts
     competition toward the resistant strain — the resistant fraction of active TB is *higher* with
-    TPT than without, even though a less-fit resistant strain would otherwise be out-competed."""
-    def run(with_tpt):
+    TPT than without, even though a less-fit resistant strain would otherwise be out-competed.
+
+    ``frac_resist`` is a ratio over the (small, fluctuating) active-TB pool, so it is noisy per seed;
+    the unmasking effect is systematic in the mean but a few individual seeds flip sign. We therefore
+    average over several seeds and compare the means (a paired comparison at matched seeds)."""
+    def run(with_tpt, seed):
         tb = tbsim.TBResistant(drugs=['INH'], rel_fitness={'INH': 0.9},
                                beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15),
                                init_strains=[0.8, 0.2], rr_reinfection_inf=0.0, rr_reinfection_non=0.0)
@@ -88,13 +92,15 @@ def test_tpt_unmasks_and_selects_resistance():
                                   pars=dict(coverage=ss.bernoulli(0.5)))
         net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=10), dur=0))
         sim = tbsim.Sim(n_agents=4000, networks=net, diseases=tb, demographics=[], interventions=ivs, dt=ss.days(30),
-                     start=ss.date('2000-01-01'), stop=ss.date('2035-12-31'), rand_seed=0, verbose=0)
+                     start=ss.date('2000-01-01'), stop=ss.date('2035-12-31'), rand_seed=seed, verbose=0)
         sim.run()
         r = sim.results.tb
         return float(np.mean(r['frac_resist'][-6:]))  # late-window resistant fraction of active TB
-    no_tpt = run(False)
-    tpt = run(True)
-    assert tpt > no_tpt, f'TPT should raise the resistant fraction (unmasking): TPT {tpt:.3f} vs none {no_tpt:.3f}'
+    seeds = range(8)
+    no_tpt = np.array([run(False, s) for s in seeds])
+    tpt    = np.array([run(True, s) for s in seeds])
+    assert tpt.mean() > no_tpt.mean(), \
+        f'TPT should raise the mean resistant fraction (unmasking): TPT {tpt.mean():.3f} vs none {no_tpt.mean():.3f}'
 
 
 def test_dst_unaffected_by_strain_count():
