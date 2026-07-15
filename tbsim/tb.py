@@ -74,8 +74,8 @@ class TB(BaseTB):
         - ``inf_cle``:     Infection -> Cleared (no active TB).
         - ``inf_non``:     Infection -> Non-infectious TB.
         - ``inf_asy``:     Infection -> Asymptomatic TB.
-        - ``k_asy``:       Optional exponential decline rate (per year) of ``inf_asy`` with time since infection tau: ``inf_asy(tau) = inf_asy * exp(-k_asy * tau)``. Default 0 (constant hazard). Set > 0 to front-load progression to active TB (the recommended one-parameter form).
-        - ``k_non``:       Optional exponential decline rate (per year) of ``inf_non`` with time since infection, analogous to ``k_asy``. Default 0 (constant hazard).
+        - ``k_asy``:       Optional exponential decline shape parameter of ``inf_asy`` with time since infection tau: ``inf_asy(tau) = inf_asy * exp(-k_asy * tau)``. Default 0 (constant hazard). Set > 0 to front-load progression to active TB (the recommended one-parameter form).
+        - ``k_non``:       Optional exponential decline shape parameter of ``inf_non`` with time since infection, analogous to ``k_asy``. Default 0 (constant hazard).
 
         *From NON_INFECTIOUS*
 
@@ -161,8 +161,8 @@ class TB(BaseTB):
             # time since infection tau (years), rate(tau) = rate * exp(-k * tau). Both default to 0
             # (constant hazard = unchanged behaviour); set k_asy > 0 for the recommended 1-parameter
             # front-loaded INFECTION -> ASYMPTOMATIC (see progression_rates).
-            k_asy=0.0,                           # Decline rate (per year) for inf_asy; 0 = constant
-            k_non=0.0,                           # Decline rate (per year) for inf_non; 0 = constant
+            k_asy=0.0,                           # Exponential decay shape parameter for inf_asy; 0 = constant
+            k_non=0.0,                           # Exponential decay shape parameter for inf_non; 0 = constant
             # --- From NON_INFECTIOUS ---
             non_rec=ss.peryear(0.18),            # Non-infectious → CLEARED
             non_asy=ss.peryear(0.25),            # Progress to asymptomatic
@@ -390,7 +390,7 @@ class TB(BaseTB):
         inf_asy = self.pars.inf_asy * rr
         k_non, k_asy = self.pars.k_non, self.pars.k_asy
         if k_non or k_asy:  # front-load progression by declining with time since infection
-            tau = (self.ti - self.ti_infected[uids]) * self.sim.t.dt_year
+            tau = (self.ti - self.ti_infected[uids]) * self.t.dt_year
             if k_non:
                 inf_non = inf_non * np.exp(-k_non * tau)
             if k_asy:
