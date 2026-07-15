@@ -114,6 +114,83 @@ def test_superinfection_requires_sigma():
     assert np.sum(on.results.tb['new_identical_superinf']) > 0  # identical-strain re-exposures now counted (spec §1)
 
 
+# --------------------------------------------------------------------------- time-varying progression
+def _run_resistance_ever_asy_curve(k_asy=0.0, k_non=0.0, n=12_000, years=10, seed=1):
+    """Closed latent cohort for TVP checks; ASYMPTOMATIC is absorbing so n_ASYMPTOMATIC is ever-ASY."""
+    tb = tbsim.TBResistant(
+        pars=dict(
+            init_prev=ss.bernoulli(1.0),
+            init_prev_active=ss.bernoulli(0.0),
+            beta=ss.peryear(0.0),
+            inf_cle=ss.peryear(0.1),
+            inf_non=ss.peryear(0.0),
+            inf_asy=ss.peryear(0.3),
+            asy_non=ss.peryear(0.0),
+            asy_sym=ss.peryear(0.0),
+            k_asy=k_asy,
+            k_non=k_non,
+        )
+    )
+    sim = tbsim.Sim(
+        tb_model=tb, n_agents=n, networks=[], demographics=[], dt=ss.days(30),
+        start=ss.date('2000-01-01'), stop=ss.date(f'{2000 + years}-01-01'), rand_seed=seed,
+    )
+    sim.pars.verbose = 0
+    sim.run()
+    curve = np.asarray(sim.get_tb().results['n_ASYMPTOMATIC'][:], dtype=float) / n
+    return curve, sim.t.dt_year
+
+
+def test_resistance_k_asy_front_loads_progression():
+    """TBResistant should honor k_asy: year-1 share rises and eventual direct progression falls."""
+    curve0, dt_year = _run_resistance_ever_asy_curve(k_asy=0.0)
+    curveK, _ = _run_resistance_ever_asy_curve(k_asy=6.0)
+
+    i1 = int(round(1.0 / dt_year))
+    frac0 = curve0[i1] / curve0[-1]
+    fracK = curveK[i1] / curveK[-1]
+
+    assert np.isclose(curveK[0], curve0[0])
+    assert np.all(np.diff(curveK) >= -1e-12)
+    assert fracK > frac0 + 0.25
+    assert fracK > 0.85 and frac0 < 0.55
+    assert curveK[-1] < 0.5 * curve0[-1]
+
+
+def test_resistance_k_zero_matches_default_closed_cohort():
+    """Explicit k_asy=k_non=0 is identical to defaults for TBResistant."""
+    def run(**pars):
+        tb = tbsim.TBResistant(
+            pars=dict(
+                init_prev=ss.bernoulli(1.0),
+                init_prev_active=ss.bernoulli(0.0),
+                beta=ss.peryear(0.0),
+            ) | pars
+        )
+        sim = tbsim.Sim(
+            tb_model=tb, n_agents=2_000, networks=[], demographics=[], dt=ss.days(30),
+            start=ss.date('2000-01-01'), stop=ss.date('2005-01-01'), rand_seed=7,
+        )
+        sim.pars.verbose = 0
+        sim.run()
+        return sim.get_tb()
+
+    tb0 = run()
+    tb1 = run(k_asy=0.0, k_non=0.0)
+    for state in TBS:
+        np.testing.assert_array_equal(tb0.results[f'n_{state.name}'][:], tb1.results[f'n_{state.name}'][:])
+    np.testing.assert_array_equal(tb0.results['cum_active'][:], tb1.results['cum_active'][:])
+    np.testing.assert_array_equal(tb0.results['new_deaths'][:], tb1.results['new_deaths'][:])
+
+
+def test_resistance_negative_k_rejected():
+    """TBResistant inherits non-negative validation for TVP shape parameters."""
+    with pytest.raises(ValueError, match='k_asy must be >= 0'):
+        tbsim.TBResistant(pars=dict(k_asy=-1.0))
+    with pytest.raises(ValueError, match='k_non must be >= 0'):
+        tbsim.TBResistant(pars=dict(k_non=-0.5))
+
+
 # --------------------------------------------------------------------------- de-novo acquisition
 def test_denovo_mixed_vs_replacement():
     """De-novo resistance from a pure-A epidemic: mixed makes AB, replacement does not; no p_rand makes none."""
