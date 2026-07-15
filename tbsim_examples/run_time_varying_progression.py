@@ -111,28 +111,26 @@ def make_plot(tb_const, tb_front, tbr_const, tbr_front, outpath):
     yrs_tbr, curve_tbr_const, share_tbr_const, total_tbr_const = tbr_const
     _, curve_tbr_front, share_tbr_front, total_tbr_front = tbr_front
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), constrained_layout=False)
+    fig, axes = plt.subplots(1, 2, figsize=(12.8, 5.2), constrained_layout=False)
 
-    axes[0].plot(yrs_tb, 100 * curve_tb_const, lw=2, label="TB constant (default k_asy=0)")
-    axes[0].plot(yrs_tb, 100 * curve_tb_front, lw=2, label="TB front-loaded (k_asy=6)")
-    axes[0].plot(list(FEREBEE.keys()), list(FEREBEE.values()), 'ko', ms=6, label='Ferebee 1970')
-    axes[0].plot(list(SUTHERLAND.keys()), list(SUTHERLAND.values()), 'ks', ms=6, mfc='white', mew=1.2, label='Sutherland 1968')
+    l_const0, = axes[0].plot(yrs_tb, 100 * curve_tb_const, lw=2, label="Constant (k_asy=0)")
+    l_front0, = axes[0].plot(yrs_tb, 100 * curve_tb_front, lw=2, label="Front-loaded (k_asy=6)")
+    l_ferebee0, = axes[0].plot(list(FEREBEE.keys()), list(FEREBEE.values()), 'ko', ms=6, label='Ferebee 1970')
+    l_suth0, = axes[0].plot(list(SUTHERLAND.keys()), list(SUTHERLAND.values()), 'ks', ms=6, mfc='white', mew=1.2, label='Sutherland 1968')
     axes[0].set_title("TB: ever reached ASYMPTOMATIC")
     axes[0].set_xlabel("Years since infection")
     axes[0].set_ylabel("Cumulative (%)")
     axes[0].grid(alpha=0.25)
-    axes[0].legend(loc="center left", bbox_to_anchor=(1.02, 0.5), borderaxespad=0.0)
     axes[0].set_xlim(0, 10.5)
 
-    axes[1].plot(yrs_tbr, 100 * curve_tbr_const, lw=2, label="TBResistant constant (default k_asy=0)")
-    axes[1].plot(yrs_tbr, 100 * curve_tbr_front, lw=2, label="TBResistant front-loaded (k_asy=6)")
-    axes[1].plot(list(FEREBEE.keys()), list(FEREBEE.values()), 'ko', ms=6, label='Ferebee 1970')
-    axes[1].plot(list(SUTHERLAND.keys()), list(SUTHERLAND.values()), 'ks', ms=6, mfc='white', mew=1.2, label='Sutherland 1968')
+    axes[1].plot(yrs_tbr, 100 * curve_tbr_const, lw=2)
+    axes[1].plot(yrs_tbr, 100 * curve_tbr_front, lw=2)
+    axes[1].plot(list(FEREBEE.keys()), list(FEREBEE.values()), 'ko', ms=6)
+    axes[1].plot(list(SUTHERLAND.keys()), list(SUTHERLAND.values()), 'ks', ms=6, mfc='white', mew=1.2)
     axes[1].set_title("TBResistant: ever reached ASYMPTOMATIC")
     axes[1].set_xlabel("Years since infection")
-    axes[1].set_ylabel("Cumulative (%)")
+    axes[1].set_ylabel("")
     axes[1].grid(alpha=0.25)
-    axes[1].legend(loc="center left", bbox_to_anchor=(1.02, 0.5), borderaxespad=0.0)
     axes[1].set_xlim(0, 10.5)
 
     fig.suptitle(
@@ -140,10 +138,21 @@ def make_plot(tb_const, tb_front, tbr_const, tbr_front, outpath):
         f"TB year-1 share: {share_tb_const:.3f} -> {share_tb_front:.3f}, total: {100*total_tb_const:.2f}% -> {100*total_tb_front:.2f}% | "
         f"TBResistant year-1 share: {share_tbr_const:.3f} -> {share_tbr_front:.3f}, total: {100*total_tbr_const:.2f}% -> {100*total_tbr_front:.2f}%",
         fontsize=10,
+        y=0.98,
     )
 
-    # Reserve space on the right for outside legends
-    fig.subplots_adjust(right=0.78, wspace=0.35)
+    # Shared legend outside the plotting area (bottom-center)
+    fig.legend(
+        [l_const0, l_front0, l_ferebee0, l_suth0],
+        ["Constant (k_asy=0)", "Front-loaded (k_asy=6)", "Ferebee 1970", "Sutherland 1968"],
+        loc='lower center',
+        ncol=4,
+        frameon=False,
+        bbox_to_anchor=(0.5, 0.02),
+    )
+
+    # Reserve space for suptitle (top) and shared legend (bottom)
+    fig.subplots_adjust(top=0.78, bottom=0.22, wspace=0.35)
     fig.savefig(outpath, dpi=160, bbox_inches='tight')
     return fig
 
