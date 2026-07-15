@@ -79,6 +79,13 @@ class TBResistant(TB):
         )
         self.update_pars(pars, **kwargs)
 
+        # TB validates these in its init, but TBResistant applies pars after super().__init__.
+        # Re-validate here so negative shape parameters are consistently rejected.
+        if self.pars.k_asy < 0:
+            raise ValueError(f'k_asy must be >= 0, got {self.pars.k_asy}')
+        if self.pars.k_non < 0:
+            raise ValueError(f'k_non must be >= 0, got {self.pars.k_non}')
+
         # Spec default coupling: σ_L defaults to rr_reinfection_rec, σ_N to σ_L. Users (or the ODE
         # null) override explicitly, e.g. rr_reinfection_inf=1.0.
         if self.pars.rr_reinfection_inf is None:
@@ -284,10 +291,11 @@ class TBResistant(TB):
             multi = m.carried(self.strain_mask[u]).sum(1) >= 2
             psi = np.where(multi, p.rr_prog_super, 1.0)
             omega = np.where(multi, p.rr_clear_super, 1.0)
+            inf_non, inf_asy = self.progression_rates(u)
             self.transition(u, to={
                 TBS.CLEARED:        p.inf_cle * omega,
-                TBS.NON_INFECTIOUS: p.inf_non * self.rr_activation[u],
-                TBS.ASYMPTOMATIC:   p.inf_asy * self.rr_activation[u] * psi,
+                TBS.NON_INFECTIOUS: inf_non,
+                TBS.ASYMPTOMATIC:   inf_asy * psi,
             }, rng=self._rng_inf)
             dest = self.state[u]
             cleared = u[dest == TBS.CLEARED]
