@@ -16,18 +16,23 @@ class ResistanceStats(ss.Analyzer):
     Records the resistance observables of the reference ODE (``model-tests.md`` §11):
     resistant and superinfected fractions of active TB, and the three-way
     **resistance-origin flux decomposition** — new resistant cases arising from
-    (i) de-novo mutation, (ii) treatment-acquired resistance, and (iii) transmission.
+    (i) de-novo mutation, (ii) treatment/TPT-acquired resistance, and (iii) transmission.
 
     ``TBResistant`` already logs ``frac_resist``/``frac_super`` and the de-novo and
     transmitted fluxes in its own results; this analyzer collates them with the
-    treatment-acquired flux (summed over any ``TxDeliveryR`` interventions) into one
-    place and exposes ``to_df()`` for like-for-like comparison against the ODE.
+    treatment/TPT-acquired flux (summed over any ``TxDeliveryR`` interventions and
+    ``TPTRx`` products) into one place and exposes ``to_df()`` for like-for-like
+    comparison against the ODE.
     """
 
     def init_pre(self, sim):
         super().init_pre(sim)
         self.tb = get_tb(sim, which=TBResistant)
         self.tx = [iv for iv in sim.interventions.values() if isinstance(iv, TxDeliveryR)]
+        # Strain-aware TPT products (wrapped in TPTSimple / TPTHousehold / …)
+        from .tpt import TPTRx
+        self.tpt = [iv.product for iv in sim.interventions.values()
+                    if getattr(iv, 'product', None) is not None and isinstance(iv.product, TPTRx)]
         return
 
     def init_results(self):
@@ -36,7 +41,7 @@ class ResistanceStats(ss.Analyzer):
             ss.Result('frac_resist', dtype=float, scale=False, label='Resistant fraction of active TB'),
             ss.Result('frac_super', dtype=float, scale=False, label='Superinfected fraction of active TB'),
             ss.Result('flux_denovo', dtype=int, label='New resistance: de-novo mutation'),
-            ss.Result('flux_txacq', dtype=int, label='New resistance: treatment-acquired'),
+            ss.Result('flux_txacq', dtype=int, label='New resistance: treatment/TPT-acquired'),
             ss.Result('flux_transmitted', dtype=int, label='New resistance: transmitted'),
         )
         return
@@ -49,7 +54,12 @@ class ResistanceStats(ss.Analyzer):
         res.frac_super[ti] = tbr['frac_super'][ti]
         res.flux_denovo[ti] = tbr['new_denovo_resistance'][ti]
         res.flux_transmitted[ti] = tbr['new_transmitted_resistance'][ti]
-        res.flux_txacq[ti] = sum(int(iv.results.n_acquired[ti]) for iv in self.tx)
+        n_tx = sum(int(iv.results.n_acquired[ti]) for iv in self.tx)
+        n_tpt = 0
+        for prod in self.tpt:
+            n_tpt += int(getattr(prod, '_n_acquired', 0))
+            prod._n_acquired = 0  # consumed for this step
+        res.flux_txacq[ti] = n_tx + n_tpt
         return
 
     def to_df(self, sim):

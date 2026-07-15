@@ -17,7 +17,7 @@ class TBS(IntEnum):
     - Each agent is in exactly one of these states.
     - Transitions are driven by exponential rates in `TB`.
     """
-    SUSCEPTIBLE     = 0     # Never infected (agents who clear/recover/treat remain in their last state, not here)
+    SUSCEPTIBLE     = 0     # Never infected (or returned from CLEARED when cle_sus > 0)
     INFECTION       = 1     # Latent infection (not yet active TB)
     CLEARED         = 2     # Post-infection: cleared latent, recovered from non-infectious, or completed treatment
     NON_INFECTIOUS  = 3     # Non-infectious TB (early/smear-negative)
@@ -28,7 +28,7 @@ class TBS(IntEnum):
     REMOVED         = 8     # Removed from the active population (e.g. emigration)
 
 
-# State groups for fast membership tests, e.g. ``tb.state.isin(TBS.ACTIVE)``.
+# State groups for fast membership tests.
 TBS.ACTIVE       = (TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC, TBS.SYMPTOMATIC)  # active TB disease
 TBS.TERMINAL     = (TBS.DEAD, TBS.REMOVED)                                  # no longer in the active population
 TBS.CARE_SEEKING = (TBS.SYMPTOMATIC,)                                       # eligible to seek care (clinical symptoms only)
@@ -69,6 +69,12 @@ class TB(BaseTB):
         - ``inf_cle``:     Infection -> Cleared (no active TB).
         - ``inf_non``:     Infection -> Non-infectious TB.
         - ``inf_asy``:     Infection -> Asymptomatic TB.
+                - ``k_non``:       Decline rate (1/year) for ``inf_non`` with time since infection: ``inf_non·exp(−k_non·τ)``.
+                    Supports scalar, [low, high] range (uniform per infection), Starsim dist, or callable ``(sim, uids)``.
+                    Default 0 (constant).
+                - ``k_asy``:       Decline rate (1/year) for ``inf_asy`` with time since infection: ``inf_asy·exp(−k_asy·τ)``.
+                    Supports scalar, [low, high] range (uniform per infection), Starsim dist, or callable ``(sim, uids)``.
+                    Default 0 (constant).
 
         *From NON_INFECTIOUS*
 
@@ -149,6 +155,10 @@ class TB(BaseTB):
             inf_cle=ss.peryear(1.90),            # Clear infection (no active TB)
             inf_non=ss.peryear(0.16),            # Progress to non-infectious TB
             inf_asy=ss.peryear(0.06),            # Progress to asymptomatic active TB
+            # Time-since-infection decline on progression (τ=years since ti_infected): rate(τ)=rate·exp(−k·τ).
+            # Default 0 ⇒ constant hazards (backward compatible). Typically calibrate k_asy only (issue #427).
+            k_non=0.0,                           # Decline rate (1/year) for inf_non; 0 = off
+            k_asy=0.0,                           # Decline rate (1/year) for inf_asy; 0 = off
             # --- From NON_INFECTIOUS ---
             non_rec=ss.peryear(0.18),            # Non-infectious → CLEARED
             non_asy=ss.peryear(0.25),            # Progress to asymptomatic
@@ -168,6 +178,8 @@ class TB(BaseTB):
         self._rng_non = ss.random(name='tb_rng_non')   # NON_INFECTIOUS exits
         self._rng_asy = ss.random(name='tb_rng_asy')   # ASYMPTOMATIC exits
         self._rng_sym = ss.random(name='tb_rng_sym')   # SYMPTOMATIC exits
+        self._rng_k_non = ss.random(name='tb_rng_k_non')  # per-infection k_non draws for range syntax
+        self._rng_k_asy = ss.random(name='tb_rng_k_asy')  # per-infection k_asy draws for range syntax
 
         # Per-agent state: redefine base Infection states and add TB-specific ones
         self.define_states(
@@ -176,6 +188,8 @@ class TB(BaseTB):
             ss.FloatArr('rel_sus', default=1.0),
             ss.FloatArr('rel_trans', default=1.0),
             ss.FloatArr('ti_infected', default=-np.inf),
+            ss.FloatArr('k_non_i', default=np.nan),
+            ss.FloatArr('k_asy_i', default=np.nan),
             ss.FloatArr('state', default=TBS.SUSCEPTIBLE),
             ss.FloatArr('ti_asymp', default=np.nan),                # Time of last entry to ASYMPTOMATIC (for new_active tracking)
             ss.BoolState('on_treatment', default=False),
@@ -229,12 +243,14 @@ class TB(BaseTB):
     @property
     def active_tb(self):
         """Active TB disease (non-infectious, asymptomatic, or symptomatic)."""
-        return self.state.isin(TBS.ACTIVE)
+        st = self.state
+        return (st == TBS.NON_INFECTIOUS) | (st == TBS.ASYMPTOMATIC) | (st == TBS.SYMPTOMATIC)
 
     @property
     def terminal(self):
         """No longer participating in transmission or care flows (dead or removed)."""
-        return self.state.isin(TBS.TERMINAL)
+        st = self.state
+        return (st == TBS.DEAD) | (st == TBS.REMOVED)
 
     def set_prognoses(self, uids, sources=None):
         """
@@ -242,7 +258,9 @@ class TB(BaseTB):
 
         The base `starsim.Infection` calls this when a susceptible agent
         acquires infection. We mark agents infected and set state to INFECTION
-        (latent). Transitions are evaluated per dt each timestep in `step`.
+        (latent). ``ti_infected`` is set to the current time so time-since-infection
+        progression multipliers (`k_asy`, `k_non`) restart for reinfections.
+        Transitions are evaluated per dt each timestep in `step`.
         """
         super().set_prognoses(uids, sources)
         if len(uids) == 0:
@@ -251,10 +269,95 @@ class TB(BaseTB):
         self.susceptible[uids] = False
         self.infected[uids] = True
         self.ever_infected[uids] = True
-        self.ti_infected[uids] = self.ti
+        self.ti_infected[uids] = self.ti  # reset progression clock (also on reinfection from CLEARED)
+        self._assign_progression_k(uids)
         self.state[uids] = TBS.INFECTION
 
         return
+
+    def _draw_progression_k(self, k, uids, rng):
+        """Resolve progression-decline input to per-agent draws for ``uids``.
+
+        Supported forms:
+            - scalar: same value for all uids
+            - 2-item sequence [low, high]: uniform draw in [low, high]
+            - object with ``rvs``: drawn via ``rvs(uids)``
+            - callable: ``k(sim, uids)``
+        """
+        n = len(uids)
+        if n == 0:
+            return np.zeros(0, dtype=float)
+
+        if np.isscalar(k):
+            return np.full(n, float(k), dtype=float)
+
+        if hasattr(k, 'rvs'):
+            out = np.asarray(k.rvs(uids), dtype=float)
+            if out.ndim == 0:
+                out = np.full(n, float(out), dtype=float)
+            return out
+
+        if callable(k):
+            out = np.asarray(k(self.sim, uids), dtype=float)
+            if out.ndim == 0:
+                out = np.full(n, float(out), dtype=float)
+            return out
+
+        if isinstance(k, (list, tuple, np.ndarray)) and len(k) == 2:
+            lo, hi = float(k[0]), float(k[1])
+            if hi < lo:
+                raise ValueError(f'Invalid k range [{lo}, {hi}]: expected low <= high')
+            u = np.asarray(rng.rvs(uids), dtype=float)
+            return lo + (hi - lo) * u
+
+        raise TypeError(f'Unsupported progression-k input: {k!r}')
+
+    def _assign_progression_k(self, uids):
+        """Assign per-infection progression-decline factors for new/reinfected agents."""
+        if len(uids) == 0:
+            return
+        self.k_non_i[uids] = self._draw_progression_k(self.pars.k_non, uids, self._rng_k_non)
+        self.k_asy_i[uids] = self._draw_progression_k(self.pars.k_asy, uids, self._rng_k_asy)
+        return
+
+    def _ensure_progression_k(self, uids):
+        """Lazily fill missing per-agent progression factors (e.g. manually seeded latent cohorts)."""
+        if len(uids) == 0:
+            return
+        miss_non = np.isnan(self.k_non_i[uids])
+        if miss_non.any():
+            uu = uids[miss_non]
+            self.k_non_i[uu] = self._draw_progression_k(self.pars.k_non, uu, self._rng_k_non)
+        miss_asy = np.isnan(self.k_asy_i[uids])
+        if miss_asy.any():
+            uu = uids[miss_asy]
+            self.k_asy_i[uu] = self._draw_progression_k(self.pars.k_asy, uu, self._rng_k_asy)
+        return
+
+    def prog_tsi(self, uids, k, k_i=None):
+        """
+        Relative progression risk by time since infection.
+
+        Returns ``exp(−k·τ)`` for each agent, where ``τ`` is years since
+        ``ti_infected``. With ``k=0`` (default), returns ``1.0`` (no decline).
+        Used to front-load INFECTION→disease hazard (issue #427).
+        """
+        if k_i is None and np.isscalar(k) and not k:
+            return 1.0
+        if k_i is None:
+            k_i = k
+        tau = (self.ti - self.ti_infected[uids]) * self.sim.t.dt_year
+        k_arr = np.asarray(k_i, dtype=float)
+        if k_arr.ndim == 0:
+            k_arr = np.full(len(uids), float(k_arr), dtype=float)
+        else:
+            k_arr = np.broadcast_to(k_arr, len(uids)).astype(float)
+        tau = np.maximum(tau, 0.0)
+        # Guard zero-k entries so we do not evaluate 0*inf (which raises warnings).
+        expo = np.zeros(len(uids), dtype=float)
+        nz = k_arr != 0.0
+        expo[nz] = -(k_arr[nz] * tau[nz])
+        return np.exp(expo)
 
     def transition(self, uids, to, rng):
         """
@@ -345,10 +448,12 @@ class TB(BaseTB):
 
         u = self.latent.uids
         if len(u):
+            self._ensure_progression_k(u)
+            rr_a = self.rr_activation[u]
             self.transition(u, to={
                 TBS.CLEARED:        self.pars.inf_cle,
-                TBS.NON_INFECTIOUS: self.pars.inf_non * self.rr_activation[u],
-                TBS.ASYMPTOMATIC:   self.pars.inf_asy * self.rr_activation[u],
+                TBS.NON_INFECTIOUS: self.pars.inf_non * rr_a * self.prog_tsi(u, self.pars.k_non, self.k_non_i[u]),
+                TBS.ASYMPTOMATIC:   self.pars.inf_asy * rr_a * self.prog_tsi(u, self.pars.k_asy, self.k_asy_i[u]),
             }, rng=self._rng_inf)
             newly_cleared = u[self.state[u] == TBS.CLEARED]  # agents cleared from INFECTION this step
             self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_cleared
@@ -365,6 +470,12 @@ class TB(BaseTB):
             self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_rec
             if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
                 self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
+
+        u = ss.uids(self.state == TBS.CLEARED)
+        if len(u):
+            self.transition(u, to={
+                TBS.SUSCEPTIBLE: self.pars.cle_sus,
+            }, rng=self._rng_cle)
 
         u = self.asymptomatic.uids
         if len(u):
@@ -389,12 +500,13 @@ class TB(BaseTB):
         """ Update infection flags, request TB deaths, reset risk modifiers, and set the
         transmission state (``susceptible``/``rel_sus``/``rel_trans``) used next step. """
         # --- Bookkeep from current state ---
-        # Derive the transmission flags from the categorical state (identical values to,
-        # but faster than, the previous np.isin re-derivation).
+        # Derive transmission flags from categorical state. ``self.state`` is a FloatArr,
+        # so use vectorized comparisons (not ndarray ``isin``).
         st = self.state
-        susceptible = st.isin((TBS.SUSCEPTIBLE, TBS.CLEARED))
+        susceptible = (st == TBS.SUSCEPTIBLE) | (st == TBS.CLEARED)
         self.susceptible[:] = susceptible
-        self.infected[:] = ~(susceptible | st.isin(TBS.TERMINAL))
+        terminal = (st == TBS.DEAD) | (st == TBS.REMOVED)
+        self.infected[:] = ~(susceptible | terminal)
         self.on_treatment[:] = (st == TBS.TREATMENT)
 
         # TB deaths

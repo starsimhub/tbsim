@@ -407,12 +407,12 @@ import starsim as ss
 import tbsim
 
 tb = tbsim.TBResistant(
-    drugs=['RIF'],
-    rel_fitness={'RIF': 0.9},
+    drugs=['RIF', 'BDQ'],
+    rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
     pars=dict(
         beta=ss.permonth(0.35),
         init_prev=ss.bernoulli(0.12),
-        init_strains=[0.8, 0.2],
+        init_strains=[0.8, 0.2, 0.0, 0.0],
         rr_reinfection_inf=1.0,
         rr_reinfection_non=1.0,
     ),
@@ -424,29 +424,28 @@ dst = tbsim.DSTDelivery(
 )
 first = tbsim.TxDeliveryR(
     name='first',
-    rate_sym=ss.peryear(1.0),
     eligibility=dst.matches(RIF=False),
     product=tbsim.TxR(
         strains=tb.strains,
+        regimen_drugs=['RIF'],
         base_efficacy=0.85,
         resist_penalty={'RIF': 0.1},
     ),
 )
 second = tbsim.TxDeliveryR(
     name='second',
-    rate_sym=ss.peryear(1.0),
     eligibility=dst.matches(RIF=True),
     product=tbsim.TxR(
         strains=tb.strains,
+        regimen_drugs=['BDQ'],
         base_efficacy=0.8,
-        regimen_drugs=['RIF'],
     ),
 )
 sim = build_sim(tb, interventions=[dst, first, second], stop='2040-12-31')
 sim.run()
 print('DST tests:', int(sim.results['dst'].n_tested.sum()))
 print('First-line courses:', int(sim.results['first'].n_treated.sum()))
-print('Second-line (RIF-R):', int(sim.results['second'].n_treated.sum()))
+print('Second-line (RIF-R→BDQ):', int(sim.results['second'].n_treated.sum()))
 ```
 
 Also available: `dst.observed_resistant('RIF')` for a single-drug eligibility callable.
@@ -459,7 +458,8 @@ To change regimen mid-course:
 
 1. Name the first-line delivery.
 2. Build a second-line delivery with `eligibility=treatment_monitoring_eligibility(...)` and `supersedes=['first']`.
-3. The second line **interrupts** the ongoing course, then starts the new regimen.
+3. Optionally pass `extra=` (e.g. `dst.matches(RIF=True)`) so the switch is contingent on a DST result or other filter.
+4. The second line **interrupts** the ongoing course, then starts the new regimen.
 
 ```python
 import starsim as ss
@@ -487,6 +487,7 @@ first = tbsim.TxDeliveryR(
 switch = tbsim.TxDeliveryR(
     name='switch',
     supersedes=['first'],
+    # Time-on-treatment gate; add extra=dst.matches(...) to require a DST phenotype too.
     eligibility=tbsim.treatment_monitoring_eligibility('first', after_steps=2),
     product=tbsim.TxR(
         strains=tb.strains,

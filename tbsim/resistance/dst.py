@@ -16,7 +16,7 @@ import starsim as ss
 from ..tb import TBS, get_tb
 from .tb_resistant import TBResistant
 
-__all__ = ['DST', 'DSTDelivery']
+__all__ = ['DST', 'DSTDelivery', 'reset_dst_on_cure']
 
 
 class DST(ss.Product):
@@ -96,6 +96,7 @@ class DSTDelivery(ss.Intervention):
         super().__init__()
         self.product = product
         self.eligibility = eligibility
+        self._n_tested = 0
         self.define_states(
             ss.IntArr('dst_profile', default=0),   # observed n-bit resistance profile
             ss.BoolArr('dst_tested', default=False),
@@ -111,29 +112,54 @@ class DSTDelivery(ss.Intervention):
         tb = get_tb(sim, which=TBResistant)
         return (tb.active_tb & sim.people.alive & ~self.dst_tested).uids
 
-    def observed_resistant(self, drug):
-        """Return a callable ``sim -> uids`` selecting agents observed resistant to ``drug`` (for treatment eligibility)."""
+    def reset(self, uids):
+        """Clear sticky DST state for *uids* (e.g. after cure) so stale profiles cannot re-route treatment."""
+        uids = ss.uids(uids)
+        if len(uids) == 0:
+            return
+        self.dst_tested[uids] = False
+        self.dst_profile[uids] = 0
+        self.ti_dst[uids] = np.nan
+        return
+
+    def observed_resistant(self, drug, require_active=True, exclude_on_treatment=True):
+        """Return a callable ``sim -> uids`` selecting agents observed resistant to ``drug`` (for treatment eligibility).
+
+        By default restricts to alive agents with current active TB and not on treatment, so cured agents
+        with a stale positive profile are not re-selected.
+        """
         di = self.product.strains.drug_idx[drug]
         name = self.name  # resolve the sim's own (copied) DST instance at call time
         def _elig(sim):
             dst = sim.interventions[name]
-            obs = ((np.asarray(dst.dst_profile.values) >> di) & 1).astype(bool)
-            return dst.dst_profile.auids[obs]
+            tb = get_tb(sim, which=TBResistant)
+            sel = (dst.dst_tested & sim.people.alive).uids
+            if len(sel) == 0:
+                return sel
+            obs = ((np.asarray(dst.dst_profile[sel]) >> di) & 1).astype(bool)
+            out = sel[obs]
+            if require_active and len(out):
+                out = out[tb.active_tb[out]]
+            if exclude_on_treatment and len(out):
+                out = out[tb.state[out] != TBS.TREATMENT]
+            return out
         return _elig
 
-    def matches(self, require_tested=True, exclude_on_treatment=True, **per_drug):
+    def matches(self, require_tested=True, exclude_on_treatment=True, require_active=True, **per_drug):
         """Return an eligibility callable selecting agents whose observed DST profile matches ``per_drug``.
 
         E.g. ``matches(RIF=True, BDQ=False)`` selects observed-RIF-resistant, observed-BDQ-susceptible
         agents. The returned ``sim -> uids`` callable restricts to DST-tested (unless
-        ``require_tested=False``) and, unless ``exclude_on_treatment=False``, not-currently-on-treatment
-        agents. Compose with ``TxDeliveryR(eligibility=..., supersedes=[...])`` to route or switch regimens.
+        ``require_tested=False``), to current active TB (unless ``require_active=False``), and, unless
+        ``exclude_on_treatment=False``, not-currently-on-treatment agents. Compose with
+        ``TxDeliveryR(eligibility=..., supersedes=[...])`` to route or switch regimens.
         """
         strains = self.product.strains
         spec = {strains.drug_idx[d]: bool(v) for d, v in per_drug.items()}
         name = self.name
         def _elig(sim):
             dst = sim.interventions[name]
+            tb = get_tb(sim, which=TBResistant)
             sel = dst.dst_tested.uids if require_tested else sim.people.alive.uids
             if len(sel) == 0:
                 return sel
@@ -143,8 +169,9 @@ class DSTDelivery(ss.Intervention):
                 bit = ((prof >> di) & 1).astype(bool)
                 mask &= bit if want else ~bit
             out = sel[mask]
+            if require_active and len(out):
+                out = out[tb.active_tb[out]]
             if exclude_on_treatment and len(out):
-                tb = get_tb(sim, which=TBResistant)
                 out = out[tb.state[out] != TBS.TREATMENT]
             return out
         _elig.__name__ = 'dst_matches_' + '_'.join(f'{d}{"+" if v else "-"}' for d, v in per_drug.items())
@@ -169,6 +196,17 @@ class DSTDelivery(ss.Intervention):
     def update_results(self):
         self.results.n_tested[self.ti] = self._n_tested
         return
+
+
+def reset_dst_on_cure(sim, uids):
+    """Reset every ``DSTDelivery`` sticky profile for cured agents (if any DST modules are present)."""
+    uids = ss.uids(uids)
+    if len(uids) == 0:
+        return
+    for iv in sim.interventions.values():
+        if isinstance(iv, DSTDelivery):
+            iv.reset(uids)
+    return
 
 
 def _perdrug(val, drug, default):

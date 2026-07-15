@@ -17,7 +17,7 @@ class HIVState(IntEnum):
 
 
 
-# HIV-positive states, for membership tests, e.g. ``hiv.state.isin(HIVState.INFECTED)``.
+# HIV-positive states, for membership tests.
 HIVState.INFECTED = (HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS)
 
 
@@ -154,12 +154,13 @@ class HIV(ss.Disease):
         ti = self.sim.ti
         n_alive = np.count_nonzero(self.sim.people.alive)
         res = self.results
+        infected = np.isin(self.state.values, HIVState.INFECTED)
 
         if n_alive > 0:
-            res.hiv_prevalence[ti] = self.state.isin(HIVState.INFECTED).count() / n_alive
+            res.hiv_prevalence[ti] = infected.sum() / n_alive
         else:
             res.hiv_prevalence[ti] = 0.0
-        res.infected[ti] = self.state.isin(HIVState.INFECTED).count()
+        res.infected[ti] = infected.sum()
         res.atrisk[ti]     = np.count_nonzero(self.state == HIVState.ATRISK)/n_alive
         res.acute[ti]      = np.count_nonzero(self.state == HIVState.ACUTE)/n_alive
         res.latent[ti]     = np.count_nonzero(self.state == HIVState.LATENT)/n_alive
@@ -211,7 +212,7 @@ class HivInterventions(ss.Intervention):
 
         target_prev = self.pars.prevalence(self.sim) if callable(self.pars.prevalence) else self.pars.prevalence
         expected_infectious = int(np.round(alive * target_prev))
-        infectious_uids = self.hiv.state.isin(HIVState.INFECTED).uids
+        infectious_uids = ss.uids(np.isin(self.hiv.state.values, HIVState.INFECTED).nonzero()[0])
         n_current = len(infectious_uids)
         delta = expected_infectious - n_current
         min_age = self.pars.min_age

@@ -77,7 +77,7 @@ class HealthSeekingBehavior(ss.Intervention):
             self._new_seekers_count = 0
             return
 
-        active = self._tb.state.isin(self._states)  # dead agents are in DEAD/REMOVED, so already excluded (no need to & alive)
+        active = np.isin(self._tb.state.values, self._states)  # dead agents are in DEAD/REMOVED, so already excluded (no need to & alive)
         # Reset sought_care when leaving eligible states so future episodes can seek care again.
         self.sought_care[~active] = False
         if self.pars.care_retry_steps is not None and int(self.pars.care_retry_steps) > 0:
@@ -120,6 +120,6 @@ class HealthSeekingBehavior(ss.Intervention):
             return
         self.results['n_ever_sought_care'][self.ti] = np.count_nonzero(self.n_care_sought_total > 0)
         self.results['new_sought_care'][self.ti] = self._new_seekers_count
-        active = self._tb.state.isin(self._states)
+        active = np.isin(self._tb.state.values, self._states)
         self.results['n_eligible'][self.ti] = np.count_nonzero(active & (~self.sought_care))
         return

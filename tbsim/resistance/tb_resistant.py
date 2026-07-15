@@ -151,6 +151,7 @@ class TBResistant(TB):
             self.infected[uids] = True
             self.ever_infected[uids] = True
             self.ti_infected[uids] = ti
+            self._assign_progression_k(uids)
             self.susceptible[uids] = False
             return
 
@@ -180,6 +181,7 @@ class TBResistant(TB):
             self.infected[acq_uids] = True
             self.ever_infected[acq_uids] = True
             self.ti_infected[acq_uids] = ti
+            self._assign_progression_k(acq_uids)
             self.susceptible[acq_uids] = False
             # Primary infection (from a susceptible/cleared state) enters latent;
             # superinfection of an already-infected agent keeps the current state.
@@ -198,13 +200,15 @@ class TBResistant(TB):
         # --- INFECTION (latent) ---
         u = self.latent.uids
         if len(u):
+            self._ensure_progression_k(u)
             multi = m.carried(self.strain_mask[u]).sum(1) >= 2
             psi = np.where(multi, p.rr_prog_super, 1.0)
             omega = np.where(multi, p.rr_clear_super, 1.0)
+            rr_a = self.rr_activation[u]
             self.transition(u, to={
                 TBS.CLEARED:        p.inf_cle * omega,
-                TBS.NON_INFECTIOUS: p.inf_non * self.rr_activation[u],
-                TBS.ASYMPTOMATIC:   p.inf_asy * self.rr_activation[u] * psi,
+                TBS.NON_INFECTIOUS: p.inf_non * rr_a * self.prog_tsi(u, p.k_non, self.k_non_i[u]),
+                TBS.ASYMPTOMATIC:   p.inf_asy * rr_a * self.prog_tsi(u, p.k_asy, self.k_asy_i[u]) * psi,
             }, rng=self._rng_inf)
             dest = self.state[u]
             cleared = u[dest == TBS.CLEARED]
@@ -338,7 +342,8 @@ class TBResistant(TB):
 
         # Susceptible = primary-infection- or superinfection-eligible states. Whether a *new*
         # strain is actually acquired (vs identical-strain blocked) is resolved in set_prognoses.
-        sus = st.isin((TBS.SUSCEPTIBLE, TBS.CLEARED, TBS.INFECTION, TBS.NON_INFECTIOUS))
+        sus = ((st == TBS.SUSCEPTIBLE) | (st == TBS.CLEARED)
+             | (st == TBS.INFECTION) | (st == TBS.NON_INFECTIOUS))
         if p.rr_reinfection_asy > 0:
             sus = sus | (st == TBS.ASYMPTOMATIC)
         if p.rr_reinfection_sym > 0:

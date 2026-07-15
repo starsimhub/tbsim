@@ -255,6 +255,31 @@ def test_susceptible_only_cleared_or_never_infected():
             )
 
 
+def test_cleared_can_progress_to_susceptible_when_enabled():
+    """With cle_sus>0, CLEARED agents can return to SUSCEPTIBLE in base TB."""
+    sim = make_tb_sim(
+        n_agents=500,
+        start=ss.date("2000-01-01"),
+        stop=ss.date("2001-01-01"),
+        dt='month',
+        pars=dict(
+            init_prev=ss.bernoulli(0.0),
+            beta=ss.peryear(0.0),
+            cle_sus=ss.peryear(20.0),  # very fast return for a robust test
+        ),
+    )
+    sim.init()
+    tb = tbsim.get_tb(sim)
+    u = ss.uids(np.arange(500))
+    tb.state[u] = TBS.CLEARED
+    tb.susceptible[u] = True
+    tb.infected[u] = False
+    sim.run()
+
+    n_sus = np.count_nonzero(tb.state[u] == TBS.SUSCEPTIBLE)
+    assert n_sus > 0, "Expected some CLEARED agents to progress back to SUSCEPTIBLE when cle_sus is enabled"
+
+
 def test_rel_sus_rel_trans_after_step():
     """After step, CLEARED agents have rel_sus == rr_reinfection; ASYMPTOMATIC have rel_trans == trans_asymp."""
     sim = make_tb_sim(n_agents=60)
@@ -387,6 +412,230 @@ def test_rr_reinfection_waning():
         # At least some protected agents should have reduced susceptibility
         assert len(has_protection) >= 0, "Protected agents check passed"
     return sim
+
+
+# --- Time-varying progression (issue #427) ---
+
+def test_prog_tsi_default_off():
+    """With k=0 (default), prog_tsi returns 1.0 (constant hazard, backward compatible)."""
+    sim = make_tb_sim(n_agents=20)
+    sim.init()
+    tb = tbsim.get_tb(sim)
+    assert tb.pars.k_asy == 0.0
+    assert tb.pars.k_non == 0.0
+    uids = ss.uids(np.arange(10))
+    tb.ti_infected[uids] = tb.ti - 52  # "infected" ~1 year ago at weekly dt
+    assert tb.prog_tsi(uids, 0) == 1.0
+
+
+def test_prog_tsi_exponential_decay():
+    """prog_tsi returns exp(−k·τ) with τ in years since ti_infected."""
+    sim = make_tb_sim(n_agents=20, dt=ss.days(7))
+    sim.init()
+    tb = tbsim.get_tb(sim)
+    uids = ss.uids(np.arange(5))
+    steps_per_year = int(round(1.0 / sim.t.dt_year))
+    tb.ti_infected[uids] = tb.ti - steps_per_year
+    k = 2.0
+    rr = tb.prog_tsi(uids, k)
+    expected = np.exp(-k * 1.0)
+    assert np.allclose(rr, expected, rtol=0.02), f"Expected ~{expected}, got {rr}"
+
+
+def test_progression_k_range_draws_per_agent():
+    """k_asy/k_non support [low, high] ranges with per-agent draws at infection."""
+    sim = make_tb_sim(n_agents=200, pars=dict(k_asy=[0.2, 1.2], k_non=[0.0, 0.5]))
+    sim.init()
+    tb = tbsim.get_tb(sim)
+    uids = ss.uids(np.arange(180))
+    tb.set_prognoses(uids)
+    kasy = np.asarray(tb.k_asy_i[uids], dtype=float)
+    knon = np.asarray(tb.k_non_i[uids], dtype=float)
+    assert np.all((kasy >= 0.2) & (kasy <= 1.2))
+    assert np.all((knon >= 0.0) & (knon <= 0.5))
+    assert np.std(kasy) > 0
+
+
+def test_progression_k_distribution_draws_per_agent():
+    """k_asy/k_non support Starsim distributions (drawn per infection event)."""
+    sim = make_tb_sim(n_agents=220, pars=dict(k_asy=ss.uniform(0.1, 0.9), k_non=ss.uniform(0.0, 0.3)))
+    sim.init()
+    tb = tbsim.get_tb(sim)
+    uids = ss.uids(np.arange(200))
+    tb.set_prognoses(uids)
+    kasy = np.asarray(tb.k_asy_i[uids], dtype=float)
+    knon = np.asarray(tb.k_non_i[uids], dtype=float)
+    assert np.all((kasy >= 0.1) & (kasy <= 0.9))
+    assert np.all((knon >= 0.0) & (knon <= 0.3))
+
+
+def test_progression_k_lazy_assignment_for_manual_latent_setup():
+    """Manually seeded latent cohorts get k draws lazily on transition step."""
+    sim = make_tb_sim(
+        n_agents=300,
+        dt='month',
+        pars=dict(
+            init_prev=ss.bernoulli(0.0),
+            beta=ss.peryear(0.0),
+            k_asy=[0.2, 0.8],
+            k_non=[0.1, 0.4],
+        ),
+    )
+    sim.init()
+    tb = tbsim.get_tb(sim)
+    u = ss.uids(np.arange(300))
+    tb.state[u] = TBS.INFECTION
+    tb.infected[u] = True
+    tb.susceptible[u] = False
+    tb.ti_infected[u] = tb.ti
+    assert np.isnan(tb.k_asy_i[u]).all()
+    assert np.isnan(tb.k_non_i[u]).all()
+    sim.run_one_step()
+    assert np.isfinite(tb.k_asy_i[u]).all()
+    assert np.isfinite(tb.k_non_i[u]).all()
+
+
+def test_set_prognoses_resets_progression_clock():
+    """Reinfection via set_prognoses updates ti_infected to the current time."""
+    sim = make_tb_sim(n_agents=30)
+    sim.init()
+    tb = tbsim.get_tb(sim)
+    uids = ss.uids([1, 2, 3])
+    tb.ti_infected[uids] = 0
+    for _ in range(5):
+        sim.run_one_step()
+    tb.set_prognoses(uids)
+    assert np.all(tb.ti_infected[uids] == tb.ti)
+
+
+def test_k_asy_frontloads_progression_to_asymptomatic():
+    """Large k_asy concentrates ASY entries early vs a constant-hazard (k_asy=0) run."""
+    def _new_active_series(k_asy, seed):
+        n = 6_000
+        sim = make_tb_sim(
+            n_agents=n,
+            start=ss.date('2000-01-01'),
+            stop=ss.date('2002-01-01'),
+            dt='month',
+            pars=dict(
+                init_prev=ss.bernoulli(0.0),
+                beta=ss.peryear(0.0),
+                sym_dead=ss.peryear(0.0),
+                k_asy=k_asy,
+                inf_asy=ss.peryear(0.15),
+                inf_non=ss.peryear(0.04),
+                inf_cle=ss.peryear(0.5),
+            ),
+            rand_seed=seed,
+        )
+        sim.init()
+        tb = tbsim.get_tb(sim)
+        u = ss.uids(np.arange(n))
+        tb.state[u] = TBS.INFECTION
+        tb.infected[u] = True
+        tb.ever_infected[u] = True
+        tb.susceptible[u] = False
+        tb.ti_infected[u] = tb.ti
+        sim.run()
+        return np.asarray(tb.results['new_active'][:], dtype=float)
+
+    na0 = np.mean([_new_active_series(0.0, s) for s in range(2)], axis=0)
+    nak = np.mean([_new_active_series(6.0, s) for s in range(2)], axis=0)
+    # Months 0–2 vs later year-1 months (monthly dt → index ≈ month)
+    early0, late0 = na0[:3].sum(), na0[6:12].sum()
+    early_k, late_k = nak[:3].sum(), nak[6:12].sum()
+    assert early0 + late0 > 0 and early_k + late_k > 0
+    share0 = early0 / (early0 + late0)
+    share_k = early_k / (early_k + late_k)
+    assert share_k > share0, (
+        f"Expected k_asy=6 to front-load new_active "
+        f"(early share: k=6 → {share_k:.3f}, k=0 → {share0:.3f})"
+    )
+
+
+def test_k_asy_sweep_frontloads_and_plots(do_plot=False):
+    """Several k_asy values: larger k raises early share of ASY entries; optional plot."""
+    from pathlib import Path
+
+    k_values = (0.0, 0.5, 2.0, 6.0)
+    n = 5_000
+
+    def _new_active(k_asy, seed):
+        sim = make_tb_sim(
+            n_agents=n,
+            start=ss.date('2000-01-01'),
+            stop=ss.date('2002-01-01'),
+            dt='month',
+            pars=dict(
+                init_prev=ss.bernoulli(0.0),
+                beta=ss.peryear(0.0),
+                sym_dead=ss.peryear(0.0),
+                k_asy=k_asy,
+                inf_asy=ss.peryear(0.15),
+                inf_non=ss.peryear(0.04),
+                inf_cle=ss.peryear(0.5),
+            ),
+            rand_seed=seed,
+        )
+        sim.init()
+        tb = tbsim.get_tb(sim)
+        u = ss.uids(np.arange(n))
+        tb.state[u] = TBS.INFECTION
+        tb.infected[u] = True
+        tb.ever_infected[u] = True
+        tb.susceptible[u] = False
+        tb.ti_infected[u] = tb.ti
+        sim.run()
+        return np.asarray(tb.results['new_active'][:], dtype=float)
+
+    early_share = {}
+    series = {}
+    for k in k_values:
+        na = np.mean([_new_active(k, s) for s in range(2)], axis=0)
+        series[k] = na
+        early, late = na[:3].sum(), na[6:12].sum()
+        assert early + late > 0
+        early_share[k] = early / (early + late)
+
+    # Front-loading should increase with k (allowing noise between close values)
+    assert early_share[6.0] > early_share[0.0]
+    assert early_share[2.0] > early_share[0.0]
+
+    if do_plot:
+        import matplotlib.pyplot as plt
+        # Cumulative ever-ASY from monthly new_active
+        fig, ax = plt.subplots(figsize=(8.0, 4.8))
+        cmap = plt.cm.viridis(np.linspace(0.15, 0.85, len(k_values)))
+        for color, k in zip(cmap, k_values):
+            cum = np.cumsum(series[k]) / n
+            t = np.arange(len(cum)) / 12.0  # monthly dt
+            ax.plot(t, 100 * cum, color=color, lw=2, label=f'k_asy={k:g}')
+        ax.set_xlabel('Years since infection')
+        ax.set_ylabel('Ever reached ASYMPTOMATIC (%)')
+        ax.set_title('k_asy sweep — cumulative progression')
+        ax.legend(frameon=False)
+        ax.spines[['top', 'right']].set_visible(False)
+        fig.tight_layout()
+        out = Path(__file__).resolve().parents[1] / 'tbsim_examples' / 'progression_k_asy_sweep_test.png'
+        fig.savefig(out, dpi=150)
+        print(f'Saved {out}')
+        plt.show()
+
+
+def test_k_asy_suppresses_late_latent_progression():
+    """Agents infected long ago have near-zero INF→ASY hazard when k_asy is large."""
+    sim = make_tb_sim(n_agents=400, dt=ss.days(7), pars=dict(k_asy=6.0, beta=ss.peryear(0.0), init_prev=0))
+    sim.init()
+    tb = tbsim.get_tb(sim)
+    u = ss.uids(np.arange(400))
+    tb.state[u] = TBS.INFECTION
+    tb.infected[u] = True
+    tb.susceptible[u] = False
+    # Infected ~5 years ago → exp(-6*5) ≈ 0
+    steps_5y = int(round(5.0 / sim.t.dt_year))
+    tb.ti_infected[u] = tb.ti - steps_5y
+    rr = tb.prog_tsi(u, tb.pars.k_asy)
+    assert np.all(rr < 1e-10), f"Expected near-zero RR after 5y with k=6, got {rr[:5]}"
 
 
 def test_dt_change(do_plot=False):

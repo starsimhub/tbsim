@@ -15,6 +15,10 @@ failures return to the state treatment was initiated from with the surviving str
 and among surviving treatment-susceptible strains resistance is acquired with probability
 ``q_acq[drug]`` (× a per-state RR) as **replacement** (the surviving A strain becomes B).
 This reproduces the ODE's ``π(m → s)`` outcome table exactly for the two-strain case.
+
+Acquisition-on-failure replaces one carried susceptible strain per drug per episode
+(lowest-id candidate); this intentional bottleneck differs from de-novo acquisition,
+which mutates every carried strain independently.
 """
 
 import numpy as np
@@ -22,6 +26,7 @@ import starsim as ss
 
 from ..tb import TBS, get_tb
 from .tb_resistant import TBResistant
+from .dst import reset_dst_on_cure
 
 __all__ = ['TxR', 'TxDeliveryR', 'treatment_monitoring_eligibility']
 
@@ -36,6 +41,7 @@ class TxR(ss.Product):
         resist_penalty (dict): per-drug multiplicative efficacy penalty applied for each *regimen*
             drug a strain is resistant to, e.g. ``{'TX': 0.333}`` gives a resistant strain 1/3 the
             cure probability. Resistance to a drug outside the regimen does not reduce efficacy.
+            Unspecified regimen drugs contribute factor 1 (no penalty) for active courses.
         adherence (float): probability an agent completes the course; non-adherent agents clear no
             strains this course (the mechanism correlating outcomes across an agent's strains).
         q_acq (dict): per-drug probability ``{drug: prob}`` that a surviving treatment-susceptible
@@ -68,10 +74,13 @@ class TxR(ss.Product):
             penalty[strains.drug_idx[d]] = f
         in_regimen = np.array([d in self.regimen_drugs for d in strains.drugs])
         self.eff_by_id = np.array([base_efficacy * penalty[strains.profile[j] & in_regimen].prod() for j in range(strains.m)])
+        # Latent clear factor = ∏ penalty only (no base_efficacy): susceptible → 1; resistant → reduced.
+        self.latent_clear_by_id = np.array([float(penalty[strains.profile[j] & in_regimen].prod()) for j in range(strains.m)])
 
         # CRN distributions (a list of Dists is discovered by sc.search like any attribute).
         self._adh_rng = ss.bernoulli(name='txr_adherence', p=adherence)
         self._cure_rngs = [ss.bernoulli(name=f'txr_cure_{j}', p=float(self.eff_by_id[j])) for j in range(strains.m)]
+        self._latent_rngs = [ss.bernoulli(name=f'txr_latent_{j}', p=float(self.latent_clear_by_id[j])) for j in range(strains.m)]
         # One independent uniform stream per regimen drug for acquisition-on-failure (state-scaled at draw).
         self._acq_rngs = [ss.random(name=f'txr_acq_{d}') for d in self.regimen_drugs]
         return
@@ -94,12 +103,39 @@ class TxR(ss.Product):
             surv[carrier] = sub
         return surv
 
+    def clear_latent(self, tb, uids):
+        """Clear strains in latent (INFECTION) agents without a timed course.
+
+        Regimen-susceptible strains clear with probability 1; strains resistant to regimen drugs
+        clear at ``∏ resist_penalty`` (no ``base_efficacy`` multiplier). Returns the surviving
+        strain masks (caller may run ``acquire`` and route agents to CLEARED / residual state).
+        """
+        m = self.strains
+        masks = np.asarray(tb.strain_mask[uids]).copy()
+        surv = masks.copy()
+        for j in range(m.m):
+            p = self.latent_clear_by_id[j]
+            if p <= 0:
+                continue
+            carrier = ((masks >> j) & 1).astype(bool)
+            if not carrier.any():
+                continue
+            if p >= 1.0:
+                surv[carrier] &= ~(1 << j)
+                continue
+            cured = self._latent_rngs[j].rvs(uids[carrier])
+            sub = surv[carrier]
+            sub[cured] &= ~(1 << j)
+            surv[carrier] = sub
+        return surv
+
     def acquire(self, uids, surv, states=None):
         """Apply acquisition-on-failure (replacement) to the surviving masks of failed courses.
 
         One trial per agent per regimen drug (spec: once per treatment episode), scaled by the
         per-agent state RR (``acq_state_rr``; default 0 outside ASYMPTOMATIC/SYMPTOMATIC). A hit
-        replaces one carried strain susceptible to that drug with its resistant counterpart.
+        replaces one carried strain susceptible to that drug with its resistant counterpart
+        (first/lowest-id candidate — intentional bottleneck vs multi-strain de-novo).
         """
         if len(uids) == 0 or not self.q_acq:
             return surv
@@ -141,6 +177,10 @@ class TxDeliveryR(ss.Intervention):
     post-treatment reinfection protection); otherwise the agent returns to the state it was
     treated from carrying the surviving (and possibly newly resistant) strains.
 
+    Custom eligibility is gated to current active TB or latent INFECTION (not CLEARED), so
+    sticky DST profiles cannot re-treat cured agents. Latent agents take an immediate
+    resistance-aware clear path (see ``TxR.clear_latent``) rather than a timed course.
+
     Treatment monitoring / regimen switching: a delivery given ``supersedes=[name, ...]`` will
     ``interrupt`` any ongoing course on those deliveries for its eligible agents before starting
     them, so a second-line regimen can take over an in-progress first-line course.
@@ -151,7 +191,7 @@ class TxDeliveryR(ss.Intervention):
         rate_sym (ss.rate): treatment initiation rate from SYMPTOMATIC.
         dur_treatment (ss.dur): course duration (fixed).
         eligibility (callable): optional ``sim -> uids`` override; if given, those agents start
-            treatment instead of the rate-based rule.
+            treatment instead of the rate-based rule (still gated to treatable states).
         supersedes (str/list): name(s) of other ``TxDeliveryR`` whose ongoing course is interrupted
             for eligible agents before this delivery starts them (regimen switching).
     """
@@ -190,6 +230,7 @@ class TxDeliveryR(ss.Intervention):
 
     def step(self):
         """Resolve completed courses, then initiate new ones."""
+        self._n_treated = self._n_success = self._n_failure = self._n_acquired = 0
         self._resolve()
         self._initiate()
         return
@@ -227,6 +268,9 @@ class TxDeliveryR(ss.Intervention):
                     if other is not None and len(switching):
                         other.interrupt(switching)
             start = start[tb.state[start] != TBS.TREATMENT]
+            # Gate custom eligibility to treatable disease (blocks CLEARED phantom re-treatment).
+            if len(start):
+                start = start[tb.active_tb[start] | tb.latent[start]]
         else:
             asy = tb.asymptomatic.uids
             sym = tb.symptomatic.uids
@@ -236,22 +280,58 @@ class TxDeliveryR(ss.Intervention):
             start_y = self._init_rng.filter(sym)
             start = start_a | start_y
 
-        self._n_treated = len(start)
         if len(start) == 0:
             return
 
-        self.prior_state[start] = tb.state[start]
-        self.pending_surv[start] = self.product.roll_survivors(tb, start)
-        tb.state[start] = TBS.TREATMENT
+        # Latent (INFECTION): immediate resistance-aware clear — no timed TREATMENT course.
+        latent = start[tb.latent[start]]
+        active = start[tb.active_tb[start]]
+        if len(latent):
+            self._initiate_latent(tb, latent)
+        if len(active):
+            self._initiate_active(tb, active)
+        return
+
+    def _initiate_latent(self, tb, uids):
+        """Clear latent infection immediately; apply acquisition on surviving resistant strains."""
+        self._n_treated += len(uids)
+        surv = self.product.clear_latent(tb, uids)
+        before = surv.copy()
+        surv = self.product.acquire(uids, surv, states=np.full(len(uids), int(TBS.INFECTION)))
+        self._n_acquired += int(np.count_nonzero(surv != before))
+        cured = uids[surv == 0]
+        failed = uids[surv != 0]
+        if len(cured):
+            tb.state[cured] = TBS.CLEARED
+            tb.strain_mask[cured] = 0
+            tb.rr_reinfection[cured] = tb.pars.rr_reinfection_cleared
+            tb._set_reinfection_wane(cured)
+            tb.infected[cured] = False
+            tb.susceptible[cured] = True
+            reset_dst_on_cure(self.sim, cured)
+        if len(failed):
+            tb.strain_mask[failed] = surv[surv != 0]
+            tb.state[failed] = TBS.INFECTION
+            tb.infected[failed] = True
+            tb.susceptible[failed] = False
+        self._n_success += len(cured)
+        self._n_failure += len(failed)
+        return
+
+    def _initiate_active(self, tb, uids):
+        """Start a timed TREATMENT course for active-TB agents."""
+        self._n_treated += len(uids)
+        self.prior_state[uids] = tb.state[uids]
+        self.pending_surv[uids] = self.product.roll_survivors(tb, uids)
+        tb.state[uids] = TBS.TREATMENT
         dur_steps = self.pars.dur_treatment / self.t.dt
-        self.ti_treatment_start[start] = self.ti
-        self.ti_treatment_end[start] = self.ti + dur_steps
-        tb.results['new_notifications_15+'][tb.ti] += np.count_nonzero(self.sim.people.age[start] >= 15)
+        self.ti_treatment_start[uids] = self.ti
+        self.ti_treatment_end[uids] = self.ti + dur_steps
+        tb.results['new_notifications_15+'][tb.ti] += np.count_nonzero(self.sim.people.age[uids] >= 15)
         return
 
     def _resolve(self):
         tb = get_tb(self.sim, which=TBResistant)
-        self._n_success = self._n_failure = self._n_acquired = 0
         on_tx = (tb.state == TBS.TREATMENT).uids
         done = on_tx[self.ti >= self.ti_treatment_end[on_tx]]
         if len(done) == 0:
@@ -267,17 +347,18 @@ class TxDeliveryR(ss.Intervention):
             tb.strain_mask[cured] = 0
             tb.rr_reinfection[cured] = tb.pars.rr_reinfection_treat
             tb._set_reinfection_wane(cured)
-        self._n_success = len(cured)
+            reset_dst_on_cure(self.sim, cured)
+        self._n_success += len(cured)
 
         # Failed: acquisition (replacement, state-scaled), then return to the state treated from.
         if len(failed):
             surv_f = self.pending_surv[failed].copy()
             before = surv_f.copy()
             surv_f = self.product.acquire(failed, surv_f, states=self.prior_state[failed])
-            self._n_acquired = int(np.count_nonzero(surv_f != before))
+            self._n_acquired += int(np.count_nonzero(surv_f != before))
             tb.strain_mask[failed] = surv_f
             tb.state[failed] = self.prior_state[failed]
-        self._n_failure = len(failed)
+        self._n_failure += len(failed)
         return
 
     def update_results(self):
@@ -289,7 +370,7 @@ class TxDeliveryR(ss.Intervention):
         return
 
 
-def treatment_monitoring_eligibility(tx_name, after_steps=4, every_steps=None):
+def treatment_monitoring_eligibility(tx_name, after_steps=4, every_steps=None, extra=None):
     """
     Eligibility callable selecting agents on ``tx_name``'s course for at least ``after_steps`` steps.
 
@@ -297,10 +378,16 @@ def treatment_monitoring_eligibility(tx_name, after_steps=4, every_steps=None):
     agents by TB state), or — combined with ``supersedes=[tx_name]`` on a second-line ``TxDeliveryR`` —
     to switch regimens mid-course (spec §"Treatment monitoring").
 
+    Compose with DST or other filters via ``extra`` (a ``sim → uids`` callable intersected after the
+    time-on-treatment gate), e.g.::
+
+        treatment_monitoring_eligibility('first', after_steps=2, extra=dst.matches(RIF=True))
+
     Args:
         tx_name (str): the ``name`` of the ``TxDeliveryR`` to monitor.
         after_steps (int): minimum sim steps since ``ti_treatment_start`` before eligibility. Default 4.
         every_steps (int/None): if given, re-test every N steps after the first; else a single test at ``after_steps``.
+        extra (callable/None): optional ``sim → uids`` filter intersected with the time-on-treatment set.
     """
     def _elig(sim):
         tx = sim.interventions.get(tx_name)
@@ -315,6 +402,9 @@ def treatment_monitoring_eligibility(tx_name, after_steps=4, every_steps=None):
         ready = np.isfinite(start) & (elapsed >= after_steps)
         if every_steps:
             ready &= ((elapsed - after_steps) % every_steps == 0)
-        return on_tx[ready]
+        out = on_tx[ready]
+        if extra is not None and len(out):
+            out = out.intersect(ss.uids(extra(sim)))
+        return out
     _elig.__name__ = f'monitoring_after_{after_steps}_steps'
     return _elig

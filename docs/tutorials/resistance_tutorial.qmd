@@ -192,30 +192,32 @@ aggregates. `DSTDelivery.matches(...)` turns the observed profile into composabl
 functions, so different regimens can be routed to different phenotypes.
 
 ```{python}
-tb = tbsim.TBResistant(drugs=['RIF'], rel_fitness={'RIF': 0.9},
+tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
                        pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                 init_strains=[0.8, 0.2], rr_reinfection_inf=1.0, rr_reinfection_non=1.0))
+                                 init_strains=[0.8, 0.2, 0.0, 0.0], rr_reinfection_inf=1.0, rr_reinfection_non=1.0))
 dst = tbsim.DSTDelivery(name='dst', product=tbsim.DST(strains=tb.strains, sens=0.95, spec=0.98),
                         eligibility=lambda sim: tbsim.get_tb(sim, which=tbsim.TBResistant).active_tb.uids)
-# First line treats RIF-susceptible; a (stronger) second line is routed to observed RIF-resistant cases.
-first = tbsim.TxDeliveryR(name='first', rate_sym=ss.peryear(1.0),
+# First line treats RIF-susceptible; second line (BDQ) is routed to observed RIF-resistant cases.
+first = tbsim.TxDeliveryR(name='first',
                           eligibility=dst.matches(RIF=False),
-                          product=tbsim.TxR(strains=tb.strains, base_efficacy=0.85,
-                                            resist_penalty={'RIF': 0.1}))
-second = tbsim.TxDeliveryR(name='second', rate_sym=ss.peryear(1.0),
+                          product=tbsim.TxR(strains=tb.strains, regimen_drugs=['RIF'],
+                                            base_efficacy=0.85, resist_penalty={'RIF': 0.1}))
+second = tbsim.TxDeliveryR(name='second',
                            eligibility=dst.matches(RIF=True),
-                           product=tbsim.TxR(strains=tb.strains, base_efficacy=0.8, regimen_drugs=['RIF']))
+                           product=tbsim.TxR(strains=tb.strains, regimen_drugs=['BDQ'], base_efficacy=0.8))
 sim = build_sim(tb, interventions=[dst, first, second], stop='2040-12-31'); sim.run()
 print(f"DST tests done:          {int(np.sum(sim.results['dst'].n_tested))}")
 print(f"first-line courses:      {int(np.sum(sim.results['first'].n_treated))}")
-print(f"second-line (RIF-R):     {int(np.sum(sim.results['second'].n_treated))}")
+print(f"second-line (RIF-R→BDQ): {int(np.sum(sim.results['second'].n_treated))}")
 ```
 
 ## 7. Treatment monitoring and regimen switching
 
 `treatment_monitoring_eligibility(tx_name, after_steps)` selects agents who have been on a course for
 a while; combined with `supersedes=[...]` on a second-line delivery, an ongoing first-line course is
-*interrupted* and the agent is switched — the spec's mid-course regimen change.
+*interrupted* and the agent is switched — the spec's mid-course regimen change. Pass `extra=` to
+intersect with DST (or any other) eligibility so switches are contingent on an observed profile
+(or compose with a culture/Dx callback for "still positive").
 
 ```{python}
 tb = tbsim.TBResistant(drugs=['INH', 'RIF'], rel_fitness={'INH': 0.95},
