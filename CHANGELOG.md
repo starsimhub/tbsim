@@ -2,6 +2,9 @@
 
 All notable changes to the codebase are documented in this file.
 
+## Version 0.11.0 (2026-07-15)
+- Added optional **time-varying (front-loaded) TB progression**: the latent `INFECTION`-exit hazards can now decline exponentially with time since infection, `inf_asy(τ) = inf_asy · exp(−k_asy · τ)` (and `inf_non` via `k_non`), where `τ` is years since the agent was infected (reinfection restarts the clock). Controlled by two new `TB` parameters, `k_asy` and `k_non`, both defaulting to `0` (constant hazard), so the default behaviour and existing calibrations are bit-for-bit unchanged. Set `k_asy > 0` for the recommended one-parameter front-loaded progression to active TB, matching the front-loaded shape seen in historical household-contact data. The per-agent effective rates are exposed via `TB.progression_rates()`.
+
 ## Version 0.10.0 (2026-07-10)
 - Added the multi-strain / drug-resistance extension `tbsim.resistance`:
     - `TBResistant` (drop-in `TB` subclass) encoding `2ⁿ` strains over `n` drugs as a per-agent bitmask with per-strain fitness costs, superinfection, de-novo resistance, and a per-strain multiplicity counter (identical-strain re-exposure now increments the count and feeds the transmission multinomial and progression bottleneck).
