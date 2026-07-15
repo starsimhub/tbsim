@@ -663,7 +663,7 @@ These are specified or desired but **not fully implemented** yet. Acceptance cri
 |-------|------------------|
 | DST indeterminate | Binary observed profile only (no explicit indeterminate outcome) |
 | TPT partial efficacy | Sterilization is all-or-nothing per strain; no per-drug TPT `resist_penalty` |
-| Time-varying progression hazard | `ti_infected` resets on exposure; full time-varying hazard not modeled |
+| Time-varying progression hazard | Optional exponential decline is modeled via `k_asy`/`k_non` (defaults 0 = constant hazard); `ti_infected` resets on exposure |
 | LTFU outcome | Not a separate treatment outcome |
 
 ---
