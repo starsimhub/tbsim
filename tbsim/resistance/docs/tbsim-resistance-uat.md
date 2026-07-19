@@ -14,21 +14,21 @@ Each UAT states the acceptance criterion, plain-English steps, and either a code
 2. [UAT-02 — Multi-strain infections (superinfection)](#uat-02)
 3. [UAT-03 — Transmission (fitness + single-strain pass)](#uat-03)
 4. [UAT-04 — Strain competition / protection against reinfection](#uat-04)
-5. [UAT-05 — Identical-strain carriage counts (alternative model) (TODO)](#uat-05)
+5. [UAT-05 — Identical-strain carriage counts](#uat-05)
 6. [UAT-06 — Progression to disease](#uat-06)
 7. [UAT-07 — Time-varying progression risk (reset the clock) (TODO)](#uat-07)
 8. [UAT-08 — Clearance](#uat-08)
 9. [UAT-09 — Random (de novo) acquisition](#uat-09)
 10. [UAT-10 — Treatment & selective acquisition](#uat-10)
-11. [UAT-11 — Adherence as a per-agent distribution (TODO)](#uat-11)
+11. [UAT-11 — Adherence as a per-agent distribution](#uat-11)
 12. [UAT-12 — LTFU as a separate treatment outcome (TODO)](#uat-12)
 13. [UAT-13 — TPT](#uat-13)
 14. [UAT-14 — Diagnostics & treatment modification (DST + monitoring)](#uat-14)
 15. [UAT-15 — DST indeterminate outcomes (TODO)](#uat-15)
-16. [UAT-16 — Treatment failure vs new case (time since last treatment) (TODO)](#uat-16)
+16. [UAT-16 — Treatment failure vs new case (time since last treatment)](#uat-16)
 17. [UAT-17 — Notation / drug naming](#uat-17)
 18. [UAT-18 — Testing / burden & parameter-effect acceptance](#uat-18)
-19. [UAT-19 — Burden table on `tb_LAI_TPT` parameters (TODO)](#uat-19)
+19. [UAT-19 — Burden table on `tb_LAI_TPT` parameters](#uat-19)
 
 ---
 
@@ -42,15 +42,15 @@ This crosswalk is verified against the requirement sections in
 | Individual strain resistance profiles | UAT-01 |
 | Allow for multi-strain infections (superinfections) | UAT-02 |
 | Transmission | UAT-03 |
-| Strain competition and protection against reinfection | UAT-04, UAT-05 (TODO) |
+| Strain competition and protection against reinfection | UAT-04, UAT-05 |
 | Progression to disease | UAT-06, UAT-07 (TODO) |
 | Clearance | UAT-08 |
 | (Random) Acquisition | UAT-09 |
-| Treatment & (Selective) Acquisition | UAT-10, UAT-11 (TODO), UAT-12 (TODO) |
+| Treatment & (Selective) Acquisition | UAT-10, UAT-11, UAT-12 (TODO) |
 | TPT | UAT-13 |
-| Diagnostics & Treatment Modification (DST + treatment monitoring) | UAT-14, UAT-15 (TODO), UAT-16 (TODO) |
+| Diagnostics & Treatment Modification (DST + treatment monitoring) | UAT-14, UAT-15 (TODO), UAT-16 |
 | Notation | UAT-17 |
-| Testing | UAT-18, UAT-19 (TODO) |
+| Testing | UAT-18, UAT-19 |
 | Sources | Informational references (intentionally out of scope for software UAT) |
 
 ---
@@ -168,14 +168,14 @@ assert set(np.where(tp > 0)[0]).issubset({1, 3})
 
 **Status:** Implemented
 
-**Accept when:** Superinfection risk depends on disease state (`INFECTION` / `NON_INFECTIOUS` allowed; `ASYMPTOMATIC` / `SYMPTOMATIC` blocked by default via `rr_reinfection_asy` / `rr_reinfection_sym` = 0; `TREATMENT` not superinfectable). Protection is strain-agnostic and count-agnostic. Identical-strain re-exposure does not add a second copy; blocked events are countable. Defaults couple `rr_reinfection_inf` → `rr_reinfection_rec` and `rr_reinfection_non` → `rr_reinfection_inf`.
+**Accept when:** Superinfection risk depends on disease state (`INFECTION` / `NON_INFECTIOUS` allowed; `ASYMPTOMATIC` / `SYMPTOMATIC` blocked by default via `rr_reinfection_asy` / `rr_reinfection_sym` = 0; `TREATMENT` not superinfectable). Protection is strain-agnostic and count-agnostic. Identical-strain re-exposure increments that strain's per-agent count (rather than being blocked) and the events are countable. Defaults couple `rr_reinfection_inf` → `rr_reinfection_rec` and `rr_reinfection_non` → `rr_reinfection_inf`.
 
 **Steps**
 
 1. Run with `rr_reinfection_inf > 0`, `rr_reinfection_non > 0`, ASY/SYM RR = 0.
 2. Confirm agents in ASY/SYM (and agents currently in TREATMENT) do not gain a new strain under default parameters.
 3. Confirm an already-superinfected agent is not *more* protected than a mono-infected agent against a third distinct strain.
-4. Force re-exposure to an already-carried strain; confirm mask unchanged and `new_blocked_superinf` increments.
+4. Force re-exposure to an already-carried strain; confirm the mask is unchanged and `new_identical_superinf` (and the strain's per-agent count) increments.
 
 ```python
 import tbsim
@@ -184,46 +184,52 @@ import starsim as ss
 tb = tbsim.TBResistant(
     drugs=['RIF'],
     rel_fitness={'RIF': 0.7},
-    pars=dict(
-        rr_reinfection_inf=0.5,
-        rr_reinfection_non=0.5,
-        rr_reinfection_asy=0.0,
-        rr_reinfection_sym=0.0,
-        init_prev=0.2,
-    ),
+    rr_reinfection_inf=0.5,
+    rr_reinfection_non=0.5,
+    rr_reinfection_asy=0.0,
+    rr_reinfection_sym=0.0,
+    init_prev=0.2,
 )
 sim = ss.Sim(diseases=tb, n_agents=5000, start='2000-01-01', stop='2005-12-31', dt=ss.days(7))
 sim.run()
 tb = sim.diseases.tb  # sim copies its modules at init; read results off the live copy
-assert 'new_blocked_superinf' in tb.results
+assert 'new_identical_superinf' in tb.results
 assert tb.pars.rr_reinfection_asy == 0.0 and tb.pars.rr_reinfection_sym == 0.0
 ```
 
-**Existing coverage:** `test_natural_history.py::test_identical_strain_superinfection_blocked_and_counted`, `test_q3a_noninfectious_eligibility_raises_superinfection`, `test_q3b_active_superinfection_adds_coinfection`.
+**Existing coverage:** `test_natural_history.py::test_identical_strain_superinfection_allowed_and_counted`, `test_q3a_noninfectious_eligibility_raises_superinfection`, `test_q3b_active_superinfection_adds_coinfection`; per-strain counter in `test_counter.py`.
 
 ---
 
 <a id="uat-05"></a>
-## UAT-05 — Identical-strain carriage counts (alternative model) (TODO)
+## UAT-05 — Identical-strain carriage counts
 
-**Spec section:** Strain competition — alternative to blocking identical strains
+**Spec section:** Strain competition — count-based carriage of identical strains
 
-**Status:** NOT IMPLEMENTED (TODO)
+**Status:** Implemented
 
-**Accept when:** As an alternative to blocking superinfection with identical strains, the model can count how many instances of each strain an agent carries, and use those counts when deciding which strains progress and/or get transmitted — without requiring a continuous relative-frequency declaration.
+**Accept when:** The model counts how many instances of each strain an agent carries (`tb.strain_counts`, one array per strain id), and uses those counts when deciding which strains progress and/or get transmitted — without requiring a continuous relative-frequency declaration.
 
 **Steps**
 
-1. Enable count-based carriage mode (once implemented).
-2. Allow repeated successful exposures to the same strain to increment that strain’s count.
-3. Confirm progression and/or transmission selection can weight by counts.
-4. Compare bias toward low-prevalence strains vs the current block-identical-strains rule (using the blocked-event analyzer as a baseline).
+1. Allow repeated successful exposures to the same strain to increment that strain's count (the default; identical-strain re-exposure is no longer blocked).
+2. Confirm the count invariant holds (count > 0 ⟺ the strain bit is set) and that clearance/death reset counts to 0.
+3. Confirm transmission selection weights by `count × fitness` and, under `p_multi < 1`, the progression bottleneck weights the surviving strain by count.
 
-```
-NOT IMPLEMENTED (TODO)
+```python
+import numpy as np
+import starsim as ss
+import tbsim
+
+s = tbsim.Strains(['TX'], rel_fitness=None)  # neutral fitness
+# Source carrying {pan:2, resistant:1} passes pan 2/3 of the time; infectiousness is count-independent.
+assert np.allclose(s.transmit_probs(np.array([0b11]), counts=np.array([[2, 1]]))[0], [2/3, 1/3])
+assert s.max_fitness(np.array([0b11]))[0] == 1.0
 ```
 
-**Notes:** Spec flags this as the main decision not yet tested with an ODE. Current implementation blocks identical-strain superinfection and counts blocked events via `new_blocked_superinf`; count-based carriage is not implemented.
+**Notes:** This replaces the earlier block-identical-strains rule. The counter feeds only the transmission multinomial and the progression bottleneck; transition rates, DST, treatment efficacy, and acquisition remain count-agnostic (identical copies behave as one).
+
+**Existing coverage:** `test_counter.py` (data model, invariant, count-weighted transmission and bottleneck); `tests/test_resistance.py::test_strain_counter_and_count_weighting`.
 
 ---
 
@@ -249,7 +255,7 @@ import tbsim
 import starsim as ss
 from tbsim import TBS
 
-tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], pars=dict(p_multi=0.0, prog_select='random'))
+tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], p_multi=0.0, prog_select='random')
 sim = ss.Sim(diseases=tb, n_agents=20, start='2000-01-01', stop='2000-01-08', dt=ss.days(7))
 sim.init()
 tb = sim.diseases.tb  # sim copies its modules at init; work with the live copy
@@ -310,7 +316,7 @@ import tbsim
 import starsim as ss
 from tbsim import TBS
 
-tb = tbsim.TBResistant(drugs=['RIF'], pars=dict(init_prev=0))
+tb = tbsim.TBResistant(drugs=['RIF'], init_prev=0)
 sim = ss.Sim(diseases=tb, n_agents=5, start='2000-01-01', stop='2000-01-08', dt=ss.days(7))
 sim.init()
 tb = sim.diseases.tb  # sim copies its modules at init; work with the live copy
@@ -349,7 +355,7 @@ import starsim as ss
 
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
-    pars=dict(p_rand={'BDQ': 1.0}, prog_resist_mode='mixed', init_prev=0.3),
+    p_rand={'BDQ': 1.0}, prog_resist_mode='mixed', init_prev=0.3,
 )
 sim = ss.Sim(diseases=tb, n_agents=2000, start='2000-01-01', stop='2010-12-31', dt=ss.days(7))
 sim.run()
@@ -382,7 +388,7 @@ assert tb.results['new_denovo_resistance'].sum() > 0
 import tbsim
 import starsim as ss
 
-tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], rel_fitness={'BDQ': 0.8}, pars=dict(init_prev=0.2))
+tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], rel_fitness={'BDQ': 0.8}, init_prev=0.2)
 tx = tbsim.TxR(
     strains=tb.strains,
     base_efficacy=0.85,
@@ -411,26 +417,36 @@ assert sim.results['first_line'].n_acquired.sum() >= 0
 ---
 
 <a id="uat-11"></a>
-## UAT-11 — Adherence as a per-agent distribution (TODO)
+## UAT-11 — Adherence as a per-agent distribution
 
 **Spec section:** Treatment & (Selective) Acquisition — adherence
 
-**Status:** NOT IMPLEMENTED (TODO)
+**Status:** Implemented
 
-**Accept when:** Adherence can be specified as a regimen-level **distribution** that varies by agent (not only a single Bernoulli probability). One draw per agent per treatment course is applied across all of that agent’s strains, inducing agent-level correlation in treatment efficacy.
+**Accept when:** Adherence can be specified as a regimen-level **distribution** that varies by agent (not only a single Bernoulli probability). One draw per agent per treatment course is applied across all of that agent's strains, inducing agent-level correlation in treatment efficacy.
 
 **Steps**
 
-1. Configure adherence as a distribution (e.g. Beta or empirical) rather than a fixed probability.
+1. Configure adherence as a callable `uids -> per-agent probability` rather than a fixed probability.
 2. Start a multi-strain agent on treatment; confirm one adherence draw gates clearance of every carried strain for that course.
 3. Confirm agents with high adherence clear more strains on average than agents with low adherence, with correlation across strains within the same agent.
-4. Confirm a scalar adherence probability remains supported as a special case of the distribution.
+4. Confirm a scalar adherence probability remains supported as the degenerate special case.
 
-```
-NOT IMPLEMENTED (TODO)
+```python
+import numpy as np
+import starsim as ss
+import tbsim
+
+tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+# Per-agent adherence distribution: first half fully adherent, second half never.
+prod = tbsim.TxR(strains=tb.strains, base_efficacy=1.0,
+                 adherence=lambda uids: np.where(np.asarray(uids) < 5000, 1.0, 0.0))
+assert callable(prod.adherence_distribution)  # a float would leave this None
 ```
 
-**Notes:** Current `TxR` uses a single per-agent Bernoulli (`adherence` float). Spec asks for a regimen-level distribution that varies by agent and is applied across all strains during a given treatment course.
+**Notes:** `adherence` accepts either a float (one regimen-level probability shared by all agents — the degenerate distribution) or a callable `uids -> per-agent probability`. The single per-agent completion draw is shared across all of the agent's strains.
+
+**Existing coverage:** `tests/test_resistance.py::test_treatment_adherence_distribution`; `codex_review/test_spec_gaps.py`.
 
 ---
 
@@ -481,7 +497,7 @@ import starsim as ss
 tb = tbsim.TBResistant(
     drugs=['INH'],
     rel_fitness={'INH': 0.9},
-    pars=dict(p_multi=1.0, init_prev=0.3),
+    p_multi=1.0, init_prev=0.3,
 )
 product = tbsim.TPTRx(
     strains=tb.strains,
@@ -518,7 +534,7 @@ product = tbsim.TPTRx(
 import tbsim
 import starsim as ss
 
-tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], pars=dict(init_prev=0.2))
+tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], init_prev=0.2)
 dst = tbsim.DST(
     strains=tb.strains,
     sens={'RIF': 0.9, 'BDQ': 0.85},
@@ -577,26 +593,34 @@ NOT IMPLEMENTED (TODO)
 ---
 
 <a id="uat-16"></a>
-## UAT-16 — Treatment failure vs new case (time since last treatment) (TODO)
+## UAT-16 — Treatment failure vs new case (time since last treatment)
 
 **Spec section:** Diagnostics & Treatment Modification — DST eligibility
 
-**Status:** NOT IMPLEMENTED (TODO)
+**Status:** Implemented
 
 **Accept when:** The model tracks time since last treatment initiation and uses it to classify a later presentation as treatment failure (eligible for DST / second-line) versus a new case.
 
 **Steps**
 
-1. Treat an agent, then allow them to leave treatment (cure or failure).
-2. After a short interval, re-present the agent and confirm they are classified as treatment failure / retreatment (DST / second-line path).
-3. After a long interval (beyond a configurable threshold), re-present the same agent and confirm they are classified as a new case.
-4. Confirm DST eligibility and regimen choice can depend on that classification.
+1. Treat an agent, then allow them to leave treatment (cure or failure). Every `TxDeliveryR` stamps a durable, cross-regimen `tb.ti_last_treatment` at initiation.
+2. Within the window, `TxDeliveryR.failure_case_eligibility(within=...)` classifies the agent as treatment failure / retreatment (DST / second-line path).
+3. Beyond the window (or never treated), `failure_case_eligibility(within=..., new_case=True)` classifies the agent as a new case.
+4. Feed either callable as `eligibility=` on a DST or `TxDeliveryR` so routing/regimen choice depends on the classification.
 
-```
-NOT IMPLEMENTED (TODO)
+```python
+import numpy as np
+import starsim as ss
+import tbsim
+
+failed = tbsim.TxDeliveryR.failure_case_eligibility(within=ss.years(2))
+new_case = tbsim.TxDeliveryR.failure_case_eligibility(within=ss.years(2), new_case=True)
+# The two are complementary partitions of the candidate pool (default: active TB).
 ```
 
-**Notes:** `TxDeliveryR` tracks `ti_treatment_start` for the current course (used by monitoring), but there is no durable “time since last treatment initiation” used to distinguish failure vs new case.
+**Notes:** `ti_last_treatment` is a durable per-agent state on `TBResistant` (distinct from the current-course `ti_treatment_start` used by monitoring). `base=` restricts the candidate pool (default active TB); `within` is any `ss.dur`.
+
+**Existing coverage:** `tests/test_resistance.py::test_failure_vs_new_case_classification`; `codex_review/test_spec_gaps.py`.
 
 ---
 
@@ -657,26 +681,26 @@ assert s2.m == 2 * s.m
 ---
 
 <a id="uat-19"></a>
-## UAT-19 — Burden table on `tb_LAI_TPT` parameters (TODO)
+## UAT-19 — Burden table on `tb_LAI_TPT` parameters
 
 **Spec section:** Testing — before/after burden comparison
 
-**Status:** NOT IMPLEMENTED (TODO)
+**Status:** Implemented
 
-**Accept when:** A documented comparison table exists for overall TB disease prevalence per 100,000, annual incidence of new asymptomatic disease per 100,000, and annual TB mortality per 100,000, using the best-fitting parameter set / configuration from `tb_LAI_TPT`, before vs after resistance/multi-strain is enabled. Material shifts are interrogated and explained.
+**Accept when:** A documented comparison table exists for overall TB disease prevalence per 100,000, annual incidence of new asymptomatic disease per 100,000, and annual TB mortality per 100,000, before vs after resistance/multi-strain is enabled. Material shifts are interrogated and explained.
 
 **Steps**
 
-1. Configure a baseline sim from the `tb_LAI_TPT` best-fit parameters (plain `TB` or resistance-off `TBResistant`).
-2. Configure the matched multi-strain / resistance-enabled sim.
-3. Report prevalence, asymptomatic incidence, and mortality per 100,000 for both.
+1. Configure a baseline sim (resistance-off: plain `TB` and machinery-on-but-single-strain `TBResistant.agnostic()`).
+2. Configure the matched resistance-on sim (circulating resistant strain).
+3. Report prevalence, asymptomatic incidence, and mortality per 100,000 for each.
 4. Confirm differences are small, or document why/under what conditions they are not.
 
-```
-NOT IMPLEMENTED (TODO)
+```bash
+python -m tbsim.resistance.codex_review.make_burden_validation   # writes lai_tpt_burden_validation.csv
 ```
 
-**Notes:** ABM↔ODE validation and directional parameter-effect tests exist (South Africa / reference-ODE set). The LAI_TPT burden-per-100k before-vs-after table has not been produced.
+**Notes:** `codex_review/make_burden_validation.py` runs three matched, seed-averaged scenarios (`resistance_off`, `resistance_on_agnostic`, `resistance_on`) and writes `codex_review/lai_tpt_burden_validation.csv`. The agnostic row matches base TB to within noise; the resistance-on row shifts overall burden only modestly (consistent with the spec's expectation). ABM↔ODE validation and directional parameter-effect tests also exist (`devtests/`, reference-ODE set).
 
 ---
 
@@ -687,21 +711,21 @@ NOT IMPLEMENTED (TODO)
 | UAT-01 | Strain profiles | Implemented | `Strains` |
 | UAT-02 | Superinfection | Implemented | `TBResistant.strain_mask` |
 | UAT-03 | Transmission | Implemented | `max_fitness`, `transmit_probs` |
-| UAT-04 | Competition / reinfection | Implemented | `rr_reinfection_*`, `new_blocked_superinf` |
-| UAT-05 | Strain carriage counts | NOT IMPLEMENTED (TODO) | block + counter only |
+| UAT-04 | Competition / reinfection | Implemented | `rr_reinfection_*`, `new_identical_superinf` |
+| UAT-05 | Strain carriage counts | Implemented | `strain_counts` (count-weighted transmit/bottleneck) |
 | UAT-06 | Progression | Implemented | `p_multi`, bottleneck |
 | UAT-07 | Time-varying progression | NOT IMPLEMENTED (TODO) | `ti_infected` hook only |
 | UAT-08 | Clearance | Implemented | natural clear → `strain_mask=0` |
 | UAT-09 | De novo acquisition | Implemented | `p_rand`, `prog_resist_mode` |
-| UAT-10 | Treatment | Implemented (partial) | `TxR`, `TxDeliveryR` |
-| UAT-11 | Adherence distribution | NOT IMPLEMENTED (TODO) | still Bernoulli only |
+| UAT-10 | Treatment | Implemented | `TxR` (incl. `efficacy_by_strain`), `TxDeliveryR` |
+| UAT-11 | Adherence distribution | Implemented | `adherence` callable → `adherence_distribution` |
 | UAT-12 | LTFU outcome | NOT IMPLEMENTED (TODO) | not a separate outcome |
 | UAT-13 | TPT | Implemented | `TPTRx` |
 | UAT-14 | DST + monitoring | Implemented (partial) | `DST`, `DSTDelivery`, monitoring helpers |
 | UAT-15 | DST indeterminate | NOT IMPLEMENTED (TODO) | binary `dst_profile` only |
-| UAT-16 | Failure vs new case | NOT IMPLEMENTED (TODO) | no durable time-since-last-Tx |
+| UAT-16 | Failure vs new case | Implemented | `failure_case_eligibility`, `ti_last_treatment` |
 | UAT-17 | Notation | Implemented | name-keyed dicts / `drug_idx` |
 | UAT-18 | Testing | Implemented (partial) | `devtests/` + ODE validation |
-| UAT-19 | LAI_TPT burden table | NOT IMPLEMENTED (TODO) | table not produced |
+| UAT-19 | LAI_TPT burden table | Implemented | `make_burden_validation.py` → CSV |
 
 **Out of scope for UAT:** Sources section (background papers only; not a software requirement).

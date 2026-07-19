@@ -26,14 +26,14 @@ def make_sim(immigration_rate=0, emigration_rate=0, tb_state_distribution=None, 
             emigration_rate=ss.freqperyear(emigration_rate),
             tb_state_distribution=tb_state_distribution or dict(SUSCEPTIBLE=1.0),
         )))
-    return ss.Sim(
+    return tbsim.Sim(
         n_agents=n_agents,
         start='2000-01-01',
         stop=stop,
         dt=ss.days(30),
         rand_seed=rand_seed,
         verbose=0,
-        diseases=tbsim.TB(pars=dict(init_prev=ss.bernoulli(init_prev), beta=ss.peryear(0.0))),
+        diseases=tbsim.TB(init_prev=ss.bernoulli(init_prev), beta=ss.peryear(0.0)),
         networks=ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=4), dur=0)),
         demographics=demographics,
     )
@@ -93,8 +93,8 @@ def test_prevalence_increases_with_high_prevalence_source():
     )
     baseline.run()
     high.run()
-    base_prev = float(tbsim.get_tb(baseline).results.prevalence_active[-1])
-    high_prev = float(tbsim.get_tb(high).results.prevalence_active[-1])
+    base_prev = float(baseline.get_tb().results.prevalence_active[-1])
+    high_prev = float(high.get_tb().results.prevalence_active[-1])
     assert high_prev > base_prev
 
 

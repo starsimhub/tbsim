@@ -27,9 +27,9 @@ def build_sim(tb, interventions=None, analyzers=None, n_agents=2000,
               start='2000-01-01', stop='2035-12-31', seed=0):
     """A small multi-strain TB sim on a random contact network."""
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=8), dur=0))
-    return ss.Sim(n_agents=n_agents, networks=net, diseases=tb, interventions=interventions,
-                  analyzers=analyzers, dt=ss.days(30), start=ss.date(start), stop=ss.date(stop),
-                  rand_seed=seed, verbose=0)
+    return tbsim.Sim(tb_model=tb, n_agents=n_agents, networks=net, demographics=[], interventions=interventions,
+                     analyzers=analyzers, dt=ss.days(30), start=ss.date(start), stop=ss.date(stop),
+                     rand_seed=seed, verbose=0)
 ```
 
 ## 1. Defining strains
@@ -74,8 +74,8 @@ run a two-drug epidemic seeded mostly pan-susceptible with a little RIF resistan
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
-    pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.10),
-              init_strains=[0.85, 0.12, 0.03, 0.0]),   # pan / RIF / BDQ / MDR
+    beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.10),
+    init_strains=[0.85, 0.12, 0.03, 0.0],   # pan / RIF / BDQ / MDR
 )
 sim = build_sim(tb)
 sim.run()
@@ -107,8 +107,8 @@ Fitness costs drive **competition**: without treatment, a less-fit resistant str
 ```{python}
 def resist_over_time(rr, label, **kw):
     tb = tbsim.TBResistant(rel_fitness={'TX': 0.7},   # single drug, 30% fitness cost
-                           pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                     init_strains=[0.7, 0.3], **kw))
+                           beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                           init_strains=[0.7, 0.3], **kw)
     sim = build_sim(tb, stop='2050-12-31')
     sim.run()
     return sim.results.timevec, sim.results.tb['frac_resist'], sim.results.tb['frac_super']
@@ -137,10 +137,10 @@ switches). Because the strain space is the full `2ⁿ`, the resistant target alw
 ```{python}
 def denovo_run(mode):
     tb = tbsim.TBResistant(rel_fitness={'TX': 0.9},
-                           pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                     init_strains=[1.0, 0.0],          # start 100% pan-susceptible
-                                     p_rand={'TX': 0.02}, prog_resist_mode=mode,
-                                     rr_reinfection_inf=0.0, rr_reinfection_non=0.0))
+                           beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                           init_strains=[1.0, 0.0],          # start 100% pan-susceptible
+                           p_rand={'TX': 0.02}, prog_resist_mode=mode,
+                           rr_reinfection_inf=0.0, rr_reinfection_non=0.0)
     sim = build_sim(tb, stop='2050-12-31'); sim.run()
     return sim.results.timevec, sim.results.tb
 
@@ -168,8 +168,8 @@ resistance:
 
 ```{python}
 tb = tbsim.TBResistant(rel_fitness={'TX': 0.6},
-                       pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                 init_strains=[0.95, 0.05], rr_reinfection_inf=1.0, rr_reinfection_non=1.0))
+                       beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                       init_strains=[0.95, 0.05], rr_reinfection_inf=1.0, rr_reinfection_non=1.0)
 tx = tbsim.TxDeliveryR(
     product=tbsim.TxR(strains=tb.strains, base_efficacy=0.8, resist_penalty={'TX': 0.2},
                       adherence=0.9, q_acq={'TX': 0.04}),
@@ -193,10 +193,10 @@ functions, so different regimens can be routed to different phenotypes.
 
 ```{python}
 tb = tbsim.TBResistant(drugs=['RIF'], rel_fitness={'RIF': 0.9},
-                       pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                 init_strains=[0.8, 0.2], rr_reinfection_inf=1.0, rr_reinfection_non=1.0))
+                       beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                       init_strains=[0.8, 0.2], rr_reinfection_inf=1.0, rr_reinfection_non=1.0)
 dst = tbsim.DSTDelivery(name='dst', product=tbsim.DST(strains=tb.strains, sens=0.95, spec=0.98),
-                        eligibility=lambda sim: tbsim.get_tb(sim, which=tbsim.TBResistant).active_tb.uids)
+                        eligibility=lambda sim: sim.get_tb().active_tb.uids)
 # First line treats RIF-susceptible; a (stronger) second line is routed to observed RIF-resistant cases.
 first = tbsim.TxDeliveryR(name='first', rate_sym=ss.peryear(1.0),
                           eligibility=dst.matches(RIF=False),
@@ -219,8 +219,8 @@ a while; combined with `supersedes=[...]` on a second-line delivery, an ongoing 
 
 ```{python}
 tb = tbsim.TBResistant(drugs=['INH', 'RIF'], rel_fitness={'INH': 0.95},
-                       pars=dict(beta=ss.permonth(0.3), init_prev=ss.bernoulli(0.10),
-                                 init_strains=[0.5, 0.5, 0.0, 0.0]))   # pan + INH-resistant
+                       beta=ss.permonth(0.3), init_prev=ss.bernoulli(0.10),
+                       init_strains=[0.5, 0.5, 0.0, 0.0])   # pan + INH-resistant
 first = tbsim.TxDeliveryR(name='first', rate_sym=ss.peryear(2.0),
                           product=tbsim.TxR(strains=tb.strains, regimen_drugs=['INH'],
                                             base_efficacy=0.8, resist_penalty={'INH': 0.1}))
@@ -242,8 +242,8 @@ resistance, at a per-drug rate scaled by TB state.
 ```{python}
 def run_tpt(with_tpt):
     tb = tbsim.TBResistant(drugs=['INH'], rel_fitness={'INH': 0.9},
-                           pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15),
-                                     init_strains=[0.8, 0.2], rr_reinfection_inf=0.0, rr_reinfection_non=0.0))
+                           beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.15),
+                           init_strains=[0.8, 0.2], rr_reinfection_inf=0.0, rr_reinfection_non=0.0)
     ivs = None
     if with_tpt:
         ivs = tbsim.TPTSimple(
@@ -272,9 +272,9 @@ per-strain active-TB counts.
 
 ```{python}
 tb = tbsim.TBResistant(rel_fitness={'TX': 0.9},
-                       pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                 init_strains=[0.9, 0.1], p_rand={'TX': 0.01},
-                                 rr_reinfection_inf=1.0, rr_reinfection_non=1.0))
+                       beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                       init_strains=[0.9, 0.1], p_rand={'TX': 0.01},
+                       rr_reinfection_inf=1.0, rr_reinfection_non=1.0)
 tx = tbsim.TxDeliveryR(product=tbsim.TxR(strains=tb.strains, base_efficacy=0.8,
                                          resist_penalty={'TX': 0.2}, q_acq={'TX': 0.05}),
                        rate_sym=ss.peryear(1.0))

@@ -43,9 +43,15 @@ class Sim(ss.Sim):
         sim = tbsim.Sim(tb_model=tb)
     """
 
-    # Map of string names to TB model classes
+    # Map of (normalized) string names to TB model classes. Names are lower-cased with '-'/' '
+    # collapsed to '_' before lookup (see _resolve_tb_class), so e.g. 'TB-Resistant' also matches.
     _tb_models = {
-        'default':  'TB',
+        'default':      'TB',
+        'tb':           'TB',
+        'tbresistant':  'TBResistant',
+        'tb_resistant': 'TBResistant',
+        'resistant':    'TBResistant',
+        'resistance':   'TBResistant',
     }
 
     def __init__(self, pars=None, sim_pars=None, tb_pars=None, tb_model=None, name='tb', **kwargs):
@@ -56,14 +62,19 @@ class Sim(ss.Sim):
         tb_pars = sc.mergedicts(tb_pars)
 
         # Pull modules out for special processing
+        NA = 'n/a'
         modules = sc.objdict()
-        for mod_type in ['diseases', 'networks', 'demographics']:
-            modules[mod_type] = sc.mergelists(pars.pop(mod_type, None))
+        for mod_type, default in dict(diseases=None, networks=NA, demographics=NA).items():
+            val = pars.pop(mod_type, default)
+            modules[mod_type] = val if val is NA else sc.mergelists(val)  # keep the NA sentinel intact for the checks below
 
         # Determine the TB model class and its default parameter keys
+        tb = None
         if isinstance(tb_model, ss.Disease):
             tb = tb_model
             default_tb_keys = set()  # Don't route pars -- user gave a pre-built instance
+        elif tb_model is None and any(isinstance(d, tbsim.tb.BaseTB) for d in modules.diseases):
+            pass  # A TB module was supplied directly via diseases=; use it as-is (don't add a default)
         else:
             tb_cls = self._resolve_tb_class(tb_model)
             default_tb_keys = set(tb_cls().pars.keys())
@@ -80,17 +91,17 @@ class Sim(ss.Sim):
 
             tb = tb_cls(name=name, pars=tb_pars)
 
-        modules.diseases.insert(0, tb)
+        # Ensure TB is first
+        if tb is not None:
+            modules.diseases.insert(0, tb)
 
         # Handle demographics
-        if not modules.demographics:
+        if modules.demographics == NA:
             modules.demographics = [ss.Births(), ss.Deaths()]
 
         # Handle networks
-        if not modules.networks:
-            modules.networks = [
-                ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=0)),
-            ]
+        if modules.networks == NA:
+            modules.networks = [ss.RandomNet(n_contacts=5)]
 
         # Apply default sim parameters, letting user values override
         default_sim_pars = dict(
@@ -99,6 +110,8 @@ class Sim(ss.Sim):
             dt       = ss.days(7),
             n_agents = 5000,
         )
+        if 'people' in pars:
+            default_sim_pars.pop('n_agents')  # A pre-created People object sets the population size
         sim_pars = sc.mergedicts(default_sim_pars, sim_pars)
 
         super().__init__(

@@ -50,5 +50,5 @@ if __name__ == '__main__':
     # Make TB-malnutrition simulation
     sim_tbn = make_tb_nut()
     sim_tbn.run()
-    tbsim.get_tb(sim_tbn).plot()
+    sim_tbn.get_tb().plot()
     plt.show()

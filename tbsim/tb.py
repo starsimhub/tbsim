@@ -49,6 +49,10 @@ class TB(BaseTB):
     Infectious states are `TBS.ASYMPTOMATIC` and `TBS.SYMPTOMATIC`; the force
     of infection depends on `pars.beta` and the prevalence of those states, with
     `pars.trans_asymp` (kappa) giving the relative infectiousness of asymptomatic vs symptomatic TB.
+    Progression out of latent `INFECTION` uses constant per-year hazards by default, but can optionally
+    be *front-loaded* via `k_asy` (and `k_non`): the `INFECTION -> ASYMPTOMATIC` (and
+    `INFECTION -> NON_INFECTIOUS`) hazard then declines exponentially with time since infection
+    (see `progression_rates`).
     Reinfectable state (`TBS.CLEARED`) uses per-agent `rr_reinfection`, set on entry from each
     pathway (`rr_reinfection_cleared`, `rr_reinfection_rec`, `rr_reinfection_treat`). Per-agent modifiers
     ``rr_activation``, ``rr_clearance``, ``rr_death`` scale selected rates.
@@ -70,6 +74,8 @@ class TB(BaseTB):
         - ``inf_cle``:     Infection -> Cleared (no active TB).
         - ``inf_non``:     Infection -> Non-infectious TB.
         - ``inf_asy``:     Infection -> Asymptomatic TB.
+        - ``k_asy``:       Optional exponential decline shape parameter of ``inf_asy`` with time since infection tau: ``inf_asy(tau) = inf_asy * exp(-k_asy * tau)``. Default 0 (constant hazard). Set > 0 to front-load progression to active TB (the recommended one-parameter form).
+        - ``k_non``:       Optional exponential decline shape parameter of ``inf_non`` with time since infection, analogous to ``k_asy``. Default 0 (constant hazard).
 
         *From NON_INFECTIOUS*
 
@@ -151,6 +157,12 @@ class TB(BaseTB):
             inf_cle=ss.peryear(1.90),            # Clear infection (no active TB)
             inf_non=ss.peryear(0.16),            # Progress to non-infectious TB
             inf_asy=ss.peryear(0.06),            # Progress to asymptomatic active TB
+            # Optional front-loading of progression: the INFECTION-exit hazards may decline with
+            # time since infection tau (years), rate(tau) = rate * exp(-k * tau). Both default to 0
+            # (constant hazard = unchanged behaviour); set k_asy > 0 for the recommended 1-parameter
+            # front-loaded INFECTION -> ASYMPTOMATIC (see progression_rates).
+            k_asy=0.0,                           # Exponential decay shape parameter for inf_asy; 0 = constant
+            k_non=0.0,                           # Exponential decay shape parameter for inf_non; 0 = constant
             # --- From NON_INFECTIOUS ---
             non_rec=ss.peryear(0.18),            # Non-infectious → CLEARED
             non_asy=ss.peryear(0.25),            # Progress to asymptomatic
@@ -164,6 +176,12 @@ class TB(BaseTB):
             cxr_asymp_sens=1.0,                 # CXR sensitivity for screening asymptomatic (0–1)
         )
         self.update_pars(pars, **kwargs)
+
+        # Decline parameters are shape terms for exp(-k*tau); require k >= 0.
+        if self.pars.k_asy < 0:
+            raise ValueError(f'k_asy must be >= 0, got {self.pars.k_asy}')
+        if self.pars.k_non < 0:
+            raise ValueError(f'k_non must be >= 0, got {self.pars.k_non}')
 
         # CRN-safe RNG distributions for per-step transition draws (one per source state)
         self._rng_inf = ss.random(name='tb_rng_inf')   # INFECTION exits
@@ -358,6 +376,33 @@ class TB(BaseTB):
         self.step_bookkeeping()
         return
 
+    def progression_rates(self, uids):
+        """
+        Per-agent INFECTION-exit rates to NON_INFECTIOUS and ASYMPTOMATIC.
+
+        Returns ``(inf_non, inf_asy)`` as rate objects with per-agent values, applying
+        ``rr_activation`` and the optional time-since-infection decline::
+
+            inf_non(tau) = inf_non * rr_activation * exp(-k_non * tau)
+            inf_asy(tau) = inf_asy * rr_activation * exp(-k_asy * tau)
+
+        where ``tau`` is years since each agent entered INFECTION (from ``ti_infected``,
+        so reinfection restarts the clock). With ``k_non = k_asy = 0`` (default) the decline
+        factors are exactly 1 and the rates reduce to the constant ``inf_non``/``inf_asy``
+        scaled only by ``rr_activation``.
+        """
+        rr = self.rr_activation[uids]
+        inf_non = self.pars.inf_non * rr
+        inf_asy = self.pars.inf_asy * rr
+        k_non, k_asy = self.pars.k_non, self.pars.k_asy
+        if k_non or k_asy:  # front-load progression by declining with time since infection
+            tau = (self.ti - self.ti_infected[uids]) * self.t.dt_year
+            if k_non:
+                inf_non = inf_non * np.exp(-k_non * tau)
+            if k_asy:
+                inf_asy = inf_asy * np.exp(-k_asy * tau)
+        return inf_non, inf_asy
+
     def step_transitions(self):
         """ Evaluate the natural-history state transitions (each mutates ``self.state`` in place). """
         # For transitions that lead to CLEARED, we snapshot the pre-transition CLEARED mask
@@ -366,10 +411,11 @@ class TB(BaseTB):
 
         u = self.latent.uids
         if len(u):
+            inf_non, inf_asy = self.progression_rates(u)  # constant, or front-loaded via k_non/k_asy
             self.transition(u, to={
                 TBS.CLEARED:        self.pars.inf_cle,
-                TBS.NON_INFECTIOUS: self.pars.inf_non * self.rr_activation[u],
-                TBS.ASYMPTOMATIC:   self.pars.inf_asy * self.rr_activation[u],
+                TBS.NON_INFECTIOUS: inf_non,
+                TBS.ASYMPTOMATIC:   inf_asy,
             }, rng=self._rng_inf)
             newly_cleared = u[self.state[u] == TBS.CLEARED]  # agents cleared from INFECTION this step
             self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_cleared

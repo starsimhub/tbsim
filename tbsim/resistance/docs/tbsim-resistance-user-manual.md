@@ -1,6 +1,6 @@
 # TBsim Resistance & Multi-Strain — User Manual
 
-A practical guide for researchers using TBsim’s drug-resistance and multi-strain extension (`tbsim.resistance`). It focuses on **how to set up, run, and interpret** simulations. For the mathematical specification see [tbsim-resistance-tech-spec.md](tbsim-resistance-tech-spec.md); for implementation internals see [tbsim-resistance-implementation.md](tbsim-resistance-implementation.md).
+A practical guide for researchers using TBsim’s drug-resistance and multi-strain extension (`tbsim.resistance`). It focuses on **how to set up, run, and interpret** simulations. For the mathematical specification see [tbsim-resistance-tech-spec-new.md](tbsim-resistance-tech-spec-new.md); for a hands-on tour of the most recent additions (per-strain counter, DST expiry, composable eligibility, …) see [resistance-updates-guide.md](resistance-updates-guide.md); for implementation internals see [tbsim-resistance-implementation.md](tbsim-resistance-implementation.md).
 
 **Audience:** epidemiologists and modelers comfortable with Python / Starsim.  
 **Requirements:** Python ≥ 3.11, `tbsim` installed editable (`pip install -e .`), Starsim ≥ 3.5.
@@ -43,19 +43,18 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.10),
-        init_strains=[0.85, 0.12, 0.03, 0.0],  # pan / RIF / BDQ / RIF+BDQ
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.10),
+    init_strains=[0.85, 0.12, 0.03, 0.0],  # pan / RIF / BDQ / RIF+BDQ
 )
 
 # 2) Small contact network + sim
 net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=8), dur=0))
-sim = ss.Sim(
+sim = tbsim.Sim(
     n_agents=2000,
     networks=net,
     diseases=tb,
+    demographics=[],
     dt=ss.days(30),
     start=ss.date('2000-01-01'),
     stop=ss.date('2030-12-31'),
@@ -82,10 +81,11 @@ def build_sim(tb, interventions=None, analyzers=None, n_agents=2000,
               start='2000-01-01', stop='2035-12-31', seed=0):
     """Small multi-strain TB sim on a random contact network."""
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=8), dur=0))
-    return ss.Sim(
+    return tbsim.Sim(
         n_agents=n_agents,
         networks=net,
         diseases=tb,
+        demographics=[],
         interventions=interventions,
         analyzers=analyzers,
         dt=ss.days(30),
@@ -154,16 +154,14 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.10),
-        # Superinfection susceptibility (σ); defaults couple to rr_reinfection_rec
-        rr_reinfection_inf=1.0,
-        rr_reinfection_non=1.0,
-        rr_reinfection_asy=0.0,   # no superinfection in active disease (default)
-        rr_reinfection_sym=0.0,
-        p_multi=1.0,              # keep all strains when progressing to ASY
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.10),
+    # Superinfection susceptibility (σ); defaults couple to rr_reinfection_rec
+    rr_reinfection_inf=1.0,
+    rr_reinfection_non=1.0,
+    rr_reinfection_asy=0.0,   # no superinfection in active disease (default)
+    rr_reinfection_sym=0.0,
+    p_multi=1.0,              # keep all strains when progressing to ASY
 )
 print(tb.strains.labels)
 ```
@@ -182,11 +180,9 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.10),
-        init_strains=[0.85, 0.12, 0.03, 0.0],
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.10),
+    init_strains=[0.85, 0.12, 0.03, 0.0],
 )
 sim = build_sim(tb, stop='2010-12-31')  # uses helper from §1
 sim.run()
@@ -207,7 +203,7 @@ Alongside standard TB outputs, `TBResistant` records:
 | `frac_super` | Fraction of active TB that is superinfected |
 | `new_denovo_resistance` | De-novo acquisition events this step |
 | `new_transmitted_resistance` | New acquisitions of a resistant strain via transmission |
-| `new_blocked_superinf` | Identical-strain re-exposures that were blocked |
+| `new_identical_superinf` | Identical-strain re-exposures this step (each increments the agent's per-strain count) |
 
 ```python
 import starsim as ss
@@ -216,11 +212,9 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9, 'BDQ': 0.85},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.10),
-        init_strains=[0.85, 0.12, 0.03, 0.0],
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.10),
+    init_strains=[0.85, 0.12, 0.03, 0.0],
 )
 sim = build_sim(tb, stop='2015-12-31')  # uses helper from §1
 sim.run()
@@ -228,7 +222,7 @@ res = sim.results.tb
 print('Mean frac_resist (last 5 years of series):',
       float(res['frac_resist'][-60:].mean()) if len(res['frac_resist']) >= 60
       else float(res['frac_resist'].mean()))
-print('Cumulative blocked superinfections:', int(res['new_blocked_superinf'].sum()))
+print('Cumulative identical-strain superinfections:', int(res['new_identical_superinf'].sum()))
 ```
 
 For origin decomposition and per-strain counts, see [§11](#11-analyzing-where-resistance-comes-from).
@@ -274,7 +268,7 @@ Already-infected agents can acquire a **second** (distinct) strain. Relative ris
 | ASYMPTOMATIC | `rr_reinfection_asy` | `0` (closed) |
 | SYMPTOMATIC | `rr_reinfection_sym` | `0` (closed) |
 
-Protection is **strain-agnostic** and **count-agnostic** (a third distinct strain is not harder than a second). Identical-strain re-exposure is blocked and counted in `new_blocked_superinf`.
+Protection is **strain-agnostic** (a third *distinct* strain is not harder to acquire than a second). Re-exposure to an already-carried strain is now **allowed**: rather than being blocked, it increments that agent's per-strain **count** (tracked in `tb.strain_counts`, one array per strain id) and is tallied in `new_identical_superinf`. The count feeds only two consumers — the transmission multinomial (which strain is passed ∝ `count × fitness`) and the progression bottleneck under `p_multi < 1` (which strain survives ∝ count) — and leaves transition rates, DST, treatment efficacy, and resistance acquisition count-agnostic (all copies of a strain behave as one). See [resistance-updates-guide.md §1–§2](resistance-updates-guide.md) for a walkthrough.
 
 Fitness costs drive competition. Without treatment, a less-fit resistant strain tends to decline:
 
@@ -287,13 +281,11 @@ import tbsim
 def resist_over_time(sigma):
     tb = tbsim.TBResistant(
         rel_fitness={'TX': 0.7},  # single drug, 30% fitness cost
-        pars=dict(
-            beta=ss.permonth(0.35),
-            init_prev=ss.bernoulli(0.12),
-            init_strains=[0.7, 0.3],
-            rr_reinfection_inf=sigma,
-            rr_reinfection_non=sigma,
-        ),
+        beta=ss.permonth(0.35),
+        init_prev=ss.bernoulli(0.12),
+        init_strains=[0.7, 0.3],
+        rr_reinfection_inf=sigma,
+        rr_reinfection_non=sigma,
     )
     sim = build_sim(tb, stop='2050-12-31')
     sim.run()
@@ -330,15 +322,13 @@ import tbsim
 
 tb = tbsim.TBResistant(
     rel_fitness={'TX': 0.9},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.12),
-        init_strains=[1.0, 0.0],       # start 100% pan-susceptible
-        p_rand={'TX': 0.02},
-        prog_resist_mode='mixed',
-        rr_reinfection_inf=0.0,
-        rr_reinfection_non=0.0,
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.12),
+    init_strains=[1.0, 0.0],       # start 100% pan-susceptible
+    p_rand={'TX': 0.02},
+    prog_resist_mode='mixed',
+    rr_reinfection_inf=0.0,
+    rr_reinfection_non=0.0,
 )
 sim = build_sim(tb, stop='2050-12-31')
 sim.run()
@@ -358,7 +348,9 @@ Use the product/delivery pair:
 - **`TxR`** — per-strain efficacy, adherence, acquisition-on-failure (`q_acq`)
 - **`TxDeliveryR`** — who starts treatment and when (rates from ASY/SYM, or a custom `eligibility` callable)
 
-Efficacy for strain `j` is `base_efficacy` × product of `resist_penalty` over **regimen** drugs that strain resists. Failed courses can acquire resistance to regimen drugs by **replacement** — one trial per regimen drug, at most once per treatment episode — scaled by TB-state RR (`acq_state_rr`; default 1 for ASY/SYM, 0 elsewhere).
+Efficacy for strain `j` is `base_efficacy` × product of `resist_penalty` over **regimen** drugs that strain resists. If that constrained form is too restrictive, pass an explicit per-strain efficacy vector `efficacy_by_strain` (length `m`, the spec's `T_l = {t_1,l, …, t_m,l}`) — it is used verbatim as the cure probabilities and overrides `base_efficacy`/`resist_penalty`. Failed courses can acquire resistance to regimen drugs by **replacement** — one trial per regimen drug, at most once per treatment episode — scaled by TB-state RR (`acq_state_rr`; default 1 for ASY/SYM, 0 elsewhere).
+
+`adherence` is a per-course completion probability that correlates all of an agent's strains through a single draw (a non-completer clears nothing that course). Pass a **float** for one regimen-level probability shared by every agent, or a **callable** `uids -> per-agent probability` to make adherence a regimen-level *distribution that varies by agent*, e.g. `adherence=lambda uids: my_dist.rvs(uids)`.
 
 ```python
 import starsim as ss
@@ -366,13 +358,11 @@ import tbsim
 
 tb = tbsim.TBResistant(
     rel_fitness={'TX': 0.6},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.12),
-        init_strains=[0.95, 0.05],
-        rr_reinfection_inf=1.0,
-        rr_reinfection_non=1.0,
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.12),
+    init_strains=[0.95, 0.05],
+    rr_reinfection_inf=1.0,
+    rr_reinfection_non=1.0,
 )
 tx = tbsim.TxDeliveryR(
     name='tx',
@@ -404,44 +394,45 @@ Partial cure is supported: if only some strains clear, the agent returns to the 
 
 `DST` produces an **observed n-drug profile** (not strain identities). Sensitivity/specificity are applied at the strain level; `p_strain_obs` (default = strain fitness) can drop strains from the sample. `DSTDelivery.matches(...)` turns the observed profile into eligibility callables for regimen routing.
 
+A key point about `regimen_drugs`: it names the **drugs the regimen acts on**, i.e. which strains it can cure (a strain resistant to a regimen drug is cured only at the `resist_penalty`-reduced efficacy, or not at all if the penalty is 0). So a realistic second-line for RIF-resistant TB is built from a **different** drug the resistant strain is still susceptible to — not RIF. The example below uses a two-drug space (`RIF`, `BDQ`): first-line is a RIF regimen routed to observed RIF-susceptible cases, and second-line is a BDQ regimen routed to observed RIF-resistant cases (which are BDQ-susceptible here).
+
 ```python
 import starsim as ss
 import tbsim
 
 tb = tbsim.TBResistant(
-    drugs=['RIF'],
+    drugs=['RIF', 'BDQ'],
     rel_fitness={'RIF': 0.9},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.12),
-        init_strains=[0.8, 0.2],
-        rr_reinfection_inf=1.0,
-        rr_reinfection_non=1.0,
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.12),
+    init_strains=[0.8, 0.2, 0.0, 0.0],  # 80% pan-susceptible, 20% RIF-resistant (both BDQ-susceptible)
+    rr_reinfection_inf=1.0,
+    rr_reinfection_non=1.0,
 )
 dst = tbsim.DSTDelivery(
     name='dst',
     product=tbsim.DST(strains=tb.strains, sens=0.95, spec=0.98),
-    eligibility=lambda sim: tbsim.get_tb(sim, which=tbsim.TBResistant).active_tb.uids,
+    eligibility=lambda sim: sim.get_tb().active_tb.uids,
 )
-first = tbsim.TxDeliveryR(
+first = tbsim.TxDeliveryR(   # first-line: a RIF regimen for observed RIF-susceptible TB
     name='first',
     rate_sym=ss.peryear(1.0),
     eligibility=dst.matches(RIF=False),
     product=tbsim.TxR(
         strains=tb.strains,
         base_efficacy=0.85,
-        resist_penalty={'RIF': 0.1},
+        regimen_drugs=['RIF'],
+        resist_penalty={'RIF': 0.1},        # a misrouted RIF-resistant case is barely cured
     ),
 )
-second = tbsim.TxDeliveryR(
+second = tbsim.TxDeliveryR(  # second-line: a BDQ regimen for observed RIF-resistant TB
     name='second',
     rate_sym=ss.peryear(1.0),
     eligibility=dst.matches(RIF=True),
     product=tbsim.TxR(
         strains=tb.strains,
         base_efficacy=0.8,
-        regimen_drugs=['RIF'],
+        regimen_drugs=['BDQ'],              # acts on BDQ, which the RIF-resistant strain is susceptible to
     ),
 )
 sim = build_sim(tb, interventions=[dst, first, second], stop='2040-12-31')
@@ -451,7 +442,19 @@ print('First-line courses:', int(sim.results['first'].n_treated.sum()))
 print('Second-line (RIF-R):', int(sim.results['second'].n_treated.sum()))
 ```
 
-Also available: `dst.observed_resistant('RIF')` for a single-drug eligibility callable.
+Also available: `dst.observed_resistant('RIF')` for a single-drug eligibility callable. Both `matches(...)` and `observed_resistant(...)` accept `max_age=<ss.dur>` to require a *fresh* DST result; see §12 and the note on retreatment below.
+
+**Retreatment vs new case.** Every `TxDeliveryR` stamps a durable, cross-regimen `tb.ti_last_treatment` at each initiation, so a *later* presentation can be classified by time since last treatment. `TxDeliveryR.failure_case_eligibility(within=<ss.dur>)` returns a `sim -> uids` callable selecting active-TB agents whose most recent treatment was within `within` — i.e. to be managed as a **treatment failure / retreatment** (route to DST / second-line). Pass `new_case=True` for the complement (no treatment within the window → managed as a **new case**), and `base=<callable>` to restrict the candidate pool (default: current active TB).
+
+```python
+import starsim as ss
+import tbsim
+
+failed = tbsim.TxDeliveryR.failure_case_eligibility(within=ss.years(2))            # recent treatment → retreatment
+second_line = tbsim.TxDeliveryR(name='second', eligibility=failed, supersedes=['first'],
+                                product=tbsim.TxR(strains=tb.strains, regimen_drugs=['BDQ']))
+new_cases = tbsim.TxDeliveryR.failure_case_eligibility(within=ss.years(2), new_case=True)  # complement
+```
 
 ---
 
@@ -470,11 +473,9 @@ import tbsim
 tb = tbsim.TBResistant(
     drugs=['INH', 'RIF'],
     rel_fitness={'INH': 0.95},
-    pars=dict(
-        beta=ss.permonth(0.3),
-        init_prev=ss.bernoulli(0.10),
-        init_strains=[0.5, 0.5, 0.0, 0.0],  # pan + INH-resistant
-    ),
+    beta=ss.permonth(0.3),
+    init_prev=ss.bernoulli(0.10),
+    init_strains=[0.5, 0.5, 0.0, 0.0],  # pan + INH-resistant
 )
 first = tbsim.TxDeliveryR(
     name='first',
@@ -520,13 +521,11 @@ def run_tpt(with_tpt):
     tb = tbsim.TBResistant(
         drugs=['INH'],
         rel_fitness={'INH': 0.9},
-        pars=dict(
-            beta=ss.permonth(0.35),
-            init_prev=ss.bernoulli(0.15),
-            init_strains=[0.8, 0.2],
-            rr_reinfection_inf=0.0,
-            rr_reinfection_non=0.0,
-        ),
+        beta=ss.permonth(0.35),
+        init_prev=ss.bernoulli(0.15),
+        init_strains=[0.8, 0.2],
+        rr_reinfection_inf=0.0,
+        rr_reinfection_non=0.0,
     )
     ivs = None
     if with_tpt:
@@ -571,14 +570,12 @@ import tbsim
 
 tb = tbsim.TBResistant(
     rel_fitness={'TX': 0.9},
-    pars=dict(
-        beta=ss.permonth(0.35),
-        init_prev=ss.bernoulli(0.12),
-        init_strains=[0.9, 0.1],
-        p_rand={'TX': 0.01},
-        rr_reinfection_inf=1.0,
-        rr_reinfection_non=1.0,
-    ),
+    beta=ss.permonth(0.35),
+    init_prev=ss.bernoulli(0.12),
+    init_strains=[0.9, 0.1],
+    p_rand={'TX': 0.01},
+    rr_reinfection_inf=1.0,
+    rr_reinfection_non=1.0,
 )
 tx = tbsim.TxDeliveryR(
     product=tbsim.TxR(
@@ -632,7 +629,8 @@ Once resistance is established, **transmission** usually dominates cumulative ev
 |-----------|--------|
 | `base_efficacy` | Cure prob. for fully susceptible strain |
 | `resist_penalty` | Per-drug multiplier on efficacy for resistance to **regimen** drugs |
-| `adherence` | Per-agent Bernoulli; non-adherent clears no strains that course |
+| `efficacy_by_strain` | Explicit per-strain cure-prob vector `T_l` (length `m`); overrides `base_efficacy`/`resist_penalty` |
+| `adherence` | Per-course completion prob. correlating an agent's strains; **float** (shared) or **callable** `uids → prob` (per-agent distribution) |
 | `q_acq` | Per-drug acquisition-on-failure (replacement) |
 | `acq_state_rr` | Scale `q_acq` by TB state at failure |
 | `regimen_drugs` | Which drugs the regimen contains |
@@ -640,6 +638,8 @@ Once resistance is established, **transmission** usually dominates cumulative ev
 | `dur_treatment` | Course length before the outcome resolves (default `ss.months(6)`) |
 | `eligibility` | Optional `sim → uids` override |
 | `supersedes` | Names of deliveries to interrupt before starting |
+| `retreat_after` | Refractory `ss.dur` after a course before the same agent is re-treated by this delivery |
+| `TxDeliveryR.failure_case_eligibility(within, base=, new_case=)` | Classifier `sim → uids` for retreatment vs new case (reads durable `tb.ti_last_treatment`) |
 
 ### 12.3 `DST` / `TPTRx`
 
@@ -661,12 +661,9 @@ These are specified or desired but **not fully implemented** yet. Acceptance cri
 
 | Topic | Current behavior |
 |-------|------------------|
-| Adherence distribution | Single Bernoulli per course, not a full per-agent distribution |
-| DST indeterminate | Binary observed profile only |
-| Failure vs new case | No durable “time since last treatment” classifier |
-| Time-varying progression hazard | `ti_infected` resets on exposure; full hazard not modeled |
-| LAI_TPT burden table | ODE / directional tests exist; per-100k LAI_TPT table not produced |
-| Strain carriage counts | Identical strains blocked + counted; no count-based carriage mode |
+| DST indeterminate | Binary observed profile only (no explicit indeterminate outcome) |
+| TPT partial efficacy | Sterilization is all-or-nothing per strain; no per-drug TPT `resist_penalty` |
+| Time-varying progression hazard | Optional exponential decline is modeled via `k_asy`/`k_non` (defaults 0 = constant hazard); `ti_infected` resets on exposure |
 | LTFU outcome | Not a separate treatment outcome |
 
 ---
@@ -675,8 +672,10 @@ These are specified or desired but **not fully implemented** yet. Acceptance cri
 
 | Document | What it is |
 |----------|------------|
+| [resistance-updates-guide.md](resistance-updates-guide.md) | Hands-on tour of the most recent feature additions |
 | [model-tests.md](model-tests.md) | ODE reference questions of interest |
 | [validate_resistance_abm_vs_ode.py](validate_resistance_abm_vs_ode.py) | ABM ↔ ODE validation script |
+| [codex_review/make_burden_validation.py](codex_review/make_burden_validation.py) | Generates the resistance-off vs resistance-on burden-per-100k comparison (`lai_tpt_burden_validation.csv`) |
 | [Resistance tutorial (Quarto)](../../../docs/tutorials/resistance_tutorial.qmd) | Executable notebook-style tutorial in the docs site |
 
 **Automated checks** (run from the repository root; the ODE validation can take several minutes):

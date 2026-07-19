@@ -24,7 +24,7 @@ def make_tb_sim(
     """Build a minimal Sim with TB."""
     tb = tbsim.TB(pars=pars)
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=30))
-    sim = ss.Sim(n_agents=n_agents, networks=net, diseases=tb, dt=dt, start=start, stop=stop, **kwargs)
+    sim = tbsim.Sim(tb_model=tb, n_agents=n_agents, networks=net, demographics=[], dt=dt, start=start, stop=stop, **kwargs)
     sim.pars.verbose = 0
     return sim
 
@@ -35,7 +35,7 @@ def test_transition_empty_uids():
     """transition with empty uids does not raise."""
     sim = make_tb_sim(n_agents=10)
     sim.init()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     tb.transition(np.array([], dtype=int), to={
         TBS.CLEARED: tb.pars.inf_cle,
         TBS.NON_INFECTIOUS: tb.pars.inf_non,
@@ -46,7 +46,7 @@ def test_transition_sets_valid_states():
     """transition applies valid destination states immediately."""
     sim = make_tb_sim(n_agents=500)
     sim.init()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     uids = ss.uids(np.arange(500))
     tb.state[uids] = TBS.INFECTION
     keys = [TBS.CLEARED, TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC]
@@ -66,7 +66,7 @@ def test_set_prognoses_sets_state_and_susceptible():
     """set_prognoses sets state to INFECTION and susceptible to False."""
     sim = make_tb_sim(n_agents=50)
     sim.init()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     uids = ss.uids([1, 2, 3, 10, 20])
     tb.susceptible[uids] = True
     tb.infected[uids] = False
@@ -82,7 +82,7 @@ def test_set_prognoses_empty_uids():
     """set_prognoses with empty uids does not raise."""
     sim = make_tb_sim(n_agents=10)
     sim.init()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     tb.set_prognoses(np.array([], dtype=int))
 
 
@@ -92,7 +92,7 @@ def test_step_die():
     """step_die sets state=DEAD, susceptible=False, infected=False, rel_trans=0."""
     sim = make_tb_sim(n_agents=50)
     sim.init()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     uids = ss.uids([1, 2, 3])
     tb.susceptible[uids] = True
     tb.infected[uids] = True
@@ -109,7 +109,7 @@ def test_step_die_empty_uids():
     """step_die with empty uids does not raise."""
     sim = make_tb_sim(n_agents=10)
     sim.init()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     tb.step_die(np.array([], dtype=int))
 
 
@@ -125,7 +125,7 @@ def test_sim_run_tb():
         pars={"init_prev": ss.bernoulli(0.05), "beta": ss.peryear(0.2)},
     )
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     assert "n_infectious" in tb.results
     assert "prevalence_active" in tb.results
     assert "incidence_kpy" in tb.results
@@ -140,7 +140,7 @@ def test_init_results_defines_expected_keys():
     """init_results defines per-state counts and main outcome series."""
     sim = make_tb_sim(n_agents=30)
     sim.init()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     for state in TBS:
         assert f"n_{state.name}" in tb.results
         assert f"n_{state.name}_15+" in tb.results
@@ -159,7 +159,7 @@ def test_finalize_results_cumulative():
     """finalize_results fills cum_deaths and cum_active from new_*."""
     sim = make_tb_sim(n_agents=50, start=ss.date("2000-01-01"), stop=ss.date("2001-12-31"))
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     tb.finalize_results()
     assert np.all(np.cumsum(tb.results["new_deaths"][:]) == tb.results["cum_deaths"][:])
     assert np.all(np.cumsum(tb.results["new_active"][:]) == tb.results["cum_active"][:])
@@ -170,7 +170,7 @@ def test_plot_returns_figure():
     import matplotlib.pyplot as plt
     sim = make_tb_sim(n_agents=50, start=ss.date("2000-01-01"), stop=ss.date("2001-12-31"))
     sim.run()
-    fig = tbsim.get_tb(sim).plot(show=False)
+    fig = sim.get_tb().plot(show=False)
     assert fig is not None
     assert isinstance(fig, plt.Figure)
 
@@ -183,7 +183,7 @@ def test_state_counts_sum_to_population():
     """At each time step, per-state counts sum to the population size at that time."""
     sim = make_tb_sim(n_agents=150, start=ss.date("2000-01-01"), stop=ss.date("2003-12-31"))
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     n_now = len(tb.sim.people)
     total_final = sum(tb.results[f"n_{state.name}"][-1] for state in TBS)
     assert total_final == n_now, f"At final ti state counts sum to {total_final}, expected {n_now}"
@@ -195,7 +195,7 @@ def test_n_infectious_matches_infectious_states():
     """Result n_infectious equals count of agents in ASYMPTOMATIC or SYMPTOMATIC."""
     sim = make_tb_sim(n_agents=100, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     for ti in range(len(tb.results["timevec"])):
         pass
     ti = tb.ti
@@ -210,7 +210,7 @@ def test_prevalence_active_in_valid_range():
     """prevalence_active is in [0, 1] when finite."""
     sim = make_tb_sim(n_agents=200, start=ss.date("2000-01-01"), stop=ss.date("2005-12-31"))
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     for ti in range(len(tb.results["timevec"])):
         prev = tb.results["prevalence_active"][ti]
         if np.isfinite(prev):
@@ -221,7 +221,7 @@ def test_cumulative_series_non_decreasing():
     """cum_deaths and cum_active are non-decreasing over time."""
     sim = make_tb_sim(n_agents=200, start=ss.date("2000-01-01"), stop=ss.date("2004-12-31"))
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     cum_d = tb.results["cum_deaths"][:]
     cum_a = tb.results["cum_active"][:]
     assert np.all(np.diff(cum_d) >= 0), "cum_deaths should be non-decreasing"
@@ -232,7 +232,7 @@ def test_new_events_non_negative():
     """new_deaths, new_active, new_notifications_15+ are non-negative."""
     sim = make_tb_sim(n_agents=150, start=ss.date("2000-01-01"), stop=ss.date("2003-12-31"))
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     assert np.all(tb.results["new_deaths"][:] >= 0)
     assert np.all(tb.results["new_active"][:] >= 0)
     assert np.all(tb.results["new_notifications_15+"][:] >= 0)
@@ -242,7 +242,7 @@ def test_susceptible_only_cleared_or_never_infected():
     """susceptible is True only for state in SUSCEPTIBLE or CLEARED."""
     sim = make_tb_sim(n_agents=80, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     susceptible_states = {TBS.SUSCEPTIBLE, TBS.CLEARED}
     for i in range(len(tb.state)):
         if tb.susceptible[i]:
@@ -259,7 +259,7 @@ def test_rel_sus_rel_trans_after_step():
     """After step, CLEARED agents have rel_sus == rr_reinfection; ASYMPTOMATIC have rel_trans == trans_asymp."""
     sim = make_tb_sim(n_agents=60)
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     cleared_uids = ss.uids(tb.state == TBS.CLEARED)
     asymp_uids = ss.uids(tb.state == TBS.ASYMPTOMATIC)
     if len(cleared_uids) > 0:
@@ -272,7 +272,7 @@ def test_transition_single_destination():
     """transition with a single destination sends all transitioning agents to that state."""
     sim = make_tb_sim(n_agents=200)
     sim.init()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     uids = ss.uids(np.arange(200))
     tb.state[uids] = TBS.INFECTION
     tb.transition(uids, to={TBS.CLEARED: tb.pars.inf_cle}, rng=tb._rng_inf)
@@ -284,7 +284,7 @@ def test_step_all_susceptible_no_infection_leaves_state_unchanged():
     """When all agents are SUSCEPTIBLE with no transmission, step() does not change state."""
     sim = make_tb_sim(n_agents=40, pars={"init_prev": ss.bernoulli(0.0), "beta": ss.peryear(0.0)})
     sim.init()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     state_before = np.array(tb.state, copy=True)
     tb.step()
     state_after = np.array(tb.state, copy=True)
@@ -295,7 +295,7 @@ def test_rr_activation_zero_prevents_progression_to_active():
     """With rr_activation=0, INFECTION agents can only transition to CLEARED."""
     sim = make_tb_sim(n_agents=200)
     sim.init()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     uids = ss.uids(np.arange(200))
     tb.state[uids] = TBS.INFECTION
     tb.rr_activation[uids] = 0
@@ -322,7 +322,7 @@ def test_zero_beta_no_initial_infection_no_transmission():
         },
     )
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     assert np.all(tb.state == TBS.SUSCEPTIBLE)
     assert not tb.infected.any()
     assert tb.results["cum_active"][-1] == 0
@@ -333,7 +333,7 @@ def test_detectable_15_plus_bounds():
     """n_detectable_15+ is at most n_SYMPTOMATIC_15+ + n_ASYMPTOMATIC_15+ (with cxr_sens=1)."""
     sim = make_tb_sim(n_agents=100, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     for ti in range(len(tb.results["timevec"])):
         n_sym_15 = tb.results["n_SYMPTOMATIC_15+"][ti]
         n_asy_15 = tb.results["n_ASYMPTOMATIC_15+"][ti]
@@ -347,7 +347,7 @@ def test_on_treatment_consistent_with_state():
     """on_treatment is True iff state == TREATMENT."""
     sim = make_tb_sim(n_agents=120, start=ss.date("2000-01-01"), stop=ss.date("2004-12-31"))
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     np.testing.assert_array_equal(
         tb.on_treatment,
         (tb.state == TBS.TREATMENT),
@@ -370,7 +370,7 @@ def test_rr_reinfection_waning():
         },
     )
     sim.run()
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     cleared = ss.uids(tb.state == TBS.CLEARED)
     assert len(cleared) > 0, "Expected some agents in CLEARED state after running"
     # Agents whose wane time has passed should have rr_reinfection == 1.0

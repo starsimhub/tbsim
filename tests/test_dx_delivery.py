@@ -149,16 +149,17 @@ def test_beta_intervention_changes_beta():
 
     beta_intv = tbsim.BetaByYear(pars={'years': [intervention_year], 'x_beta': x_beta})
 
-    sim = ss.Sim(
+    sim = tbsim.Sim(
         people=pop,
         networks=net,
         diseases=tb,
         interventions=beta_intv,
+        demographics=[],
         pars=sim_pars,
     )
     sim.init()
 
-    pars = tbsim.get_tb(sim).pars
+    pars = sim.get_tb().pars
     assert np.isclose(pars.beta.value, initial_beta)
 
     while sim.t.now('year') < intervention_year:
@@ -180,20 +181,20 @@ def test_beta_multiple_years():
     x_betas = [0.5, 0.8]
 
     pop = ss.People(n_agents=50)
-    tb = tbsim.TB(name='tb', pars=dict(beta=initial_beta, init_prev=0.25))
+    tb = tbsim.TB(name='tb', beta=initial_beta, init_prev=0.25)
     net = ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
 
     beta_intv = tbsim.BetaByYear(pars={'years': years, 'x_beta': x_betas})
-    sim = ss.Sim(people=pop, networks=net, diseases=tb, interventions=beta_intv,
-                 pars=dict(start='2001-01-01', stop='2007-01-01', dt=ss.days(7), rand_seed=42))
+    sim = tbsim.Sim(people=pop, networks=net, diseases=tb, interventions=beta_intv, demographics=[],
+                    pars=dict(start='2001-01-01', stop='2007-01-01', dt=ss.days(7), rand_seed=42))
     sim.init()
 
     while sim.t.now('year') < 2002:
         sim.run_one_step()
     sim.run_one_step()
-    assert np.isclose(tbsim.get_tb(sim).pars.beta.value, initial_beta * 0.5)
+    assert np.isclose(sim.get_tb().pars.beta.value, initial_beta * 0.5)
 
     while sim.t.now('year') < 2005:
         sim.run_one_step()
     sim.run_one_step()
-    assert np.isclose(tbsim.get_tb(sim).pars.beta.value, initial_beta * 0.5 * 0.8)
+    assert np.isclose(sim.get_tb().pars.beta.value, initial_beta * 0.5 * 0.8)

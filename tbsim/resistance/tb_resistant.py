@@ -79,6 +79,13 @@ class TBResistant(TB):
         )
         self.update_pars(pars, **kwargs)
 
+        # TB validates these in its init, but TBResistant applies pars after super().__init__.
+        # Re-validate here so negative shape parameters are consistently rejected.
+        if self.pars.k_asy < 0:
+            raise ValueError(f'k_asy must be >= 0, got {self.pars.k_asy}')
+        if self.pars.k_non < 0:
+            raise ValueError(f'k_non must be >= 0, got {self.pars.k_non}')
+
         # Spec default coupling: σ_L defaults to rr_reinfection_rec, σ_N to σ_L. Users (or the ODE
         # null) override explicitly, e.g. rr_reinfection_inf=1.0.
         if self.pars.rr_reinfection_inf is None:
@@ -86,8 +93,18 @@ class TBResistant(TB):
         if self.pars.rr_reinfection_non is None:
             self.pars.rr_reinfection_non = float(self.pars.rr_reinfection_inf)
 
-        # Per-agent strain membership (bit j = carries strain j; 0 = uninfected).
-        self.define_states(ss.IntArr('strain_mask', default=0))
+        # Per-agent strain membership (bit j = carries strain j; 0 = uninfected) and the per-strain
+        # multiplicity counter (one IntArr per strain id; count>0 ⟺ bit set — see the D-COUNTER note
+        # in implementation-decisions.md). Multiplicity >1 arises only from repeated transmission/seeding
+        # of an already-carried strain; it feeds only the transmission multinomial and the progression
+        # bottleneck, never DST / treatment / acquisition.
+        self.strain_counts = [ss.IntArr(f'strain_count_{j}', default=0) for j in range(self.strains.m)]
+        # Durable, cross-regimen time of the agent's most recent treatment initiation (nan = never treated),
+        # written by every TxDeliveryR at initiation. Powers failure-vs-new-case classification for later
+        # DST / second-line routing (spec §"Diagnostics"); see TxDeliveryR.failure_case_eligibility.
+        self.define_states(ss.IntArr('strain_mask', default=0),
+                           ss.FloatArr('ti_last_treatment', default=np.nan),
+                           *self.strain_counts)
 
         # CRN-safe distributions. choice2d holds per-agent probabilities set each use.
         m = self.strains.m
@@ -99,9 +116,71 @@ class TBResistant(TB):
         self._denovo_rngs = [ss.bernoulli(name=f'tb_denovo_{d}', p=float(p_rand.get(d, 0.0))) for d in self.strains.drugs]
 
         # Per-step resistance-origin counters (written to results in update_results).
-        self._n_blocked = 0
+        self._n_identical_superinf = 0
         self._n_denovo = 0
         self._n_trans_resist = 0
+        return
+
+    @classmethod
+    def agnostic(cls, pars=None, **kwargs):
+        """Construct a ``TBResistant`` configured to behave like single-strain ``tbsim.TB`` (L7).
+
+        Sets the "effectively single-strain" defaults — one drug, all seed infections pan-susceptible
+        (``init_strains=[1, 0]``), no de-novo resistance (``p_rand=None``), and no superinfection
+        (``rr_reinfection_inf = rr_reinfection_non = 0``, matching base ``tbsim.TB``, which does not
+        reinfect latent / non-infectious agents) — so no resistant strain ever arises (and the counter
+        never activates). This gives a one-liner for strain-aware-vs-agnostic comparison runs without
+        hand-tuning. It does **not** create a true ``m=1`` strain space (the bitmask needs ``m = 2**n``);
+        it is the documented convenience recipe, not a separate mode.
+
+        Args:
+            pars (dict): extra parameter overrides merged over the agnostic defaults.
+            **kwargs: forwarded to ``TBResistant`` (e.g. ``name``).
+
+        Example::
+
+            tb = tbsim.TBResistant.agnostic(pars=dict(beta=ss.permonth(0.2), init_prev=ss.bernoulli(0.05)))
+        """
+        agn = dict(init_strains=[1.0, 0.0], p_rand=None, rr_reinfection_inf=0.0, rr_reinfection_non=0.0)
+        agn.update(pars or {})
+        return cls(drugs=['TX'], rel_fitness=None, pars=agn, **kwargs)
+
+    # ------------------------------------------------------------------ per-strain counter helpers
+    def _counts(self, uids):
+        """Return the ``(len(uids), m)`` per-strain multiplicity matrix for ``uids``."""
+        return np.stack([c[uids] for c in self.strain_counts], axis=1)
+
+    def _write_counts(self, uids, mat):
+        """Write an ``(len(uids), m)`` multiplicity matrix back to the per-strain count arrays."""
+        for j, c in enumerate(self.strain_counts):
+            c[uids] = mat[:, j]
+        return
+
+    def _reset_counts(self, uids):
+        """Zero every per-strain count for ``uids`` (natural clearance / successful cure / death)."""
+        if len(uids) == 0:
+            return
+        for c in self.strain_counts:
+            c[uids] = 0
+        return
+
+    def _sync_counts_to_mask(self, uids, before_mask):
+        """Restore the invariant count>0 ⟺ bit-set after a ``strain_mask`` edit.
+
+        A strain whose bit is newly set gets count 1 (a fresh emergent lineage — mutation does not
+        carry over source multiplicity); a strain whose bit was cleared gets count 0; unchanged strains
+        keep their count. Used by the de-novo / acquisition / bottleneck edits (see D-COUNTER)."""
+        if len(uids) == 0:
+            return
+        js = np.arange(self.strains.m)
+        after = np.asarray(self.strain_mask[uids])[:, None]
+        before = np.asarray(before_mask)[:, None]
+        bits_after = ((after >> js) & 1).astype(bool)
+        bits_before = ((before >> js) & 1).astype(bool)
+        counts = self._counts(uids)
+        counts[bits_after & ~bits_before] = 1
+        counts[bits_before & ~bits_after] = 0
+        self._write_counts(uids, counts)
         return
 
     # ------------------------------------------------------------------ helpers
@@ -119,7 +198,7 @@ class TBResistant(TB):
     # ------------------------------------------------------------------ step
     def step(self):
         """Reset per-step counters, then run the TB step (transmission → transitions → bookkeeping)."""
-        self._n_blocked = 0
+        self._n_identical_superinf = 0
         self._n_denovo = 0
         self._n_trans_resist = 0
         super().step()
@@ -129,12 +208,13 @@ class TBResistant(TB):
         """
         Assign strains to newly infected / superinfected agents.
 
-        Seeds (``sources`` is ``None`` or a scalar) draw a single strain from
-        ``init_strains``. Transmission events (``sources`` is a UID array, one per
-        target) draw the transmitted strain from the source's carried strains ∝
-        fitness, block identical-strain re-exposure, and otherwise add the strain
-        (entering ``INFECTION`` from a susceptible state, or keeping the current
-        state for a superinfection).
+        Seeds (``sources`` is ``None`` or a scalar) draw a single strain from ``init_strains`` and
+        start it at count 1. Transmission events (``sources`` is a UID array, one per target) draw the
+        transmitted strain from the source's carried strains ∝ ``count × fitness``. A target already
+        carrying the drawn strain is **superinfected with an identical strain** — its count for that
+        strain is incremented (spec §1; previously this was blocked). Otherwise the strain is added
+        (entering ``INFECTION`` from a susceptible state, or keeping the current state for a
+        superinfection) at count 1, regardless of how many copies the source carried.
         """
         if len(uids) == 0:
             return
@@ -147,6 +227,9 @@ class TBResistant(TB):
             self._strain_dist.set(a=np.arange(m.m), p=probs)
             ids = self._strain_dist.rvs(uids).astype(int)
             self.strain_mask[uids] = (1 << ids)
+            onehot = np.zeros((len(uids), m.m), dtype=int)
+            onehot[np.arange(len(uids)), ids] = 1  # founding strain starts at count 1, all others 0
+            self._write_counts(uids, onehot)
             self.state[uids] = TBS.INFECTION
             self.infected[uids] = True
             self.ever_infected[uids] = True
@@ -154,23 +237,26 @@ class TBResistant(TB):
             self.susceptible[uids] = False
             return
 
-        # --- Transmission: pick which strain each source passes (∝ fitness) ---
+        # --- Transmission: pick which strain each source passes (∝ count × fitness) ---
         sources = ss.uids(sources)
-        probs = m.transmit_probs(self.strain_mask[sources])
+        probs = m.transmit_probs(self.strain_mask[sources], counts=self._counts(sources))
         self._strain_dist.set(a=np.arange(m.m), p=probs)
         drawn = self._strain_dist.rvs(uids).astype(int)
 
         tgt_masks = self.strain_mask[uids]
-        already = ((tgt_masks >> drawn) & 1).astype(bool)  # target already carries drawn strain
+        already = ((tgt_masks >> drawn) & 1).astype(bool)  # target already carries the drawn strain
 
-        # Blocked identical-strain exposures: no change, but reset the infection clock
-        # (spec: every successful exposure resets time-since-infection; a no-op until
-        # time-varying progression exists).
-        blocked = uids[already]
-        self._n_blocked += len(blocked)
-        self.ti_infected[blocked] = ti
+        # Identical-strain superinfection: mask unchanged, increment that strain's count, and reset the
+        # infection clock (spec: every successful exposure resets time-since-infection).
+        ident = uids[already]
+        self._n_identical_superinf += len(ident)
+        self.ti_infected[ident] = ti
+        if len(ident):
+            counts = self._counts(ident)
+            counts[np.arange(len(ident)), drawn[already]] += 1
+            self._write_counts(ident, counts)
 
-        # Acquired strains
+        # New strain acquired (a founding infection, or superinfection with a not-yet-carried strain).
         acq = ~already
         acq_uids = uids[acq]
         if len(acq_uids):
@@ -184,6 +270,10 @@ class TBResistant(TB):
             # Primary infection (from a susceptible/cleared state) enters latent;
             # superinfection of an already-infected agent keeps the current state.
             self.state[acq_uids[was_uninfected]] = TBS.INFECTION
+            # Founding strain starts at count 1 regardless of the source's multiplicity (spec §1).
+            counts = self._counts(acq_uids)
+            counts[np.arange(len(acq_uids)), new_ids] = 1
+            self._write_counts(acq_uids, counts)
             # Track transmitted resistance (a resistant strain, id != 0, was acquired).
             self._n_trans_resist += int(np.count_nonzero(new_ids != 0))
         return
@@ -201,16 +291,18 @@ class TBResistant(TB):
             multi = m.carried(self.strain_mask[u]).sum(1) >= 2
             psi = np.where(multi, p.rr_prog_super, 1.0)
             omega = np.where(multi, p.rr_clear_super, 1.0)
+            inf_non, inf_asy = self.progression_rates(u)
             self.transition(u, to={
                 TBS.CLEARED:        p.inf_cle * omega,
-                TBS.NON_INFECTIOUS: p.inf_non * self.rr_activation[u],
-                TBS.ASYMPTOMATIC:   p.inf_asy * self.rr_activation[u] * psi,
+                TBS.NON_INFECTIOUS: inf_non,
+                TBS.ASYMPTOMATIC:   inf_asy * psi,
             }, rng=self._rng_inf)
             dest = self.state[u]
             cleared = u[dest == TBS.CLEARED]
             self.rr_reinfection[cleared] = p.rr_reinfection_cleared
             self._set_reinfection_wane(cleared)
             self.strain_mask[cleared] = 0  # natural clearance removes all strains
+            self._reset_counts(cleared)    # ...and their per-strain counts (spec §3)
 
             # De-novo acquisition (at →NON_INFECTIOUS and →ASYMPTOMATIC) and the progression
             # bottleneck (only at →ASYMPTOMATIC). Subsets are computed from the pre-edit mask so
@@ -233,6 +325,7 @@ class TBResistant(TB):
             self.rr_reinfection[cleared] = p.rr_reinfection_rec
             self._set_reinfection_wane(cleared)
             self.strain_mask[cleared] = 0
+            self._reset_counts(cleared)  # spec §3
             self._progress(u[dest == TBS.ASYMPTOMATIC], bottleneck=True, denovo=False)  # no de-novo out of NON_INFECTIOUS
 
         # --- ASYMPTOMATIC (A→Y keeps both strains; ψ scales the A→Y rate for multi) ---
@@ -272,15 +365,23 @@ class TBResistant(TB):
         _, reduce = self._rng_pmulti.filter(uids, both=True)
         if len(reduce) == 0:
             return
-        probs = self._select_probs(self.strain_mask[reduce])
+        before = np.asarray(self.strain_mask[reduce]).copy()
+        probs = self._select_probs(self.strain_mask[reduce], counts=self._counts(reduce))
         self._prog_dist.set(a=np.arange(self.strains.m), p=probs)
         chosen = self._prog_dist.rvs(reduce).astype(int)
         self.strain_mask[reduce] = (1 << chosen)
+        self._sync_counts_to_mask(reduce, before)  # dropped strains → count 0; survivor keeps its count
         return
 
-    def _select_probs(self, masks):
-        """Per-agent probability of each carried strain being the one that progresses (random or fitness-weighted)."""
+    def _select_probs(self, masks, counts=None):
+        """Per-agent probability of each carried strain being the one that progresses.
+
+        Weighted by ``count`` (a multi-copy strain is proportionally more likely to be the survivor;
+        spec §2) and, if ``prog_select='fitness'``, additionally by fitness. ``counts=None`` falls back
+        to one-copy-per-carried-strain weighting."""
         w = self.strains.carried(masks).astype(float)
+        if counts is not None:
+            w = w * np.asarray(counts)
         if self.pars.prog_select == 'fitness':
             w = w * self.strains.fitness
         return w / w.sum(1, keepdims=True)
@@ -298,7 +399,7 @@ class TBResistant(TB):
             return
         m = self.strains
         mixed = self.pars.prog_resist_mode == 'mixed'
-        masks = self.strain_mask[uids]  # snapshot: carriers read from this so freshly-added strains aren't re-mutated
+        masks = np.asarray(self.strain_mask[uids]).copy()  # snapshot: carriers read from this so freshly-added strains aren't re-mutated (also the counter `before`)
         for j in range(m.m):
             carrier = ((masks >> j) & 1).astype(bool)
             cu = uids[carrier]
@@ -318,6 +419,7 @@ class TBResistant(TB):
             cur = self.strain_mask[agents]
             self.strain_mask[agents] = (cur | (1 << targets)) if mixed else ((cur & ~(1 << j)) | (1 << targets))
             self._n_denovo += len(agents)
+        self._sync_counts_to_mask(uids, masks)  # emergent strains → count 1; replaced strains → count 0
         return
 
     def _set_reinfection_wane(self, uids):
@@ -377,9 +479,10 @@ class TBResistant(TB):
         return
 
     def step_die(self, uids):
-        """Clear strains on death, then apply the base TB death handling."""
+        """Clear strains (and their counts) on death, then apply the base TB death handling."""
         if len(uids):
             self.strain_mask[uids] = 0
+            self._reset_counts(uids)
         super().step_die(uids)
         return
 
@@ -387,7 +490,7 @@ class TBResistant(TB):
     def init_results(self):
         super().init_results()
         results = [
-            ss.Result('new_blocked_superinf', dtype=int, label='Blocked identical-strain superinfections'),
+            ss.Result('new_identical_superinf', dtype=int, label='Identical-strain superinfections (count increments)'),
             ss.Result('new_denovo_resistance', dtype=int, label='De-novo resistance acquisitions'),
             ss.Result('new_transmitted_resistance', dtype=int, label='Transmitted resistant infections'),
             ss.Result('frac_resist', dtype=float, scale=False, label='Resistant fraction of active TB'),
@@ -402,7 +505,7 @@ class TBResistant(TB):
         super().update_results()
         res = self.results
         ti = self.ti
-        res['new_blocked_superinf'][ti] = self._n_blocked
+        res['new_identical_superinf'][ti] = self._n_identical_superinf
         res['new_denovo_resistance'][ti] = self._n_denovo
         res['new_transmitted_resistance'][ti] = self._n_trans_resist
 

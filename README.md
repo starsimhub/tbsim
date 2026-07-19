@@ -10,6 +10,8 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
 
 TBsim uses an agent-based implementation of the LSHTM "spectrum of TB disease" natural history (susceptible → infection/cleared → non-infectious → asymptomatic → symptomatic → treatment/treated/death), designed to support evaluating active case-finding / population-wide screening algorithms (e.g., CXR and NAAT workflows) as in Schwalb et al. 2025 ([PLOS Glob Public Health](https://journals.plos.org/globalpublichealth/article?id=10.1371/journal.pgph.0005050)).
 
+TBsim also includes a **multi-strain / drug-resistance extension** (`tbsim.resistance`) for modeling `2ⁿ` strains over `n` drugs — with fitness costs, superinfection, de-novo and acquired resistance, drug-susceptibility testing, and strain-aware treatment/preventive therapy. See the [resistance user manual](tbsim/resistance/docs/tbsim-resistance-user-manual.md) and the resistance tutorial in the docs.
+
 ## Getting started
 
 ### Installation

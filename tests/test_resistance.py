@@ -25,8 +25,8 @@ def make_sim(tb, seed=1, n=3000, start=ss.date('2000-01-01'), stop=ss.date('2035
     if isinstance(stop, str):
         stop = ss.date(stop)
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=10), dur=0))
-    sim = ss.Sim(n_agents=n, networks=net, diseases=tb, interventions=interventions, analyzers=analyzers,
-                 dt=dt, start=start, stop=stop, rand_seed=seed, verbose=0)
+    sim = tbsim.Sim(tb_model=tb, n_agents=n, networks=net, demographics=[], interventions=interventions,
+                    analyzers=analyzers, dt=dt, start=start, stop=stop, rand_seed=seed, verbose=0)
     return sim
 
 
@@ -69,7 +69,7 @@ def test_single_strain_reduction_matches_tb():
     """A single pan-susceptible strain, σ=0, reproduces the single-strain TB trajectory closely."""
     pars = dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12))
     sim_tb = make_sim(tbsim.TB(pars=pars)); sim_tb.run()
-    sim_r = make_sim(tbsim.TBResistant(pars=dict(**pars, **NOSUPER))); sim_r.run()
+    sim_r = make_sim(tbsim.TBResistant(**pars, **NOSUPER)); sim_r.run()
     a = np.array([sim_tb.results.tb[f'n_{s.name}'][-1] for s in TBS])
     b = np.array([sim_r.results.tb[f'n_{s.name}'][-1] for s in TBS])
     # RNG streams differ (extra strain draws), so require close, not identical.
@@ -83,8 +83,8 @@ def test_strain_symmetry_neutral():
     fr = []
     for seed in range(6):
         tb = tbsim.TBResistant(rel_fitness={'TX': 1.0},
-                               pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                         init_strains=[0.5, 0.5], **NOSUPER))
+                               beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                               init_strains=[0.5, 0.5], **NOSUPER)
         sim = make_sim(tb, seed=seed); sim.run()
         assert sim.results.tb['frac_super'][-1] == 0.0  # σ=0 → no superinfection
         fr.append(sim.results.tb['frac_resist'][-1])
@@ -95,8 +95,8 @@ def test_strain_symmetry_neutral():
 def test_competitive_exclusion_no_treatment():
     """Without treatment a less-fit resistant strain is out-competed (frac_resist declines toward 0)."""
     tb = tbsim.TBResistant(rel_fitness={'TX': 0.55},
-                           pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                     init_strains=[0.7, 0.3], **NOSUPER))
+                           beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                           init_strains=[0.7, 0.3], **NOSUPER)
     sim = make_sim(tb, stop='2060-12-31'); sim.run()
     fr = sim.results.tb['frac_resist']
     assert fr[3] > 0.15 and fr[-1] < fr[3] / 2  # started substantial, then declined
@@ -106,27 +106,104 @@ def test_competitive_exclusion_no_treatment():
 def test_superinfection_requires_sigma():
     """AB co-infections appear only when the superinfection susceptibility σ>0."""
     base = dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12), init_strains=[0.5, 0.5])
-    off = make_sim(tbsim.TBResistant(rel_fitness={'TX': 1.0}, pars=dict(**base, **NOSUPER))); off.run()
-    on = make_sim(tbsim.TBResistant(rel_fitness={'TX': 1.0}, pars=dict(**base,
-                  rr_reinfection_inf=1.0, rr_reinfection_non=1.0))); on.run()
+    off = make_sim(tbsim.TBResistant(rel_fitness={'TX': 1.0}, **base, **NOSUPER)); off.run()
+    on = make_sim(tbsim.TBResistant(rel_fitness={'TX': 1.0}, **base,
+                  rr_reinfection_inf=1.0, rr_reinfection_non=1.0)); on.run()
     assert off.results.tb['frac_super'][-1] == 0.0
     assert on.results.tb['frac_super'][-1] > 0.05
-    assert np.sum(on.results.tb['new_blocked_superinf']) > 0  # identical-strain re-exposures blocked
+    assert np.sum(on.results.tb['new_identical_superinf']) > 0  # identical-strain re-exposures now counted (spec §1)
+
+
+# --------------------------------------------------------------------------- time-varying progression
+def _run_resistance_ever_asy_curve(k_asy=0.0, k_non=0.0, n=12_000, years=10, seed=1):
+    """Closed latent cohort for TVP checks; ASYMPTOMATIC is absorbing so n_ASYMPTOMATIC is ever-ASY."""
+    tb = tbsim.TBResistant(
+        pars=dict(
+            init_prev=ss.bernoulli(1.0),
+            init_prev_active=ss.bernoulli(0.0),
+            beta=ss.peryear(0.0),
+            inf_cle=ss.peryear(0.1),
+            inf_non=ss.peryear(0.0),
+            inf_asy=ss.peryear(0.3),
+            asy_non=ss.peryear(0.0),
+            asy_sym=ss.peryear(0.0),
+            k_asy=k_asy,
+            k_non=k_non,
+        )
+    )
+    sim = tbsim.Sim(
+        tb_model=tb, n_agents=n, networks=[], demographics=[], dt=ss.days(30),
+        start=ss.date('2000-01-01'), stop=ss.date(f'{2000 + years}-01-01'), rand_seed=seed,
+    )
+    sim.pars.verbose = 0
+    sim.run()
+    curve = np.asarray(sim.get_tb().results['n_ASYMPTOMATIC'][:], dtype=float) / n
+    return curve, sim.t.dt_year
+
+
+def test_resistance_k_asy_front_loads_progression():
+    """TBResistant should honor k_asy: year-1 share rises and eventual direct progression falls."""
+    curve0, dt_year = _run_resistance_ever_asy_curve(k_asy=0.0)
+    curveK, _ = _run_resistance_ever_asy_curve(k_asy=6.0)
+
+    i1 = int(round(1.0 / dt_year))
+    frac0 = curve0[i1] / curve0[-1]
+    fracK = curveK[i1] / curveK[-1]
+
+    assert np.isclose(curveK[0], curve0[0])
+    assert np.all(np.diff(curveK) >= -1e-12)
+    assert fracK > frac0 + 0.25
+    assert fracK > 0.85 and frac0 < 0.55
+    assert curveK[-1] < 0.5 * curve0[-1]
+
+
+def test_resistance_k_zero_matches_default_closed_cohort():
+    """Explicit k_asy=k_non=0 is identical to defaults for TBResistant."""
+    def run(**pars):
+        tb = tbsim.TBResistant(
+            pars=dict(
+                init_prev=ss.bernoulli(1.0),
+                init_prev_active=ss.bernoulli(0.0),
+                beta=ss.peryear(0.0),
+            ) | pars
+        )
+        sim = tbsim.Sim(
+            tb_model=tb, n_agents=2_000, networks=[], demographics=[], dt=ss.days(30),
+            start=ss.date('2000-01-01'), stop=ss.date('2005-01-01'), rand_seed=7,
+        )
+        sim.pars.verbose = 0
+        sim.run()
+        return sim.get_tb()
+
+    tb0 = run()
+    tb1 = run(k_asy=0.0, k_non=0.0)
+    for state in TBS:
+        np.testing.assert_array_equal(tb0.results[f'n_{state.name}'][:], tb1.results[f'n_{state.name}'][:])
+    np.testing.assert_array_equal(tb0.results['cum_active'][:], tb1.results['cum_active'][:])
+    np.testing.assert_array_equal(tb0.results['new_deaths'][:], tb1.results['new_deaths'][:])
+
+
+def test_resistance_negative_k_rejected():
+    """TBResistant inherits non-negative validation for TVP shape parameters."""
+    with pytest.raises(ValueError, match='k_asy must be >= 0'):
+        tbsim.TBResistant(pars=dict(k_asy=-1.0))
+    with pytest.raises(ValueError, match='k_non must be >= 0'):
+        tbsim.TBResistant(pars=dict(k_non=-0.5))
 
 
 # --------------------------------------------------------------------------- de-novo acquisition
 def test_denovo_mixed_vs_replacement():
     """De-novo resistance from a pure-A epidemic: mixed makes AB, replacement does not; no p_rand makes none."""
     base = dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12), init_strains=[1.0, 0.0])
-    none = make_sim(tbsim.TBResistant(rel_fitness={'TX': 0.9}, pars=dict(**base, **NOSUPER)),
+    none = make_sim(tbsim.TBResistant(rel_fitness={'TX': 0.9}, **base, **NOSUPER),
                     stop='2050-12-31'); none.run()
     assert none.results.tb['frac_resist'][-1] == 0.0  # no mechanism to create B
 
     mixed = make_sim(tbsim.TBResistant(rel_fitness={'TX': 0.9},
-                     pars=dict(**base, p_rand={'TX': 0.02}, prog_resist_mode='mixed', **NOSUPER)),
+                     **base, p_rand={'TX': 0.02}, prog_resist_mode='mixed', **NOSUPER),
                      stop='2050-12-31'); mixed.run()
     rep = make_sim(tbsim.TBResistant(rel_fitness={'TX': 0.9},
-                   pars=dict(**base, p_rand={'TX': 0.02}, prog_resist_mode='replacement', **NOSUPER)),
+                   **base, p_rand={'TX': 0.02}, prog_resist_mode='replacement', **NOSUPER),
                    stop='2050-12-31'); rep.run()
     assert np.sum(mixed.results.tb['new_denovo_resistance']) > 0
     assert mixed.results.tb['frac_resist'][-1] > 0
@@ -137,8 +214,8 @@ def test_denovo_mixed_vs_replacement():
 def test_denovo_per_drug_specificity():
     """p_rand is per drug: with p_rand on BDQ only, active TB acquires BDQ resistance but never RIF."""
     tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], rel_fitness={'BDQ': 0.9},
-                           pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                     init_strains=[1.0, 0.0, 0.0, 0.0], p_rand={'BDQ': 0.05}, **NOSUPER))
+                           beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                           init_strains=[1.0, 0.0, 0.0, 0.0], p_rand={'BDQ': 0.05}, **NOSUPER)
     sim = make_sim(tb, stop='2050-12-31'); sim.run()
     r = sim.results.tb
     assert np.sum(r['new_denovo_resistance']) > 0
@@ -150,8 +227,8 @@ def test_denovo_per_drug_specificity():
 def test_treatment_selects_for_resistance():
     """Treatment that cures A well but B poorly drives the resistant fraction up."""
     tb = tbsim.TBResistant(rel_fitness={'TX': 0.575},
-                           pars=dict(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
-                                     init_strains=[0.9, 0.1], rr_reinfection_inf=1.0, rr_reinfection_non=1.0))
+                           beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                           init_strains=[0.9, 0.1], rr_reinfection_inf=1.0, rr_reinfection_non=1.0)
     tx = tbsim.TxDeliveryR(product=tbsim.TxR(strains=tb.strains, base_efficacy=0.75,
                            resist_penalty={'TX': 1/3.}, adherence=0.9, q_acq={'TX': 0.05}),
                            rate_sym=ss.peryear(1.2), rate_asym=ss.peryear(0.05))
@@ -164,11 +241,11 @@ def test_treatment_selects_for_resistance():
 def test_treatment_outcome_operator_matches_ode():
     """Per-strain cure of an AB cohort reproduces the ODE outcome probabilities (adherence=1, q=0)."""
     ea, eb = 0.75, 0.25
-    tb = tbsim.TBResistant(rel_fitness={'TX': 0.575}, pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(rel_fitness={'TX': 0.575}, init_prev=ss.bernoulli(0.0))
     prod = tbsim.TxR(strains=tb.strains, base_efficacy=ea, resist_penalty={'TX': eb/ea}, adherence=1.0, q_acq=None)
     sim = make_sim(tb, n=20000, interventions=tbsim.TxDeliveryR(product=prod)); sim.init()
     # ss.Sim copies its modules, so operate on the sim's initialized copies.
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     prod = _product(sim, tbsim.TxDeliveryR).product
     uids = ss.uids(np.arange(20000))
     tb.strain_mask[uids] = 3  # everyone AB
@@ -183,10 +260,10 @@ def test_treatment_outcome_operator_matches_ode():
 def test_treatment_interrupt_reverts_and_preserves_strains():
     """interrupt() prematurely stops this delivery's course, reverting agents to their prior
     active state with strains intact (the mechanism behind treatment-monitoring regimen switching)."""
-    tb = tbsim.TBResistant(pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0))
     tx = tbsim.TxDeliveryR(product=tbsim.TxR(strains=tb.strains), rate_sym=ss.peryear(0.0))
     sim = make_sim(tb, n=1000, interventions=tx); sim.init()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     txd = _product(sim, tbsim.TxDeliveryR)
     uids = ss.uids(np.arange(500))
     # Manually put a cohort on this delivery's course.
@@ -205,8 +282,8 @@ def test_treatment_interrupt_reverts_and_preserves_strains():
 def test_treatment_monitoring_switches_regimen():
     """Monitoring eligibility + supersedes moves agents from a first-line to a second-line course."""
     tb = tbsim.TBResistant(drugs=['INH', 'RIF'], rel_fitness={'INH': 0.95},
-                           pars=dict(beta=ss.permonth(0.3), init_prev=ss.bernoulli(0.10),
-                                     init_strains=[0.5, 0.5, 0.0, 0.0]))  # pan + INH-resistant
+                           beta=ss.permonth(0.3), init_prev=ss.bernoulli(0.10),
+                           init_strains=[0.5, 0.5, 0.0, 0.0])  # pan + INH-resistant
     first = tbsim.TxDeliveryR(name='first', rate_sym=ss.peryear(2.0),
                               product=tbsim.TxR(strains=tb.strains, regimen_drugs=['INH'],
                                                 base_efficacy=0.8, resist_penalty={'INH': 0.1}))
@@ -221,10 +298,10 @@ def test_treatment_monitoring_switches_regimen():
 # --------------------------------------------------------------------------- TPT
 def test_tpt_strain_aware_sterilization():
     """Strain-aware TPT clears regimen-susceptible strains but leaves resistant strains latent."""
-    tb = tbsim.TBResistant(drugs=['INH'], pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(drugs=['INH'], init_prev=ss.bernoulli(0.0))
     tpt = tbsim.TPTSimple(product=tbsim.TPTRx(strains=tb.strains, regimen_drugs=['INH']))
     sim = make_sim(tb, n=2000, interventions=tpt); sim.init()
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     prod = _product(sim, tbsim.TPTSimple).product
     pan = ss.uids(np.arange(1000))
     res = ss.uids(np.arange(1000, 2000))
@@ -241,11 +318,11 @@ def test_tpt_strain_aware_sterilization():
 def test_dst_recovers_sens_spec():
     """DST observed calls recover the configured sensitivity/specificity in the mono-infection limit."""
     sens, spec = 0.9, 0.95
-    tb = tbsim.TBResistant(pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0))
     dst = tbsim.DSTDelivery(product=tbsim.DST(strains=tb.strains, sens=sens, spec=spec, p_strain_obs=1.0))
     sim = make_sim(tb, n=20000, interventions=dst); sim.init()
     # ss.Sim copies its modules, so operate on the sim's initialized copies.
-    tb = tbsim.get_tb(sim, which=tbsim.TBResistant)
+    tb = sim.get_tb()
     prod = _product(sim, tbsim.DSTDelivery).product
     res_uids = ss.uids(np.arange(10000))
     sus_uids = ss.uids(np.arange(10000, 20000))
@@ -259,7 +336,7 @@ def test_dst_recovers_sens_spec():
 
 def test_dst_router_matches_observed_profile():
     """DSTDelivery.matches builds composable eligibility from the observed n-bit profile."""
-    tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], pars=dict(init_prev=ss.bernoulli(0.0)))
+    tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], init_prev=ss.bernoulli(0.0))
     dst = tbsim.DSTDelivery(product=tbsim.DST(strains=tb.strains))
     sim = make_sim(tb, n=300, interventions=dst); sim.init()
     dstd = _product(sim, tbsim.DSTDelivery)
@@ -270,10 +347,138 @@ def test_dst_router_matches_observed_profile():
     dstd.dst_profile[rif_only] = 0b01   # observed RIF-resistant (bit 0 = RIF)
     dstd.dst_profile[both] = 0b11       # RIF + BDQ
     dstd.dst_profile[sus] = 0b00
-    any_rif = set(dstd.matches(RIF=True)(sim))
-    rif_not_bdq = set(dstd.matches(RIF=True, BDQ=False)(sim))
+    any_rif = set(dstd.matches(RIF=True, require_active_tb=False)(sim))
+    rif_not_bdq = set(dstd.matches(RIF=True, BDQ=False, require_active_tb=False)(sim))
     assert any_rif == set(rif_only) | set(both)   # all observed RIF-resistant
     assert rif_not_bdq == set(rif_only)           # RIF-resistant, BDQ-susceptible only
+
+
+def test_dst_routed_treatment_does_not_start_on_cleared():
+    """DST-routed treatment initiation should not start courses for CLEARED agents."""
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+    dst = tbsim.DSTDelivery(name='dst', product=tbsim.DST(strains=tb.strains))
+    tx = tbsim.TxDeliveryR(
+        name='tx',
+        eligibility=dst.matches(RIF=True),
+        product=tbsim.TxR(strains=tb.strains, base_efficacy=0.8, regimen_drugs=['RIF']),
+    )
+    sim = make_sim(tb, n=300, interventions=[dst, tx])
+    sim.init()
+    tb = sim.get_tb()
+    tx = sim.interventions['tx']
+    dstd = sim.interventions['dst']
+    all_uids = ss.uids(np.arange(300))
+    # Everyone has a tested positive DST profile.
+    dstd.dst_tested[all_uids] = True
+    dstd.dst_profile[all_uids] = 0b1
+    active = ss.uids(np.arange(150))
+    cleared = ss.uids(np.arange(150, 300))
+    tb.state[active] = TBS.SYMPTOMATIC
+    tb.state[cleared] = TBS.CLEARED
+    tx._initiate()
+    # Only active TB agents should be started.
+    assert tx._n_treated == len(active)
+
+
+def test_treat_latent_modes_diverge():
+    """Latent agents selected via eligibility are cleared (treat_latent=False) or run a course (treat_latent=True).
+
+    Regression guard: initiation must not strip latent (INFECTION) agents before the treat_latent
+    branch runs, otherwise both modes silently become no-ops for latent-targeted eligibility.
+    """
+    def run(treat_latent):
+        tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+        tx = tbsim.TxDeliveryR(
+            name='tx',
+            eligibility=lambda sim: sim.get_tb().latent.uids,
+            product=tbsim.TxR(strains=tb.strains, base_efficacy=0.0, adherence=1.0),
+            treat_latent=treat_latent,
+        )
+        sim = make_sim(tb, n=200, interventions=tx)
+        sim.init()
+        tb = sim.get_tb()
+        latent = ss.uids(np.arange(100))
+        tb.state[latent] = TBS.INFECTION
+        tb.strain_mask[latent] = 1
+        sim.interventions['tx']._initiate()
+        return sim.get_tb(), sim.interventions['tx'], latent
+
+    # treat_latent=False: latent agents are cleared immediately, not counted as treated.
+    tb_f, tx_f, latent = run(False)
+    assert tx_f._n_treated == 0
+    assert (tb_f.state[latent] == TBS.CLEARED).all()
+
+    # treat_latent=True: latent agents run a full course (state -> TREATMENT, counted as treated).
+    tb_t, tx_t, latent = run(True)
+    assert tx_t._n_treated == len(latent)
+    assert (tb_t.state[latent] == TBS.TREATMENT).all()
+
+
+# --------------------------------------------------------------------------- explicit efficacy vector / adherence distribution / retreatment classifier
+def test_treatment_explicit_efficacy_vector():
+    """TxR(efficacy_by_strain=...) uses the given per-strain vector T_l verbatim as the cure probabilities
+    (spec §Treatment), overriding the base_efficacy × penalty parameterization."""
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+    eff = np.array([0.9, 0.2])  # pan, RIF-resistant
+    prod = tbsim.TxR(strains=tb.strains, efficacy_by_strain=eff, adherence=1.0)
+    sim = make_sim(tb, n=20000, interventions=tbsim.TxDeliveryR(product=prod)); sim.init()
+    tb = sim.get_tb(); prod = _product(sim, tbsim.TxDeliveryR).product
+    assert np.allclose(prod.eff_by_id, eff)
+    u = ss.uids(np.arange(20000))
+    tb.strain_mask[ss.uids(np.arange(10000))] = 1        # pan
+    tb.strain_mask[ss.uids(np.arange(10000, 20000))] = 2  # RIF-resistant
+    surv = prod.roll_survivors(tb, u)
+    assert np.isclose(np.mean(surv[:10000] == 0), 0.9, atol=0.02)   # pan cured at t_pan
+    assert np.isclose(np.mean(surv[10000:] == 0), 0.2, atol=0.02)   # resistant cured at t_res
+
+
+def test_treatment_adherence_distribution():
+    """adherence as a callable makes completion a per-agent distribution applied across all the agent's
+    strains (spec §Treatment): non-completers clear nothing that course."""
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+    adh = lambda uids: np.where(np.asarray(uids) < 5000, 1.0, 0.0)  # first half fully adherent, rest never
+    prod = tbsim.TxR(strains=tb.strains, base_efficacy=1.0, adherence=adh)
+    sim = make_sim(tb, n=10000, interventions=tbsim.TxDeliveryR(product=prod)); sim.init()
+    tb = sim.get_tb(); prod = _product(sim, tbsim.TxDeliveryR).product
+    assert callable(prod.adherence_distribution)
+    u = ss.uids(np.arange(10000)); tb.strain_mask[u] = 1
+    surv = prod.roll_survivors(tb, u)
+    assert np.mean(surv[:5000] == 0) == 1.0   # adherent + efficacy 1 → all cured
+    assert np.mean(surv[5000:] == 0) == 0.0   # non-adherent → none cured
+
+
+def test_failure_vs_new_case_classification():
+    """TxDeliveryR.failure_case_eligibility partitions active TB by time since last treatment initiation
+    (durable tb.ti_last_treatment): recent → treatment failure/retreatment, old or never-treated → new
+    case (spec §Diagnostics)."""
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0))
+    sim = make_sim(tb, n=600); sim.init()
+    tb = sim.get_tb(); ti = sim.ti
+    tb.state[ss.uids(np.arange(300))] = TBS.SYMPTOMATIC  # candidate pool = active TB (uids 0-299)
+    recent, old = ss.uids(np.arange(100)), ss.uids(np.arange(100, 200))
+    tb.ti_last_treatment[recent] = ti          # treated now → failure/retreatment
+    tb.ti_last_treatment[old] = ti - 100       # treated long ago → new case; uids 200-299 never treated (nan)
+    failed = tbsim.TxDeliveryR.failure_case_eligibility(within=ss.years(2))
+    newcase = tbsim.TxDeliveryR.failure_case_eligibility(within=ss.years(2), new_case=True)
+    assert set(failed(sim).tolist()) == set(range(100))
+    assert set(newcase(sim).tolist()) == set(range(100, 300))
+
+
+# --------------------------------------------------------------------------- per-strain counter
+def test_strain_counter_and_count_weighting():
+    """Identical-strain re-exposure increments the per-strain count (previously blocked) and the
+    transmission multinomial is weighted by count × fitness (spec updates §1)."""
+    s = tbsim.Strains(['TX'], rel_fitness=None)  # neutral fitness
+    tp = s.transmit_probs(np.array([0b11]), counts=np.array([[2, 1]]))[0]
+    assert np.allclose(tp, [2/3, 1/3]) and s.max_fitness(np.array([0b11]))[0] == 1.0  # split by count, infectiousness count-free
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0))
+    sim = make_sim(tb, n=200); sim.init(); tb = sim.get_tb()
+    tgt, src = ss.uids(np.arange(50)), ss.uids(np.arange(50, 100))
+    for u in (tgt, src):
+        tb.strain_mask[u] = 1; tb.strain_counts[0][u] = 1; tb.state[u] = TBS.INFECTION
+    tb.set_prognoses(tgt, sources=src)
+    assert (tb.strain_mask[tgt] == 1).all()                    # carried set unchanged
+    assert (np.asarray(tb.strain_counts[0][tgt]) == 2).all()   # count incremented 1 → 2
 
 
 # --------------------------------------------------------------------------- ODE reference self-checks (model-tests.md §8)

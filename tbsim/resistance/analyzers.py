@@ -7,6 +7,7 @@ import starsim as ss
 from ..tb import get_tb
 from .tb_resistant import TBResistant
 from .treatments import TxDeliveryR
+from .tpt import TPTRx
 
 __all__ = ['ResistanceStats', 'StrainResults']
 
@@ -14,20 +15,24 @@ __all__ = ['ResistanceStats', 'StrainResults']
 class ResistanceStats(ss.Analyzer):
     """
     Records the resistance observables of the reference ODE (``model-tests.md`` §11):
-    resistant and superinfected fractions of active TB, and the three-way
-    **resistance-origin flux decomposition** — new resistant cases arising from
-    (i) de-novo mutation, (ii) treatment-acquired resistance, and (iii) transmission.
+    resistant and superinfected fractions of active TB, and the **resistance-origin flux
+    decomposition** — new resistant cases arising from (i) de-novo mutation, (ii) treatment-acquired
+    resistance, (iii) TPT-acquired resistance, and (iv) transmission.
 
-    ``TBResistant`` already logs ``frac_resist``/``frac_super`` and the de-novo and
-    transmitted fluxes in its own results; this analyzer collates them with the
-    treatment-acquired flux (summed over any ``TxDeliveryR`` interventions) into one
-    place and exposes ``to_df()`` for like-for-like comparison against the ODE.
+    ``TBResistant`` already logs ``frac_resist``/``frac_super`` and the de-novo and transmitted
+    fluxes in its own results; this analyzer collates them with the treatment-acquired flux (summed
+    over any ``TxDeliveryR`` interventions) and the TPT-acquired flux (summed over any ``TPTRx``
+    products) into one place, and exposes ``to_df()`` for like-for-like comparison against the ODE.
     """
 
     def init_pre(self, sim):
         super().init_pre(sim)
         self.tb = get_tb(sim, which=TBResistant)
         self.tx = [iv for iv in sim.interventions.values() if isinstance(iv, TxDeliveryR)]
+        # TPTRx products are wrapped inside a TPT delivery but are themselves registered sim modules,
+        # so resolve the sim's own (copied, stepped) instances directly from sim.modules and read their
+        # per-step n_acquired result (L2).
+        self.tpt = [m for m in sim.modules if isinstance(m, TPTRx)]
         return
 
     def init_results(self):
@@ -37,6 +42,7 @@ class ResistanceStats(ss.Analyzer):
             ss.Result('frac_super', dtype=float, scale=False, label='Superinfected fraction of active TB'),
             ss.Result('flux_denovo', dtype=int, label='New resistance: de-novo mutation'),
             ss.Result('flux_txacq', dtype=int, label='New resistance: treatment-acquired'),
+            ss.Result('flux_tptacq', dtype=int, label='New resistance: TPT-acquired'),
             ss.Result('flux_transmitted', dtype=int, label='New resistance: transmitted'),
         )
         return
@@ -50,6 +56,7 @@ class ResistanceStats(ss.Analyzer):
         res.flux_denovo[ti] = tbr['new_denovo_resistance'][ti]
         res.flux_transmitted[ti] = tbr['new_transmitted_resistance'][ti]
         res.flux_txacq[ti] = sum(int(iv.results.n_acquired[ti]) for iv in self.tx)
+        res.flux_tptacq[ti] = sum(int(p.results.n_acquired[ti]) for p in self.tpt)
         return
 
     def to_df(self, sim):
@@ -61,6 +68,7 @@ class ResistanceStats(ss.Analyzer):
             frac_super=res.frac_super,
             flux_denovo=res.flux_denovo,
             flux_txacq=res.flux_txacq,
+            flux_tptacq=res.flux_tptacq,
             flux_transmitted=res.flux_transmitted,
         )
 
