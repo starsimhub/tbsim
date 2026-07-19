@@ -29,13 +29,22 @@ def _init_product(ea, eb, q):
     return tb, prod
 
 
-def _outcome_dist(tb, prod, mask, n=30000):
-    """Apply the full operator (roll_survivors → acquire, at SYMPTOMATIC so state-RR=1) to a mask cohort."""
-    uids = ss.uids(np.arange(n))
+def _set_mask_counts(tb, uids, mask):
+    """Set an agent cohort to carry ``mask``, one copy per carried strain (invariant count>0 ⟺ bit set)."""
     tb.strain_mask[uids] = mask
-    surv = prod.roll_survivors(tb, uids)
-    surv = prod.acquire(uids, surv, states=np.full(n, int(TBS.SYMPTOMATIC)))
-    return {v: float(np.mean(surv == v)) for v in (0, 1, 2, 3)}
+    for j in range(tb.strains.m):
+        tb.strain_counts[j][uids] = 1 if (mask >> j) & 1 else 0
+    return
+
+
+def _outcome_dist(tb, prod, mask, n=30000):
+    """Apply the full operator (roll_survivors → acquire_counts, at SYMPTOMATIC so state-RR=1) to a cohort."""
+    uids = ss.uids(np.arange(n))
+    _set_mask_counts(tb, uids, mask)
+    surv = prod.roll_survivors(tb, uids)                                   # surviving strain mask (bits ⊆ mask)
+    counts_surv = tb._counts(uids) * tb.strains.carried(surv)              # cured strains → 0
+    _, mask_out, _ = prod.acquire_counts(tb, uids, counts_surv, states=np.full(n, int(TBS.SYMPTOMATIC)))
+    return {v: float(np.mean(mask_out == v)) for v in (0, 1, 2, 3)}
 
 
 # --------------------------------------------------------------------------- §6: outcome operator
@@ -71,16 +80,17 @@ def test_acquisition_only_in_active_states():
     eligibility override) a NON_INFECTIOUS cohort must yield no acquired resistance; SYMPTOMATIC must."""
     tb, prod = _init_product(ea=0.5, eb=0.5, q=1.0)  # q=1 → deterministic acquisition where RR>0
     uids = ss.uids(np.arange(20000))
-    tb.strain_mask[uids] = 1  # all mono-A (susceptible; a failure can acquire)
+    _set_mask_counts(tb, uids, 1)  # all mono-A (susceptible; a failure can acquire)
     surv = prod.roll_survivors(tb, uids)          # ~half survive (eff 0.5)
     failed = surv != 0
+    counts_surv = tb._counts(uids) * tb.strains.carried(surv)
     # NON_INFECTIOUS → RR 0 → no acquisition (no A→B), so no surviving strain becomes B (mask 2).
-    surv_ni = prod.acquire(uids, surv.copy(), states=np.full(len(uids), int(TBS.NON_INFECTIOUS)))
-    assert np.count_nonzero(surv_ni == 2) == 0
+    _, mask_ni, _ = prod.acquire_counts(tb, uids, counts_surv.copy(), states=np.full(len(uids), int(TBS.NON_INFECTIOUS)))
+    assert np.count_nonzero(mask_ni == 2) == 0
     # SYMPTOMATIC → RR 1 → every surviving A acquires B (mask 1 → 2).
-    surv_sy = prod.acquire(uids, surv.copy(), states=np.full(len(uids), int(TBS.SYMPTOMATIC)))
-    assert np.count_nonzero(surv_sy == 2) == np.count_nonzero(failed)
-    assert np.count_nonzero(surv_sy == 1) == 0
+    _, mask_sy, _ = prod.acquire_counts(tb, uids, counts_surv.copy(), states=np.full(len(uids), int(TBS.SYMPTOMATIC)))
+    assert np.count_nonzero(mask_sy == 2) == np.count_nonzero(failed)
+    assert np.count_nonzero(mask_sy == 1) == 0
 
 
 # --------------------------------------------------------------------------- ABM ↔ ODE: selection

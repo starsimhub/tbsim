@@ -239,11 +239,12 @@ def test_new_events_non_negative():
 
 
 def test_susceptible_only_cleared_or_never_infected():
-    """susceptible is True only for state in SUSCEPTIBLE or CLEARED."""
+    """susceptible is True only for reinfection-eligible states: SUSCEPTIBLE, CLEARED, and (clock-reset
+    reinfection) INFECTION / NON_INFECTIOUS."""
     sim = make_tb_sim(n_agents=80, start=ss.date("2000-01-01"), stop=ss.date("2002-12-31"))
     sim.run()
     tb = sim.get_tb()
-    susceptible_states = {TBS.SUSCEPTIBLE, TBS.CLEARED}
+    susceptible_states = {TBS.SUSCEPTIBLE, TBS.CLEARED, TBS.INFECTION, TBS.NON_INFECTIOUS}
     for i in range(len(tb.state)):
         if tb.susceptible[i]:
             assert tb.state[i] in susceptible_states, (
@@ -353,6 +354,43 @@ def test_on_treatment_consistent_with_state():
         (tb.state == TBS.TREATMENT),
         err_msg="on_treatment should equal (state == TREATMENT)",
     )
+
+
+def test_rr_reinfection_inf_defaults_to_rec():
+    """rr_reinfection_inf defaults to rr_reinfection_rec, and rr_reinfection_non to rr_reinfection_inf,
+    resolved by init_pre once all pars are final."""
+    sim = make_tb_sim(n_agents=20, pars={"rr_reinfection_rec": 0.3})
+    sim.init()
+    tb = sim.get_tb()
+    assert tb.pars.rr_reinfection_inf == 0.3
+    assert tb.pars.rr_reinfection_non == 0.3
+    # Explicit override is respected; non still couples to inf.
+    sim2 = make_tb_sim(n_agents=20, pars={"rr_reinfection_rec": 0.3, "rr_reinfection_inf": 0.7})
+    sim2.init()
+    tb2 = sim2.get_tb()
+    assert tb2.pars.rr_reinfection_inf == 0.7
+    assert tb2.pars.rr_reinfection_non == 0.7
+
+
+def test_latent_agents_reinfectable_clock_reset():
+    """A latent (INFECTION) agent is reinfection-eligible: step_bookkeeping marks it susceptible with
+    rel_sus == rr_reinfection_inf, and a reinfection resets ti_infected while keeping the state."""
+    sim = make_tb_sim(n_agents=100, pars={"init_prev": ss.bernoulli(0.5), "beta": ss.peryear(1.0)})
+    sim.init()
+    tb = sim.get_tb()
+    tb.step()  # one step so step_bookkeeping runs and sets transmission flags
+    latent = ss.uids(tb.state == TBS.INFECTION)
+    assert len(latent) > 0, "Expected some latent agents after seeding"
+    # Latent agents are susceptible (reinfection-eligible) with rel_sus set to the σ_L factor.
+    assert np.all(tb.susceptible[latent])
+    assert np.allclose(tb.rel_sus[latent], tb.pars.rr_reinfection_inf)
+    assert np.all(tb.infected[latent])  # still counted as infected
+    # A reinfection resets the clock but leaves the state unchanged.
+    sub = latent[:5]
+    tb.ti_infected[sub] = -10
+    tb.set_prognoses(sub, sources=ss.uids(np.zeros(len(sub), dtype=np.int64)))
+    assert np.all(tb.ti_infected[sub] == tb.ti)
+    assert np.all(tb.state[sub] == TBS.INFECTION)
 
 
 def test_rr_reinfection_waning():

@@ -26,7 +26,7 @@ import numpy as np
 import starsim as ss
 
 from ..interventions.tpt import TPTTx
-from ..tb import TBS, choice2d
+from ..tb import TBS
 from .tb_resistant import TBResistant
 
 __all__ = ['TPTRx']
@@ -41,11 +41,10 @@ class TPTRx(TPTTx):
         regimen_drugs (list): drugs in the TPT regimen (default: all drugs in ``strains``).
             A strain is cleared by sterilization only if susceptible to *every* regimen drug.
         p_tpt_acq (dict): per-drug ``{drug: prob}`` of a susceptible strain acquiring resistance
-            under TPT drug pressure (replacement). Default none (off).
+            under TPT drug pressure (replacement). Default none (off). Each carried drug-susceptible
+            strain rolls independently, so multiple strains may acquire resistance under one course.
         acq_state_rr (dict): per-TB-state multiplier on ``p_tpt_acq``. Default follows the spec:
             INFECTION 0.05, NON_INFECTIOUS 0.5, ASYMPTOMATIC 1.0, SYMPTOMATIC 1.0.
-        acq_select (str): how the carried strain that acquires resistance is chosen among the
-            drug-susceptible carried strains — ``'random'`` (uniform, default) or ``'fitness'`` (L4).
         pars, **kwargs: forwarded to :class:`tbsim.TPTTx` (``efficacy``, ``p_sterilize``, durations, …).
     """
 
@@ -57,12 +56,11 @@ class TPTRx(TPTTx):
         int(TBS.SYMPTOMATIC):    1.0,
     }
 
-    def __init__(self, strains, regimen_drugs=None, p_tpt_acq=None, acq_state_rr=None, acq_select='random', pars=None, **kwargs):
+    def __init__(self, strains, regimen_drugs=None, p_tpt_acq=None, acq_state_rr=None, pars=None, **kwargs):
         super().__init__(pars=pars, **kwargs)
         self.strains = strains
         self.regimen_drugs = list(regimen_drugs) if regimen_drugs is not None else list(strains.drugs)
         self.p_tpt_acq = dict(p_tpt_acq) if p_tpt_acq else {}
-        self.acq_select = acq_select
         # Fail-fast on mistyped drug names (L8).
         strains.validate_drugs(self.regimen_drugs, where='TPTRx.regimen_drugs')
         strains.validate_drugs(self.p_tpt_acq, where='TPTRx.p_tpt_acq')
@@ -70,16 +68,12 @@ class TPTRx(TPTTx):
         if acq_state_rr:
             self.acq_state_rr.update({int(k): float(v) for k, v in acq_state_rr.items()})
 
-        # Strains covered by the regimen = strains susceptible to every regimen drug.
-        cols = [strains.drug_idx[d] for d in self.regimen_drugs]
-        covered = ~strains.profile[:, cols].any(axis=1)  # (m,) True = covered by regimen
-        self._covered_row = np.asarray(covered, dtype=bool)  # (m,) used to weight per-strain protection
-        self._covered_mask = int(sum(1 << j for j in range(strains.m) if covered[j]))
+        # Strains covered by the regimen (susceptible to every regimen drug); used to weight per-strain
+        # protection. The clearance itself is delegated to TBResistant.sterilize_covered.
+        self._covered_row = strains.covered(self.regimen_drugs)  # (m,) True = covered by regimen
 
-        # One independent uniform stream per regimen drug for TPT-driven acquisition, plus one choice
-        # stream per drug to pick which carried susceptible strain mutates (L4).
+        # One independent uniform stream per regimen drug for TPT-driven acquisition (state-scaled at draw).
         self._acq_rngs = [ss.random(name=f'tpt_acq_{d}') for d in self.regimen_drugs]
-        self._acq_select = [choice2d(p=np.ones((1, strains.m)) / strains.m, name=f'tpt_acqsel_{d}') for d in self.regimen_drugs]
 
         # Origin-flux accounting (L2): a monotonic count of TPT-acquired resistance events. The
         # per-step delta is written to the ``n_acquired`` result and read by ``ResistanceStats``.
@@ -104,28 +98,30 @@ class TPTRx(TPTTx):
         return self.sim.diseases[self.pars.disease]
 
     def _acquire(self, uids):
-        """TPT drug pressure selects resistance: a susceptible carried strain mutates to its
-        resistant counterpart (replacement) with prob ``p_tpt_acq[drug]`` × per-state RR."""
+        """TPT drug pressure selects resistance: each carried drug-susceptible strain independently
+        mutates to its resistant counterpart (replacement) with prob ``p_tpt_acq[drug]`` × per-state RR,
+        transferring multiplicity source→target (see :meth:`TBResistant._apply_acquisition`)."""
         if len(uids) == 0 or not self.p_tpt_acq:
             return
         tb = self._tb()
-        m = self.strains
         rr = np.array([self.acq_state_rr.get(int(s), 0.0) for s in tb.state[uids]], dtype=float)
-        surv = tb.strain_mask[uids].copy()
-        before = surv.copy()  # snapshot for the origin-flux count (L2)
-        for di, drug in enumerate(self.regimen_drugs):
+        counts0 = tb._counts(uids)
+        before_mask = np.asarray(tb.strain_mask[uids])
+        drug_idxs, q_by_di, rng_by_di = [], {}, {}
+        for pos, drug in enumerate(self.regimen_drugs):
             p = self.p_tpt_acq.get(drug, 0.0)
-            if p <= 0:
-                continue
-            u = np.asarray(self._acq_rngs[di].rvs(uids), dtype=float)
-            hit = u < (p * rr)
-            if not hit.any():
-                continue
-            surv[hit] = m.mutate_one_susceptible(surv[hit], drug, self._acq_select[di], uids[hit],
-                                                 weighted=(self.acq_select == 'fitness'))
-        tb.strain_mask[uids] = surv
-        tb._sync_counts_to_mask(uids, before)  # replaced strain → count 0, emergent resistant → count 1
-        self._cum_tpt_acquired += int(np.count_nonzero(surv != before))
+            if p > 0:
+                di = self.strains.drug_idx[drug]
+                drug_idxs.append(di)
+                q_by_di[di] = p
+                rng_by_di[di] = self._acq_rngs[pos]
+        def hit_fn(di, cu, rows):
+            u = np.asarray(rng_by_di[di].rvs(cu), dtype=float)
+            return u < (q_by_di[di] * rr[rows])
+        counts, mask, _ = tb._apply_acquisition(uids, counts0, drug_idxs, hit_fn, mixed=False)
+        tb._write_counts(uids, counts)
+        tb.strain_mask[uids] = mask
+        self._cum_tpt_acquired += int(np.count_nonzero(mask != before_mask))  # agents whose profile changed
         return
 
     def _apply_sterilization(self, uids):
@@ -138,18 +134,7 @@ class TPTRx(TPTTx):
 
         # Regimen-susceptible strains are cleared only for agents still latent (base TPT semantics).
         still = uids[tb.state[uids] == TBS.INFECTION]
-        if len(still):
-            before = np.asarray(tb.strain_mask[still]).copy()
-            tb.strain_mask[still] &= ~self._covered_mask
-            tb._sync_counts_to_mask(still, before)  # cleared (sterilized) strains → count 0
-            cleared = still[tb.strain_mask[still] == 0]
-            if len(cleared):
-                tb.state[cleared] = TBS.CLEARED
-                tb.rr_reinfection[cleared] = tb.pars.rr_reinfection_cleared
-                if tb.pars.dur_reinfection_protection is not None:
-                    tb.ti_rr_reinfection_wane[cleared] = self.ti + tb.pars.dur_reinfection_protection.rvs(cleared)
-                tb.infected[cleared] = False
-                tb.susceptible[cleared] = True
+        tb.sterilize_covered(still, self.regimen_drugs)
         self.tpt_resolved[uids] = True
         return
 

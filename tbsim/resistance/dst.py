@@ -47,10 +47,13 @@ class DST(ss.Product):
         else:
             self.p_obs_by_id = np.array([p_strain_obs.get(i, 1.0) for i in range(strains.m)])
 
-        # Independent CRN stream per strain, so a phenotype carried by several strains has a higher
-        # detection probability (spec §DST) and per-strain observation drop-out is independent across strains.
+        # Independent CRN stream per strain for the culture-bottleneck observation, so a phenotype carried
+        # by several strains has a higher detection probability (spec §DST) and per-strain observation
+        # drop-out is independent across strains. The sensitivity/specificity *call* uses an independent
+        # stream per (strain, drug) — flattened as ``j * n + di`` — so within one strain the errors are
+        # independent across drugs (a multi-drug DST behaves like independent per-drug tests).
         self._obs_rngs = [ss.random(name=f'dst_obs_{j}') for j in range(strains.m)]
-        self._call_rngs = [ss.random(name=f'dst_call_{j}') for j in range(strains.m)]
+        self._call_rngs = [ss.random(name=f'dst_call_{j}_{d}') for j in range(strains.m) for d in strains.drugs]
         return
 
     def administer(self, tb, uids):
@@ -60,9 +63,10 @@ class DST(ss.Product):
         is independently observed (culture bottleneck ``p_strain_obs``), and each observed strain
         independently passes sensitivity (if truly resistant) or fails specificity (if susceptible). A
         drug is called resistant for an agent if *any* of its observed strains reads resistant — so a
-        phenotype carried by several strains is more likely detected (spec §DST). Sensitivity and
-        specificity for the drugs within one strain share that strain's call draw (a minor, deliberate
-        within-strain correlation); independence across strains is what drives the multi-strain boost.
+        phenotype carried by several strains is more likely detected (spec §DST). The per-drug calls
+        within one strain use independent CRN streams, so within a strain resistant to some modeled drugs
+        and susceptible to others the test's errors are independent across drugs (a multi-drug DST behaves
+        like independent per-drug tests).
         """
         m = self.strains
         n_u = len(uids)
@@ -77,8 +81,8 @@ class DST(ss.Product):
             seen = cj & (np.asarray(self._obs_rngs[j].rvs(uids), dtype=float) < self.p_obs_by_id[j])
             if not seen.any():
                 continue
-            call = np.asarray(self._call_rngs[j].rvs(uids), dtype=float)
             for di in range(m.n):
+                call = np.asarray(self._call_rngs[j * m.n + di].rvs(uids), dtype=float)  # independent per (strain, drug)
                 if m.profile[j, di]:
                     hit = seen & (call < self.sens[di])    # truly resistant → read resistant w.p. sens
                 else:

@@ -152,44 +152,14 @@ class Strains:
             return 0.0
         return float(self.phenotype_any(mask)[:, self.drug_idx[drug]].mean())
 
-    def mutate_one_susceptible(self, masks, drug, dist, uids, weighted=False):
-        """Acquisition strain selection (L4): for each agent pick **one** carried strain susceptible to
-        ``drug`` and replace it with its resistant (``| drug_bit``) counterpart (replacement).
+    def covered(self, regimen_drugs):
+        """``(m,)`` bool: strain ``j`` is *covered* by ``regimen_drugs`` iff it is susceptible to every
+        drug in the regimen (so a regimen with no drugs covers nothing to be resistant to = all strains).
+        Used by TPT / latent-treatment sterilization."""
+        cols = [self.drug_idx[d] for d in regimen_drugs]
+        return ~self.profile[:, cols].any(axis=1) if cols else np.ones(self.m, dtype=bool)
 
-        The strain is chosen uniformly at random among the agent's carried drug-susceptible strains, or
-        ``\\propto`` fitness if ``weighted``, via the CRN ``dist`` (a ``choice2d``). Agents carrying no
-        such strain are returned unchanged. Preserves "one mutation per hit" while removing the old
-        lowest-id bias (which could never land on a strain already carrying other resistances).
-
-        Args:
-            masks (array): per-agent ``strain_mask`` integers for the hit agents.
-            drug (str): the regimen drug whose resistance is acquired.
-            dist (choice2d): a per-agent CRN choice distribution owned by the caller.
-            uids (ss.uids): the hit agents' UIDs, aligned with ``masks`` rows (for CRN).
-            weighted (bool): weight the selection by strain fitness instead of uniform.
-
-        Returns:
-            The mutated ``masks`` array (a copy).
-        """
-        masks = np.asarray(masks).copy()
-        if len(masks) == 0:
-            return masks
-        dcol = self.drug_idx[drug]
-        bit = self.drug_bit(drug)
-        # carried AND susceptible to this drug (bit dcol of the strain id is 0)
-        w = (self.carried(masks) & ~self.profile[:, dcol]).astype(float)  # (k, m)
-        if weighted:
-            w = w * self.fitness
-        tot = w.sum(1, keepdims=True)
-        has_target = tot[:, 0] > 0
-        if not has_target.any():
-            return masks
-        probs = np.divide(w, tot, out=np.zeros_like(w), where=tot > 0)
-        probs[~has_target, 0] = 1.0  # dummy valid row for no-target agents (their draw is discarded)
-        dist.set(a=np.arange(self.m), p=probs)
-        chosen = np.asarray(dist.rvs(uids)).astype(int)
-        sel = np.nonzero(has_target)[0]
-        j = chosen[sel]
-        sub = masks[sel]
-        masks[sel] = (sub & ~(1 << j)) | (1 << (j | bit))
-        return masks
+    def covered_mask(self, regimen_drugs):
+        """Bitmask over strain ids of the strains covered by ``regimen_drugs`` (see :meth:`covered`)."""
+        covered = self.covered(regimen_drugs)
+        return int(sum(1 << j for j in range(self.m) if covered[j]))
