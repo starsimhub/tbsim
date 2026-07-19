@@ -60,6 +60,14 @@ def test_decline_params_default_off():
     assert float(tb.pars.k_non) == 0.0
 
 
+def test_negative_k_rejected_in_tb():
+    """Shape parameters must be non-negative."""
+    with pytest.raises(ValueError, match='k_asy must be >= 0'):
+        tbsim.TB(k_asy=-1.0)
+    with pytest.raises(ValueError, match='k_non must be >= 0'):
+        tbsim.TB(k_non=-0.5)
+
+
 # --- progression_rates: the exact spec formula ---
 
 def _setup_latent(sim, uids, taus, rr=1.0):

@@ -177,6 +177,12 @@ class TB(BaseTB):
         )
         self.update_pars(pars, **kwargs)
 
+        # Decline parameters are shape terms for exp(-k*tau); require k >= 0.
+        if self.pars.k_asy < 0:
+            raise ValueError(f'k_asy must be >= 0, got {self.pars.k_asy}')
+        if self.pars.k_non < 0:
+            raise ValueError(f'k_non must be >= 0, got {self.pars.k_non}')
+
         # CRN-safe RNG distributions for per-step transition draws (one per source state)
         self._rng_inf = ss.random(name='tb_rng_inf')   # INFECTION exits
         self._rng_non = ss.random(name='tb_rng_non')   # NON_INFECTIOUS exits
