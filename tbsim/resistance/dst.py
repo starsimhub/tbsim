@@ -82,7 +82,7 @@ class DST(ss.Product):
             if not seen.any():
                 continue
             for di in range(m.n):
-                call = np.asarray(self._call_rngs[j * m.n + di].rvs(uids), dtype=float)  # independent per (strain, drug)
+                call = self._call_rngs[j * m.n + di].rvs(uids)  # independent draw per (strain, drug)
                 if m.profile[j, di]:
                     hit = seen & (call < self.sens[di])    # truly resistant → read resistant w.p. sens
                 else:

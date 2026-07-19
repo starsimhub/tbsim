@@ -106,7 +106,7 @@ class TPTRx(TPTTx):
         tb = self._tb()
         rr = np.array([self.acq_state_rr.get(int(s), 0.0) for s in tb.state[uids]], dtype=float)
         counts0 = tb._counts(uids)
-        before_mask = np.asarray(tb.strain_mask[uids])
+        before_mask = tb.strain_mask[uids].copy()
         drug_idxs, q_by_di, rng_by_di = [], {}, {}
         for pos, drug in enumerate(self.regimen_drugs):
             p = self.p_tpt_acq.get(drug, 0.0)
@@ -116,8 +116,7 @@ class TPTRx(TPTTx):
                 q_by_di[di] = p
                 rng_by_di[di] = self._acq_rngs[pos]
         def hit_fn(di, cu, rows):
-            u = np.asarray(rng_by_di[di].rvs(cu), dtype=float)
-            return u < (q_by_di[di] * rr[rows])
+            return rng_by_di[di].rvs(cu) < (q_by_di[di] * rr[rows])
         counts, mask, _ = tb._apply_acquisition(uids, counts0, drug_idxs, hit_fn, mixed=False)
         tb._write_counts(uids, counts)
         tb.strain_mask[uids] = mask

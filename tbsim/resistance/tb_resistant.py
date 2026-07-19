@@ -215,7 +215,7 @@ class TBResistant(TB):
             for di in drug_idxs:
                 if m.profile[j, di]:
                     continue  # strain j is already resistant to this drug
-                hit = np.asarray(hit_fn(di, cu, rows), dtype=bool)
+                hit = hit_fn(di, cu, rows)  # bool array over cu
                 acquired[hit] |= (1 << di)
             got = acquired > 0
             if not got.any():
@@ -446,7 +446,7 @@ class TBResistant(TB):
             return
         counts0 = self._counts(uids)  # snapshot: carriers/source amounts read from this
         def hit_fn(di, cu, rows):
-            return np.asarray(self._denovo_rngs[di].rvs(cu), dtype=bool)
+            return self._denovo_rngs[di].rvs(cu)  # bernoulli → bool array
         mixed = self.pars.prog_resist_mode == 'mixed'
         counts, mask, n_events = self._apply_acquisition(uids, counts0, drug_idxs, hit_fn, mixed)
         self._write_counts(uids, counts)
@@ -473,7 +473,7 @@ class TBResistant(TB):
         if len(uids) == 0:
             return ss.uids()
         covered_mask = self.strains.covered_mask(regimen_drugs)
-        before = np.asarray(self.strain_mask[uids]).copy()
+        before = self.strain_mask[uids].copy()
         self.strain_mask[uids] &= ~covered_mask
         self._sync_counts_to_mask(uids, before)  # sterilized strains → count 0; survivors keep their count
         cleared = uids[self.strain_mask[uids] == 0]

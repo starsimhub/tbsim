@@ -150,8 +150,7 @@ class TxR(ss.Product):
                 q_by_di[di] = p
                 rng_by_di[di] = self._acq_rngs[pos]
         def hit_fn(di, cu, rows):
-            u = np.asarray(rng_by_di[di].rvs(cu), dtype=float)
-            return u < (q_by_di[di] * rr[rows])
+            return rng_by_di[di].rvs(cu) < (q_by_di[di] * rr[rows])
         return tb._apply_acquisition(uids, counts0, drug_idxs, hit_fn, mixed=False)
 
 
@@ -364,7 +363,7 @@ class TxDeliveryR(ss.Intervention):
         # strain's count to its resistant target (spec §2/§3, D-COUNTER). Finally return to the state
         # treated from.
         if len(failed):
-            surv_mask = np.asarray(self.pending_surv[failed])            # surviving strains (bits ⊆ pre-course)
+            surv_mask = self.pending_surv[failed]                        # surviving strains (bits ⊆ pre-course)
             counts_surv = tb._counts(failed) * tb.strains.carried(surv_mask)  # zero out cured strains
             counts, mask, _ = self.product.acquire_counts(tb, failed, counts_surv, states=self.prior_state[failed])
             self._n_acquired = int(np.count_nonzero(mask != surv_mask))  # agents whose strain profile changed
