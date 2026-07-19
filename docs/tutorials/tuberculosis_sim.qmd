@@ -231,6 +231,16 @@ The TB model in this notebook uses the latest implementation from the `tbsim` li
 
 - **Treatment Integration**: The model includes treatment effects that reduce transmission and prevent mortality.
 
+### Time-varying (front-loaded) progression
+
+By default the hazards of progressing from latent `INFECTION` to active TB are constant per year. Real household-contact data are instead *front-loaded*: most people who ever progress do so within about a year of infection. You can reproduce this by letting the `INFECTION → ASYMPTOMATIC` hazard decline exponentially with time since infection, `inf_asy(τ) = inf_asy · exp(−k_asy · τ)`, where `τ` is the number of years since the agent was infected (reinfection restarts the clock). This is controlled by a single new parameter, `k_asy` (per year); the analogous `k_non` does the same for `INFECTION → NON_INFECTIOUS`. Both default to `0`, which is exactly the constant-hazard model, so existing calibrations and results are unchanged.
+
+```python
+# Front-load progression to active TB (larger k_asy concentrates progression in year 1);
+# k_asy = 0 (the default) recovers the original constant-rate behaviour.
+tb = tbsim.TB(k_asy=6.0)
+```
+
 ### Next Steps
 
 To extend this simulation, you can:
