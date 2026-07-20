@@ -2,15 +2,22 @@
 
 All notable changes to the codebase are documented in this file.
 
-## Version 0.11.0 (2026-07-15)
+## Version 0.10.2 (2026-07-20)
+- Reworked several multi-strain / drug-resistance behaviors (`tbsim.resistance`) and lifted latent reinfection into base `TB`.
+- **Latent reinfection in base `TB`**: `rr_reinfection_inf` (σ_L) and `rr_reinfection_non` (σ_N) are now base-`TB` parameters, so latent (`INFECTION`) and non-infectious (`NON_INFECTIOUS`) agents are reinfection-eligible in single-strain models too. A re-exposure resets the `ti_infected` clock without otherwise changing the agent's state (clock reset only). σ_L defaults to `rr_reinfection_rec` and σ_N to σ_L; set them to `0` to disable.
+- **Per-strain count preserved through acquisition**: when a strain acquires resistance (de-novo, on treatment, or under TPT), the emergent resistant strain now inherits the source strain's per-strain multiplicity count and accumulates onto any copies already present, instead of resetting to `1`. Replacement moves the source count to the target; de-novo `'mixed'` keeps the source and copies the count to the target.
+- **Multi-strain treatment/TPT acquisition**: treatment- and TPT-acquired resistance now let *each* carried drug-susceptible strain acquire resistance independently in one round (mirroring de-novo), rather than a single picked strain; the `acq_select` parameter was removed from `TxR`/`TPTRx`.
+- **Independent per-drug DST errors**: `DST` draws sensitivity/specificity errors independently per (strain, drug), so a multi-drug DST behaves like independent per-drug tests.
+- **Latent-treatment mode**: `TxDeliveryR(treat_latent=False)` (default) now clears a latent agent's regimen-susceptible strains with certainty while keeping any regimen-resistant strain (no course, no acquisition, not counted in `n_treated`), instead of unconditionally clearing the agent to `CLEARED`; pan-susceptible / single-strain behavior is unchanged.
+
+## Version 0.10.1 (2026-07-15)
 - Added optional **time-varying (front-loaded) TB progression**: the latent `INFECTION`-exit hazards can now decline exponentially with time since infection, `inf_asy(τ) = inf_asy · exp(−k_asy · τ)` (and `inf_non` via `k_non`), where `τ` is years since the agent was infected (reinfection restarts the clock). Controlled by two new `TB` parameters, `k_asy` and `k_non`, both defaulting to `0` (constant hazard), so the default behaviour and existing calibrations are bit-for-bit unchanged. Set `k_asy > 0` for the recommended one-parameter front-loaded progression to active TB, matching the front-loaded shape seen in historical household-contact data. The per-agent effective rates are exposed via `TB.progression_rates()`.
 
 ## Version 0.10.0 (2026-07-10)
-- Added the multi-strain / drug-resistance extension `tbsim.resistance`:
-    - `TBResistant` (drop-in `TB` subclass) encoding `2ⁿ` strains over `n` drugs as a per-agent bitmask with per-strain fitness costs, superinfection, de-novo resistance, and a per-strain multiplicity counter (identical-strain re-exposure now increments the count and feeds the transmission multinomial and progression bottleneck).
-    - Strain-aware product/delivery interventions `TxR`/`TxDeliveryR` (per-strain efficacy incl. explicit `efficacy_by_strain` vectors, float or per-agent-distribution `adherence`, acquisition-on-failure, regimen switching, and `failure_case_eligibility` retreatment-vs-new-case classification), `DST`/`DSTDelivery` diagnostics with observed-profile routing, and strain-aware `TPTRx`.
-    - `ResistanceStats` and `StrainResults` analyzers, plus a two-strain reference ODE (`tbsim.compartmental.TwoStrainODE`) for ABM↔ODE validation.
-- Added a resistance tutorial, user manual, and updates guide under `docs/` and `tbsim/resistance/docs/`.
+- Added the multi-strain / drug-resistance extension `tbsim.resistance`.
+- `TBResistant` (drop-in `TB` subclass) encoding `2ⁿ` strains over `n` drugs as a per-agent bitmask with per-strain fitness costs, superinfection, de-novo resistance, and a per-strain multiplicity counter (identical-strain re-exposure now increments the count and feeds the transmission multinomial and progression bottleneck).
+- Strain-aware product/delivery interventions `TxR`/`TxDeliveryR` (per-strain efficacy incl. explicit `efficacy_by_strain` vectors, float or per-agent-distribution `adherence`, acquisition-on-failure, regimen switching, and `failure_case_eligibility` retreatment-vs-new-case classification), `DST`/`DSTDelivery` diagnostics with observed-profile routing, and strain-aware `TPTRx`.
+- `ResistanceStats` and `StrainResults` analyzers, plus a two-strain reference ODE (`tbsim.compartmental.TwoStrainODE`) for ABM↔ODE validation.
 
 ## Version 0.9.0 (2026-07-09)
 - Added read-only boolean views of TB `state` (`latent`, `non_infectious`, `asymptomatic`, `symptomatic`, `active_tb`, `terminal`), giving the Starsim boolean idiom at call sites while keeping the categorical `state` as the single source of truth.

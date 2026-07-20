@@ -241,6 +241,15 @@ By default the hazards of progressing from latent `INFECTION` to active TB are c
 tb = tbsim.TB(k_asy=6.0)
 ```
 
+### Reinfection of latent agents
+
+Latent (`INFECTION`) and non-infectious (`NON_INFECTIOUS`) agents can be reinfected: a re-exposure resets the agent's `ti_infected` clock (raising the progression hazard under front-loading) without otherwise changing its state. The relative susceptibility to reinfection in these states is set by `rr_reinfection_inf` (σ_L, defaults to `rr_reinfection_rec`) and `rr_reinfection_non` (σ_N, defaults to `rr_reinfection_inf`). Setting them to `0` closes reinfection of already-infected agents.
+
+```python
+# Latent agents reinfect at the recovered-agent RR by default; set to 0 to disable.
+tb = tbsim.TB(rr_reinfection_inf=0.21, rr_reinfection_non=0.21)
+```
+
 ### Next Steps
 
 To extend this simulation, you can:
