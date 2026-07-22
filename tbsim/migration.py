@@ -375,7 +375,6 @@ class Migration(ss.Demographics):
 
     def _bound_ages(self, ages):
         """Coerce sampled ages into the valid simulation range [0, max_age)."""
-        ages = np.asarray(ages, dtype=float)
         max_age = float(self.pars.max_age)
         if not np.isfinite(max_age) or max_age <= 0:
             return np.clip(ages, 0.0, None)
@@ -416,14 +415,13 @@ class Migration(ss.Demographics):
         hh_ids, hh_sizes = self._household_ids_and_sizes(household_net)
         if len(hh_ids) == 0 or hh_sizes.sum() <= 0:
             return np.empty(0, dtype=int)
-        draws = np.asarray(self.dist_household.rvs(sample_uids), dtype=float)
+        draws = self.dist_household.rvs(sample_uids)
         cdf = np.cumsum(hh_sizes / hh_sizes.sum())
         hh_inds = np.searchsorted(cdf, draws, side='right').astype(int)
         return hh_ids[hh_inds]
 
     def _members_by_household_id(self, household_net, household_ids):
         """Return current member UID arrays for the requested household IDs."""
-        household_ids = np.asarray(household_ids, dtype=int)
         if len(household_ids) == 0:
             return {}
 
@@ -444,8 +442,6 @@ class Migration(ss.Demographics):
 
     def _append_household_group_edges(self, household_net, new_uids, member_uids):
         """Connect new household members to existing members and each other."""
-        new_uids = np.asarray(new_uids, dtype=int)
-        member_uids = np.asarray(member_uids, dtype=int)
         if len(new_uids) == 0:
             return
 
@@ -491,8 +487,7 @@ class Migration(ss.Demographics):
         if len(household_ids) == 0:
             return self._create_household_singletons(household_net, new_uids)
 
-        new_uids = np.asarray(new_uids, dtype=int)
-        assigned = np.asarray(household_ids, dtype=int)
+        assigned = household_ids
         members_by_hid = self._members_by_household_id(household_net, np.unique(assigned))
         for household_id in np.unique(assigned):
             group_uids = new_uids[assigned == household_id]
@@ -566,7 +561,7 @@ class Migration(ss.Demographics):
         """Per-agent emigration weights from the age profile, or None for uniform selection."""
         if self.emig_age_lows is None or self.emig_age_weights is None or len(uids) == 0:
             return None
-        ages = np.asarray(self.sim.people.age[uids], dtype=float)
+        ages = self.sim.people.age[uids]
         weights = np.zeros(len(uids), dtype=float)
         age_bins = np.searchsorted(self.emig_age_lows, ages, side='right') - 1
         valid = np.where(age_bins >= 0)[0]
@@ -584,26 +579,25 @@ class Migration(ss.Demographics):
 
         weights = self._emig_weights_for_uids(eligible)
         if weights is None:
-            scores = np.asarray(self.dist_emigrant.rvs(eligible), dtype=float)
+            scores = self.dist_emigrant.rvs(eligible)
             return eligible[np.argsort(scores)[:n_select]]
 
         # Weighted sampling without replacement via the exponential (Efraimidis-Spirakis) key trick.
         selected = np.array([], dtype=int)
         pos_mask = weights > 0
-        weighted_uids = np.asarray(eligible[pos_mask], dtype=int)
+        weighted_uids = eligible[pos_mask]
         if len(weighted_uids):
-            draws = np.clip(np.asarray(self.dist_emigrant.rvs(weighted_uids), dtype=float), 1e-12, 1.0)
+            draws = np.clip(self.dist_emigrant.rvs(weighted_uids), 1e-12, 1.0)
             keys = -np.log(draws) / weights[pos_mask]
             n_weighted = min(n_select, len(weighted_uids))
             selected = weighted_uids[np.argsort(keys)[:n_weighted]]
 
         # If the weighted pool was too small, fill the remainder uniformly from the rest.
         if len(selected) < n_select:
-            eligible_arr = np.asarray(eligible, dtype=int)
-            fallback_uids = eligible_arr[~np.isin(eligible_arr, selected)]
+            fallback_uids = eligible[~np.isin(eligible, selected)]
             if len(fallback_uids):
                 n_fill = n_select - len(selected)
-                fallback_scores = np.asarray(self.dist_emigrant.rvs(fallback_uids), dtype=float)
+                fallback_scores = self.dist_emigrant.rvs(fallback_uids)
                 selected = np.concatenate([selected, fallback_uids[np.argsort(fallback_scores)[:n_fill]]])
 
         return ss.uids(selected)
