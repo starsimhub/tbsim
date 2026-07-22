@@ -35,6 +35,7 @@ def test_monitoring_require_and_will_fail():
     first, dst = sim.interventions['first'], sim.interventions['dst']
     coh = ss.uids(np.arange(200))
     tb.state[coh] = TBS.TREATMENT
+    first.on_course[coh] = True
     first.ti_treatment_start[coh] = -3           # started 3 steps ago (≥ after_steps=2)
     rif_r = ss.uids(np.arange(100))
     dst.dst_tested[coh] = True

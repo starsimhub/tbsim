@@ -270,6 +270,7 @@ def test_treatment_interrupt_reverts_and_preserves_strains():
     txd.prior_state[uids] = int(TBS.SYMPTOMATIC)
     tb.strain_mask[uids] = 1
     tb.state[uids] = TBS.TREATMENT
+    txd.on_course[uids] = True
     txd.ti_treatment_start[uids] = sim.ti
     txd.ti_treatment_end[uids] = sim.ti + 10
     reverted = txd.interrupt(uids)
@@ -293,6 +294,27 @@ def test_treatment_monitoring_switches_regimen():
     sim = make_sim(tb, interventions=[first, second], stop='2012-12-31'); sim.run()
     # The monitoring→interrupt→switch chain ran and moved at least some agents onto second-line.
     assert np.sum(sim.results['second'].n_treated) > 0
+
+
+def test_concurrent_deliveries_do_not_cross_resolve():
+    """Regression (#447): two independent deliveries treating the same pool must each resolve only
+    their own courses. Before the delivery-scoped `on_course` flag, a delivery re-resolved agents
+    another delivery was treating using its stale `pending_surv`, zeroing an infectious agent's
+    strain mask and crashing the transmission draw (IndexError in choice2d.ppf)."""
+    tb = tbsim.TBResistant(drugs=['RIF'], rel_fitness={'RIF': 0.9},
+                           init_prev=ss.bernoulli(0.25), init_strains=[1.0, 0.0],
+                           beta=ss.permonth(0.25))
+    def mk(name):
+        prod = tbsim.TxR(strains=tb.strains, regimen_drugs=['RIF'], base_efficacy=0.0,
+                         adherence=1.0, q_acq={'RIF': 0.5})
+        return tbsim.TxDeliveryR(name=name, product=prod, rate_sym=ss.peryear(2.0),
+                                 dur_treatment=ss.months(1))
+    sim = make_sim(tb, n=5000, interventions=[mk('txA'), mk('txB')],
+                   stop='2010-12-31', seed=0)
+    sim.run()  # must not raise
+    tb = sim.get_tb()
+    # No infectious agent may ever be left carrying zero strains (the impossible state that crashed).
+    assert not np.any(tb.active_tb & (tb.strain_mask == 0))
 
 
 # --------------------------------------------------------------------------- TPT

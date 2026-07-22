@@ -146,6 +146,7 @@ def test_successful_cure_resets_count_survivor_unchanged():
     tx.prior_state[u] = tb.state[u]
     tx.pending_surv[u] = prod.roll_survivors(tb, u)
     tb.state[u] = TBS.TREATMENT
+    tx.on_course[u] = True
     tx.ti_treatment_end[u] = -1                 # already ended → resolve now
     tx._resolve()
     assert (tb.strain_mask[u] == (1 << 1)).all()          # pan cured, resistant survives
