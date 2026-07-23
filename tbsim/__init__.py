@@ -10,3 +10,5 @@ from .analyzers import *
 from .plots import *
 from .sim import *
 from .migration import *
+from . import resistance
+from .resistance import *

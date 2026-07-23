@@ -55,9 +55,9 @@ website:
         text: What's new
       - href: tutorials/index.md
         text: Tutorials
-      - href: user_guide.md
+      - href: user_guide/index.md
         text: User guide
-      - href: examples.md
+      - href: user_guide/examples.qmd
         text: Examples
       - href: api/index.qmd
         text: API reference
@@ -70,9 +70,9 @@ website:
           text: "**Home**"
         - href: whatsnew.md
           text: "**What's new**"
-        - href: installation.md
+        - href: user_guide/installation.qmd
           text: "**Installation**"
-        - href: quickstart.md
+        - href: user_guide/quickstart.qmd
           text: "**Quick start**"
         - section: "**Tutorials**"
           contents:
@@ -84,11 +84,16 @@ website:
             - tutorials/tbhiv_comorbidity.qmd
             - tutorials/malnutrition_tutorial.qmd
             - tutorials/comprehensive_analyzer_plots_example.qmd
-        - href: user_guide.md
-          text: "**User guide**"
-        - href: examples.md
+            - tutorials/resistance_tutorial.qmd
+        - section: "**User guide**"
+          contents:
+            - href: user_guide/index.md
+              text: "Overview"
+            - href: user_guide/resistance.qmd
+              text: "Drug resistance"
+        - href: user_guide/examples.qmd
           text: "**Examples**"
-        - href: scripts.md
+        - href: user_guide/scripts.qmd
           text: "**Scripts**"
         - href: api/index.qmd
           text: "**API reference**"

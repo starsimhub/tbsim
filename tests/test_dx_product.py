@@ -44,7 +44,7 @@ def test_dx_simple_dataframe():
     for _ in range(20):
         sim.run_one_step()
 
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     dx = sim.interventions.dxdelivery.product
     all_uids = sim.people.alive.uids
     results = dx.administer(sim, all_uids)
@@ -80,7 +80,7 @@ def test_dx_administer_correct_after_deaths():
     ])
     sim = make_dx_sim(n_agents=300, dx=df)
     ppl = sim.people
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     dx = sim.interventions.dxdelivery.product
 
     # Kill a block of low-numbered agents to force a UID/position gap.
@@ -116,7 +116,7 @@ def test_dx_age_stratified():
     for _ in range(20):
         sim.run_one_step()
 
-    tb = tbsim.get_tb(sim)
+    tb = sim.get_tb()
     dx = sim.interventions.dxdelivery.product
     all_uids = sim.people.alive.uids
     results = dx.administer(sim, all_uids)
