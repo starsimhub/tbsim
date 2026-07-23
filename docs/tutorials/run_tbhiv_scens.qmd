@@ -144,7 +144,7 @@ def plot_results(flat_results, keywords=None, exclude=['15']):
         n_rows = int(np.ceil(n_metrics / n_cols))
         fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, n_rows*2))
         axs = axs.flatten()
-    cmap = plt.cm.get_cmap('tab10', len(flat_results))
+    cmap = plt.colormaps['tab10'].resampled(len(flat_results))
     for i, metric in enumerate(metrics):
         ax = axs[i]
         for j, (scenario, flat) in enumerate(flat_results.items()):
