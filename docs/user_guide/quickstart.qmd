@@ -1,4 +1,6 @@
-# Quick Start Guide
+---
+title: Quick start
+---
 
 This guide will help you run your first TBsim simulation in minutes.
 
@@ -45,4 +47,4 @@ After running the basic simulation:
 3. **Add Interventions**: Implement different TB control strategies
 4. **Analyze Results**: Use the built-in analyzers for detailed output analysis
 
-For more detailed examples, see the [examples](examples.md) section.
+For more detailed examples, see the [examples](examples.qmd) section.

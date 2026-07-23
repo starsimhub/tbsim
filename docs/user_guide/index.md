@@ -105,7 +105,7 @@ TBsim includes an optional multi-strain, drug-resistance overlay (`tbsim.resista
 - **Strain-aware interventions** — treatment (`TxR` / `TxDeliveryR`), drug-susceptibility testing with regimen routing (`DST` / `DSTDelivery`), and preventive therapy (`TPTRx`) all resolve at the strain level.
 - **Origin decomposition** — the `ResistanceStats` analyzer attributes new resistant infections to de-novo, treatment-acquired, transmitted, and TPT-acquired channels.
 
-The agent-based model is validated against a deterministic two-strain reference ODE (`tbsim.compartmental.TwoStrainODE`). For a hands-on, feature-by-feature walkthrough, see the [drug resistance tutorial](tutorials/resistance_tutorial.qmd).
+The agent-based model is validated against a deterministic two-strain reference ODE (`tbsim.compartmental.TwoStrainODE`). For a recipe-based how-to, see the [drug resistance user guide](resistance.qmd); for a hands-on, feature-by-feature walkthrough, see the [drug resistance tutorial](../tutorials/resistance_tutorial.qmd).
 
 ## Networks and Social Structure
 
@@ -210,4 +210,4 @@ analyzer.plot('network')
 analyzer.plot('kaplan_meier')
 ```
 
-For specific examples and tutorials, see the [examples](examples.md) and [tutorials](tutorials/index.md) sections.
+For specific examples and tutorials, see the [examples](examples.qmd) and [tutorials](../tutorials/index.md) sections.

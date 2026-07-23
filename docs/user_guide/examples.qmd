@@ -1,4 +1,7 @@
-# Examples
+---
+title: Examples
+jupyter: python3
+---
 
 This section provides practical examples of TBsim usage across different scenarios and applications.
 
@@ -6,14 +9,12 @@ This section provides practical examples of TBsim usage across different scenari
 
 The simplest way to run a TB simulation:
 
-```python
+```{python}
 from tbsim import TB
 import starsim as ss
 
-# Create a basic TB simulation
-sim = ss.Sim(diseases=TB())
-
-# Run the simulation
+# Create and run a basic TB simulation
+sim = ss.Sim(diseases=TB(), verbose=0)
 sim.run()
 
 # Plot results
@@ -24,7 +25,8 @@ sim.plot()
 
 Adding BCG vaccination and treatment interventions:
 
-```python
+```{python}
+#| output: false
 import tbsim
 from tbsim import TB
 import starsim as ss
@@ -46,6 +48,7 @@ sim = ss.Sim(
     diseases=tb,
     interventions=[bcg, tpt],
     pars=dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
+    verbose=0,
 )
 sim.run()
 ```
@@ -54,7 +57,8 @@ sim.run()
 
 Modeling TB and HIV together:
 
-```python
+```{python}
+#| output: false
 from tbsim.comorbidities.hiv import HIV
 from tbsim import TB
 import starsim as ss
@@ -63,7 +67,7 @@ import starsim as ss
 tb = TB()
 hiv = HIV()
 
-sim = ss.Sim(diseases=[tb, hiv])
+sim = ss.Sim(diseases=[tb, hiv], verbose=0)
 sim.run()
 ```
 
@@ -71,7 +75,8 @@ sim.run()
 
 Using household-based social networks:
 
-```python
+```{python}
+#| output: false
 import starsim as ss
 import sciris as sc
 from tbsim import TB
@@ -86,10 +91,7 @@ dhs_data = sc.dataframe(
 households = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 tb = TB()
 
-sim = ss.Sim(
-    networks=households,
-    diseases=tb
-)
+sim = ss.Sim(networks=households, diseases=tb, verbose=0)
 sim.run()
 ```
 
@@ -97,7 +99,8 @@ sim.run()
 
 Using the built-in analyzers:
 
-```python
+```{python}
+#| eval: false
 from tbsim import TB
 from tbsim.analyzers import DwellTime
 import starsim as ss
@@ -116,7 +119,8 @@ sim.analyzers[0].plot('network')
 
 Running multiple parameter combinations:
 
-```python
+```{python}
+#| output: false
 from tbsim import TB
 import starsim as ss
 import numpy as np
@@ -126,7 +130,7 @@ transmission_rates = np.linspace(0.1, 0.5, 5)
 
 results = []
 for rate in transmission_rates:
-    sim = ss.Sim(diseases=TB(pars={'beta': ss.peryear(rate)}))
+    sim = ss.Sim(diseases=TB(pars={'beta': ss.peryear(rate)}), verbose=0)
     sim.run()
     results.append(sim.results)
 ```
@@ -141,4 +145,4 @@ The `tbsim_examples/` directory contains ready-to-run examples:
 - **Interventions**: `run_tb_interventions.py` - BCG, TPT, and beta scenarios
 - **Health Seeking**: `run_health_seeking.py` - Health-seeking behaviour with the LSHTM TB model
 
-For more detailed tutorials and step-by-step guides, see the [tutorials](tutorials/index.md) section.
+For more detailed tutorials and step-by-step guides, see the [tutorials](../tutorials/index.md) section.

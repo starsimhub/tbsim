@@ -1,4 +1,6 @@
-# Scripts
+---
+title: Scripts
+---
 
 This section provides documentation for the example scripts in the `tbsim_examples` directory. These scripts demonstrate the core features of TBsim.
 
