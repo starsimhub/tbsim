@@ -9,7 +9,7 @@ strains, multi-strain transmission and superinfection, competition and reinfecti
 and treatment-acquired resistance, drug-susceptibility testing (DST) with regimen routing,
 treatment monitoring, and strain-aware preventive therapy (TPT).
 
-The companion reference — [tbsim-resistance-implementation.md](https://github.com/starsimhub/tbsim/blob/main/tbsim/resistance/docs/tbsim-resistance-implementation.md) — explains *how* each piece is implemented; this tutorial focuses on *using* it.
+The companion reference — the [`tbsim.resistance` README](https://github.com/starsimhub/tbsim/blob/main/tbsim/resistance/README.md) — explains *how* each piece is implemented; this tutorial focuses on *using* it.
 
 ## Setup
 
@@ -219,6 +219,28 @@ print(f"first-line courses:      {int(np.sum(sim.results['first'].n_treated))}")
 print(f"second-line (RIF-R):     {int(np.sum(sim.results['second'].n_treated))}")
 ```
 
+### Retreatment vs. new cases
+
+Every `TxDeliveryR` stamps a durable, cross-regimen `tb.ti_last_treatment` when it starts a course, so a
+delivery can distinguish agents returning after a previous course (retreatment) from genuinely new cases.
+`TxDeliveryR.failure_case_eligibility(within=<duration>)` returns a `sim → uids` classifier selecting
+agents whose last treatment was within `within` (pass `new_case=True` for the complement) — the natural
+way to route retreatment cases to a stronger second-line regimen.
+
+```{python}
+tb = tbsim.TBResistant(drugs=['RIF'], rel_fitness={'RIF': 0.9},
+                       beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                       init_strains=[0.8, 0.2], rr_reinfection_inf=1.0, rr_reinfection_non=1.0)
+retreat = tbsim.TxDeliveryR.failure_case_eligibility(within=ss.years(2))  # returned to care within 2 years
+first = tbsim.TxDeliveryR(name='first', rate_sym=ss.peryear(1.0),
+                          product=tbsim.TxR(strains=tb.strains, base_efficacy=0.5, resist_penalty={'RIF': 0.2}))
+second = tbsim.TxDeliveryR(name='second', eligibility=retreat, supersedes=['first'], rate_sym=ss.peryear(1.0),
+                           product=tbsim.TxR(strains=tb.strains, base_efficacy=0.85, regimen_drugs=['RIF']))
+sim = build_sim(tb, interventions=[first, second], stop='2035-12-31'); sim.run()
+print(f"first-line courses:  {int(np.sum(sim.results['first'].n_treated))}")
+print(f"retreatment courses: {int(np.sum(sim.results['second'].n_treated))}")
+```
+
 ## 7. Treatment monitoring and regimen switching
 
 `treatment_monitoring_eligibility(tx_name, after_steps)` selects agents who have been on a course for
@@ -315,5 +337,5 @@ You have now used every major feature of the resistance extension:
 - **`TPTRx`** — strain-aware preventive therapy and the resistance-unmasking dynamic.
 - **`ResistanceStats` / `StrainResults`** — resistance-origin decomposition and per-strain tracking.
 
-For the mechanics behind each of these, see the implementation reference,
-`tbsim/resistance/docs/tbsim-resistance-implementation.md`.
+For a task-oriented, recipe-style companion — including the results glossary, a parameter cheat sheet, and known limitations — see the [drug resistance user guide](../user_guide/resistance.qmd). For the mechanics behind each feature, see the [`tbsim.resistance` README](https://github.com/starsimhub/tbsim/blob/main/tbsim/resistance/README.md).
+

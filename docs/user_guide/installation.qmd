@@ -1,4 +1,6 @@
-# Installation Guide
+---
+title: Installation
+---
 
 This guide covers different ways to install and set up TBsim for your tuberculosis modeling projects.
 

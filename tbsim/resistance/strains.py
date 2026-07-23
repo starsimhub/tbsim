@@ -10,7 +10,7 @@ integer ``strain_mask`` (bit ``j`` set = carries strain ``j``); see
 ``tbsim.resistance.TBResistant``. This registry holds the strain-level lookups
 (fitness, resistance profiles, labels) and the bit helpers used to reason about masks.
 
-The two-strain reference (``model-tests.md``, ``ode.r``) is the ``n=1`` special
+The two-strain reference ODE (``tbsim.compartmental.TwoStrainODE``) is the ``n=1`` special
 case: ``drugs=['TX']`` gives strain 0 = A (susceptible) and strain 1 = B (resistant).
 """
 

@@ -1,14 +1,14 @@
 """
 Two-strain (drug-resistance) compartmental TB model — the ODE validation reference.
 
-Python port of ``ode.r`` (specified in ``model-tests.md`` §1–7): the single-strain
+Python port of ``two_strain_ode.R`` (in this folder): the single-strain
 LSHTM spectrum-of-disease model extended into strain A (treatment-susceptible) and
 strain B (treatment-resistant), with superinfection (``AB``), a transmission bottleneck,
 a progression bottleneck, de-novo resistance, and a strain-resolved treatment operator.
 
 Every "question of interest" is a mode switch on this one system; the defaults reproduce
 the intended baseline. Used as the deterministic reference that ``tbsim.TBResistant`` is
-validated against (``tests/test_resistance.py``). Parameter and state names match ``ode.r``.
+validated against (``tests/test_resistance.py``). Parameter and state names match ``two_strain_ode.R``.
 """
 
 import numpy as np
@@ -17,7 +17,7 @@ from scipy.integrate import odeint
 
 __all__ = ['two_strain_defaults', 'TwoStrainODE']
 
-# Canonical state ordering (matches ode.r).
+# Canonical state ordering (matches two_strain_ode.R).
 STATES = [
     'SUS', 'CLE', 'REC', 'TRD',
     'L_A', 'L_B', 'L_AB',
@@ -32,7 +32,7 @@ _IDX = {s: i for i, s in enumerate(STATES)}
 
 
 def two_strain_defaults():
-    """Default parameters (South-Africa 2-strain calibration; matches ode.r ``two_strain_defaults``)."""
+    """Default parameters (South-Africa 2-strain calibration; matches two_strain_ode.R ``two_strain_defaults``)."""
     return sc.objdict(
         N=1e5, mu=1/70,
         beta=16.45, trans_asymp=0.82,
@@ -80,7 +80,7 @@ class TwoStrainODE(sc.prettyobj):
         return y
 
     def derivs(self, y, t):
-        """Right-hand side of the 22-compartment system (model-tests.md §7)."""
+        """Right-hand side of the 22-compartment system (see two_strain_ode.R)."""
         p = self.pars
         s = {name: y[i] for i, name in enumerate(STATES)}
         SUS, CLE, REC, TRD = s['SUS'], s['CLE'], s['REC'], s['TRD']

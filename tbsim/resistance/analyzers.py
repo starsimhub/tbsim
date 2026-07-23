@@ -14,7 +14,7 @@ __all__ = ['ResistanceStats', 'StrainResults']
 
 class ResistanceStats(ss.Analyzer):
     """
-    Records the resistance observables of the reference ODE (``model-tests.md`` §11):
+    Records the resistance observables of the reference ODE (``tbsim.compartmental.TwoStrainODE``):
     resistant and superinfected fractions of active TB, and the **resistance-origin flux
     decomposition** — new resistant cases arising from (i) de-novo mutation, (ii) treatment-acquired
     resistance, (iii) TPT-acquired resistance, and (iv) transmission.

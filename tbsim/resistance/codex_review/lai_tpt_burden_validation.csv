@@ -1,4 +1,0 @@
-scenario,n_seeds,prevalence_per_100k,asymp_incidence_per_100k_yr,tb_mortality_per_100k_yr,frac_resist_active
-resistance_off,3,531.94,743.05,90.08,0.00
-resistance_on_agnostic,3,531.94,743.05,90.08,0.00
-resistance_on,3,545.93,758.28,91.52,0.03

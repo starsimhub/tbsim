@@ -5,8 +5,8 @@ Covers: the Strains registry, the transmission/superinfection mechanics, the
 strain-aware natural history (progression bottleneck, per-drug de-novo acquisition),
 the strain-resolved treatment operator, treatment monitoring / regimen switching,
 strain-aware TPT, DST + DST-routing, and validation against the two-strain reference
-ODE (tbsim.compartmental.TwoStrainODE, a port of ode.r) — including the model-tests.md
-§8 conservation / single-strain-reduction / strain-symmetry checks.
+ODE (tbsim.compartmental.TwoStrainODE, a port of two_strain_ode.R) — including the
+conservation / single-strain-reduction / strain-symmetry checks.
 """
 
 import numpy as np
@@ -613,7 +613,7 @@ def test_treatment_acquisition_multiple_strains_and_count_transfer():
     assert (counts[:, 1] == 0).all() and (counts[:, 2] == 0).all()
 
 
-# --------------------------------------------------------------------------- ODE reference self-checks (model-tests.md §8)
+# --------------------------------------------------------------------------- ODE reference self-checks
 def test_ode_conservation():
     """Summed over all 22 compartments the population is conserved at N."""
     ode = tc.TwoStrainODE(); df = ode.run()
@@ -638,6 +638,150 @@ def test_ode_strain_symmetry():
     df = ode.run(SY_A=5e2, SY_B=5e2)
     for a, b in [('L_A', 'L_B'), ('N_A', 'N_B'), ('AS_A', 'AS_B'), ('SY_A', 'SY_B')]:
         assert np.allclose(df[a], df[b], atol=1e-6)
+
+
+# --------------------------------------------------------------------------- ResistanceStats origin decomposition (public analyzer, §11)
+def test_resistance_stats_origin_decomposition():
+    """The ResistanceStats analyzer separates new resistance into de-novo / treatment-acquired /
+    transmitted flux: de-novo fires only with p_rand>0, treatment-acquired only with treatment + q_acq>0,
+    and transmitted whenever resistance already circulates."""
+    def run(p_rand, tx):
+        tb = tbsim.TBResistant(rel_fitness={'TX': 0.9}, beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.12),
+                               init_strains=[0.85, 0.15], rr_reinfection_inf=1.0, rr_reinfection_non=1.0,
+                               p_rand=p_rand)
+        ivs = None
+        if tx:
+            ivs = tbsim.TxDeliveryR(product=tbsim.TxR(strains=tb.strains, base_efficacy=0.8,
+                                    resist_penalty={'TX': 0.1}, q_acq={'TX': 0.05}), rate_sym=ss.peryear(1.0))
+        sim = make_sim(tb, seed=0, n=3000, stop='2040-12-31', interventions=ivs, analyzers=tbsim.ResistanceStats())
+        sim.run()
+        res = sim.results['resistancestats']
+        return dict(denovo=int(np.sum(res.flux_denovo)), txacq=int(np.sum(res.flux_txacq)),
+                    transmitted=int(np.sum(res.flux_transmitted)))
+
+    base = run(p_rand=None, tx=False)
+    denovo_only = run(p_rand={'TX': 0.02}, tx=False)
+    tx_only = run(p_rand=None, tx=True)
+    assert base['denovo'] == 0 and base['txacq'] == 0
+    assert base['transmitted'] > 0                       # seeded resistance still transmits
+    assert denovo_only['denovo'] > 0 and denovo_only['txacq'] == 0
+    assert tx_only['txacq'] > 0 and tx_only['denovo'] == 0
+
+
+def test_resistance_stats_tpt_flux_channel():
+    """TPT-driven acquisition is its own origin channel (flux_tptacq); with only p_tpt_acq active (no
+    de-novo, no treatment) resistance emerges and is attributed to TPT, not the other channels."""
+    tb = tbsim.TBResistant(drugs=['INH'], rel_fitness={'INH': 0.9}, beta=ss.permonth(0.3),
+                           init_prev=ss.bernoulli(0.2), init_strains=[1.0, 0.0],  # pure-susceptible seed
+                           rr_reinfection_inf=0.0, rr_reinfection_non=0.0, p_rand=None)
+    tpt = tbsim.TPTSimple(product=tbsim.TPTRx(strains=tb.strains, regimen_drugs=['INH'],
+                          p_tpt_acq={'INH': 1.0}, acq_state_rr={int(TBS.INFECTION): 1.0},
+                          pars=dict(efficacy=ss.bernoulli(0.6), p_sterilize=ss.bernoulli(0.0))),
+                          pars=dict(coverage=ss.bernoulli(0.5)))
+    sim = make_sim(tb, seed=0, n=3000, stop='2012-12-31', interventions=tpt, analyzers=tbsim.ResistanceStats())
+    sim.run()
+    res = sim.results['resistancestats']
+    assert int(np.sum(res.flux_tptacq)) > 0              # TPT-acquired resistance is captured
+    assert int(np.sum(res.flux_denovo)) == 0             # no de-novo configured
+    assert int(np.sum(res.flux_txacq)) == 0              # no treatment configured
+    assert sim.results.tb['frac_resist'][-1] > 0.0       # resistance really emerged
+
+
+# --------------------------------------------------------------------------- usability / safety API helpers
+def test_eligibility_combinators_intersect_and_union():
+    """eligibility_all / eligibility_any intersect / union the uids returned by their callables."""
+    a = lambda sim: ss.uids([1, 2, 3, 4])
+    b = lambda sim: ss.uids([3, 4, 5, 6])
+    assert set(tbsim.eligibility_all(a, b)(None).tolist()) == {3, 4}
+    assert set(tbsim.eligibility_any(a, b)(None).tolist()) == {1, 2, 3, 4, 5, 6}
+    assert len(tbsim.eligibility_all()(None)) == 0
+
+
+def test_agnostic_reproduces_single_strain_tb():
+    """TBResistant.agnostic() reproduces single-strain tbsim.TB: no resistance ever arises and the
+    endemic active prevalence tracks base TB within stochastic tolerance on a matched scenario."""
+    pars = dict(beta=ss.permonth(0.2), init_prev=ss.bernoulli(0.05))
+    s_tb = make_sim(tbsim.TB(name='tb', pars=pars), seed=1, n=5000); s_tb.run()
+    s_ag = make_sim(tbsim.TBResistant.agnostic(pars=pars), seed=1, n=5000); s_ag.run()
+    assert float(np.max(s_ag.results.tb['frac_resist'])) == 0.0        # no resistance ever
+    p_tb = np.array(s_tb.results.tb['prevalence_active'])[-24:].mean()
+    p_ag = np.array(s_ag.results.tb['prevalence_active'])[-24:].mean()
+    assert abs(p_tb - p_ag) < 0.02                                     # tracks single-strain TB
+
+
+def test_validate_drugs_raises_on_typos():
+    """Mistyped drug names fail fast (rather than resolving silently) in TxR, TPTRx, and DST."""
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+    s = tb.strains
+    with pytest.raises(ValueError, match='RIFF'):
+        tbsim.TxR(strains=s, regimen_drugs=['RIFF'])
+    with pytest.raises(ValueError, match='RIFF'):
+        tbsim.TxR(strains=s, q_acq={'RIFF': 0.1})
+    with pytest.raises(ValueError, match='RIFF'):
+        tbsim.TxR(strains=s, resist_penalty={'RIFF': 0.1})
+    with pytest.raises(ValueError, match='RIFF'):
+        tbsim.TPTRx(strains=s, p_tpt_acq={'RIFF': 0.1})
+    with pytest.raises(ValueError, match='RIFF'):
+        tbsim.DST(strains=s, sens={'RIFF': 0.9})
+    tbsim.TxR(strains=s, regimen_drugs=['RIF'], q_acq={'RIF': 0.1})    # a correct name still works
+
+
+# --------------------------------------------------------------------------- DST/treatment configuration knobs (L1)
+def test_dst_result_validity_expiry():
+    """With result_validity set, a stored DST result older than the window is wiped so the agent must be
+    re-tested; a fresh result is left intact."""
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0))
+    dst = tbsim.DSTDelivery(product=tbsim.DST(strains=tb.strains, sens=1.0, spec=1.0),
+                            result_validity=ss.months(6),
+                            eligibility=lambda sim: ss.uids())  # never (re)test → observe expiry alone
+    sim = make_sim(tb, n=100, interventions=dst); sim.init()
+    dst = _product(sim, tbsim.DSTDelivery)
+    stale, fresh = ss.uids(np.arange(50)), ss.uids(np.arange(50, 100))
+    for u in (stale, fresh):
+        dst.dst_tested[u] = True
+        dst.dst_profile[u] = 1
+    dst.ti_dst[stale] = -10   # tested 10 steps ago (> ~6-month window) → stale
+    dst.ti_dst[fresh] = -1    # tested last step → fresh
+    dst.step()                # expiry runs at ti=0
+    assert not dst.dst_tested[stale].any() and int(dst.dst_profile[stale].sum()) == 0
+    assert np.isnan(dst.ti_dst[stale]).all()
+    assert dst.dst_tested[fresh].all()  # fresh result untouched
+
+
+def test_dst_matches_max_age_gates_stale_results():
+    """matches(..., max_age=) selects only agents whose DST result is within the window."""
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+    dst = tbsim.DSTDelivery(name='dst', product=tbsim.DST(strains=tb.strains, sens=1.0, spec=1.0))
+    sim = make_sim(tb, n=100, interventions=dst); sim.init()
+    dst = sim.interventions['dst']
+    tb = sim.get_tb()
+    u = ss.uids(np.arange(100))
+    tb.state[u] = TBS.SYMPTOMATIC            # active so exclude_on_treatment keeps them
+    dst.dst_tested[u] = True
+    dst.dst_profile[u] = 1                   # observed RIF-resistant (bit 0)
+    fresh, stale = ss.uids(np.arange(50)), ss.uids(np.arange(50, 100))
+    dst.ti_dst[fresh] = -1
+    dst.ti_dst[stale] = -10
+    sel = dst.matches(RIF=True, max_age=ss.months(6))(sim)
+    assert set(fresh.tolist()) <= set(sel.tolist())
+    assert len(set(stale.tolist()) & set(sel.tolist())) == 0
+
+
+def test_dst_retreat_after_guard_bounds_treatments():
+    """retreat_after imposes a refractory period so a failing agent is not re-treated on every
+    resolution; cumulative treatments fall sharply vs. no guard."""
+    def run(retreat_after):
+        tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0), init_prev_active=ss.bernoulli(0.2))
+        tx = tbsim.TxDeliveryR(name='tx', product=tbsim.TxR(strains=tb.strains, base_efficacy=0.0, adherence=1.0),
+                               eligibility=lambda sim: sim.get_tb().active_tb.uids,
+                               dur_treatment=ss.months(6), retreat_after=retreat_after)
+        sim = make_sim(tb, seed=0, n=2000, stop='2008-12-31', interventions=tx)
+        sim.run()
+        return int(np.sum(sim.results['tx'].n_treated))
+    unguarded = run(None)
+    guarded = run(ss.years(50))     # longer than the run → at most ~one course per agent
+    assert guarded < unguarded
+    assert unguarded > 2 * guarded  # continuous retreatment inflates the unguarded count
 
 
 if __name__ == '__main__':

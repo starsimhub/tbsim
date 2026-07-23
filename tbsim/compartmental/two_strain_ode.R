@@ -1,15 +1,15 @@
 # =============================================================================
 # Two-strain compartmental TB model (deterministic ODE).
 #
-# Extends the single-strain LSHTM spectrum-of-disease model
-# (~/active/tbsim/tbsim/compartmental/lshtm_ode.R) into a two-strain system:
+# Extends the single-strain LSHTM spectrum-of-disease model (lshtm_ode.R, in this
+# folder) into a two-strain system:
 #   strain A = treatment-susceptible, strain B = treatment-resistant.
 #
-# Implements the master system described in model-tests.md Sections 1-7.
-# Every "question of interest" (model-tests.md Section 10) is a parameter or
-# mode switch on this one system; the defaults reproduce the intended baseline.
+# Every "question of interest" is a parameter or mode switch on this one system;
+# the defaults reproduce the intended baseline. The Python port is two_strain_ode.py
+# (tbsim.compartmental.TwoStrainODE), against which tbsim.TBResistant is validated.
 #
-# State names map to the spec symbols as follows:
+# State names map to the model symbols as follows:
 #   SUS = S, CLE = C, REC = R, TRD = W                  (strain-agnostic)
 #   L_*  = L^s  (INFECTION / latent)                    s in {A, B, AB}
 #   N_*  = N^s  (NON_INFECTIOUS)
@@ -41,7 +41,7 @@ TWO_STRAIN_STATES <- c(
 )
 
 # -----------------------------------------------------------------------------
-# Default parameters (model-tests.md Section 2).
+# Default parameters (South-Africa 2-strain calibration).
 #
 # Natural-history rates inherit the LSHTM / tbsim.TB defaults. Mode switches are
 # encoded as 0/1 numeric indicators so the whole vector stays numeric and can be
@@ -154,7 +154,7 @@ two_strain_init <- function(N = 1e5, ...) {
 }
 
 # -----------------------------------------------------------------------------
-# Derivative function (model-tests.md Section 7). Returns the 23 derivatives in
+# Derivative function. Returns the 23 derivatives in
 # TWO_STRAIN_STATES order plus a set of observable outputs.
 # -----------------------------------------------------------------------------
 two_strain_des <- function(time, state, parms) {
@@ -287,7 +287,7 @@ two_strain_des <- function(time, state, parms) {
       TA_A + TA_B + TA_AB + TY_A + TY_B + TY_AB
     dDTH <- mu * dynamic_sum + sym_dead * sumY
 
-    # --- Observable outputs (model-tests.md Section 11) ---
+    # --- Observable outputs ---
     active      <- AS_A + AS_B + AS_AB + SY_A + SY_B + SY_AB
     active_B    <- AS_B + SY_B + AS_AB + SY_AB        # active TB carrying B
     active_AB   <- AS_AB + SY_AB                      # active superinfections
