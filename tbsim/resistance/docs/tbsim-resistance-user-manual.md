@@ -268,7 +268,9 @@ Already-infected agents can acquire a **second** (distinct) strain. Relative ris
 | ASYMPTOMATIC | `rr_reinfection_asy` | `0` (closed) |
 | SYMPTOMATIC | `rr_reinfection_sym` | `0` (closed) |
 
-Protection is **strain-agnostic** (a third *distinct* strain is not harder to acquire than a second). Re-exposure to an already-carried strain is now **allowed**: rather than being blocked, it increments that agent's per-strain **count** (tracked in `tb.strain_counts`, one array per strain id) and is tallied in `new_identical_superinf`. The count feeds only two consumers — the transmission multinomial (which strain is passed ∝ `count × fitness`) and the progression bottleneck under `p_multi < 1` (which strain survives ∝ count) — and leaves transition rates, DST, treatment efficacy, and resistance acquisition count-agnostic (all copies of a strain behave as one). See [resistance-updates-guide.md §1–§2](resistance-updates-guide.md) for a walkthrough.
+Protection is **strain-agnostic** (a third *distinct* strain is not harder to acquire than a second). Re-exposure to an already-carried strain is now **allowed**: rather than being blocked, it increments that agent's per-strain **count** (tracked in `tb.strain_counts`, one array per strain id) and is tallied in `new_identical_superinf`. The count feeds only two consumers — the transmission multinomial (which strain is passed ∝ `count × fitness`) and the progression bottleneck under `p_multi < 1` (which strain survives ∝ count) — and leaves transition rates, DST, treatment efficacy, and the *probability* of resistance acquisition count-agnostic (all copies of a strain behave as one). When a strain does acquire resistance (de-novo, on treatment, or under TPT), its count **carries over** to the emergent resistant strain — accumulating onto any copies already present — so multiplicity is preserved through acquisition (under `'replacement'` the source count moves to the target; under de-novo `'mixed'` the source keeps its count and the target additionally receives a copy). See [resistance-updates-guide.md §1–§2](resistance-updates-guide.md) for a walkthrough.
+
+The reinfection surface (`rr_reinfection_inf` / `rr_reinfection_non`, the clock-reset on re-exposure of a latent or non-infectious agent) now lives on base `tbsim.TB` as well, so single-strain models get the same latent-reinfection behavior; `TBResistant` adds the strain overlay on top.
 
 Fitness costs drive competition. Without treatment, a less-fit resistant strain tends to decline:
 
@@ -348,7 +350,7 @@ Use the product/delivery pair:
 - **`TxR`** — per-strain efficacy, adherence, acquisition-on-failure (`q_acq`)
 - **`TxDeliveryR`** — who starts treatment and when (rates from ASY/SYM, or a custom `eligibility` callable)
 
-Efficacy for strain `j` is `base_efficacy` × product of `resist_penalty` over **regimen** drugs that strain resists. If that constrained form is too restrictive, pass an explicit per-strain efficacy vector `efficacy_by_strain` (length `m`, the spec's `T_l = {t_1,l, …, t_m,l}`) — it is used verbatim as the cure probabilities and overrides `base_efficacy`/`resist_penalty`. Failed courses can acquire resistance to regimen drugs by **replacement** — one trial per regimen drug, at most once per treatment episode — scaled by TB-state RR (`acq_state_rr`; default 1 for ASY/SYM, 0 elsewhere).
+Efficacy for strain `j` is `base_efficacy` × product of `resist_penalty` over **regimen** drugs that strain resists. If that constrained form is too restrictive, pass an explicit per-strain efficacy vector `efficacy_by_strain` (length `m`, the spec's `T_l = {t_1,l, …, t_m,l}`) — it is used verbatim as the cure probabilities and overrides `base_efficacy`/`resist_penalty`. Failed courses can acquire resistance to regimen drugs by **replacement**: **each** surviving drug-susceptible strain rolls independently, once per regimen drug it is susceptible to (mirroring de-novo), so more than one strain can acquire resistance in a single failed course. Each roll is scaled by TB-state RR (`acq_state_rr`; default 1 for ASY/SYM, 0 elsewhere), and an emergent resistant strain inherits its source strain's per-strain count.
 
 `adherence` is a per-course completion probability that correlates all of an agent's strains through a single draw (a non-completer clears nothing that course). Pass a **float** for one regimen-level probability shared by every agent, or a **callable** `uids -> per-agent probability` to make adherence a regimen-level *distribution that varies by agent*, e.g. `adherence=lambda uids: my_dist.rvs(uids)`.
 
@@ -388,11 +390,13 @@ print('Final resistant fraction:', float(sim.results.tb['frac_resist'][-1]))
 
 Partial cure is supported: if only some strains clear, the agent returns to the pre-treatment TB state carrying the survivors.
 
+**Treating latent (`INFECTION`) agents.** `TxDeliveryR(treat_latent=...)` controls what happens when a latent agent is selected for treatment (only reachable via a custom/DST-routed `eligibility` — the default rate-based initiation draws from ASYMPTOMATIC/SYMPTOMATIC only). With `treat_latent=False` (**default**) the agent undergoes strain-aware **sterilization**: every strain susceptible to *all* regimen drugs is cleared with certainty, any regimen-resistant strain is kept (the agent stays latent), and the agent moves to `CLEARED` only if no strain remains — no course is run and no resistance is acquired. So a pan-susceptible latent agent is still fully cleared (single-strain behavior is unchanged), but a latent agent carrying a regimen-resistant strain now retains it. Latent agents handled this way are **not** counted in `n_treated`. Set `treat_latent=True` to instead run latent agents through a full failable course that can select for resistance exactly like active disease.
+
 ---
 
 ## 8. Drug-susceptibility testing (DST)
 
-`DST` produces an **observed n-drug profile** (not strain identities). Sensitivity/specificity are applied at the strain level; `p_strain_obs` (default = strain fitness) can drop strains from the sample. `DSTDelivery.matches(...)` turns the observed profile into eligibility callables for regimen routing.
+`DST` produces an **observed n-drug profile** (not strain identities). Sensitivity/specificity are applied at the strain level; `p_strain_obs` (default = strain fitness) can drop strains from the sample. `DSTDelivery.matches(...)` turns the observed profile into eligibility callables for regimen routing. Sensitivity/specificity errors are drawn **independently per (strain, drug)**, so a multi-drug DST behaves like independent per-drug tests — a strain resistant to one modeled drug and susceptible to another can be mis-called on each drug independently, rather than the errors being perfectly correlated across drugs.
 
 A key point about `regimen_drugs`: it names the **drugs the regimen acts on**, i.e. which strains it can cure (a strain resistant to a regimen drug is cured only at the `resist_penalty`-reduced efficacy, or not at all if the penalty is 0). So a realistic second-line for RIF-resistant TB is built from a **different** drug the resistant strain is still susceptible to — not RIF. The example below uses a two-drug space (`RIF`, `BDQ`): first-line is a RIF regimen routed to observed RIF-susceptible cases, and second-line is a BDQ regimen routed to observed RIF-resistant cases (which are BDQ-susceptible here).
 
@@ -639,6 +643,7 @@ Once resistance is established, **transmission** usually dominates cumulative ev
 | `eligibility` | Optional `sim → uids` override |
 | `supersedes` | Names of deliveries to interrupt before starting |
 | `retreat_after` | Refractory `ss.dur` after a course before the same agent is re-treated by this delivery |
+| `treat_latent` | How a selected latent (`INFECTION`) agent is handled: `False` (default) = certain strain-aware sterilization (regimen-susceptible strains cleared, regimen-resistant kept, no course, not counted in `n_treated`); `True` = full failable course |
 | `TxDeliveryR.failure_case_eligibility(within, base=, new_case=)` | Classifier `sim → uids` for retreatment vs new case (reads durable `tb.ti_last_treatment`) |
 
 ### 12.3 `DST` / `TPTRx`

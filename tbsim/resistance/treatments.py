@@ -12,15 +12,17 @@ Per the reference treatment operator (``model-tests.md`` §6): each carried stra
 cured independently (efficacy reduced for strains resistant to *regimen* drugs), the
 whole course's outcomes are correlated through a single agent-level adherence draw,
 failures return to the state treatment was initiated from with the surviving strains,
-and among surviving treatment-susceptible strains resistance is acquired with probability
-``q_acq[drug]`` (× a per-state RR) as **replacement** (the surviving A strain becomes B).
-This reproduces the ODE's ``π(m → s)`` outcome table exactly for the two-strain case.
+and each surviving treatment-susceptible strain independently acquires resistance to each
+regimen drug with probability ``q_acq[drug]`` (× a per-state RR) as **replacement** — so
+multiple strains may acquire resistance in one course, mirroring de-novo acquisition, with
+multiplicity transferred source→target. This reproduces the ODE's ``π(m → s)`` outcome table
+exactly for the single-strain-per-agent two-strain case.
 """
 
 import numpy as np
 import starsim as ss
 
-from ..tb import TBS, get_tb, choice2d
+from ..tb import TBS, get_tb
 from .tb_resistant import TBResistant
 
 __all__ = ['TxR', 'TxDeliveryR', 'treatment_monitoring_eligibility', 'eligibility_all', 'eligibility_any', 'will_fail']
@@ -52,20 +54,16 @@ class TxR(ss.Product):
             Default 1 for ASYMPTOMATIC/SYMPTOMATIC, 0 for all other states.
         regimen_drugs (list): drugs the regimen acts on; determines which strains can be cured/acquire
             resistance. Default: all drugs in ``strains``.
-        acq_select (str): how the carried strain that acquires resistance on failure is chosen among
-            the drug-susceptible carried strains — ``'random'`` (uniform, default) or ``'fitness'``
-            (∝ fitness). See L4 / implementation-decisions.md D-L4.
     """
 
     def __init__(self, strains, base_efficacy=0.85, resist_penalty=None, efficacy_by_strain=None,
-                 adherence=1.0, q_acq=None, acq_state_rr=None, regimen_drugs=None, acq_select='random', **kwargs):
+                 adherence=1.0, q_acq=None, acq_state_rr=None, regimen_drugs=None, **kwargs):
         super().__init__(**kwargs)
         self.strains = strains
         self.base_efficacy = base_efficacy
         self.resist_penalty = resist_penalty or {}
         self.regimen_drugs = list(regimen_drugs) if regimen_drugs is not None else list(strains.drugs)
         self.q_acq = dict(q_acq) if q_acq else {}
-        self.acq_select = acq_select
         # Fail-fast on mistyped drug names (L8) before they silently resolve via .get().
         strains.validate_drugs(self.regimen_drugs, where='TxR.regimen_drugs')
         strains.validate_drugs(self.q_acq, where='TxR.q_acq')
@@ -101,10 +99,8 @@ class TxR(ss.Product):
         # CRN distributions (a list of Dists is discovered by sc.search like any attribute).
         self._adh_rng = ss.bernoulli(name='txr_adherence', p=(0.5 if self.adherence_distribution else adherence))
         self._cure_rngs = [ss.bernoulli(name=f'txr_cure_{j}', p=float(self.eff_by_id[j])) for j in range(strains.m)]
-        # One independent uniform stream per regimen drug for acquisition-on-failure (state-scaled at draw),
-        # plus one choice stream per drug to pick which carried susceptible strain mutates (L4).
+        # One independent uniform stream per regimen drug for acquisition-on-failure (state-scaled at draw).
         self._acq_rngs = [ss.random(name=f'txr_acq_{d}') for d in self.regimen_drugs]
-        self._acq_select = [choice2d(p=np.ones((1, strains.m)) / strains.m, name=f'txr_acqsel_{d}') for d in self.regimen_drugs]
         return
 
     def roll_survivors(self, tb, uids):
@@ -127,31 +123,35 @@ class TxR(ss.Product):
             surv[carrier] = sub
         return surv
 
-    def acquire(self, uids, surv, states=None):
-        """Apply acquisition-on-failure (replacement) to the surviving masks of failed courses.
+    def acquire_counts(self, tb, uids, counts0, states=None):
+        """Apply acquisition-on-failure (replacement) to the surviving *counts* of failed courses.
 
-        One trial per agent per regimen drug (spec: once per treatment episode), scaled by the
-        per-agent state RR (``acq_state_rr``; default 0 outside ASYMPTOMATIC/SYMPTOMATIC). A hit
-        replaces one carried strain susceptible to that drug — chosen per ``acq_select`` (L4) — with
-        its resistant counterpart.
+        Each surviving carried strain independently rolls, once per regimen drug it is susceptible to,
+        whether it acquires that resistance (prob ``q_acq[drug]`` × the per-agent state RR
+        ``acq_state_rr``; default 0 outside ASYMPTOMATIC/SYMPTOMATIC). Hits mutate the strain to its
+        resistant counterpart, transferring multiplicity source→target via
+        :meth:`TBResistant._apply_acquisition`. Multiple strains may acquire resistance in one course.
+
+        Returns ``(counts, mask, n_events)`` for the treated agents.
         """
         if len(uids) == 0 or not self.q_acq:
-            return surv
-        m = self.strains
+            js = np.arange(self.strains.m)
+            mask = ((counts0 > 0).astype(np.int64) * (1 << js)).sum(axis=1)
+            return counts0, mask, 0
         rr = np.ones(len(uids))
         if states is not None:
             rr = np.array([self.acq_state_rr.get(int(s), 0.0) for s in states], dtype=float)
-        for di, drug in enumerate(self.regimen_drugs):
+        drug_idxs, q_by_di, rng_by_di = [], {}, {}
+        for pos, drug in enumerate(self.regimen_drugs):
             p = self.q_acq.get(drug, 0.0)
-            if p <= 0:
-                continue
-            u = np.asarray(self._acq_rngs[di].rvs(uids), dtype=float)
-            hit = u < (p * rr)
-            if not hit.any():
-                continue
-            surv[hit] = m.mutate_one_susceptible(surv[hit], drug, self._acq_select[di], uids[hit],
-                                                 weighted=(self.acq_select == 'fitness'))
-        return surv
+            if p > 0:
+                di = self.strains.drug_idx[drug]
+                drug_idxs.append(di)
+                q_by_di[di] = p
+                rng_by_di[di] = self._acq_rngs[pos]
+        def hit_fn(di, cu, rows):
+            return rng_by_di[di].rvs(cu) < (q_by_di[di] * rr[rows])
+        return tb._apply_acquisition(uids, counts0, drug_idxs, hit_fn, mixed=False)
 
 
 class TxDeliveryR(ss.Intervention):
@@ -182,8 +182,11 @@ class TxDeliveryR(ss.Intervention):
             re-treated by this delivery. Prevents a failing agent from being re-treated on every
             resolution off a single stale DST result (L1). Default ``None`` = no guard.
         treat_latent (bool): how latent (``INFECTION``) agents selected for treatment are handled.
-            ``False`` (default): cleared immediately to ``CLEARED`` with no course (matching base
-            ``tbsim.TxDelivery``); they never enter ``TREATMENT`` and cannot acquire resistance.
+            ``False`` (default): strain-aware sterilization — every carried strain susceptible to *all*
+            regimen drugs is cleared with certainty, any regimen-resistant strain persists (the agent
+            stays latent carrying it), and an agent left carrying no strain moves to ``CLEARED``. No
+            course is run and no resistance is acquired. For a pan-susceptible agent this clears the only
+            strain → ``CLEARED``, matching the single-strain behavior of base ``tbsim.TxDelivery``.
             ``True``: run through a full course that can fail / select for resistance. See L3 /
             implementation-decisions.md D-L3. (The default rate-based eligibility never selects latent
             agents, so this only affects custom / DST-routed eligibilities.)
@@ -207,6 +210,7 @@ class TxDeliveryR(ss.Intervention):
         self.define_states(
             ss.FloatArr('ti_treatment_start'),
             ss.FloatArr('ti_treatment_end'),
+            ss.BoolArr('on_course', default=False),
             ss.IntArr('pending_surv', default=0),
             ss.IntArr('prior_state', default=int(TBS.SUSCEPTIBLE)),
         )
@@ -235,16 +239,18 @@ class TxDeliveryR(ss.Intervention):
 
         Reverts interrupted agents to the state treatment was initiated from, keeping their current
         strains, so another delivery can re-treat them. Only agents actually on *this* delivery's
-        course (state TREATMENT with a finite ``ti_treatment_end``) are affected.
+        course (``on_course``) are affected — the flag is delivery-scoped, so a shared TREATMENT
+        state never lets one delivery interrupt another delivery's patients (#447).
         """
         uids = ss.uids(uids)
         if len(uids) == 0:
             return ss.uids()
         tb = get_tb(self.sim, which=TBResistant)
-        mine = uids[(tb.state[uids] == TBS.TREATMENT) & np.isfinite(self.ti_treatment_end[uids])]
+        mine = uids[self.on_course[uids]]
         if len(mine) == 0:
             return mine
         tb.state[mine] = self.prior_state[mine]
+        self.on_course[mine] = False
         self.ti_treatment_start[mine] = np.nan
         self.ti_treatment_end[mine] = np.nan
         self.pending_surv[mine] = 0
@@ -312,20 +318,15 @@ class TxDeliveryR(ss.Intervention):
             window = self.retreat_after / self.t.dt
             start = start[~(np.isfinite(end) & ((self.ti - end) < window))]
 
-        # Latent-treatment divergence (L3): by default, latent agents selected for treatment are
-        # cleared immediately (base-tbsim behavior) instead of running a course that could fail /
-        # acquire resistance, and are excluded from the course-based `start` (not counted as treated).
+        # Latent-treatment divergence (L3 / TR-5): by default, latent agents selected for treatment
+        # undergo strain-aware sterilization — regimen-susceptible strains cleared with certainty, any
+        # regimen-resistant strain kept (agent stays latent) — instead of running a course that could
+        # fail / acquire resistance, and are excluded from the course-based `start` (not counted as treated).
         if not self.treat_latent and len(start):
             is_latent = tb.latent[start]
             latent = start[is_latent]
             if len(latent):
-                tb.state[latent] = TBS.CLEARED
-                tb.strain_mask[latent] = 0
-                tb._reset_counts(latent)
-                tb.rr_reinfection[latent] = tb.pars.rr_reinfection_cleared
-                tb._set_reinfection_wane(latent)
-                tb.infected[latent] = False
-                tb.susceptible[latent] = True
+                tb.sterilize_covered(latent, self.product.regimen_drugs)
                 start = start[~is_latent]
 
         self._n_treated = len(start)
@@ -336,6 +337,7 @@ class TxDeliveryR(ss.Intervention):
         self.pending_surv[start] = self.product.roll_survivors(tb, start)
         tb.ti_last_treatment[start] = self.ti  # durable cross-regimen history (failure-vs-new-case; spec §Diagnostics)
         tb.state[start] = TBS.TREATMENT
+        self.on_course[start] = True  # delivery-scoped ownership so _resolve only claims its own patients (#447)
         dur_steps = self.pars.dur_treatment / self.t.dt
         self.ti_treatment_start[start] = self.ti
         self.ti_treatment_end[start] = self.ti + dur_steps
@@ -345,10 +347,13 @@ class TxDeliveryR(ss.Intervention):
     def _resolve(self):
         tb = get_tb(self.sim, which=TBResistant)
         self._n_success = self._n_failure = self._n_acquired = 0
-        on_tx = (tb.state == TBS.TREATMENT).uids
-        done = on_tx[self.ti >= self.ti_treatment_end[on_tx]]
+        # Delivery-scoped: only resolve courses THIS delivery started (`on_course`), never agents put
+        # into TREATMENT by another delivery. `ti_treatment_end` persists after a course (retreat_after
+        # relies on it), so it alone cannot identify current patients (#447).
+        done = (self.on_course & (self.ti >= self.ti_treatment_end)).uids
         if len(done) == 0:
             return
+        self.on_course[done] = False  # release; these agents leave TREATMENT below
 
         surv = self.pending_surv[done]
         cured = done[surv == 0]
@@ -357,23 +362,20 @@ class TxDeliveryR(ss.Intervention):
         # Cured: clear all strains (and their counts, spec §5), go to CLEARED with post-treatment protection.
         if len(cured):
             tb.state[cured] = TBS.CLEARED
-            tb.strain_mask[cured] = 0
-            tb._reset_counts(cured)
-            tb.rr_reinfection[cured] = tb.pars.rr_reinfection_treat
-            tb._set_reinfection_wane(cured)
+            tb._enter_cleared(cured, tb.pars.rr_reinfection_treat)
         self._n_success = len(cured)
 
-        # Failed: acquisition (replacement, state-scaled), then return to the state treated from. The
-        # per-strain counter is re-synced from the pre-course mask: cured strains → count 0, an acquired
-        # (emergent) strain → count 1, surviving strains keep their count (spec §5, D-COUNTER).
+        # Failed: cured strains drop out (count 0); surviving strains keep their pre-course count; then
+        # acquisition-on-failure mutates surviving treatment-susceptible strains, transferring the source
+        # strain's count to its resistant target (spec §2/§3, D-COUNTER). Finally return to the state
+        # treated from.
         if len(failed):
-            before = np.asarray(tb.strain_mask[failed]).copy()
-            surv_f = self.pending_surv[failed].copy()
-            before_acq = surv_f.copy()
-            surv_f = self.product.acquire(failed, surv_f, states=self.prior_state[failed])
-            self._n_acquired = int(np.count_nonzero(surv_f != before_acq))
-            tb.strain_mask[failed] = surv_f
-            tb._sync_counts_to_mask(failed, before)
+            surv_mask = self.pending_surv[failed]                        # surviving strains (bits ⊆ pre-course)
+            counts_surv = tb._counts(failed) * tb.strains.carried(surv_mask)  # zero out cured strains
+            counts, mask, _ = self.product.acquire_counts(tb, failed, counts_surv, states=self.prior_state[failed])
+            self._n_acquired = int(np.count_nonzero(mask != surv_mask))  # agents whose strain profile changed
+            tb._write_counts(failed, counts)
+            tb.strain_mask[failed] = mask
             tb.state[failed] = self.prior_state[failed]
         self._n_failure = len(failed)
         return
@@ -425,8 +427,7 @@ def will_fail(tx_name):
         tx = sim.interventions.get(tx_name)
         if tx is None:
             return ss.uids()
-        tb = get_tb(sim, which=TBResistant)
-        on_tx = (tb.state == TBS.TREATMENT).uids
+        on_tx = tx.on_course.uids  # delivery-scoped: only this tx's own patients (#447)
         if len(on_tx) == 0:
             return on_tx
         return on_tx[np.asarray(tx.pending_surv[on_tx]) != 0]
@@ -455,13 +456,12 @@ def treatment_monitoring_eligibility(tx_name, after_steps=4, every_steps=None, r
         tx = sim.interventions.get(tx_name)
         if tx is None:
             return ss.uids()
-        tb = get_tb(sim, which=TBResistant)
-        on_tx = (tb.state == TBS.TREATMENT).uids
+        on_tx = tx.on_course.uids  # delivery-scoped: only this tx's own patients (#447)
         if len(on_tx) == 0:
             return on_tx
-        start = np.asarray(tx.ti_treatment_start[on_tx], dtype=float)  # finite only for tx's own patients
+        start = np.asarray(tx.ti_treatment_start[on_tx], dtype=float)
         elapsed = sim.ti - start
-        ready = np.isfinite(start) & (elapsed >= after_steps)
+        ready = elapsed >= after_steps
         if every_steps:
             ready &= ((elapsed - after_steps) % every_steps == 0)
         out = on_tx[ready]

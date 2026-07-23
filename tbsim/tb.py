@@ -152,6 +152,8 @@ class TB(BaseTB):
             rr_reinfection_rec=0.21,            # π pi: RR reinfection after NON_INFECTIOUS → CLEARED
             rr_reinfection_treat=3.15,          # ρ rho: RR reinfection after TREATMENT → CLEARED
             rr_reinfection_cleared=1.0,         # RR reinfection after INFECTION → CLEARED (latent cleared); also applies to agents cleared via TPT sterilization
+            rr_reinfection_inf=None,            # σ_L: relative susceptibility of a latent INFECTION agent to reinfection (clock reset). None → rr_reinfection_rec
+            rr_reinfection_non=None,            # σ_N: relative susceptibility of a NON_INFECTIOUS agent to reinfection (clock reset). None → rr_reinfection_inf
             dur_reinfection_protection=None,    # Distribution of protection duration; None = never wanes
             # --- From INFECTION (latent) ---
             inf_cle=ss.peryear(1.90),            # Clear infection (no active TB)
@@ -176,12 +178,7 @@ class TB(BaseTB):
             cxr_asymp_sens=1.0,                 # CXR sensitivity for screening asymptomatic (0–1)
         )
         self.update_pars(pars, **kwargs)
-
-        # Decline parameters are shape terms for exp(-k*tau); require k >= 0.
-        if self.pars.k_asy < 0:
-            raise ValueError(f'k_asy must be >= 0, got {self.pars.k_asy}')
-        if self.pars.k_non < 0:
-            raise ValueError(f'k_non must be >= 0, got {self.pars.k_non}')
+        self._validate_pars()
 
         # CRN-safe RNG distributions for per-step transition draws (one per source state)
         self._rng_inf = ss.random(name='tb_rng_inf')   # INFECTION exits
@@ -210,6 +207,38 @@ class TB(BaseTB):
             reset=True,
         )
 
+        return
+
+    def _validate_pars(self):
+        """Validate parameter values that share the same rule across ``TB`` and ``TBResistant``.
+
+        Called after ``update_pars`` in each subclass' ``__init__`` so the checks live in one place
+        (``TBResistant`` applies its own pars after ``super().__init__``, hence the shared re-use).
+        """
+        # Decline parameters are shape terms for exp(-k*tau); require k >= 0.
+        if self.pars.k_asy < 0:
+            raise ValueError(f'k_asy must be >= 0, got {self.pars.k_asy}')
+        if self.pars.k_non < 0:
+            raise ValueError(f'k_non must be >= 0, got {self.pars.k_non}')
+        return
+
+    def _set_reinfection_wane(self, uids):
+        """Schedule reinfection-protection waning for newly cleared ``uids``, if waning is enabled."""
+        if self.pars.dur_reinfection_protection is not None and len(uids):
+            self.ti_rr_reinfection_wane[uids] = self.ti + self.pars.dur_reinfection_protection.rvs(uids)
+        return
+
+    def _enter_cleared(self, uids, rr):
+        """Bookkeeping shared by every pathway that moves agents into ``CLEARED``.
+
+        Sets the pathway-specific per-agent reinfection RR and schedules protection waning. Callers set
+        ``state`` (and any infected/susceptible flags) themselves. ``TBResistant`` extends this to also
+        drop all carried strains and their counts.
+        """
+        if len(uids) == 0:
+            return
+        self.rr_reinfection[uids] = rr
+        self._set_reinfection_wane(uids)
         return
 
     @property
@@ -260,20 +289,41 @@ class TB(BaseTB):
         """
         Set prognoses for newly infected agents (called when transmission occurs).
 
-        The base `starsim.Infection` calls this when a susceptible agent
-        acquires infection. We mark agents infected and set state to INFECTION
-        (latent). Transitions are evaluated per dt each timestep in `step`.
+        The base `starsim.Infection` calls this when a susceptible agent acquires infection. A primary
+        infection (from ``SUSCEPTIBLE`` / ``CLEARED``) enters latent ``INFECTION``; a *reinfection* of an
+        already-infected latent (``INFECTION``) or non-infectious (``NON_INFECTIOUS``) agent only resets
+        the ``ti_infected`` clock — its state is left unchanged (clock reset, no state change). Transitions
+        are evaluated per dt each timestep in `step`.
         """
         super().set_prognoses(uids, sources)
         if len(uids) == 0:
             return
 
+        # Reinfection resets everyone's infection clock (raising the progression hazard under
+        # front-loading); the state is only (re)set to INFECTION for agents entering from a non-infected
+        # state, so a reinfected NON_INFECTIOUS agent is not wrongly knocked back to latent.
+        was_uninfected = ~self.infected[uids]
         self.susceptible[uids] = False
         self.infected[uids] = True
         self.ever_infected[uids] = True
         self.ti_infected[uids] = self.ti
-        self.state[uids] = TBS.INFECTION
+        self.state[uids[was_uninfected]] = TBS.INFECTION
 
+        return
+
+    def init_pre(self, sim):
+        """Resolve the reinfection-RR default coupling once all pars are final (spec §reinfection).
+
+        ``rr_reinfection_inf`` (σ_L) defaults to ``rr_reinfection_rec``; ``rr_reinfection_non`` (σ_N)
+        defaults to ``rr_reinfection_inf``. Done here (not in ``__init__``) so it uses the fully-resolved
+        pars regardless of subclass construction order (``TBResistant`` applies its pars after
+        ``super().__init__``).
+        """
+        super().init_pre(sim)
+        if self.pars.rr_reinfection_inf is None:
+            self.pars.rr_reinfection_inf = float(self.pars.rr_reinfection_rec)
+        if self.pars.rr_reinfection_non is None:
+            self.pars.rr_reinfection_non = float(self.pars.rr_reinfection_inf)
         return
 
     def init_post(self):
@@ -418,9 +468,7 @@ class TB(BaseTB):
                 TBS.ASYMPTOMATIC:   inf_asy,
             }, rng=self._rng_inf)
             newly_cleared = u[self.state[u] == TBS.CLEARED]  # agents cleared from INFECTION this step
-            self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_cleared
-            if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
-                self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
+            self._enter_cleared(newly_cleared, self.pars.rr_reinfection_cleared)
 
         u = self.non_infectious.uids
         if len(u):
@@ -429,9 +477,7 @@ class TB(BaseTB):
                 TBS.ASYMPTOMATIC: self.pars.non_asy,
             }, rng=self._rng_non)
             newly_cleared = u[self.state[u] == TBS.CLEARED]  # agents cleared from NON_INFECTIOUS this step
-            self.rr_reinfection[newly_cleared] = self.pars.rr_reinfection_rec
-            if self.pars.dur_reinfection_protection is not None and len(newly_cleared):
-                self.ti_rr_reinfection_wane[newly_cleared] = self.ti + self.pars.dur_reinfection_protection.rvs(newly_cleared)
+            self._enter_cleared(newly_cleared, self.pars.rr_reinfection_rec)
 
         u = self.asymptomatic.uids
         if len(u):
@@ -459,9 +505,10 @@ class TB(BaseTB):
         # Derive the transmission flags from the categorical state (identical values to,
         # but faster than, the previous np.isin re-derivation).
         st = self.state
-        susceptible = st.isin((TBS.SUSCEPTIBLE, TBS.CLEARED))
-        self.susceptible[:] = susceptible
-        self.infected[:] = ~(susceptible | st.isin(TBS.TERMINAL))
+        # Reinfection-eligible states: never-infected/cleared, plus latent and non-infectious agents
+        # (a re-exposure resets their infection clock; see set_prognoses and rr_reinfection_inf/non).
+        self.susceptible[:] = st.isin((TBS.SUSCEPTIBLE, TBS.CLEARED, TBS.INFECTION, TBS.NON_INFECTIOUS))
+        self.infected[:] = st.isin((TBS.INFECTION, TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC, TBS.SYMPTOMATIC, TBS.TREATMENT))
         self.on_treatment[:] = (st == TBS.TREATMENT)
 
         # TB deaths
@@ -475,8 +522,8 @@ class TB(BaseTB):
         self.rr_clearance[:] = 1
         self.rr_death[:] = 1
 
-        # rel_sus / rel_trans
-        # rel_sus is reset to 1 for all agents first; other modules can then *= their own factors
+        # rel_sus / rel_trans. rel_sus is per-state: 1 for fully-susceptible, the (waning) per-agent
+        # rr_reinfection for CLEARED, and the σ_L / σ_N reinfection factors for latent / non-infectious.
         self.rel_sus[:] = 1
         cleared = ss.uids(self.state == TBS.CLEARED)
         if self.pars.dur_reinfection_protection is not None and len(cleared):
@@ -485,6 +532,8 @@ class TB(BaseTB):
             self.rr_reinfection[waned] = 1.0
             self.ti_rr_reinfection_wane[waned] = np.inf
         self.rel_sus[cleared] *= self.rr_reinfection[cleared]
+        self.rel_sus[st == TBS.INFECTION] = self.pars.rr_reinfection_inf
+        self.rel_sus[st == TBS.NON_INFECTIOUS] = self.pars.rr_reinfection_non
         self.rel_trans[:] = 1
         self.rel_trans[self.asymptomatic] = self.pars.trans_asymp
 

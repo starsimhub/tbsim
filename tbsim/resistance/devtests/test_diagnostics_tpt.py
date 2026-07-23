@@ -194,6 +194,7 @@ def test_tpt_failure_acquisition_state_gradient():
     for u, st in [(latent, TBS.INFECTION), (sympt, TBS.SYMPTOMATIC)]:
         tb.state[u] = st
         tb.strain_mask[u] = 1  # mono INH-susceptible (can acquire INH resistance)
+        tb.strain_counts[0][u] = 1  # invariant: count>0 ⟺ bit set
     prod._acquire(ss.uids(np.arange(20000)))
     acq_latent = np.mean(tb.strain_mask[latent] == 2)   # became INH-resistant
     acq_sympt = np.mean(tb.strain_mask[sympt] == 2)

@@ -163,6 +163,13 @@ Treatment is a product/delivery pair. `TxR` (product) sets per-strain cure proba
 `TxDeliveryR` (delivery) initiates treatment from the active states at state-specific rates and
 resolves each course after a fixed duration.
 
+On a failed course, **each** surviving drug-susceptible strain independently rolls for acquisition,
+once per regimen drug it is susceptible to (the same per-strain mechanism as de-novo), so more than one
+strain can acquire resistance in a single course. A latent agent selected for treatment (only via a
+custom `eligibility`) is instead cleared of its regimen-susceptible strains with certainty while any
+regimen-resistant strain persists (`treat_latent=False`, the default); `treat_latent=True` runs it
+through a full failable course.
+
 Treatment that cures the susceptible strain well but the resistant strain poorly *selects for*
 resistance:
 
@@ -188,8 +195,9 @@ print(f"resistance acquired on treatment failure: {int(np.sum(sim.results[tx.nam
 
 `DST` observes an agent-level resistance phenotype: it applies sensitivity/specificity at the strain
 level (with a per-strain observation bottleneck `p_strain_obs`, defaulting to strain fitness), then
-aggregates. `DSTDelivery.matches(...)` turns the observed profile into composable eligibility
-functions, so different regimens can be routed to different phenotypes.
+aggregates. Test probabilities are drawn independently per (strain, drug), so a multi-drug DST behaves like
+independent per-drug tests. `DSTDelivery.matches(...)` turns the observed profile into composable
+eligibility functions, so different regimens can be routed to different phenotypes.
 
 ```{python}
 tb = tbsim.TBResistant(drugs=['RIF'], rel_fitness={'RIF': 0.9},

@@ -270,6 +270,7 @@ def test_treatment_interrupt_reverts_and_preserves_strains():
     txd.prior_state[uids] = int(TBS.SYMPTOMATIC)
     tb.strain_mask[uids] = 1
     tb.state[uids] = TBS.TREATMENT
+    txd.on_course[uids] = True
     txd.ti_treatment_start[uids] = sim.ti
     txd.ti_treatment_end[uids] = sim.ti + 10
     reverted = txd.interrupt(uids)
@@ -293,6 +294,27 @@ def test_treatment_monitoring_switches_regimen():
     sim = make_sim(tb, interventions=[first, second], stop='2012-12-31'); sim.run()
     # The monitoring→interrupt→switch chain ran and moved at least some agents onto second-line.
     assert np.sum(sim.results['second'].n_treated) > 0
+
+
+def test_concurrent_deliveries_do_not_cross_resolve():
+    """Regression (#447): two independent deliveries treating the same pool must each resolve only
+    their own courses. Before the delivery-scoped `on_course` flag, a delivery re-resolved agents
+    another delivery was treating using its stale `pending_surv`, zeroing an infectious agent's
+    strain mask and crashing the transmission draw (IndexError in choice2d.ppf)."""
+    tb = tbsim.TBResistant(drugs=['RIF'], rel_fitness={'RIF': 0.9},
+                           init_prev=ss.bernoulli(0.25), init_strains=[1.0, 0.0],
+                           beta=ss.permonth(0.25))
+    def mk(name):
+        prod = tbsim.TxR(strains=tb.strains, regimen_drugs=['RIF'], base_efficacy=0.0,
+                         adherence=1.0, q_acq={'RIF': 0.5})
+        return tbsim.TxDeliveryR(name=name, product=prod, rate_sym=ss.peryear(2.0),
+                                 dur_treatment=ss.months(1))
+    sim = make_sim(tb, n=5000, interventions=[mk('txA'), mk('txB')],
+                   stop='2010-12-31', seed=0)
+    sim.run()  # must not raise
+    tb = sim.get_tb()
+    # No infectious agent may ever be left carrying zero strains (the impossible state that crashed).
+    assert not np.any(tb.active_tb & (tb.strain_mask == 0))
 
 
 # --------------------------------------------------------------------------- TPT
@@ -332,6 +354,25 @@ def test_dst_recovers_sens_spec():
     obs_sus = (prod.administer(tb, sus_uids) & 1).astype(bool)
     assert np.isclose(obs_res.mean(), sens, atol=0.02)         # sensitivity
     assert np.isclose(1 - obs_sus.mean(), spec, atol=0.02)     # specificity
+
+
+def test_dst_per_drug_errors_independent():
+    """TR-4: within one strain the per-drug DST calls are independent. A mono RIF-resistant /
+    BDQ-susceptible strain read with sens = spec = 0.5 on both drugs yields all four observed profiles at
+    ~25% — under the old shared per-strain draw, RIF and BDQ calls were perfectly correlated so
+    'both-resistant' and 'neither' essentially never occurred."""
+    tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], init_prev=ss.bernoulli(0.0))
+    dst = tbsim.DSTDelivery(product=tbsim.DST(strains=tb.strains, sens=0.5, spec=0.5, p_strain_obs=1.0))
+    sim = make_sim(tb, n=40000, interventions=dst); sim.init()
+    tb = sim.get_tb(); prod = _product(sim, tbsim.DSTDelivery).product
+    u = ss.uids(np.arange(40000))
+    tb.strain_mask[u] = (1 << 1)          # carries strain 1 = RIF-resistant, BDQ-susceptible
+    tb.strain_counts[1][u] = 1
+    prof = prod.administer(tb, u)
+    rif = ((prof >> 0) & 1).astype(bool)  # observed RIF (truly resistant → sens = 0.5)
+    bdq = ((prof >> 1) & 1).astype(bool)  # observed BDQ (truly susceptible → 1 - spec = 0.5)
+    assert abs(np.mean(rif & bdq) - 0.25) < 0.03 and abs(np.mean(~rif & ~bdq) - 0.25) < 0.03  # independent
+    assert abs(np.mean(rif) - 0.5) < 0.03 and abs(np.mean(bdq) - 0.5) < 0.03                  # marginals exact
 
 
 def test_dst_router_matches_observed_profile():
@@ -414,6 +455,30 @@ def test_treat_latent_modes_diverge():
     assert (tb_t.state[latent] == TBS.TREATMENT).all()
 
 
+def test_treat_latent_keeps_resistant_clears_susceptible():
+    """TR-5: treat_latent=False sterilizes regimen-susceptible strains with certainty but keeps
+    regimen-resistant ones. A latent agent carrying only the pan strain is fully cleared to CLEARED; a
+    latent agent carrying a RIF-resistant strain stays latent with that strain, its count preserved, and
+    runs no course / acquires no resistance."""
+    tb = tbsim.TBResistant(drugs=['RIF'], init_prev=ss.bernoulli(0.0))
+    tx = tbsim.TxDeliveryR(name='tx', eligibility=lambda sim: sim.get_tb().latent.uids,
+                           product=tbsim.TxR(strains=tb.strains, regimen_drugs=['RIF']),
+                           treat_latent=False)
+    sim = make_sim(tb, n=200, interventions=tx); sim.init()
+    tb = sim.get_tb()
+    pan, res = ss.uids(np.arange(50)), ss.uids(np.arange(50, 100))
+    tb.state[pan] = TBS.INFECTION; tb.strain_mask[pan] = 1; tb.strain_counts[0][pan] = 1  # pan (RIF-susceptible)
+    tb.state[res] = TBS.INFECTION; tb.strain_mask[res] = 2; tb.strain_counts[1][res] = 3  # RIF-resistant ×3
+    sim.interventions['tx']._initiate()
+    tb = sim.get_tb()
+    assert (tb.state[pan] == TBS.CLEARED).all()                  # susceptible strain cleared → CLEARED
+    assert (tb.strain_mask[pan] == 0).all()
+    assert (tb.state[res] == TBS.INFECTION).all()                # resistant strain persists → stays latent
+    assert (tb.strain_mask[res] == 2).all()
+    assert (np.asarray(tb.strain_counts[1][res]) == 3).all()     # count preserved (no acquisition)
+    assert sim.interventions['tx']._n_treated == 0               # no course run for latent agents
+
+
 # --------------------------------------------------------------------------- explicit efficacy vector / adherence distribution / retreatment classifier
 def test_treatment_explicit_efficacy_vector():
     """TxR(efficacy_by_strain=...) uses the given per-strain vector T_l verbatim as the cure probabilities
@@ -479,6 +544,73 @@ def test_strain_counter_and_count_weighting():
     tb.set_prognoses(tgt, sources=src)
     assert (tb.strain_mask[tgt] == 1).all()                    # carried set unchanged
     assert (np.asarray(tb.strain_counts[0][tgt]) == 2).all()   # count incremented 1 → 2
+
+
+def test_acquisition_transfers_strain_count_denovo():
+    """De-novo (replacement): a source strain carried at count 2 mutating to its resistant counterpart
+    transfers the full count to the target (spec §2), not reset to 1; the source is cleared."""
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0), p_rand={'TX': 1.0}, prog_resist_mode='replacement')
+    sim = make_sim(tb, n=100); sim.init(); tb = sim.get_tb()
+    u = ss.uids(np.arange(10))
+    tb.state[u] = TBS.INFECTION
+    tb.strain_mask[u] = 1               # carries strain 0 (pan) only
+    tb.strain_counts[0][u] = 2; tb.strain_counts[1][u] = 0
+    tb._denovo(u)
+    assert (tb.strain_mask[u] == 2).all()                        # strain 0 → strain 1 (TX-resistant)
+    assert (np.asarray(tb.strain_counts[1][u]) == 2).all()       # count carried over (2, not 1)
+    assert (np.asarray(tb.strain_counts[0][u]) == 0).all()       # source cleared (replacement)
+
+
+def test_acquisition_accumulates_count_onto_existing_and_multiple_sources():
+    """Spec §3: when the resistant target already exists and multiple susceptible strains mutate into it,
+    the target's count accumulates (2 + 1 + 1 = 4). Two-drug de-novo, replacement, p_rand = 1 on both."""
+    tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], init_prev=ss.bernoulli(0.0),
+                           p_rand={'RIF': 1.0, 'BDQ': 1.0}, prog_resist_mode='replacement')
+    sim = make_sim(tb, n=100); sim.init(); tb = sim.get_tb()
+    u = ss.uids(np.arange(10))
+    tb.state[u] = TBS.INFECTION
+    tb.strain_mask[u] = (1 << 1) | (1 << 2) | (1 << 3)  # carries strains 1 (RIF), 2 (BDQ), 3 (RIF+BDQ)
+    tb.strain_counts[1][u] = 1; tb.strain_counts[2][u] = 1; tb.strain_counts[3][u] = 2
+    tb.strain_counts[0][u] = 0
+    tb._denovo(u)
+    # strain 1 (+BDQ) → 3 and strain 2 (+RIF) → 3; strain 3 already fully resistant (no drug to acquire).
+    assert (tb.strain_mask[u] == (1 << 3)).all()                 # only the RIF+BDQ target remains carried
+    assert (np.asarray(tb.strain_counts[3][u]) == 4).all()       # 2 (existing) + 1 + 1 (two sources)
+    assert (np.asarray(tb.strain_counts[1][u]) == 0).all()
+    assert (np.asarray(tb.strain_counts[2][u]) == 0).all()
+
+
+def test_acquisition_mixed_keeps_source_count():
+    """De-novo (mixed): the source strain keeps its count and the resistant target receives a copy
+    (D2) — total per-agent load rises."""
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.0), p_rand={'TX': 1.0}, prog_resist_mode='mixed')
+    sim = make_sim(tb, n=100); sim.init(); tb = sim.get_tb()
+    u = ss.uids(np.arange(10))
+    tb.state[u] = TBS.INFECTION
+    tb.strain_mask[u] = 1; tb.strain_counts[0][u] = 2; tb.strain_counts[1][u] = 0
+    tb._denovo(u)
+    assert (tb.strain_mask[u] == 0b11).all()                     # carries both strain 0 and strain 1
+    assert (np.asarray(tb.strain_counts[0][u]) == 2).all()       # source retained
+    assert (np.asarray(tb.strain_counts[1][u]) == 2).all()       # target got a copy of the source count
+
+
+def test_treatment_acquisition_multiple_strains_and_count_transfer():
+    """TR-1 + §2/§3: on a failed course multiple carried strains can acquire resistance in one round,
+    with counts transferred source→target. Two mono-resistant strains each acquire the other drug and
+    converge on the RIF+BDQ strain, whose count sums the two sources."""
+    tb = tbsim.TBResistant(drugs=['RIF', 'BDQ'], init_prev=ss.bernoulli(0.0))
+    prod = tbsim.TxR(strains=tb.strains, q_acq={'RIF': 1.0, 'BDQ': 1.0})
+    sim = make_sim(tb, n=100, interventions=tbsim.TxDeliveryR(product=prod)); sim.init()
+    tb = sim.get_tb(); prod = _product(sim, tbsim.TxDeliveryR).product
+    u = ss.uids(np.arange(10))
+    counts0 = np.zeros((10, tb.strains.m), dtype=int)
+    counts0[:, 1] = 1   # strain 1 (RIF-resistant, BDQ-susceptible)
+    counts0[:, 2] = 3   # strain 2 (BDQ-resistant, RIF-susceptible)
+    states = np.full(10, int(TBS.SYMPTOMATIC))
+    counts, mask, _ = prod.acquire_counts(tb, u, counts0, states=states)
+    assert (mask == (1 << 3)).all()          # both mono strains → RIF+BDQ (strain 3)
+    assert (counts[:, 3] == 4).all()         # 1 (from strain 1) + 3 (from strain 2)
+    assert (counts[:, 1] == 0).all() and (counts[:, 2] == 0).all()
 
 
 # --------------------------------------------------------------------------- ODE reference self-checks (model-tests.md §8)

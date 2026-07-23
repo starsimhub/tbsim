@@ -81,6 +81,12 @@ Interventions in [tbsim/interventions/](tbsim/interventions/) follow a product/d
 - Linting configured in [.pylintrc](.pylintrc)
 - PRs should target `main`; all tests must pass
 
+## Claude Code Skills
+
+Repo-specific Claude Code skills live in `.claude/skills/` (also exposed at the top level via the `skills/` symlink). Currently one skill:
+
+- **`tbsim.address-issue`** — fixes a specified TBsim GitHub issue end to end: reviews the issue, writes and confirms a failing test, implements the change in Starsim style, runs the test suite, and updates the changelog/docs. Invoke with `/tbsim.address-issue <number-or-url>` or by asking to "address"/"fix" an issue.
+
 ## Key Dependencies
 
 - **starsim** (>=3.5.1) — ABM framework; use `ss.library.HouseholdNet`

@@ -83,6 +83,7 @@ def test_denovo_multistrain_each_strain_mutates():
     u = ss.uids(np.arange(100))
     tb.state[u] = TBS.INFECTION
     tb.strain_mask[u] = (1 << 0) | (1 << 1)     # carries pan (id0) and RIF (id1)
+    tb.strain_counts[0][u] = 1; tb.strain_counts[1][u] = 1  # invariant: count>0 ⟺ bit set
     tb._denovo(u)                               # de-novo at progression, BDQ p=1
     carried = tb.strains.carried(tb.strain_mask[u])
     # Every agent now carries a BDQ-resistant strain (id2={0,1} from pan, and id3={1,1} from RIF).
@@ -125,11 +126,11 @@ def test_resistance_origin_decomposition():
     assert tx_only['txacq'] > 0 and tx_only['denovo'] == 0
 
 
-def test_acquisition_strain_selection_is_random_not_lowest_id():
-    """L4/§4: on a treatment-failure acquisition hit, the carried drug-susceptible strain that acquires
-    resistance is chosen at random, not always the lowest-id one. An agent co-carrying strain 0 (pan)
-    and strain 1 (RIF-R) that acquires FQ resistance lands on strain 2 (FQ) OR strain 3 (RIF+FQ) —
-    the old lowest-id rule could only ever produce strain 2. (Fails before L4.)"""
+def test_acquisition_mutates_every_susceptible_strain():
+    """TR-1/§4: on a treatment-failure acquisition hit, *every* carried drug-susceptible strain acquires
+    resistance independently (not just one). An agent co-carrying strain 0 (pan) and strain 1 (RIF-R),
+    both FQ-susceptible, that fails an FQ-acquiring regimen ends carrying strain 2 (FQ, from the pan
+    strain) AND strain 3 (RIF+FQ, from the RIF-R strain) — the old single-pick rule produced only one."""
     tb = tbsim.TBResistant(drugs=['RIF', 'FQ'], init_prev=ss.bernoulli(0.0))
     prod = tbsim.TxR(strains=tb.strains, base_efficacy=0.0, adherence=1.0, q_acq={'FQ': 1.0})  # q=1 → certain FQ hit
     net = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
@@ -140,12 +141,12 @@ def test_acquisition_strain_selection_is_random_not_lowest_id():
     prod = next(iv for iv in sim.interventions.values() if isinstance(iv, tbsim.TxDeliveryR)).product
     u = ss.uids(np.arange(8000))
     tb.strain_mask[u] = (1 << 0) | (1 << 1)   # carries pan (id0) and RIF-R (id1); both FQ-susceptible
-    surv = tb.strain_mask[u].copy()           # base_efficacy=0 → nothing cured
-    surv = prod.acquire(u, surv, states=np.full(len(u), int(TBS.SYMPTOMATIC)))
-    got_s2 = ((surv >> 2) & 1).astype(bool).mean()   # acquired FQ on the pan strain → carries strain 2 ({FQ})
-    got_s3 = ((surv >> 3) & 1).astype(bool).mean()   # acquired FQ on the RIF strain → carries strain 3 ({RIF,FQ})
-    assert got_s2 > 0.2 and got_s3 > 0.2             # both targets occur (~50/50), not always strain 2
-    assert np.allclose(got_s2 + got_s3, 1.0)         # exactly one susceptible carried strain mutated
+    tb.strain_counts[0][u] = 1; tb.strain_counts[1][u] = 1
+    counts0 = tb._counts(u)                    # base_efficacy=0 → nothing cured; every strain survives
+    _, mask, _ = prod.acquire_counts(tb, u, counts0, states=np.full(len(u), int(TBS.SYMPTOMATIC)))
+    got_s2 = ((mask >> 2) & 1).astype(bool).mean()   # pan strain acquired FQ → strain 2 ({FQ})
+    got_s3 = ((mask >> 3) & 1).astype(bool).mean()   # RIF-R strain acquired FQ → strain 3 ({RIF,FQ})
+    assert np.allclose(got_s2, 1.0) and np.allclose(got_s3, 1.0)  # BOTH susceptible strains mutated
 
 
 def test_denovo_acquisition_probability_independent_of_count():
