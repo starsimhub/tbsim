@@ -17,7 +17,7 @@ per drug, per carried strain), the progression bottleneck (``p_multi``), clear-a
 on natural clearance, and the superinfection rate modifiers (``rr_prog_super`` ψ,
 ``rr_clear_super`` ω).
 
-This reproduces the two-strain reference ODE (``ode.r`` / ``model-tests.md``) in the
+This reproduces the two-strain reference ODE (``tbsim.compartmental.TwoStrainODE``) in the
 ``n=1`` case; see ``tests/test_resistance.py``.
 """
 

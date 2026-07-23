@@ -8,7 +8,7 @@ callable), freezes the outcome at initiation, and resolves it after a fixed cour
 It also supports treatment monitoring / regimen switching via ``interrupt`` +
 ``supersedes`` (see ``treatment_monitoring_eligibility``).
 
-Per the reference treatment operator (``model-tests.md`` §6): each carried strain is
+Per the reference treatment operator (the ODE's ``π(m→s)``): each carried strain is
 cured independently (efficacy reduced for strains resistant to *regimen* drugs), the
 whole course's outcomes are correlated through a single agent-level adherence draw,
 failures return to the state treatment was initiated from with the surviving strains,
