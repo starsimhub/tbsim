@@ -210,6 +210,7 @@ class TxDeliveryR(ss.Intervention):
         self.define_states(
             ss.FloatArr('ti_treatment_start'),
             ss.FloatArr('ti_treatment_end'),
+            ss.BoolArr('on_course', default=False),
             ss.IntArr('pending_surv', default=0),
             ss.IntArr('prior_state', default=int(TBS.SUSCEPTIBLE)),
         )
@@ -238,16 +239,18 @@ class TxDeliveryR(ss.Intervention):
 
         Reverts interrupted agents to the state treatment was initiated from, keeping their current
         strains, so another delivery can re-treat them. Only agents actually on *this* delivery's
-        course (state TREATMENT with a finite ``ti_treatment_end``) are affected.
+        course (``on_course``) are affected — the flag is delivery-scoped, so a shared TREATMENT
+        state never lets one delivery interrupt another delivery's patients (#447).
         """
         uids = ss.uids(uids)
         if len(uids) == 0:
             return ss.uids()
         tb = get_tb(self.sim, which=TBResistant)
-        mine = uids[(tb.state[uids] == TBS.TREATMENT) & np.isfinite(self.ti_treatment_end[uids])]
+        mine = uids[self.on_course[uids]]
         if len(mine) == 0:
             return mine
         tb.state[mine] = self.prior_state[mine]
+        self.on_course[mine] = False
         self.ti_treatment_start[mine] = np.nan
         self.ti_treatment_end[mine] = np.nan
         self.pending_surv[mine] = 0
@@ -334,6 +337,7 @@ class TxDeliveryR(ss.Intervention):
         self.pending_surv[start] = self.product.roll_survivors(tb, start)
         tb.ti_last_treatment[start] = self.ti  # durable cross-regimen history (failure-vs-new-case; spec §Diagnostics)
         tb.state[start] = TBS.TREATMENT
+        self.on_course[start] = True  # delivery-scoped ownership so _resolve only claims its own patients (#447)
         dur_steps = self.pars.dur_treatment / self.t.dt
         self.ti_treatment_start[start] = self.ti
         self.ti_treatment_end[start] = self.ti + dur_steps
@@ -343,10 +347,13 @@ class TxDeliveryR(ss.Intervention):
     def _resolve(self):
         tb = get_tb(self.sim, which=TBResistant)
         self._n_success = self._n_failure = self._n_acquired = 0
-        on_tx = (tb.state == TBS.TREATMENT).uids
-        done = on_tx[self.ti >= self.ti_treatment_end[on_tx]]
+        # Delivery-scoped: only resolve courses THIS delivery started (`on_course`), never agents put
+        # into TREATMENT by another delivery. `ti_treatment_end` persists after a course (retreat_after
+        # relies on it), so it alone cannot identify current patients (#447).
+        done = (self.on_course & (self.ti >= self.ti_treatment_end)).uids
         if len(done) == 0:
             return
+        self.on_course[done] = False  # release; these agents leave TREATMENT below
 
         surv = self.pending_surv[done]
         cured = done[surv == 0]
@@ -420,8 +427,7 @@ def will_fail(tx_name):
         tx = sim.interventions.get(tx_name)
         if tx is None:
             return ss.uids()
-        tb = get_tb(sim, which=TBResistant)
-        on_tx = (tb.state == TBS.TREATMENT).uids
+        on_tx = tx.on_course.uids  # delivery-scoped: only this tx's own patients (#447)
         if len(on_tx) == 0:
             return on_tx
         return on_tx[np.asarray(tx.pending_surv[on_tx]) != 0]
@@ -450,13 +456,12 @@ def treatment_monitoring_eligibility(tx_name, after_steps=4, every_steps=None, r
         tx = sim.interventions.get(tx_name)
         if tx is None:
             return ss.uids()
-        tb = get_tb(sim, which=TBResistant)
-        on_tx = (tb.state == TBS.TREATMENT).uids
+        on_tx = tx.on_course.uids  # delivery-scoped: only this tx's own patients (#447)
         if len(on_tx) == 0:
             return on_tx
-        start = np.asarray(tx.ti_treatment_start[on_tx], dtype=float)  # finite only for tx's own patients
+        start = np.asarray(tx.ti_treatment_start[on_tx], dtype=float)
         elapsed = sim.ti - start
-        ready = np.isfinite(start) & (elapsed >= after_steps)
+        ready = elapsed >= after_steps
         if every_steps:
             ready &= ((elapsed - after_steps) % every_steps == 0)
         out = on_tx[ready]

@@ -34,6 +34,7 @@ TBsim is not yet released on PyPI, so you need to install from source:
 - `tbsim_examples/` -- Ready-to-run example scripts
 - `tests/` -- Test suite
 - `docs/` -- Documentation source (Quarto)
+- `skills/` -- [Claude Code](https://claude.com/claude-code) skills for working on TBsim (symlink to `.claude/skills/`); currently just `tbsim.address-issue`, which fixes a specified GitHub issue end to end (plan, test, implement, run the suite, update the changelog)
 
 ### Running a sample simulation
 

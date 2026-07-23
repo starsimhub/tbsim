@@ -152,7 +152,7 @@ def _format_x_axis(ax, x, show_xlabel=True, max_ticks=4):
     if x is None:
         return
 
-    x = np.asarray(x).ravel()
+    x = np.ravel(x)
     if len(x) == 0:
         return
 
@@ -174,7 +174,7 @@ def _format_x_axis(ax, x, show_xlabel=True, max_ticks=4):
 
 def _is_date_like(x):
     """Return whether an array contains Starsim/Python/date-like objects."""
-    arr = np.asarray(x).ravel()
+    arr = np.ravel(x)
     if arr.size == 0:
         return False
     if np.issubdtype(arr.dtype, np.datetime64):
@@ -316,7 +316,7 @@ class _ZeroResult:
 
     def __init__(self, timevec, values):
         self.timevec = timevec
-        self.values = np.asarray(values, dtype=float)
+        self.values = values
 
 
 def _as_1d_xy(result): # TODO: is this needed?
@@ -342,10 +342,9 @@ def _safe_min_max(x):
     if x is None:
         return None, None
     try:
-        a = np.asarray(x)
-        if a.size == 0:
+        if x.size == 0:
             return None, None
-        return np.nanmin(a), np.nanmax(a)
+        return np.nanmin(x), np.nanmax(x)
     except (TypeError, ValueError):
         return None, None
 
@@ -379,7 +378,7 @@ def _households_from_input(households_or_network, return_network=False):
         if not np.any(valid):
             return ([], hh_net) if return_network else []
         hh_ids = np.unique(hh_arr[valid]).astype(int)
-        households = [list(np.asarray((hh_state == hhid).uids, dtype=int)) for hhid in hh_ids]
+        households = [list((hh_state == hhid).uids) for hhid in hh_ids]
         households = [hh for hh in households if len(hh)]
         return (households, hh_net) if return_network else households
 
@@ -485,8 +484,8 @@ def plot_household(
     # Add edges within households
     edges_by_hh = {hh_idx: [] for hh_idx in range(len(households))}
     if use_actual_edges:
-        p1 = np.asarray(hh_net.edges.p1, dtype=int)
-        p2 = np.asarray(hh_net.edges.p2, dtype=int)
+        p1 = hh_net.edges.p1
+        p2 = hh_net.edges.p2
         for a, b in zip(p1, p2):
             ha = node_to_hh.get(int(a), None)
             hb = node_to_hh.get(int(b), None)
