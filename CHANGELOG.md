@@ -2,6 +2,9 @@
 
 All notable changes to the codebase are documented in this file.
 
+## Version 0.10.3 (2026-08-04)
+- Migrated documentation from Quarto to Great Docs.
+
 ## Version 0.10.2 (2026-07-20)
 - Reworked several multi-strain / drug-resistance behaviors (`tbsim.resistance`) and lifted latent reinfection into base `TB`.
 - **Latent reinfection in base `TB`**: `rr_reinfection_inf` (σ_L) and `rr_reinfection_non` (σ_N) are now base-`TB` parameters, so latent (`INFECTION`) and non-infectious (`NON_INFECTIOUS`) agents are reinfection-eligible in single-strain models too. A re-exposure resets the `ti_infected` clock without otherwise changing the agent's state (clock reset only). σ_L defaults to `rr_reinfection_rec` and σ_N to σ_L; set them to `0` to disable.
