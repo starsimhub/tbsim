@@ -139,6 +139,20 @@ website:
               href: api/comorbidities.hiv.qmd
             - text: malnutrition
               href: api/comorbidities.malnutrition.qmd
+        - section: "**Resistance**"
+          contents:
+            - text: analyzers
+              href: api/resistance.analyzers.qmd
+            - text: dst
+              href: api/resistance.dst.qmd
+            - text: strains
+              href: api/resistance.strains.qmd
+            - text: tb_resistant
+              href: api/resistance.tb_resistant.qmd
+            - text: tpt
+              href: api/resistance.tpt.qmd
+            - text: treatments
+              href: api/resistance.treatments.qmd
         - section: "**Compartmental**"
           contents:
             - text: lshtm_ode
@@ -176,6 +190,16 @@ quartodoc:
       contents:
         - comorbidities.hiv
         - comorbidities.malnutrition
+    - title: Resistance
+      desc: Multi-strain drug-resistance extension.
+      contents:
+        - resistance.analyzers
+        - resistance.dst
+        - resistance.strains
+        - resistance.tb_resistant
+        - resistance.tpt
+        - resistance.treatments
+
     - title: Compartmental
       desc: Compartmental (ODE-style) TB models.
       contents:

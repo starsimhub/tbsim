@@ -35,6 +35,4 @@ the pre-render step in `quarto_utils.py`.
 
 ## Publishing
 
-`./publish` renders the site and pushes it to the `gh-pages` branch. This
-normally runs automatically via GitHub Actions on tagged releases (see
-`.github/workflows/publish_docs.yaml`).
+`./publish` renders the site and pushes it to the `gh-pages` branch, which is what GitHub Pages serves. The same script runs automatically via GitHub Actions on every push to `main` (see `.github/workflows/publish_docs.yaml`), so publishing by hand is only needed when you want to push a build without merging, or when you're debugging a failure that only shows up in CI.
