@@ -1,0 +1,2559 @@
+{
+  "project": "tbsim",
+  "version": "0.0.9999",
+  "count": 167,
+  "items": [
+    {
+      "name": "tbsim.sim.Sim.get_dx",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.Sim.get_dx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.sim.Sim.get_hsb",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.Sim.get_hsb",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.sim.Sim.get_tb",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.Sim.get_tb",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.sim.Sim.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.Sim.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.sim.Sim",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.Sim",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.sim.demo",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.demo",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.sim",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.active_tb",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.active_tb",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.asymptomatic",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.asymptomatic",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.finalize_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.finalize_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.infectious",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.infectious",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.init_post",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.init_post",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.init_pre",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.init_pre",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.latent",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.latent",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.non_infectious",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.non_infectious",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.progression_rates",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.progression_rates",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.set_prognoses",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.set_prognoses",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.step_bookkeeping",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.step_bookkeeping",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.step_die",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.step_die",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.step_transitions",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.step_transitions",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.symptomatic",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.symptomatic",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.terminal",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.terminal",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.transition",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.transition",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TB",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.TBS",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TBS",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.choice2d.ppf",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.choice2d.ppf",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.choice2d",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.choice2d",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb.get_tb",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.get_tb",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.networks.plot_household_structure",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/networks.html#tbsim.networks.plot_household_structure",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.networks",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/networks.html#tbsim.networks",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.DwellTime.finalize",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime.finalize",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.DwellTime.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.DwellTime.save",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime.save",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.DwellTime.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.DwellTime.validate_dwell_time_distributions",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime.validate_dwell_time_distributions",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.DwellTime",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.HouseholdStats.from_multisim",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.from_multisim",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.HouseholdStats.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.HouseholdStats.plot_from_multisim",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.plot_from_multisim",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.HouseholdStats.plot_matrix",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.plot_matrix",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.HouseholdStats.plot_normalized_matrix",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.plot_normalized_matrix",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.HouseholdStats.plot_stats",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.plot_stats",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.HouseholdStats",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.plots.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/plots.html#tbsim.plots.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.plots.plot_household",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/plots.html#tbsim.plots.plot_household",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.plots",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/plots.html#tbsim.plots",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.bcg.BCGRoutine.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGRoutine.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.bcg.BCGRoutine",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGRoutine",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.bcg.BCGVx.administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGVx.administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.bcg.BCGVx.apply_protection",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGVx.apply_protection",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.bcg.BCGVx.update_roster",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGVx.update_roster",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.bcg.BCGVx",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGVx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.bcg",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.beta.BetaByYear.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.beta.html#tbsim.interventions.beta.BetaByYear.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.beta.BetaByYear",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.beta.html#tbsim.interventions.beta.BetaByYear",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.beta",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.beta.html#tbsim.interventions.beta",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.CAD",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.CAD",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.Dx",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.Dx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.DxDelivery.shrink",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.shrink",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.DxDelivery.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.DxDelivery.step_administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.step_administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.DxDelivery.step_expire_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.step_expire_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.DxDelivery.step_select_eligible",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.step_select_eligible",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.DxDelivery.step_update_states",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.step_update_states",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.DxDelivery.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.DxDelivery",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.FujiLAM",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.FujiLAM",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.OralSwab",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.OralSwab",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics.Xpert",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.Xpert",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.diagnostics",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.health_seeking.HealthSeekingBehavior.init_post",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking.HealthSeekingBehavior.init_post",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.health_seeking.HealthSeekingBehavior.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking.HealthSeekingBehavior.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.health_seeking.HealthSeekingBehavior.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking.HealthSeekingBehavior.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.health_seeking.HealthSeekingBehavior.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking.HealthSeekingBehavior.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.health_seeking.HealthSeekingBehavior",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking.HealthSeekingBehavior",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.health_seeking",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.interventions.TBProductRoutine.check_eligibility",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine.check_eligibility",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.interventions.TBProductRoutine.init_pre",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine.init_pre",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.interventions.TBProductRoutine.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.interventions.TBProductRoutine.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.interventions.TBProductRoutine.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.interventions.TBProductRoutine",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.interventions",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.products.ProductMulti.administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.products.html#tbsim.interventions.products.ProductMulti.administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.products.ProductMulti.default_value",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/interventions.products.html#tbsim.interventions.products.ProductMulti.default_value",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.products.ProductMulti",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.products.html#tbsim.interventions.products.ProductMulti",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.products",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.products.html#tbsim.interventions.products",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.HouseholdContactTracing.find_household_net",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.HouseholdContactTracing.find_household_net",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.HouseholdContactTracing.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.HouseholdContactTracing.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.HouseholdContactTracing",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.HouseholdContactTracing",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTDelivery.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTDelivery.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTDelivery",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTDelivery",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTHousehold.check_eligibility",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTHousehold.check_eligibility",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTHousehold.find_household_net",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTHousehold.find_household_net",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTHousehold.shrink",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTHousehold.shrink",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTHousehold.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTHousehold.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTHousehold",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTHousehold",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTSimple.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTSimple.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTSimple",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTSimple",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTTx.administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTTx.administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTTx.apply_protection",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTTx.apply_protection",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTTx.update_roster",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTTx.update_roster",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt.TPTTx",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTTx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.tpt",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.DOTS",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.DOTS",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.DOTSImproved",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.DOTSImproved",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.FirstLine",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.FirstLine",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.SecondLine",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.SecondLine",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.Tx.administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.Tx.administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.Tx",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.Tx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.TxDelivery.shrink",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.shrink",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.TxDelivery.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.TxDelivery.step_check_completion",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_check_completion",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.TxDelivery.step_eligibility",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_eligibility",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.TxDelivery.step_failures",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_failures",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.TxDelivery.step_relapses",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_relapses",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.TxDelivery.step_start_treatment",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_start_treatment",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.TxDelivery.step_success",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_success",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.TxDelivery",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments.TxMulti",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxMulti",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.treatments",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.HIV.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.HIV.p_acute_to_latent",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.p_acute_to_latent",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.HIV.p_latent_to_aids",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.p_latent_to_aids",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.HIV.set_prognoses",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.set_prognoses",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.HIV.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.HIV.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.HIV",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.HIVState",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIVState",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.HivInterventions.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HivInterventions.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.HivInterventions",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HivInterventions",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.TB_HIV_Connector.compute_tb_hiv_risk_rr",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.TB_HIV_Connector.compute_tb_hiv_risk_rr",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.TB_HIV_Connector.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.TB_HIV_Connector.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv.TB_HIV_Connector",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.TB_HIV_Connector",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.hiv",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.Malnutrition.dweight_scale",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.dweight_scale",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.Malnutrition.height",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.height",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.Malnutrition.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.Malnutrition.lms",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.lms",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.Malnutrition.set_initial_states",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.set_initial_states",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.Malnutrition.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.Malnutrition.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.Malnutrition.weight",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.weight",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.Malnutrition",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.compute_relsus",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.compute_relsus",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.lonnroth_bmi_rr",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.lonnroth_bmi_rr",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.ones_rr",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.ones_rr",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.supplementation_rr",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.supplementation_rr",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition.TB_Nutrition_Connector",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.comorbidities.malnutrition",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.compartmental.lshtm_ode.TB_ODE.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/compartmental.lshtm_ode.html#tbsim.compartmental.lshtm_ode.TB_ODE.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.compartmental.lshtm_ode.TB_ODE.run",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/compartmental.lshtm_ode.html#tbsim.compartmental.lshtm_ode.TB_ODE.run",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.compartmental.lshtm_ode.TB_ODE",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/compartmental.lshtm_ode.html#tbsim.compartmental.lshtm_ode.TB_ODE",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.compartmental.lshtm_ode.TB_SS.init_post",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/compartmental.lshtm_ode.html#tbsim.compartmental.lshtm_ode.TB_SS.init_post",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.compartmental.lshtm_ode.TB_SS.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/compartmental.lshtm_ode.html#tbsim.compartmental.lshtm_ode.TB_SS.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.compartmental.lshtm_ode.TB_SS.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/compartmental.lshtm_ode.html#tbsim.compartmental.lshtm_ode.TB_SS.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.compartmental.lshtm_ode.TB_SS.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/compartmental.lshtm_ode.html#tbsim.compartmental.lshtm_ode.TB_SS.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.compartmental.lshtm_ode.TB_SS.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/compartmental.lshtm_ode.html#tbsim.compartmental.lshtm_ode.TB_SS.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.compartmental.lshtm_ode.TB_SS",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/compartmental.lshtm_ode.html#tbsim.compartmental.lshtm_ode.TB_SS",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.compartmental.lshtm_ode",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/compartmental.lshtm_ode.html#tbsim.compartmental.lshtm_ode",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.Sim.get_dx",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.Sim.get_dx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.Sim.get_hsb",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.Sim.get_hsb",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.Sim.get_tb",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.Sim.get_tb",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.Sim.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.Sim.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.Sim",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.Sim",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.demo",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/sim.html#tbsim.sim.demo",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.active_tb",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.active_tb",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.asymptomatic",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.asymptomatic",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.finalize_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.finalize_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.infectious",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.infectious",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.init_post",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.init_post",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.init_pre",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.init_pre",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.latent",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.latent",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.non_infectious",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.non_infectious",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.progression_rates",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.progression_rates",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.set_prognoses",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.set_prognoses",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.step_bookkeeping",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.step_bookkeeping",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.step_die",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.step_die",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.step_transitions",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.step_transitions",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.symptomatic",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.symptomatic",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.terminal",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.terminal",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.transition",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.transition",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TB",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TB",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.TBS",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.TBS",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.choice2d.ppf",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.choice2d.ppf",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.choice2d",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.choice2d",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.get_tb",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/tb.html#tbsim.tb.get_tb",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.plot_household_structure",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/networks.html#tbsim.networks.plot_household_structure",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.DwellTime.finalize",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime.finalize",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.DwellTime.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.DwellTime.save",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime.save",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.DwellTime.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.DwellTime.validate_dwell_time_distributions",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime.validate_dwell_time_distributions",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.DwellTime",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.DwellTime",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.HouseholdStats.from_multisim",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.from_multisim",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.HouseholdStats.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.HouseholdStats.plot_from_multisim",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.plot_from_multisim",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.HouseholdStats.plot_matrix",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.plot_matrix",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.HouseholdStats.plot_normalized_matrix",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.plot_normalized_matrix",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.HouseholdStats.plot_stats",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats.plot_stats",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.HouseholdStats",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/analyzers.html#tbsim.analyzers.HouseholdStats",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.plot",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/plots.html#tbsim.plots.plot",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.plot_household",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/plots.html#tbsim.plots.plot_household",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.bcg.BCGRoutine.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGRoutine.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.bcg.BCGRoutine",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGRoutine",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.bcg.BCGVx.administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGVx.administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.bcg.BCGVx.apply_protection",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGVx.apply_protection",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.bcg.BCGVx.update_roster",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGVx.update_roster",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.bcg.BCGVx",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg.BCGVx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.bcg",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.bcg.html#tbsim.interventions.bcg",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.beta.BetaByYear.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.beta.html#tbsim.interventions.beta.BetaByYear.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.beta.BetaByYear",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.beta.html#tbsim.interventions.beta.BetaByYear",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.beta",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.beta.html#tbsim.interventions.beta",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.CAD",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.CAD",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.Dx",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.Dx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.DxDelivery.shrink",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.shrink",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.DxDelivery.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.DxDelivery.step_administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.step_administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.DxDelivery.step_expire_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.step_expire_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.DxDelivery.step_select_eligible",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.step_select_eligible",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.DxDelivery.step_update_states",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.step_update_states",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.DxDelivery.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.DxDelivery",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.DxDelivery",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.FujiLAM",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.FujiLAM",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.OralSwab",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.OralSwab",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics.Xpert",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics.Xpert",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.diagnostics",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.diagnostics.html#tbsim.interventions.diagnostics",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.health_seeking.HealthSeekingBehavior.init_post",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking.HealthSeekingBehavior.init_post",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.health_seeking.HealthSeekingBehavior.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking.HealthSeekingBehavior.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.health_seeking.HealthSeekingBehavior.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking.HealthSeekingBehavior.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.health_seeking.HealthSeekingBehavior.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking.HealthSeekingBehavior.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.health_seeking.HealthSeekingBehavior",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking.HealthSeekingBehavior",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.health_seeking",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.health_seeking.html#tbsim.interventions.health_seeking",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.TBProductRoutine.check_eligibility",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine.check_eligibility",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.TBProductRoutine.init_pre",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine.init_pre",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.TBProductRoutine.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.TBProductRoutine.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.TBProductRoutine.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions.TBProductRoutine",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions.TBProductRoutine",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.interventions",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.interventions.html#tbsim.interventions.interventions",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.products.ProductMulti.administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.products.html#tbsim.interventions.products.ProductMulti.administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.products.ProductMulti.default_value",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "api/interventions.products.html#tbsim.interventions.products.ProductMulti.default_value",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.products.ProductMulti",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.products.html#tbsim.interventions.products.ProductMulti",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.products",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.products.html#tbsim.interventions.products",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.HouseholdContactTracing.find_household_net",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.HouseholdContactTracing.find_household_net",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.HouseholdContactTracing.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.HouseholdContactTracing.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.HouseholdContactTracing",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.HouseholdContactTracing",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTDelivery.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTDelivery.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTDelivery",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTDelivery",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTHousehold.check_eligibility",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTHousehold.check_eligibility",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTHousehold.find_household_net",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTHousehold.find_household_net",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTHousehold.shrink",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTHousehold.shrink",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTHousehold.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTHousehold.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTHousehold",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTHousehold",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTSimple.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTSimple.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTSimple",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTSimple",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTTx.administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTTx.administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTTx.apply_protection",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTTx.apply_protection",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTTx.update_roster",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTTx.update_roster",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTTx",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt.TPTTx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.tpt.html#tbsim.interventions.tpt",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.DOTS",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.DOTS",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.DOTSImproved",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.DOTSImproved",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.FirstLine",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.FirstLine",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.SecondLine",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.SecondLine",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.Tx.administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.Tx.administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.Tx",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.Tx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDelivery.shrink",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.shrink",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDelivery.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDelivery.step_check_completion",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_check_completion",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDelivery.step_eligibility",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_eligibility",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDelivery.step_failures",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_failures",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDelivery.step_relapses",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_relapses",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDelivery.step_start_treatment",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_start_treatment",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDelivery.step_success",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery.step_success",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDelivery",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxDelivery",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxMulti",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments.TxMulti",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/interventions.treatments.html#tbsim.interventions.treatments",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.HIV.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.HIV.p_acute_to_latent",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.p_acute_to_latent",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.HIV.p_latent_to_aids",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.p_latent_to_aids",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.HIV.set_prognoses",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.set_prognoses",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.HIV.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.HIV.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.HIV",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIV",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.HIVState",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HIVState",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.HivInterventions.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HivInterventions.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.HivInterventions",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.HivInterventions",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.TB_HIV_Connector.compute_tb_hiv_risk_rr",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.TB_HIV_Connector.compute_tb_hiv_risk_rr",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.TB_HIV_Connector.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.TB_HIV_Connector.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv.TB_HIV_Connector",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv.TB_HIV_Connector",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.hiv",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/comorbidities.hiv.html#tbsim.comorbidities.hiv",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.Malnutrition.dweight_scale",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.dweight_scale",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.Malnutrition.height",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.height",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.Malnutrition.init_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.init_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.Malnutrition.lms",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.lms",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.Malnutrition.set_initial_states",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.set_initial_states",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.Malnutrition.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.Malnutrition.update_results",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.update_results",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.Malnutrition.weight",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition.weight",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.Malnutrition",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.Malnutrition",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.TB_Nutrition_Connector.compute_relsus",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.compute_relsus",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.TB_Nutrition_Connector.lonnroth_bmi_rr",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.lonnroth_bmi_rr",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.TB_Nutrition_Connector.ones_rr",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.ones_rr",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.TB_Nutrition_Connector.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.TB_Nutrition_Connector.supplementation_rr",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector.supplementation_rr",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition.TB_Nutrition_Connector",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition.TB_Nutrition_Connector",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.malnutrition",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition",
+      "dispname": "-"
+    }
+  ]
+}

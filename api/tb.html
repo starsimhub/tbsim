@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>tb – TBsim</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../api/networks.html" rel="next">
+<link href="../api/sim.html" rel="prev">
+<link href="..//assets/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-23bbe8b5e4efc1e257f6d59dce478b08.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-b8d35f6d858c1e6bbf659b4b83919473.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../assets/tbsim-logo.png" alt="" class="navbar-logo light-content">
+    <img src="../assets/tbsim-logo.png" alt="" class="navbar-logo dark-content">
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="../index.html" aria-current="page"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../whatsnew.html"> 
+<span class="menu-text">What’s new</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../tutorials/index.html"> 
+<span class="menu-text">Tutorials</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../user_guide/index.html"> 
+<span class="menu-text">User guide</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../user_guide/examples.html"> 
+<span class="menu-text">Examples</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../api/index.html"> 
+<span class="menu-text">API reference</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools tools-wide">
+    <a href="https://github.com/starsimhub/tbsim" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+    <a href="mailto:info@starsim.org" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-envelope-at-fill"></i></a>
+    <a href="https://starsim-idm.slack.com" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-slack"></i></a>
+    <a href="https://starsim.org" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-globe"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/sim.html"><strong>Core</strong></a></li><li class="breadcrumb-item"><a href="../api/tb.html">tb</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>Home</strong></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>API reference</strong></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Core</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/sim.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sim</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/tb.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">tb</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/networks.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/analyzers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">analyzers</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/plots.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plots</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Interventions</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.bcg.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">bcg</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.beta.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">beta</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.diagnostics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">diagnostics</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.health_seeking.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">health_seeking</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.interventions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">interventions</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.products.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">products</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.tpt.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tpt</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.treatments.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">treatments</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Comorbidities</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/comorbidities.hiv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">hiv</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/comorbidities.malnutrition.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">malnutrition</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Compartmental</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/compartmental.lshtm_ode.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">lshtm_ode</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="99">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tbsim.tb" id="toc-tbsim.tb" class="nav-link active" data-scroll-target="#tbsim.tb">tb</a>
+  <ul>
+  <li><a href="#classes" id="toc-classes" class="nav-link" data-scroll-target="#classes">Classes</a>
+  <ul>
+  <li><a href="#tbsim.tb.TB" id="toc-tbsim.tb.TB" class="nav-link" data-scroll-target="#tbsim.tb.TB">TB</a>
+  <ul class="collapse">
+  <li><a href="#attributes" id="toc-attributes" class="nav-link" data-scroll-target="#attributes">Attributes</a></li>
+  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
+  <ul class="collapse">
+  <li><a href="#tbsim.tb.TB.finalize_results" id="toc-tbsim.tb.TB.finalize_results" class="nav-link" data-scroll-target="#tbsim.tb.TB.finalize_results">finalize_results</a></li>
+  <li><a href="#tbsim.tb.TB.init_post" id="toc-tbsim.tb.TB.init_post" class="nav-link" data-scroll-target="#tbsim.tb.TB.init_post">init_post</a></li>
+  <li><a href="#tbsim.tb.TB.init_pre" id="toc-tbsim.tb.TB.init_pre" class="nav-link" data-scroll-target="#tbsim.tb.TB.init_pre">init_pre</a></li>
+  <li><a href="#tbsim.tb.TB.init_results" id="toc-tbsim.tb.TB.init_results" class="nav-link" data-scroll-target="#tbsim.tb.TB.init_results">init_results</a></li>
+  <li><a href="#tbsim.tb.TB.plot" id="toc-tbsim.tb.TB.plot" class="nav-link" data-scroll-target="#tbsim.tb.TB.plot">plot</a></li>
+  <li><a href="#tbsim.tb.TB.progression_rates" id="toc-tbsim.tb.TB.progression_rates" class="nav-link" data-scroll-target="#tbsim.tb.TB.progression_rates">progression_rates</a></li>
+  <li><a href="#tbsim.tb.TB.set_prognoses" id="toc-tbsim.tb.TB.set_prognoses" class="nav-link" data-scroll-target="#tbsim.tb.TB.set_prognoses">set_prognoses</a></li>
+  <li><a href="#tbsim.tb.TB.step" id="toc-tbsim.tb.TB.step" class="nav-link" data-scroll-target="#tbsim.tb.TB.step">step</a></li>
+  <li><a href="#tbsim.tb.TB.step_bookkeeping" id="toc-tbsim.tb.TB.step_bookkeeping" class="nav-link" data-scroll-target="#tbsim.tb.TB.step_bookkeeping">step_bookkeeping</a></li>
+  <li><a href="#tbsim.tb.TB.step_die" id="toc-tbsim.tb.TB.step_die" class="nav-link" data-scroll-target="#tbsim.tb.TB.step_die">step_die</a></li>
+  <li><a href="#tbsim.tb.TB.step_transitions" id="toc-tbsim.tb.TB.step_transitions" class="nav-link" data-scroll-target="#tbsim.tb.TB.step_transitions">step_transitions</a></li>
+  <li><a href="#tbsim.tb.TB.transition" id="toc-tbsim.tb.TB.transition" class="nav-link" data-scroll-target="#tbsim.tb.TB.transition">transition</a></li>
+  <li><a href="#tbsim.tb.TB.update_results" id="toc-tbsim.tb.TB.update_results" class="nav-link" data-scroll-target="#tbsim.tb.TB.update_results">update_results</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#tbsim.tb.TBS" id="toc-tbsim.tb.TBS" class="nav-link" data-scroll-target="#tbsim.tb.TBS">TBS</a></li>
+  <li><a href="#tbsim.tb.choice2d" id="toc-tbsim.tb.choice2d" class="nav-link" data-scroll-target="#tbsim.tb.choice2d">choice2d</a>
+  <ul class="collapse">
+  <li><a href="#parameters-1" id="toc-parameters-1" class="nav-link" data-scroll-target="#parameters-1">Parameters</a></li>
+  <li><a href="#methods-1" id="toc-methods-1" class="nav-link" data-scroll-target="#methods-1">Methods</a>
+  <ul class="collapse">
+  <li><a href="#tbsim.tb.choice2d.ppf" id="toc-tbsim.tb.choice2d.ppf" class="nav-link" data-scroll-target="#tbsim.tb.choice2d.ppf">ppf</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#functions" id="toc-functions" class="nav-link" data-scroll-target="#functions">Functions</a>
+  <ul>
+  <li><a href="#tbsim.tb.get_tb" id="toc-tbsim.tb.get_tb" class="nav-link" data-scroll-target="#tbsim.tb.get_tb">get_tb</a>
+  <ul class="collapse">
+  <li><a href="#parameters-2" id="toc-parameters-2" class="nav-link" data-scroll-target="#parameters-2">Parameters</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/starsimhub/tbsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/sim.html"><strong>Core</strong></a></li><li class="breadcrumb-item"><a href="../api/tb.html">tb</a></li></ol></nav></header>
+
+
+
+
+
+<section id="tbsim.tb" class="level1">
+<h1>tb</h1>
+<p><code>tb</code></p>
+<p>TB natural history model. State definitions and transition diagram are in the API docs (tbsim.tb).</p>
+<section id="classes" class="level2">
+<h2 class="anchored" data-anchor-id="classes">Classes</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="#tbsim.tb.TB">TB</a></td>
+<td>Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al.&nbsp;2025).</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.tb.TBS">TBS</a></td>
+<td>TB state labels.</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.tb.choice2d">choice2d</a></td>
+<td>Version of ss.choice() allowing different per-agent probabilities.</td>
+</tr>
+</tbody>
+</table>
+<section id="tbsim.tb.TB" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.tb.TB">TB</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>tb.TB(pars<span class="op">=</span><span class="va">None</span>, <span class="op">**</span>kwargs)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al.&nbsp;2025). States in <code>TBS</code> span the spectrum from susceptibility to active disease and treatment. Infectious states are <code>TBS.ASYMPTOMATIC</code> and <code>TBS.SYMPTOMATIC</code>; the force of infection depends on <code>pars.beta</code> and the prevalence of those states, with <code>pars.trans_asymp</code> (kappa) giving the relative infectiousness of asymptomatic vs symptomatic TB. Progression out of latent <code>INFECTION</code> uses constant per-year hazards by default, but can optionally be <em>front-loaded</em> via <code>k_asy</code> (and <code>k_non</code>): the <code>INFECTION -&gt; ASYMPTOMATIC</code> (and <code>INFECTION -&gt; NON_INFECTIOUS</code>) hazard then declines exponentially with time since infection (see <code>progression_rates</code>). Reinfectable state (<code>TBS.CLEARED</code>) uses per-agent <code>rr_reinfection</code>, set on entry from each pathway (<code>rr_reinfection_cleared</code>, <code>rr_reinfection_rec</code>, <code>rr_reinfection_treat</code>). Per-agent modifiers <code>rr_activation</code>, <code>rr_clearance</code>, <code>rr_death</code> scale selected rates.</p>
+<p>Args (pars): <em>Transmission and reinfection</em></p>
+<pre><code>- ``init_prev``:   Initial seed infections into latent ``INFECTION`` (prevalence).
+- ``init_prev_active``: Initial seed infections into active ``SYMPTOMATIC`` TB (prevalence). Default 0. Mirrors the ODE model's symptomatic seeding, so that both models can start from identical active-TB prevalence.
+- ``beta``:        Transmission rate per year.
+- ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (kappa)
+- ``rr_reinfection_rec``:     Relative risk of reinfection after recovering from NON_INFECTIOUS. (pi)
+- ``rr_reinfection_treat``:   Relative risk of reinfection after completing treatment. (rho)
+- ``rr_reinfection_cleared``: Relative risk of reinfection after clearing latent infection. Default: 1.0
+- ``dur_reinfection_protection``: Distribution of duration of reinfection protection. If None, never wanes.
+
+*From INFECTION (latent)*
+
+- ``inf_cle``:     Infection -&gt; Cleared (no active TB).
+- ``inf_non``:     Infection -&gt; Non-infectious TB.
+- ``inf_asy``:     Infection -&gt; Asymptomatic TB.
+- ``k_asy``:       Optional exponential decline shape parameter of ``inf_asy`` with time since infection tau: ``inf_asy(tau) = inf_asy * exp(-k_asy * tau)``. Default 0 (constant hazard). Set &gt; 0 to front-load progression to active TB (the recommended one-parameter form).
+- ``k_non``:       Optional exponential decline shape parameter of ``inf_non`` with time since infection, analogous to ``k_asy``. Default 0 (constant hazard).
+
+*From NON_INFECTIOUS*
+
+- ``non_rec``:    Non-infectious -&gt; Recovered.
+- ``non_asy``:    Non-infectious -&gt; Asymptomatic.
+
+*From ASYMPTOMATIC*
+
+- ``asy_non``:    Asymptomatic -&gt; Non-infectious.
+- ``asy_sym``:    Asymptomatic -&gt; Symptomatic.
+
+*From SYMPTOMATIC*
+
+- ``sym_asy``:     Symptomatic -&gt; Asymptomatic.
+- ``sym_dead``:    Symptomatic -&gt; Dead (TB-specific mortality, mu_TB).
+
+*Background (general mortality is handled by* ``ss.Deaths`` *demographics, not this module)*
+
+- ``cxr_asymp_sens``:   CXR sensitivity for screening asymptomatic (0-1).</code></pre>
+<section id="attributes" class="level4 doc-section doc-section-attributes">
+<h4 class="doc-section doc-section-attributes anchored" data-anchor-id="attributes">Attributes</h4>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 6%">
+<col style="width: 43%">
+<col style="width: 49%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>susceptible</code> (BoolState, default=True</td>
+<td>Whether the agent is susceptible to TB.</td>
+</tr>
+<tr class="even">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>infected</code> (BoolState, default=False</td>
+<td>Whether the agent is currently infected.</td>
+</tr>
+<tr class="odd">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>ever_infected</code> (BoolState, default=False</td>
+<td>Whether the agent has ever been infected.</td>
+</tr>
+<tr class="even">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>on_treatment</code> (BoolState, default=False</td>
+<td>Whether the agent is on TB treatment.</td>
+</tr>
+<tr class="odd">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>state</code> (FloatArr, default=TBS.SUSCEPTIBLE</td>
+<td>Current TB state (<code>TBS</code> value).</td>
+</tr>
+<tr class="even">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>ti_infected</code> (FloatArr, default=-inf</td>
+<td>Time of infection (never infected = -inf).</td>
+</tr>
+<tr class="odd">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>rel_sus</code> (FloatArr, default=1.0</td>
+<td>Relative susceptibility to TB.</td>
+</tr>
+<tr class="even">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>rel_trans</code> (FloatArr, default=1.0</td>
+<td>Relative transmissibility of TB.</td>
+</tr>
+<tr class="odd">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>rr_activation</code> (FloatArr, default=1.0</td>
+<td>Multiplier on INFECTION -&gt; NON_INFECTIOUS / ASYMPTOMATIC.</td>
+</tr>
+<tr class="even">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>rr_clearance</code> (FloatArr, default=1.0</td>
+<td>Multiplier on NON_INFECTIOUS -&gt; CLEARED.</td>
+</tr>
+<tr class="odd">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>rr_death</code> (FloatArr, default=1.0</td>
+<td>Multiplier on SYMPTOMATIC -&gt; DEAD.</td>
+</tr>
+<tr class="even">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>rr_reinfection</code> (FloatArr, default=1.0</td>
+<td>Per-agent relative reinfection risk; set on entry to CLEARED.</td>
+</tr>
+<tr class="odd">
+<td><ul>
+<li></li>
+</ul></td>
+<td><code>ti_rr_reinfection_wane</code> (FloatArr, default=np.inf</td>
+<td>Sim time at which <code>rr_reinfection</code> resets to 1.0.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="example" class="level4 doc-section doc-section-example">
+<h4 class="doc-section doc-section-example anchored" data-anchor-id="example">Example</h4>
+<p>::</p>
+<pre><code>import starsim as ss
+import tbsim
+
+sim = ss.Sim(diseases=tbsim.TB(), pars=dict(start='2000', stop='2020'))
+sim.run()
+sim.plot()</code></pre>
+</section>
+<section id="references" class="level4 doc-section doc-section-references">
+<h4 class="doc-section doc-section-references anchored" data-anchor-id="references">References</h4>
+<p>[1] Schwalb et al.&nbsp;(2025) Potential impact, costs, and benefits of population-wide screening interventions for tuberculosis in Viet Nam. PLOS Glob Public Health. https://doi.org/10.1371/journal.pgph.0005050</p>
+</section>
+<section id="methods" class="level4">
+<h4 class="anchored" data-anchor-id="methods">Methods</h4>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="#tbsim.tb.TB.finalize_results">finalize_results</a></td>
+<td>Compute cumulative series from new-event series after the run.</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.tb.TB.init_post">init_post</a></td>
+<td>Seed initial infections, then (optionally) promote a fraction to active TB.</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.tb.TB.init_pre">init_pre</a></td>
+<td>Resolve the reinfection-RR default coupling once all pars are final (spec §reinfection).</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.tb.TB.init_results">init_results</a></td>
+<td>Define result time series.</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.tb.TB.plot">plot</a></td>
+<td>Plot TB result time series using tbsim.plot().</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.tb.TB.progression_rates">progression_rates</a></td>
+<td>Per-agent INFECTION-exit rates to NON_INFECTIOUS and ASYMPTOMATIC.</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.tb.TB.set_prognoses">set_prognoses</a></td>
+<td>Set prognoses for newly infected agents (called when transmission occurs).</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.tb.TB.step">step</a></td>
+<td>Advance TB state machine one timestep.</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.tb.TB.step_bookkeeping">step_bookkeeping</a></td>
+<td>Update infection flags, request TB deaths, reset risk modifiers, and set the</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.tb.TB.step_die">step_die</a></td>
+<td>Apply death for the given agents and update TB state.</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.tb.TB.step_transitions">step_transitions</a></td>
+<td>Evaluate the natural-history state transitions (each mutates <code>self.state</code> in place).</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.tb.TB.transition">transition</a></td>
+<td>Evaluate competing exponential transitions over one dt and apply immediately.</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.tb.TB.update_results">update_results</a></td>
+<td>Record current time-step values for all result series.</td>
+</tr>
+</tbody>
+</table>
+<section id="tbsim.tb.TB.finalize_results" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.finalize_results">finalize_results</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>tb.TB.finalize_results()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Compute cumulative series from new-event series after the run.</p>
+</section>
+<section id="tbsim.tb.TB.init_post" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.init_post">init_post</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>tb.TB.init_post()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Seed initial infections, then (optionally) promote a fraction to active TB.</p>
+<p>The base <a href="https://docs.starsim.org/api/diseases.html#starsim.diseases.Infection.init_post" title="0"><code>starsim.Infection.init_post</code></a> seeds <code>init_prev</code> cases into latent <code>INFECTION</code> (via <code>set_prognoses</code>). We additionally seed <code>init_prev_active</code> cases directly into <code>SYMPTOMATIC</code> active TB, matching the compartmental ODE, which seeds its initial cases as symptomatic rather than latent. Active seeding draws from agents still susceptible after latent seeding, so the two seeds do not overlap.</p>
+</section>
+<section id="tbsim.tb.TB.init_pre" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.init_pre">init_pre</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>tb.TB.init_pre(sim)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Resolve the reinfection-RR default coupling once all pars are final (spec §reinfection).</p>
+<p><code>rr_reinfection_inf</code> (σ_L) defaults to <code>rr_reinfection_rec</code>; <code>rr_reinfection_non</code> (σ_N) defaults to <code>rr_reinfection_inf</code>. Done here (not in <code>__init__</code>) so it uses the fully-resolved pars regardless of subclass construction order (<code>TBResistant</code> applies its pars after <code>super().__init__</code>).</p>
+</section>
+<section id="tbsim.tb.TB.init_results" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.init_results">init_results</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>tb.TB.init_results()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Define result time series.</p>
+</section>
+<section id="tbsim.tb.TB.plot" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.plot">plot</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>tb.TB.plot(<span class="op">**</span>kwargs)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Plot TB result time series using tbsim.plot().</p>
+<section id="parameters" class="level6 doc-section doc-section-parameters">
+<h6 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h6>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>**kwargs</td>
+<td></td>
+<td>Forwarded to :func:<a href="../api/plots.html#tbsim.plots.plot" title="0"><code>tbsim.plots.plot</code></a>. Common options include <a href="https://docs.python.org/3/library/select.html#module-select" title="1"><code>select</code></a>, <code>title</code>, <code>n_cols</code>, <code>row_height</code>, <code>style</code>, <code>filename</code>, and <code>show</code>.</td>
+<td><code>{}</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="returns" class="level6 doc-section doc-section-returns">
+<h6 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h6>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 37%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td></td>
+<td></td>
+<td>matplotlib.figure.Figure</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="tbsim.tb.TB.progression_rates" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.progression_rates">progression_rates</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>tb.TB.progression_rates(uids)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Per-agent INFECTION-exit rates to NON_INFECTIOUS and ASYMPTOMATIC.</p>
+<p>Returns <code>(inf_non, inf_asy)</code> as rate objects with per-agent values, applying <code>rr_activation</code> and the optional time-since-infection decline::</p>
+<pre><code>inf_non(tau) = inf_non * rr_activation * exp(-k_non * tau)
+inf_asy(tau) = inf_asy * rr_activation * exp(-k_asy * tau)</code></pre>
+<p>where <code>tau</code> is years since each agent entered INFECTION (from <code>ti_infected</code>, so reinfection restarts the clock). With <code>k_non = k_asy = 0</code> (default) the decline factors are exactly 1 and the rates reduce to the constant <code>inf_non</code>/<code>inf_asy</code> scaled only by <code>rr_activation</code>.</p>
+</section>
+<section id="tbsim.tb.TB.set_prognoses" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.set_prognoses">set_prognoses</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>tb.TB.set_prognoses(uids, sources<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Set prognoses for newly infected agents (called when transmission occurs).</p>
+<p>The base <a href="https://docs.starsim.org/api/diseases.html#starsim.diseases.Infection" title="0"><code>starsim.Infection</code></a> calls this when a susceptible agent acquires infection. A primary infection (from <code>SUSCEPTIBLE</code> / <code>CLEARED</code>) enters latent <code>INFECTION</code>; a <em>reinfection</em> of an already-infected latent (<code>INFECTION</code>) or non-infectious (<code>NON_INFECTIOUS</code>) agent only resets the <code>ti_infected</code> clock — its state is left unchanged (clock reset, no state change). Transitions are evaluated per dt each timestep in <code>step</code>.</p>
+</section>
+<section id="tbsim.tb.TB.step" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.step">step</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>tb.TB.step()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Advance TB state machine one timestep.</p>
+<ol type="1">
+<li><strong>Transmission</strong> (via <code>super().step()</code>): handles force of infection.</li>
+<li><strong>Evaluate transitions</strong> (<code>step_transitions</code>): competing-risk transitions, applied immediately; agents may cascade through multiple states in one step.</li>
+<li><strong>Bookkeeping</strong> (<code>step_bookkeeping</code>): update flags, modifiers, deaths, and the transmission state (<code>susceptible</code>/<code>rel_sus</code>/<code>rel_trans</code>) for next step.</li>
+</ol>
+<p>The work is split into <code>step_transitions</code> and <code>step_bookkeeping</code> so that strain-aware subclasses (see <code>tbsim.resistance</code>) can override the natural history and the transmission set-up independently.</p>
+</section>
+<section id="tbsim.tb.TB.step_bookkeeping" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.step_bookkeeping">step_bookkeeping</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>tb.TB.step_bookkeeping()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Update infection flags, request TB deaths, reset risk modifiers, and set the transmission state (<code>susceptible</code>/<code>rel_sus</code>/<code>rel_trans</code>) used next step.</p>
+</section>
+<section id="tbsim.tb.TB.step_die" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.step_die">step_die</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>tb.TB.step_die(uids)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Apply death for the given agents and update TB state.</p>
+<p>Called by the framework when agents die (e.g.&nbsp;background mortality). Sets state to DEAD, clears flags, and stops transmission.</p>
+</section>
+<section id="tbsim.tb.TB.step_transitions" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.step_transitions">step_transitions</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>tb.TB.step_transitions()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Evaluate the natural-history state transitions (each mutates <code>self.state</code> in place).</p>
+</section>
+<section id="tbsim.tb.TB.transition" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.transition">transition</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>tb.TB.transition(uids, to, rng)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Evaluate competing exponential transitions over one dt and apply immediately.</p>
+<p>For each agent in <em>uids</em>, computes the probability of transitioning to each destination in <em>to</em> during one timestep. Uses a single uniform draw per agent to decide (a) whether the agent transitions and (b) which destination it goes to. State is updated <strong>immediately</strong>.</p>
+</section>
+<section id="tbsim.tb.TB.update_results" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.TB.update_results">update_results</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>tb.TB.update_results()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Record current time-step values for all result series.</p>
+</section>
+</section>
+</section>
+<section id="tbsim.tb.TBS" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.tb.TBS">TBS</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>tb.TBS()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>TB state labels.</p>
+<ul>
+<li>Each agent is in exactly one of these states.</li>
+<li>Transitions are driven by exponential rates in <code>TB</code>.</li>
+</ul>
+</section>
+<section id="tbsim.tb.choice2d" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.tb.choice2d">choice2d</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>tb.choice2d(a<span class="op">=</span><span class="va">None</span>, p<span class="op">=</span><span class="va">None</span>, replace<span class="op">=</span><span class="va">True</span>, <span class="op">**</span>kwargs)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Version of ss.choice() allowing different per-agent probabilities.</p>
+<p>Temporary location; to be ported to Starsim and potentially merged with ss.choice().</p>
+<section id="parameters-1" class="level4 doc-section doc-section-parameters">
+<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-1">Parameters</h4>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>a</td>
+<td>1D array</td>
+<td>the values to choose from (default: np.arange(p.shape[1]))</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="even">
+<td>p</td>
+<td>2D array</td>
+<td>the probability of each choice for each agent</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example</strong>: # Choose between specified options each with a specified probability (must sum to 1) p = np.array([ # Per-agent array of outcome probabilities across 3 options [0.1, 0.5, 0.4], [0.2, 0.3, 0.5], [0.3, 0.4, 0.3], [0.4, 0.2, 0.4], [0.5, 0.3, 0.2], [0.8, 0.1, 0.1], ]) n = len(p) choices = tbsim.choice2d(p=p, strict=False)(n)</p>
+</section>
+<section id="methods-1" class="level4">
+<h4 class="anchored" data-anchor-id="methods-1">Methods</h4>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="#tbsim.tb.choice2d.ppf">ppf</a></td>
+<td>Always use ppf to allow per-agent probabilities</td>
+</tr>
+</tbody>
+</table>
+<section id="tbsim.tb.choice2d.ppf" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.tb.choice2d.ppf">ppf</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>tb.choice2d.ppf(rands)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Always use ppf to allow per-agent probabilities</p>
+</section>
+</section>
+</section>
+</section>
+<section id="functions" class="level2">
+<h2 class="anchored" data-anchor-id="functions">Functions</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="#tbsim.tb.get_tb">get_tb</a></td>
+<td>Helper to get the TB infection module from a sim</td>
+</tr>
+</tbody>
+</table>
+<section id="tbsim.tb.get_tb" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.tb.get_tb">get_tb</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>tb.get_tb(sim, which<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Helper to get the TB infection module from a sim</p>
+<section id="parameters-2" class="level4 doc-section doc-section-parameters">
+<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-2">Parameters</h4>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>sim</td>
+<td><a href="../api/sim.html#tbsim.sim.Sim">Sim</a></td>
+<td>the simulation to search for the TB module</td>
+<td><em>required</em></td>
+</tr>
+<tr class="even">
+<td>which</td>
+<td><a href="https://docs.python.org/3/library/functions.html#type">type</a></td>
+<td>the class of TB module to get (e.g.&nbsp;TB); if None, returns the first BaseTB subclass found</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+</tbody>
+</table>
+
+
+</section>
+</section>
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../api/sim.html" class="pagination-link" aria-label="sim">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">sim</span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../api/networks.html" class="pagination-link" aria-label="networks">
+        <span class="nav-page-text">networks</span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Docs built for TBsim v0.10.2 (2026-07-20).<br>© 2023–2026, Gates Foundation and collaborators. All rights reserved. <a href="https://www.gatesfoundation.org/Privacy-and-Cookies-Notice">Privacy and Cookies Notice</a> | <a href="https://www.gatesfoundation.org/Terms-of-Use">Terms of Use</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/starsimhub/tbsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div>
+    <div class="nav-footer-right">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/starsimhub/tbsim">
+      <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+    </a>
+  </li>  
+    <li class="nav-item compact">
+    <a class="nav-link" href="mailto:info@starsim.org">
+      <i class="bi bi-envelope-at-fill" role="img">
+</i> 
+    </a>
+  </li>  
+    <li class="nav-item compact">
+    <a class="nav-link" href="https://starsim-idm.slack.com">
+      <i class="bi bi-slack" role="img">
+</i> 
+    </a>
+  </li>  
+    <li class="nav-item compact">
+    <a class="nav-link" href="https://starsim.org/">
+      <i class="bi bi-globe" role="img">
+</i> 
+    </a>
+  </li>  
+</ul>
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
