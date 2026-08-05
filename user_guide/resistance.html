@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.37">
+<meta name="generator" content="quarto-1.10.18">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -12,10 +12,13 @@
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
 */
-code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
-div.columns{display: flex; gap: min(4vw, 1.5em);}
-div.column{flex: auto; overflow-x: auto;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
@@ -77,14 +80,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-23bbe8b5e4efc1e257f6d59dce478b08.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-5a1953863e1f72ef3b996ef827f01ca7.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-b8d35f6d858c1e6bbf659b4b83919473.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-cd2179aaae4b775b664ba2d87bf1ea05.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-d9810d97357975cc6fb43885eb33278f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-cd2179aaae4b775b664ba2d87bf1ea05.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -546,7 +549,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="quick-start" class="level2">
 <h2 class="anchored" data-anchor-id="quick-start">Quick start</h2>
 <p>The shortest path from install to a multi-strain run:</p>
-<div id="054b8caf" class="cell" data-execution_count="1">
+<div id="473825fb" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> starsim <span class="im">as</span> ss</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tbsim</span>
@@ -581,7 +584,7 @@ Final RIF-resistant fraction: 0.03148148148148148</code></pre>
 </div>
 </div>
 <p><strong>Reusable helper</strong> used in the recipes below (copy once into a notebook or script):</p>
-<div id="eebd97c9" class="cell" data-execution_count="2">
+<div id="ef76c920" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> starsim <span class="im">as</span> ss</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tbsim</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -643,7 +646,7 @@ Final RIF-resistant fraction: 0.03148148148148148</code></pre>
 <h2 class="anchored" data-anchor-id="building-a-multi-strain-simulation">Building a multi-strain simulation</h2>
 <section id="defining-strains" class="level3">
 <h3 class="anchored" data-anchor-id="defining-strains">Defining strains</h3>
-<div id="a6dad748" class="cell" data-execution_count="3">
+<div id="8295ba06" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tbsim</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>strains <span class="op">=</span> tbsim.Strains(drugs<span class="op">=</span>[<span class="st">'RIF'</span>, <span class="st">'BDQ'</span>], rel_fitness<span class="op">=</span>{<span class="st">'RIF'</span>: <span class="fl">0.5</span>, <span class="st">'BDQ'</span>: <span class="fl">0.8</span>})</span>
@@ -702,7 +705,7 @@ Final RIF-resistant fraction: 0.03148148148148148</code></pre>
 <section id="creating-tbresistant" class="level3">
 <h3 class="anchored" data-anchor-id="creating-tbresistant">Creating <code>TBResistant</code></h3>
 <p><code>TBResistant</code> is a drop-in replacement for <a href="../api/tb.html#tbsim.tb.TB" title="0"><code>tbsim.TB</code></a>:</p>
-<div id="3e9acad1" class="cell" data-execution_count="4">
+<div id="3742769e" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> starsim <span class="im">as</span> ss</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tbsim</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -728,7 +731,7 @@ Final RIF-resistant fraction: 0.03148148148148148</code></pre>
 <section id="seeding-the-epidemic" class="level3">
 <h3 class="anchored" data-anchor-id="seeding-the-epidemic">Seeding the epidemic</h3>
 <p><code>init_strains</code> is a probability vector over strain ids for <strong>seeded</strong> infections (length <code>m</code>, need not be normalized — it is renormalized internally):</p>
-<div id="2819659b" class="cell" data-execution_count="5">
+<div id="75092b00" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>tb <span class="op">=</span> tbsim.TBResistant(</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    drugs<span class="op">=</span>[<span class="st">'RIF'</span>, <span class="st">'BDQ'</span>], rel_fitness<span class="op">=</span>{<span class="st">'RIF'</span>: <span class="fl">0.9</span>, <span class="st">'BDQ'</span>: <span class="fl">0.85</span>},</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    beta<span class="op">=</span>ss.permonth(<span class="fl">0.35</span>), init_prev<span class="op">=</span>ss.bernoulli(<span class="fl">0.10</span>),</span>
@@ -784,7 +787,7 @@ Final RIF-resistant fraction: 0.03148148148148148</code></pre>
 </tr>
 </tbody>
 </table>
-<div id="91a20125" class="cell" data-execution_count="6">
+<div id="a5d554a4" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>sim <span class="op">=</span> build_sim(tb, stop<span class="op">=</span><span class="st">'2015-12-31'</span>)<span class="op">;</span> sim.run()</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> sim.results.tb</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'Mean frac_resist (last 5 years):'</span>, <span class="bu">float</span>(res[<span class="st">'frac_resist'</span>][<span class="op">-</span><span class="dv">60</span>:].mean()))</span>
@@ -806,7 +809,7 @@ Cumulative identical-strain superinfections: 643</code></pre>
 <li>Conditional on transmission, which strain is passed ∝ fitness among carried strains.</li>
 </ol>
 <p>Reproduce the specification’s worked example (≈56% / 44% → 0.28β / 0.22β):</p>
-<div id="f441b309" class="cell" data-execution_count="7">
+<div id="c82027e6" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tbsim</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -865,7 +868,7 @@ P(pass RIF+BDQ) = 44.4%</code></pre>
 </table>
 <p>Protection is <strong>strain-agnostic</strong> (a third <em>distinct</em> strain is not harder to acquire than a second). Re-exposure to an already-carried strain is <strong>allowed</strong>: rather than being blocked, it increments that agent’s per-strain <strong>count</strong> (tracked in <code>tb.strain_counts</code>, one array per strain id) and is tallied in <code>new_identical_superinf</code>. The count feeds only two consumers — the transmission multinomial (which strain is passed ∝ <code>count × fitness</code>) and the progression bottleneck under <code>p_multi &lt; 1</code> (which strain survives ∝ count) — and leaves transition rates, DST, treatment efficacy, and the <em>probability</em> of resistance acquisition count-agnostic (all copies of a strain behave as one).</p>
 <p>You can inspect the count-weighting directly on the <code>Strains</code> registry:</p>
-<div id="1ef7d499" class="cell" data-execution_count="8">
+<div id="038bdb39" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tbsim</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -879,7 +882,7 @@ P(pass RIF+BDQ) = 44.4%</code></pre>
 </div>
 </div>
 <p>Fitness costs drive competition. Without treatment, a less-fit resistant strain tends to decline:</p>
-<div id="33bfd7f6" class="cell" data-execution_count="9">
+<div id="0f957d62" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -933,7 +936,7 @@ P(pass RIF+BDQ) = 44.4%</code></pre>
 </tr>
 </tbody>
 </table>
-<div id="d008743f" class="cell" data-execution_count="10">
+<div id="d3234ca1" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>tb <span class="op">=</span> tbsim.TBResistant(</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    rel_fitness<span class="op">=</span>{<span class="st">'TX'</span>: <span class="fl">0.9</span>}, beta<span class="op">=</span>ss.permonth(<span class="fl">0.35</span>), init_prev<span class="op">=</span>ss.bernoulli(<span class="fl">0.12</span>),</span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    init_strains<span class="op">=</span>[<span class="fl">1.0</span>, <span class="fl">0.0</span>],       <span class="co"># start 100% pan-susceptible</span></span>
@@ -959,13 +962,13 @@ Final resistant fraction: 0.030660377358490566</code></pre>
 </ul>
 <p>Efficacy for strain <code>j</code> is <code>base_efficacy</code> × product of <code>resist_penalty</code> over <strong>regimen</strong> drugs that strain resists. If that constrained form is too restrictive, pass an explicit per-strain efficacy vector <code>efficacy_by_strain</code> (length <code>m</code>) — it is used verbatim and overrides <code>base_efficacy</code>/<code>resist_penalty</code>. Failed courses can acquire resistance to regimen drugs by <strong>replacement</strong>: each surviving drug-susceptible strain rolls independently, once per regimen drug it is susceptible to, scaled by TB-state RR (<code>acq_state_rr</code>; default 1 for ASYMPTOMATIC/SYMPTOMATIC, 0 elsewhere).</p>
 <p><code>adherence</code> is a per-course completion probability that correlates all of an agent’s strains through a single draw (a non-completer clears nothing that course). Pass a <strong>float</strong> for one regimen-level probability shared by every agent, or a <strong>callable</strong> <code>uids -&gt; per-agent probability</code> to make adherence a distribution that varies by agent:</p>
-<div id="6036240d" class="cell" data-execution_count="11">
+<div id="00ff39f5" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="co"># First half of agents fully adherent, second half never — a per-agent adherence distribution.</span></span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>adherence <span class="op">=</span> <span class="kw">lambda</span> uids: np.where(np.asarray(uids) <span class="op">&lt;</span> <span class="dv">1000</span>, <span class="fl">1.0</span>, <span class="fl">0.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>A worked treatment run that <em>selects for</em> resistance (susceptible strain cured well, resistant strain poorly):</p>
-<div id="7f3d49a4" class="cell" data-execution_count="12">
+<div id="9a5f9537" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>tb <span class="op">=</span> tbsim.TBResistant(</span>
 <span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>    rel_fitness<span class="op">=</span>{<span class="st">'TX'</span>: <span class="fl">0.6</span>}, beta<span class="op">=</span>ss.permonth(<span class="fl">0.35</span>), init_prev<span class="op">=</span>ss.bernoulli(<span class="fl">0.12</span>),</span>
 <span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    init_strains<span class="op">=</span>[<span class="fl">0.95</span>, <span class="fl">0.05</span>], rr_reinfection_inf<span class="op">=</span><span class="fl">1.0</span>, rr_reinfection_non<span class="op">=</span><span class="fl">1.0</span>,</span>
@@ -993,7 +996,7 @@ Final resistant fraction: 0.646551724137931</code></pre>
 <h2 class="anchored" data-anchor-id="drug-susceptibility-testing-dst">Drug-susceptibility testing (DST)</h2>
 <p><code>DST</code> produces an <strong>observed n-drug profile</strong> (not strain identities). Sensitivity/specificity are applied at the strain level; <code>p_strain_obs</code> (default = strain fitness) can drop strains from the sample. Sensitivity/specificity errors are drawn <strong>independently per (strain, drug)</strong>, so a multi-drug DST behaves like independent per-drug tests. <code>DSTDelivery.matches(...)</code> turns the observed profile into eligibility callables for regimen routing.</p>
 <p>A key point about <code>regimen_drugs</code>: it names the <strong>drugs the regimen acts on</strong>. A realistic second-line for RIF-resistant TB is built from a <strong>different</strong> drug the resistant strain is still susceptible to — not RIF. The example uses a two-drug space (<code>RIF</code>, <code>BDQ</code>): first-line is a RIF regimen routed to observed RIF-susceptible cases, and second-line is a BDQ regimen routed to observed RIF-resistant cases (which are BDQ-susceptible here).</p>
-<div id="f0dd4de1" class="cell" data-execution_count="13">
+<div id="0bceec35" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>tb <span class="op">=</span> tbsim.TBResistant(</span>
 <span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    drugs<span class="op">=</span>[<span class="st">'RIF'</span>, <span class="st">'BDQ'</span>], rel_fitness<span class="op">=</span>{<span class="st">'RIF'</span>: <span class="fl">0.9</span>},</span>
 <span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    beta<span class="op">=</span>ss.permonth(<span class="fl">0.35</span>), init_prev<span class="op">=</span>ss.bernoulli(<span class="fl">0.12</span>),</span>
@@ -1025,7 +1028,7 @@ Second-line (RIF-R): 5</code></pre>
 </div>
 <p>Also available: <code>dst.observed_resistant('RIF')</code> for a single-drug eligibility callable. Both <code>matches(...)</code> and <code>observed_resistant(...)</code> accept <code>max_age=&lt;ss.dur&gt;</code> to require a <em>fresh</em> DST result, and <code>DSTDelivery(result_validity=&lt;ss.dur&gt;)</code> wipes stored results older than the window so agents must be re-tested.</p>
 <p><strong>Retreatment vs new case.</strong> Every <code>TxDeliveryR</code> stamps a durable, cross-regimen <code>tb.ti_last_treatment</code> at each initiation, so a later presentation can be classified by time since last treatment. <code>TxDeliveryR.failure_case_eligibility(within=&lt;ss.dur&gt;)</code> returns a <code>sim -&gt; uids</code> callable selecting active-TB agents whose most recent treatment was within <code>within</code> (manage as <strong>retreatment</strong>); pass <code>new_case=True</code> for the complement, and <code>base=&lt;callable&gt;</code> to restrict the candidate pool.</p>
-<div id="103bc70e" class="cell" data-execution_count="14">
+<div id="0d67377e" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>failed <span class="op">=</span> tbsim.TxDeliveryR.failure_case_eligibility(within<span class="op">=</span>ss.years(<span class="dv">2</span>))   <span class="co"># recent treatment → retreatment</span></span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>second_line <span class="op">=</span> tbsim.TxDeliveryR(name<span class="op">=</span><span class="st">'second'</span>, eligibility<span class="op">=</span>failed, supersedes<span class="op">=</span>[<span class="st">'first'</span>],</span>
 <span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>                                product<span class="op">=</span>tbsim.TxR(strains<span class="op">=</span>tb.strains, regimen_drugs<span class="op">=</span>[<span class="st">'BDQ'</span>]))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -1039,7 +1042,7 @@ Second-line (RIF-R): 5</code></pre>
 <li>Build a second-line delivery with <code>eligibility=treatment_monitoring_eligibility(...)</code> and <code>supersedes=['first']</code>.</li>
 <li>The second line <strong>interrupts</strong> the ongoing course, then starts the new regimen.</li>
 </ol>
-<div id="2b9b4b9c" class="cell" data-execution_count="15">
+<div id="695c8232" class="cell" data-execution_count="15">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>tb <span class="op">=</span> tbsim.TBResistant(</span>
 <span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>    drugs<span class="op">=</span>[<span class="st">'INH'</span>, <span class="st">'RIF'</span>], rel_fitness<span class="op">=</span>{<span class="st">'INH'</span>: <span class="fl">0.95</span>},</span>
 <span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>    beta<span class="op">=</span>ss.permonth(<span class="fl">0.3</span>), init_prev<span class="op">=</span>ss.bernoulli(<span class="fl">0.10</span>),</span>
@@ -1068,7 +1071,7 @@ Switched to second-line: 13</code></pre>
 <section id="strain-aware-preventive-therapy-tpt" class="level2">
 <h2 class="anchored" data-anchor-id="strain-aware-preventive-therapy-tpt">Strain-aware preventive therapy (TPT)</h2>
 <p><code>TPTRx</code> sterilizes <strong>per strain</strong>: only strains susceptible to every drug in the TPT regimen are cleared. A resistant strain in a co-infected agent can survive and later progress/transmit — the classic “TPT unmasks resistance” dynamic. Ineffective TPT can also select resistance (<code>p_tpt_acq</code>), scaled by TB state.</p>
-<div id="0b414567" class="cell" data-execution_count="16">
+<div id="2794d11d" class="cell" data-execution_count="16">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
 <span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -1108,7 +1111,7 @@ Switched to second-line: 13</code></pre>
 <section id="analyzing-where-resistance-comes-from" class="level2">
 <h2 class="anchored" data-anchor-id="analyzing-where-resistance-comes-from">Analyzing where resistance comes from</h2>
 <p><code>ResistanceStats</code> decomposes new resistance into <strong>de-novo</strong>, <strong>treatment-acquired</strong>, <strong>transmitted</strong>, and <strong>TPT-acquired</strong> fluxes. <code>StrainResults</code> records per-strain active-TB counts.</p>
-<div id="cd82a658" class="cell" data-execution_count="17">
+<div id="c47407de" class="cell" data-execution_count="17">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>tb <span class="op">=</span> tbsim.TBResistant(</span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>    rel_fitness<span class="op">=</span>{<span class="st">'TX'</span>: <span class="fl">0.9</span>}, beta<span class="op">=</span>ss.permonth(<span class="fl">0.35</span>), init_prev<span class="op">=</span>ss.bernoulli(<span class="fl">0.12</span>),</span>
 <span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    init_strains<span class="op">=</span>[<span class="fl">0.9</span>, <span class="fl">0.1</span>], p_rand<span class="op">=</span>{<span class="st">'TX'</span>: <span class="fl">0.01</span>},</span>
@@ -1465,7 +1468,7 @@ Switched to second-line: 13</code></pre>
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/starsimhub\.github\.io\/tbsim\/");
+        var filterRegex = new RegExp('/' + window.location.host + '/');
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

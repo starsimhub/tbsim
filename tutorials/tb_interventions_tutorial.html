@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.37">
+<meta name="generator" content="quarto-1.10.18">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -12,10 +12,13 @@
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
 */
-code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
-div.columns{display: flex; gap: min(4vw, 1.5em);}
-div.column{flex: auto; overflow-x: auto;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
@@ -77,14 +80,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-23bbe8b5e4efc1e257f6d59dce478b08.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-5a1953863e1f72ef3b996ef827f01ca7.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-b8d35f6d858c1e6bbf659b4b83919473.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-cd2179aaae4b775b664ba2d87bf1ea05.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-d9810d97357975cc6fb43885eb33278f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-cd2179aaae4b775b664ba2d87bf1ea05.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -553,7 +556,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="required-packages" class="level2">
 <h2 class="anchored" data-anchor-id="required-packages">Required Packages</h2>
 <p>First, let’s import the necessary libraries:</p>
-<div id="5ac792f2" class="cell" data-execution_count="1">
+<div id="1233c62c" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tbsim</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> starsim <span class="im">as</span> ss</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sciris <span class="im">as</span> sc</span>
@@ -570,7 +573,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="default-parameters" class="level2">
 <h2 class="anchored" data-anchor-id="default-parameters">Default Parameters</h2>
 <p>Let’s define the default parameters for our simulations:</p>
-<div id="8179f8b6" class="cell" data-execution_count="2">
+<div id="de331612" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Simple default parameters for simulation</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>DEFAULT_SPARS <span class="op">=</span> <span class="bu">dict</span>(</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    dt<span class="op">=</span>ss.days(<span class="dv">7</span>),</span>
@@ -640,7 +643,7 @@ Age distribution:
 <section id="building-the-simulation-function" class="level2">
 <h2 class="anchored" data-anchor-id="building-the-simulation-function">Building the Simulation Function</h2>
 <p>Now let’s create a function that builds a complete TB simulation with intervention capabilities:</p>
-<div id="9e110cab" class="cell" data-execution_count="3">
+<div id="8b018d80" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> build_sim(scenario<span class="op">=</span><span class="va">None</span>, spars<span class="op">=</span><span class="va">None</span>):</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co">    Build and return a complete Starsim-based simulation instance for TB modeling,</span></span>
@@ -724,7 +727,7 @@ Age distribution:
 <section id="defining-intervention-scenarios" class="level2">
 <h2 class="anchored" data-anchor-id="defining-intervention-scenarios">Defining Intervention Scenarios</h2>
 <p>Let’s create a function that defines different intervention scenarios:</p>
-<div id="b6ab10ee" class="cell" data-execution_count="4">
+<div id="ef797910" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_scenarios():</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co">    Define a set of simulation scenarios for evaluating TB interventions.</span></span>
@@ -799,7 +802,7 @@ Beta Change: Beta transmission rate change
 <section id="running-a-single-scenario" class="level2">
 <h2 class="anchored" data-anchor-id="running-a-single-scenario">Running a Single Scenario</h2>
 <p>Let’s start by running a single baseline scenario to understand the basic simulation:</p>
-<div id="edb74e9c" class="cell" data-execution_count="5">
+<div id="cdd6257d" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run baseline scenario</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Running baseline scenario..."</span>)</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>baseline_scenario <span class="op">=</span> scenarios[<span class="st">'Baseline'</span>]</span>
@@ -816,7 +819,7 @@ Beta Change: Beta transmission rate change
 <section id="exploring-baseline-results" class="level2">
 <h2 class="anchored" data-anchor-id="exploring-baseline-results">Exploring Baseline Results</h2>
 <p>Let’s examine the baseline simulation results:</p>
-<div id="fd0fbf18" class="cell" data-execution_count="6">
+<div id="868d62c0" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Get baseline results</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>baseline_results <span class="op">=</span> baseline_sim.results.flatten()</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -895,7 +898,7 @@ Key TB metrics:
 <section id="plotting-baseline-results" class="level2">
 <h2 class="anchored" data-anchor-id="plotting-baseline-results">Plotting Baseline Results</h2>
 <p>Let’s create some basic plots to visualize the baseline TB dynamics:</p>
-<div id="f9036bdc" class="cell" data-execution_count="7">
+<div id="b4ba3b5b" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>baseline_sim.plot()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Figure(1200x900)</code></pre>
@@ -912,7 +915,7 @@ Key TB metrics:
 <section id="running-multiple-scenarios" class="level2">
 <h2 class="anchored" data-anchor-id="running-multiple-scenarios">Running Multiple Scenarios</h2>
 <p>Now let’s run multiple scenarios to compare the effects of different interventions:</p>
-<div id="7fef563b" class="cell" data-execution_count="8">
+<div id="cf60706d" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> run_scenarios(scenario_names<span class="op">=</span><span class="va">None</span>, plot<span class="op">=</span><span class="va">True</span>):</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Run multiple scenarios and optionally plot results."""</span></span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    </span>
@@ -945,7 +948,7 @@ Key TB metrics:
 <section id="creating-comparison-plots" class="level2">
 <h2 class="anchored" data-anchor-id="creating-comparison-plots">Creating Comparison Plots</h2>
 <p>Let’s create a function to compare results across different scenarios:</p>
-<div id="2eaab736" class="cell" data-execution_count="9">
+<div id="b56117d1" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> run_scenarios(selected_scenarios, plot<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="co"># print(f"\nCompleted {len(results)} scenarios successfully!")</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -967,7 +970,7 @@ Running: Single BCG</code></pre>
 <section id="intervention-impact-analysis" class="level2">
 <h2 class="anchored" data-anchor-id="intervention-impact-analysis">Intervention Impact Analysis</h2>
 <p>Let’s analyze the impact of interventions by calculating key metrics:</p>
-<div id="537f4621" class="cell" data-execution_count="10">
+<div id="3bb48563" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> analyze_intervention_impact(results):</span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Analyze the impact of interventions compared to baseline."""</span></span>
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    </span>
@@ -1021,17 +1024,15 @@ Single BCG:
   Prevalence Reduction: nan%</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_549911/3857901492.py:23: RuntimeWarning:
-
-invalid value encountered in scalar divide
-</code></pre>
+<pre><code>/tmp/ipykernel_2712/3857901492.py:23: RuntimeWarning: invalid value encountered in scalar divide
+  reduction = ((baseline_final - intervention_final) / baseline_final) * 100</code></pre>
 </div>
 </div>
 </section>
 <section id="advanced-custom-scenario-creation" class="level2">
 <h2 class="anchored" data-anchor-id="advanced-custom-scenario-creation">Advanced: Custom Scenario Creation</h2>
 <p>Let’s create a custom scenario to demonstrate how to define your own interventions:</p>
-<div id="0fd0d3f6" class="cell" data-execution_count="11">
+<div id="64597abe" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a custom scenario with multiple interventions</span></span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>custom_scenario <span class="op">=</span> {</span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">'name'</span>: <span class="st">'Combined BCG + TPT + Beta Reduction'</span>,</span>
@@ -1223,7 +1224,7 @@ Custom scenario completed!</code></pre>
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/starsimhub\.github\.io\/tbsim\/");
+        var filterRegex = new RegExp('/' + window.location.host + '/');
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
