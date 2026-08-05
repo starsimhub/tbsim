@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
@@ -19,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history, so page timestamps are accurate
 
       - uses: actions/setup-python@v5
         with:
@@ -26,13 +30,21 @@ jobs:
 
       - uses: actions/cache@v4
         with:
-          key: quarto-${{ runner.os }}-${{ hashFiles('**/requirements.txt', '**/pyproject.toml', '**/_quarto.yml') }}
+          key: pip-${{ runner.os }}-${{ hashFiles('**/pyproject.toml') }}
           path: ~/.cache/pip
 
       - name: Install TBsim and docs dependencies
         run: |
           pip install -e .[dev]
-          pip install -r docs/requirements.txt
+
+      - name: Restore freeze cache  # skip re-executing notebooks whose source is unchanged
+        uses: actions/cache@v4
+        with:
+          path: _freeze/
+          key: freeze-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('tutorials/**/*.qmd', 'user_guide/**/*.qmd') }}
+          restore-keys: |
+            freeze-${{ hashFiles('**/pyproject.toml') }}-
+            freeze-
 
       - name: Pre-build font cache  # so it doesn't appear in notebook output
         run: python -c "import tbsim"
@@ -40,20 +52,17 @@ jobs:
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
-      - name: Install Quarto interlinks extension
-        working-directory: ./docs
-        run: quarto add machow/quartodoc --no-prompt
-
-      - name: Render docs
-        working-directory: ./docs
-        run: quarto render
+      - name: Build docs
+        run: great-docs build
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/_site
+          path: great-docs/_site
+          include-hidden-files: true
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

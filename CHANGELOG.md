@@ -3,7 +3,13 @@
 All notable changes to the codebase are documented in this file.
 
 ## Version 0.10.3 (2026-08-04)
-- Migrated documentation from Quarto to Great Docs.
+- **Migrated documentation from Quarto to [Great Docs](https://posit-dev.github.io/great-docs/).** All site configuration now lives in a single `great-docs.yml` at the repository root, replacing `docs/_quarto.yml`, `docs/quarto_utils.py`, and the quartodoc/interlinks setup. The site builds with `great-docs build` (or `docs/render`) into the ephemeral, gitignored `great-docs/` directory. See [docs/README.md](docs/README.md).
+  - **Content moved to the repository root**: narrative pages are now `user_guide/` and `tutorials/` (previously `docs/user_guide/` and `docs/tutorials/`), since Great Docs discovers content relative to the project root. Numeric filename prefixes control sidebar order and are stripped from the output URLs, so page URLs are unchanged apart from `user_guide/` → `user-guide/`.
+  - **API reference is now per-symbol rather than per-module**: 17 module pages became 66 pages, one per public class/function, grouped into Core, Interventions, Comorbidities, Resistance, and Compartmental. The `tbsim.resistance` and `Migration` APIs are now documented, having previously been omitted.
+  - **"What's new" is generated from `CHANGELOG.md`** (via a symlink) rather than Great Docs' GitHub-Releases-based changelog, so it cannot drift from this file.
+  - `contributing.md` and `code_of_conduct.md` were renamed to `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` so Great Docs auto-detects them as community pages.
+  - Dropped the generated Sphinx `objects.inv`, so other projects can no longer resolve TBsim references via intersphinx. Cross-package interlinks to NumPy/pandas/Starsim docs are also no longer available in docstrings.
+- **Fixed a `DwellTime` analyzer crash** with births or deaths enabled: `self.data` and `self._latest_sts_df` were created as all-`object` DataFrames, so the first `pd.concat` left `agent_id` as `object` dtype and `ss.uids()` raised `TypeError: ufunc 'isfinite' not supported`. Both frames are now built with explicit dtypes, and empty batches short-circuit instead of concatenating (which also clears a pandas `FutureWarning`).
 
 ## Version 0.10.2 (2026-07-20)
 - Reworked several multi-strain / drug-resistance behaviors (`tbsim.resistance`) and lifted latent reinfection into base `TB`.

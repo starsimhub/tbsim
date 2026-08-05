@@ -1,0 +1,171 @@
+# Great Docs configuration for TBsim
+# See https://posit-dev.github.io/great-docs/user-guide/configuration.html
+#
+# This file replaces the hand-maintained docs/_quarto.yml. The great-docs/
+# build directory is ephemeral and gitignored; run `great-docs build` to
+# regenerate it. Narrative content lives in user_guide/ and tutorials/.
+
+module: tbsim
+display_name: TBsim
+parser: google
+# Static analysis: dynamic introspection fails on one re-exported item and
+# falls back to static anyway, so ask for it directly and skip the retry.
+dynamic: false
+jupyter: python3
+
+repo: https://github.com/starsimhub/tbsim
+site_url: "https://starsim.org/tbsim/"
+
+# TBsim is not yet released on PyPI (install from source).
+pypi: false
+
+# Document class methods inline on the class page rather than splitting them
+# out, matching the module-page layout of the previous quartodoc site.
+inline_methods: true
+
+# Cache executed code cells; re-execute only when a page's source changes.
+freeze: auto
+
+logo:
+  light: docs/assets/tbsim-logo.png
+  dark: docs/assets/tbsim-logo-dark.png
+  alt: TBsim
+favicon: docs/assets/favicon.ico
+
+# The hand-maintained CHANGELOG.md is the source of truth for release notes
+# (GitHub Releases lag well behind), so it is carried in as a User guide page
+# instead of being auto-generated.
+changelog:
+  enabled: false
+
+user_guide: user_guide
+
+sections:
+  - title: Tutorials
+    dir: tutorials
+    index: true
+    # Anchored to "User Guide" because the default insertion point looks for a
+    # navbar item named exactly "Reference", which reference.title renames.
+    navbar_after: User Guide
+
+authors:
+  - name: Minerva Enriquez
+    role: Author
+    email: info@starsim.org
+  - name: Daniel Klein
+    role: Author
+  - name: Cliff Kerr
+    role: Author
+  - name: Ryan Hull
+    role: Author
+  - name: Mike Famulare
+    role: Author
+  - name: Deven Gokhale
+    role: Author
+  - name: Stewart Chang
+    role: Author
+  - name: Tess Ryckman
+    role: Author
+  - name: Kyra Grantz
+    role: Author
+  - name: Ted Cohen
+    role: Author
+  - name: Jamie Cohen
+    role: Author
+
+funding:
+  name: Gates Foundation
+  roles:
+    - Copyright holder
+    - funder
+  homepage: https://www.gatesfoundation.org
+
+reference:
+  title: API reference
+  desc: >-
+    Reference documentation for TBsim's public API, generated from docstrings.
+  sections:
+    - title: Core
+      desc: Core simulation classes and utilities.
+      contents:
+        - Sim
+        - demo
+        - TB
+        - TBS
+        - get_tb
+        - choice2d
+        - tb.BaseTB
+        - Migration
+        - plot_household_structure
+        - DwellTime
+        - DwtAnalyzer
+        - DwtPlotter
+        - DwtPostProcessor
+        - HouseholdStats
+        - plot
+        - plot_household
+
+    - title: Interventions
+      desc: Diagnostics, treatment, and prevention.
+      contents:
+        - BCGVx
+        - BCGRoutine
+        - BetaByYear
+        - Dx
+        - Xpert
+        - OralSwab
+        - FujiLAM
+        - CAD
+        - DxDelivery
+        - HealthSeekingBehavior
+        - TBProductRoutine
+        - ProductMulti
+        - TPTTx
+        - TPTSimple
+        - TPTHousehold
+        - HouseholdContactTracing
+        - TPTDelivery
+        - Tx
+        - TxMulti
+        - DOTS
+        - DOTSImproved
+        - FirstLine
+        - SecondLine
+        - TxDelivery
+        - interventions.drug_params
+
+    - title: Comorbidities
+      desc: HIV and malnutrition co-infection modules.
+      contents:
+        - HIV
+        - HIVState
+        - HivInterventions
+        - TB_HIV_Connector
+        - Malnutrition
+        - TB_Nutrition_Connector
+
+    - title: Resistance
+      desc: Multi-strain and drug-resistance extension.
+      contents:
+        - Strains
+        - TBResistant
+        - TxR
+        - TxDeliveryR
+        - DST
+        - DSTDelivery
+        - TPTRx
+        - ResistanceStats
+        - StrainResults
+        - eligibility_all
+        - eligibility_any
+        - will_fail
+        - treatment_monitoring_eligibility
+
+    - title: Compartmental
+      desc: Compartmental (ODE-style) TB models.
+      contents:
+        - compartmental.TB_ODE
+        - compartmental.TB_SS
+        - compartmental.TwoStrainODE
+        - compartmental.two_strain_defaults
+        - compartmental.default_pars

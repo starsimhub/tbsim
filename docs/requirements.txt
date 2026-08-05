@@ -1,5 +1,0 @@
-quartodoc
-sphobjinv
-jupyter
-jupyter-cache
-jupytext

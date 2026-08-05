@@ -3,7 +3,7 @@
 Welcome! We are thrilled you are interested in contributing to TBsim. This
 document will help you get started.
 
-- We are serious about inclusion and believe the open-source software community still has a long way to go. The TBsim community follows a [code of conduct](code_of_conduct.md). By participating in this project, you agree to abide by its terms.
+- We are serious about inclusion and believe the open-source software community still has a long way to go. The TBsim community follows a [code of conduct](https://github.com/starsimhub/tbsim/blob/main/CODE_OF_CONDUCT.md). By participating in this project, you agree to abide by its terms.
 - Take a look at our house [style guide](https://github.com/starsimhub/styleguide). TBsim more or less follows Google's Python style guide, but with some exceptions.
 - Feel free to [open an issue](https://github.com/starsimhub/tbsim/issues/new) on more or less anything! This project is small enough that we don't need a formal triage system.
 - Pull requests should be made against `main`. In addition to following the [style guide](https://github.com/starsimhub/styleguide), please make sure the tests pass (`run_tests` in the `tests` folder; they also run via GitHub actions).

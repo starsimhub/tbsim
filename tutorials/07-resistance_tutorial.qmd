@@ -337,5 +337,5 @@ You have now used every major feature of the resistance extension:
 - **`TPTRx`** — strain-aware preventive therapy and the resistance-unmasking dynamic.
 - **`ResistanceStats` / `StrainResults`** — resistance-origin decomposition and per-strain tracking.
 
-For a task-oriented, recipe-style companion — including the results glossary, a parameter cheat sheet, and known limitations — see the [drug resistance user guide](../user_guide/resistance.qmd). For the mechanics behind each feature, see the [`tbsim.resistance` README](https://github.com/starsimhub/tbsim/blob/main/tbsim/resistance/README.md).
+For a task-oriented, recipe-style companion — including the results glossary, a parameter cheat sheet, and known limitations — see the [drug resistance user guide](../user-guide/resistance.qmd). For the mechanics behind each feature, see the [`tbsim.resistance` README](https://github.com/starsimhub/tbsim/blob/main/tbsim/resistance/README.md).
 

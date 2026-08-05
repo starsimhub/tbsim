@@ -2,4 +2,6 @@
 # Preview site with live reloading
 set -euo pipefail # Fail fast if needed
 
-quarto preview
+cd "$(dirname "$0")/.." # great-docs runs from the repo root
+
+great-docs preview "$@"

@@ -1,4 +1,6 @@
-# Tutorials
+---
+title: Tutorials
+---
 
 These tutorials walk through TBsim's core functionality, from a first simulation to more advanced comorbidity and analysis workflows. Each is a runnable notebook -- start with the basics and progress to the advanced topics as you become familiar with the framework.
 

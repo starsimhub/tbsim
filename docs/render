@@ -2,10 +2,12 @@
 # Render full site
 set -euo pipefail # Fail fast if needed
 
+cd "$(dirname "$0")/.." # great-docs runs from the repo root
+
 SECONDS=0
 
 # Do the render!
-quarto render $@
+great-docs build "$@"
 
 echo -e "Done: docs built in ${SECONDS} s"
-echo -e "Index: $(pwd)/_site/index.html"
+echo -e "Index: $(pwd)/great-docs/_site/index.html"

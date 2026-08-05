@@ -27,9 +27,10 @@ pytest tests/test_tb.py::test_something -v
 # Run tests in parallel
 pytest tests/test_*.py -n auto
 
-# Build docs (Quarto; run from the docs/ directory)
+# Build docs (Great Docs; wrappers in docs/, or run great-docs from the repo root)
 cd docs && ./preview   # local preview with live reload
-cd docs && ./render    # build static site to docs/_site
+cd docs && ./render    # build static site to great-docs/_site
+great-docs scan        # list API symbols available for the reference config
 ```
 
 ## Architecture
@@ -44,7 +45,7 @@ Extends `ss.Disease` from Starsim.
 
 ### Multi-strain / drug-resistance extension
 
-[tbsim/resistance/](tbsim/resistance/) adds a multi-strain, drug-resistance overlay. `TBResistant` (in [tb_resistant.py](tbsim/resistance/tb_resistant.py)) is a drop-in `TB` subclass that encodes `2ⁿ` strains over `n` named drugs as a per-agent bitmask (`strain_mask`) plus a per-strain multiplicity counter, with per-strain fitness costs, superinfection, and de-novo resistance. It ships strain-aware product/delivery interventions — `TxR`/`TxDeliveryR` (treatment), `DST`/`DSTDelivery` (diagnostics), `TPTRx` (preventive therapy) — the `ResistanceStats`/`StrainResults` analyzers, and a two-strain reference ODE (`tbsim.compartmental.TwoStrainODE`) for ABM↔ODE validation. All public entry points are re-exported on `tbsim`. CI coverage lives in [tests/test_resistance.py](tests/test_resistance.py) and the ABM↔ODE validation in [tests/test_compartmental.py](tests/test_compartmental.py). The implementation reference is [tbsim/resistance/README.md](tbsim/resistance/README.md); the usage tutorial is `docs/tutorials/resistance_tutorial.qmd`.
+[tbsim/resistance/](tbsim/resistance/) adds a multi-strain, drug-resistance overlay. `TBResistant` (in [tb_resistant.py](tbsim/resistance/tb_resistant.py)) is a drop-in `TB` subclass that encodes `2ⁿ` strains over `n` named drugs as a per-agent bitmask (`strain_mask`) plus a per-strain multiplicity counter, with per-strain fitness costs, superinfection, and de-novo resistance. It ships strain-aware product/delivery interventions — `TxR`/`TxDeliveryR` (treatment), `DST`/`DSTDelivery` (diagnostics), `TPTRx` (preventive therapy) — the `ResistanceStats`/`StrainResults` analyzers, and a two-strain reference ODE (`tbsim.compartmental.TwoStrainODE`) for ABM↔ODE validation. All public entry points are re-exported on `tbsim`. CI coverage lives in [tests/test_resistance.py](tests/test_resistance.py) and the ABM↔ODE validation in [tests/test_compartmental.py](tests/test_compartmental.py). The implementation reference is [tbsim/resistance/README.md](tbsim/resistance/README.md); the usage tutorial is `tutorials/07-resistance_tutorial.qmd`.
 
 ### Sim Wrapper
 
@@ -83,9 +84,10 @@ Interventions in [tbsim/interventions/](tbsim/interventions/) follow a product/d
 
 ## Claude Code Skills
 
-Repo-specific Claude Code skills live in `.claude/skills/` (also exposed at the top level via the `skills/` symlink). Currently one skill:
+Repo-specific Claude Code skills live in `.claude/skills/` (also exposed at the top level via the `skills/` symlink):
 
 - **`tbsim.address-issue`** — fixes a specified TBsim GitHub issue end to end: reviews the issue, writes and confirms a failing test, implements the change in Starsim style, runs the test suite, and updates the changelog/docs. Invoke with `/tbsim.address-issue <number-or-url>` or by asking to "address"/"fix" an issue.
+- **`quarto-to-great-docs`** — migrates a project's docs from hand-maintained Quarto + quartodoc to [Great Docs](https://posit-dev.github.io/great-docs/). Written during TBsim's own migration, so it captures the gotchas (content must sit at the repo root, per-symbol reference config, changelog handling, what gets lost). Applies to any Starsim-family repo.
 
 ## Key Dependencies
 

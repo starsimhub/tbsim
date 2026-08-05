@@ -173,6 +173,12 @@ cython_debug/
 #.idea/
 .DS_Store
 
+# Great Docs (ephemeral build directory + Quarto execution cache)
+great-docs/
+_freeze/
+.jupyter_cache/
+**/*.quarto_ipynb
+
 # data files
 *.png
 # Exception: allow logo and image assets used in the documentation

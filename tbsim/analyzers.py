@@ -82,12 +82,21 @@ class DwellTime(ss.Analyzer):
         else:
             # Analyzer mode – will be attached to a simulation
             ss.Analyzer.__init__(self)
-            self.data = pd.DataFrame(
-                columns=['agent_id', 'state', 'entry_time', 'exit_time',
-                         'dwell_time', 'state_name', 'going_to_state_id',
-                         'going_to_state'])
-            self._latest_sts_df = pd.DataFrame(
-                columns=['agent_id', 'last_state', 'last_state_time'])
+            # Explicit dtypes: an all-object frame would upcast agent_id to
+            # object on the first concat, breaking ss.uids() conversion
+            self.data = pd.DataFrame({
+                'agent_id': np.array([], dtype=ss.dtypes.int),
+                'state': np.array([], dtype=float),
+                'entry_time': np.array([], dtype=float),
+                'exit_time': np.array([], dtype=float),
+                'dwell_time': np.array([], dtype=float),
+                'state_name': np.array([], dtype=object),
+                'going_to_state_id': np.array([], dtype=float),
+                'going_to_state': np.array([], dtype=object)})
+            self._latest_sts_df = pd.DataFrame({
+                'agent_id': np.array([], dtype=ss.dtypes.int),
+                'last_state': np.array([], dtype=float),
+                'last_state_time': np.array([], dtype=float)})
             return  # skip data-error check for analyzer mode
 
         if self._data_error():
@@ -416,9 +425,11 @@ class DwellTime(ss.Analyzer):
     def _check_for_new_borns(self):
         """Add newly born agents to the state tracking system."""
         if len(self.sim.people.auids) != len(self._latest_sts_df):
-            new_agent_ids = list(
+            new_agent_ids = np.array(sorted(
                 set(self.sim.people.auids)
-                - set(self._latest_sts_df.agent_id))
+                - set(self._latest_sts_df.agent_id)), dtype=ss.dtypes.int)
+            if not len(new_agent_ids): # Skip: an empty concat upcasts agent_id to object
+                return
             new_logs = pd.DataFrame({
                 'agent_id': new_agent_ids,
                 'last_state': np.full(len(new_agent_ids), -1.0),
@@ -465,6 +476,8 @@ class DwellTime(ss.Analyzer):
     def _log_dwell_time(self, agent_ids, states, entry_times, exit_times,
                         going_to_state_ids, age):
         """Record dwell time data for a batch of state transitions."""
+        if not len(agent_ids): # Skip: an empty concat upcasts agent_id to object
+            return
         entry_times = np.nan_to_num(entry_times, nan=0)
         dwell_times = exit_times - entry_times
         new_logs = pd.DataFrame({

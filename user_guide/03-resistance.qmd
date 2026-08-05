@@ -1,5 +1,5 @@
 ---
-title: Drug resistance and multi-strain user guide
+title: Drug resistance
 jupyter: python3
 ---
 

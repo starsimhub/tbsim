@@ -56,13 +56,14 @@ dev = [
   "jupyter",
   "jupyter-cache",
   "jupytext",
-  "quartodoc",
-  "sphobjinv",
+  "great-docs",
 ]
 
 [project.urls]
-"Website" = "https://starsim.org/tbsim"
+"Website" = "https://starsim.org/tbsim/"
 "Source" = "https://github.com/starsimhub/tbsim/"
+"Repository" = "https://github.com/starsimhub/tbsim"
+"Documentation" = "https://starsim.org/tbsim/"
 
 [tool.pytest.ini_options]
 env = ["MPLBACKEND=Agg"]

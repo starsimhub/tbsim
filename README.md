@@ -10,7 +10,7 @@ Tuberculosis is a major global health problem, and understanding its dynamics ca
 
 TBsim uses an agent-based implementation of the LSHTM "spectrum of TB disease" natural history (susceptible → infection/cleared → non-infectious → asymptomatic → symptomatic → treatment/treated/death), designed to support evaluating active case-finding / population-wide screening algorithms (e.g., CXR and NAAT workflows) as in Schwalb et al. 2025 ([PLOS Glob Public Health](https://journals.plos.org/globalpublichealth/article?id=10.1371/journal.pgph.0005050)).
 
-TBsim also includes a **multi-strain / drug-resistance extension** (`tbsim.resistance`) for modeling `2ⁿ` strains over `n` drugs — with fitness costs, superinfection, de-novo and acquired resistance, drug-susceptibility testing, and strain-aware treatment/preventive therapy. See the [`tbsim.resistance` README](tbsim/resistance/README.md) and the resistance tutorial in the docs.
+TBsim also includes a **multi-strain / drug-resistance extension** (`tbsim.resistance`) for modeling `2ⁿ` strains over `n` drugs — with fitness costs, superinfection, de-novo and acquired resistance, drug-susceptibility testing, and strain-aware treatment/preventive therapy. See the [`tbsim.resistance` README](https://github.com/starsimhub/tbsim/blob/main/tbsim/resistance/README.md) and the resistance tutorial in the docs.
 
 ## Getting started
 
@@ -33,7 +33,8 @@ TBsim is not yet released on PyPI, so you need to install from source:
 - `tbsim/` -- Core package (disease models, interventions, analyzers, networks, comorbidities)
 - `tbsim_examples/` -- Ready-to-run example scripts
 - `tests/` -- Test suite
-- `docs/` -- Documentation source (Quarto)
+- `docs/` -- Documentation assets and build scripts ([Great Docs](https://posit-dev.github.io/great-docs/); see [docs/README.md](https://github.com/starsimhub/tbsim/blob/main/docs/README.md))
+- `user_guide/`, `tutorials/` -- Documentation content (Quarto `.qmd` pages)
 - `skills/` -- [Claude Code](https://claude.com/claude-code) skills for working on TBsim (symlink to `.claude/skills/`); currently just `tbsim.address-issue`, which fixes a specified GitHub issue end to end (plan, test, implement, run the suite, update the changelog)
 
 ### Running a sample simulation
@@ -60,9 +61,9 @@ sim.plot()
 - Usage examples are available in the **[tbsim_examples](https://github.com/starsimhub/tbsim/tree/main/tbsim_examples)** folder.
 
 ## Documentation
-TBsim documentation is available at [starsim.org/tbsim](https://starsim.org/tbsim).
+TBsim documentation is available at [starsim.org/tbsim](https://starsim.org/tbsim/).
 
 TBsim is based on Starsim; please refer to [Starsim documentation](https://docs.starsim.org) for additional information.
 
 ## Contributing
-Contributions to the TBsim project are welcome! Please read [contributing.md](contributing.md) for details on our code of conduct, and the process for submitting pull requests.
+Contributions to the TBsim project are welcome! Please read [CONTRIBUTING.md](https://github.com/starsimhub/tbsim/blob/main/CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.

@@ -1,0 +1,9 @@
+---
+title: What's new
+---
+
+All notable changes to TBsim are documented here. The canonical source is
+[CHANGELOG.md](https://github.com/starsimhub/tbsim/blob/main/CHANGELOG.md) in the repository root,
+which `_changelog.md` symlinks to so this page can never drift.
+
+{{< include _changelog.md >}}
