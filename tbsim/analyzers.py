@@ -82,12 +82,14 @@ class DwellTime(ss.Analyzer):
         else:
             # Analyzer mode – will be attached to a simulation
             ss.Analyzer.__init__(self)
+            # dtype=float: empty frames default to object columns, which would
+            # then propagate through the first concat and break ss.uids()
             self.data = pd.DataFrame(
                 columns=['agent_id', 'state', 'entry_time', 'exit_time',
                          'dwell_time', 'state_name', 'going_to_state_id',
-                         'going_to_state'])
+                         'going_to_state'], dtype=float)
             self._latest_sts_df = pd.DataFrame(
-                columns=['agent_id', 'last_state', 'last_state_time'])
+                columns=['agent_id', 'last_state', 'last_state_time'], dtype=float)
             return  # skip data-error check for analyzer mode
 
         if self._data_error():
