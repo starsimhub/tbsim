@@ -462,6 +462,7 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#core" id="toc-core" class="nav-link active" data-scroll-target="#core">Core</a></li>
   <li><a href="#interventions" id="toc-interventions" class="nav-link" data-scroll-target="#interventions">Interventions</a></li>
   <li><a href="#comorbidities" id="toc-comorbidities" class="nav-link" data-scroll-target="#comorbidities">Comorbidities</a></li>
+  <li><a href="#resistance" id="toc-resistance" class="nav-link" data-scroll-target="#resistance">Resistance</a></li>
   <li><a href="#compartmental" id="toc-compartmental" class="nav-link" data-scroll-target="#compartmental">Compartmental</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/starsimhub/tbsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
@@ -573,6 +574,38 @@ ul.task-list li input[type="checkbox"] {
 </tbody>
 </table>
 </section>
+<section id="resistance" class="level2">
+<h2 class="anchored" data-anchor-id="resistance">Resistance</h2>
+<p>Multi-strain drug-resistance extension.</p>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../api/resistance.analyzers.html#tbsim.resistance.analyzers">resistance.analyzers</a></td>
+<td>Analyzers for multi-strain (drug-resistance) TB.</td>
+</tr>
+<tr class="even">
+<td><a href="../api/resistance.dst.html#tbsim.resistance.dst">resistance.dst</a></td>
+<td>Drug-susceptibility testing (DST) for multi-strain TB.</td>
+</tr>
+<tr class="odd">
+<td><a href="../api/resistance.strains.html#tbsim.resistance.strains">resistance.strains</a></td>
+<td>Strain registry for multi-strain (drug-resistance) TB.</td>
+</tr>
+<tr class="even">
+<td><a href="../api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant">resistance.tb_resistant</a></td>
+<td>Multi-strain (drug-resistance) TB natural history.</td>
+</tr>
+<tr class="odd">
+<td><a href="../api/resistance.tpt.html#tbsim.resistance.tpt">resistance.tpt</a></td>
+<td>Strain-aware TB preventive therapy (TPT).</td>
+</tr>
+<tr class="even">
+<td><a href="../api/resistance.treatments.html#tbsim.resistance.treatments">resistance.treatments</a></td>
+<td>Strain-aware TB treatment.</td>
+</tr>
+</tbody>
+</table>
+</section>
 <section id="compartmental" class="level2">
 <h2 class="anchored" data-anchor-id="compartmental">Compartmental</h2>
 <p>Compartmental (ODE-style) TB models.</p>
@@ -675,7 +708,7 @@ ul.task-list li input[type="checkbox"] {
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp('/' + window.location.host + '/');
+        var filterRegex = new RegExp("https:\/\/starsimhub\.github\.io\/tbsim\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

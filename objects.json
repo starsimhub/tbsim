@@ -1,7 +1,7 @@
 {
   "project": "tbsim",
   "version": "0.0.9999",
-  "count": 167,
+  "count": 213,
   "items": [
     {
       "name": "tbsim.sim.Sim.get_dx",
@@ -1257,6 +1257,374 @@
       "role": "module",
       "priority": "1",
       "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.analyzers.ResistanceStats.to_df",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.analyzers.html#tbsim.resistance.analyzers.ResistanceStats.to_df",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.analyzers.ResistanceStats",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.analyzers.html#tbsim.resistance.analyzers.ResistanceStats",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.analyzers.StrainResults",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.analyzers.html#tbsim.resistance.analyzers.StrainResults",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.analyzers",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.analyzers.html#tbsim.resistance.analyzers",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.dst.DST.administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst.DST.administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.dst.DST",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst.DST",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.dst.DSTDelivery.matches",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst.DSTDelivery.matches",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.dst.DSTDelivery.observed_resistant",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst.DSTDelivery.observed_resistant",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.dst.DSTDelivery",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst.DSTDelivery",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.dst",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains.add_resistance",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.add_resistance",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains.carried",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.carried",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains.covered",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.covered",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains.covered_mask",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.covered_mask",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains.drug_bit",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.drug_bit",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains.max_fitness",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.max_fitness",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains.phenotype_any",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.phenotype_any",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains.resistant_frac",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.resistant_frac",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains.transmit_probs",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.transmit_probs",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains.validate_drugs",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.validate_drugs",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains.Strains",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.strains",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tb_resistant.TBResistant.agnostic",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.agnostic",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tb_resistant.TBResistant.set_prognoses",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.set_prognoses",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tb_resistant.TBResistant.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tb_resistant.TBResistant.step_bookkeeping",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.step_bookkeeping",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tb_resistant.TBResistant.step_die",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.step_die",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tb_resistant.TBResistant.step_transitions",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.step_transitions",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tb_resistant.TBResistant.sterilize_covered",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.sterilize_covered",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tb_resistant.TBResistant",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tb_resistant",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tpt.TPTRx.apply_protection",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tpt.html#tbsim.resistance.tpt.TPTRx.apply_protection",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tpt.TPTRx",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.tpt.html#tbsim.resistance.tpt.TPTRx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.tpt",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.tpt.html#tbsim.resistance.tpt",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.TxDeliveryR.failure_case_eligibility",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxDeliveryR.failure_case_eligibility",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.TxDeliveryR.interrupt",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxDeliveryR.interrupt",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.TxDeliveryR.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxDeliveryR.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.TxDeliveryR",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxDeliveryR",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.TxR.acquire_counts",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxR.acquire_counts",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.TxR.roll_survivors",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxR.roll_survivors",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.TxR",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxR",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.eligibility_all",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.eligibility_all",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.eligibility_any",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.eligibility_any",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.treatment_monitoring_eligibility",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.treatment_monitoring_eligibility",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments.will_fail",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.will_fail",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.resistance.treatments",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments",
       "dispname": "-"
     },
     {
@@ -2553,6 +2921,366 @@
       "role": "module",
       "priority": "1",
       "uri": "api/comorbidities.malnutrition.html#tbsim.comorbidities.malnutrition",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.ResistanceStats.to_df",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.analyzers.html#tbsim.resistance.analyzers.ResistanceStats.to_df",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.ResistanceStats",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.analyzers.html#tbsim.resistance.analyzers.ResistanceStats",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.analyzers.StrainResults",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.analyzers.html#tbsim.resistance.analyzers.StrainResults",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.dst.DST.administer",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst.DST.administer",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.dst.DST",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst.DST",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.dst.DSTDelivery.matches",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst.DSTDelivery.matches",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.dst.DSTDelivery.observed_resistant",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst.DSTDelivery.observed_resistant",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.dst.DSTDelivery",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst.DSTDelivery",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.dst",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.dst.html#tbsim.resistance.dst",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains.add_resistance",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.add_resistance",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains.carried",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.carried",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains.covered",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.covered",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains.covered_mask",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.covered_mask",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains.drug_bit",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.drug_bit",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains.max_fitness",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.max_fitness",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains.phenotype_any",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.phenotype_any",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains.resistant_frac",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.resistant_frac",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains.transmit_probs",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.transmit_probs",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains.validate_drugs",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains.validate_drugs",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains.Strains",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains.Strains",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.strains",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.strains.html#tbsim.resistance.strains",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb_resistant.TBResistant.agnostic",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.agnostic",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb_resistant.TBResistant.set_prognoses",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.set_prognoses",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb_resistant.TBResistant.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb_resistant.TBResistant.step_bookkeeping",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.step_bookkeeping",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb_resistant.TBResistant.step_die",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.step_die",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb_resistant.TBResistant.step_transitions",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.step_transitions",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb_resistant.TBResistant.sterilize_covered",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant.sterilize_covered",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb_resistant.TBResistant",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant.TBResistant",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tb_resistant",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.tb_resistant.html#tbsim.resistance.tb_resistant",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTRx.apply_protection",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.tpt.html#tbsim.resistance.tpt.TPTRx.apply_protection",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt.TPTRx",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.tpt.html#tbsim.resistance.tpt.TPTRx",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.tpt",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.tpt.html#tbsim.resistance.tpt",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDeliveryR.failure_case_eligibility",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxDeliveryR.failure_case_eligibility",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDeliveryR.interrupt",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxDeliveryR.interrupt",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDeliveryR.step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxDeliveryR.step",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxDeliveryR",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxDeliveryR",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxR.acquire_counts",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxR.acquire_counts",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxR.roll_survivors",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxR.roll_survivors",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.TxR",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.TxR",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.eligibility_all",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.eligibility_all",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.eligibility_any",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.eligibility_any",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.treatment_monitoring_eligibility",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.treatment_monitoring_eligibility",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments.will_fail",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments.will_fail",
+      "dispname": "-"
+    },
+    {
+      "name": "tbsim.treatments",
+      "domain": "py",
+      "role": "module",
+      "priority": "1",
+      "uri": "api/resistance.treatments.html#tbsim.resistance.treatments",
       "dispname": "-"
     }
   ]

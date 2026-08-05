@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>index – TBsim</title>
+<title>resistance.strains – TBsim</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -23,6 +23,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -33,8 +68,8 @@ ul.task-list li input[type="checkbox"] {
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<link href="../tutorials/tuberculosis_sim.html" rel="next">
-<link href="../user_guide/quickstart.html" rel="prev">
+<link href="../api/resistance.tb_resistant.html" rel="next">
+<link href="../api/resistance.dst.html" rel="prev">
 <link href="..//assets/favicon.ico" rel="icon">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -301,7 +336,7 @@ ul.task-list li input[type="checkbox"] {
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../tutorials/index.html"><strong>Tutorials</strong></a></li><li class="breadcrumb-item"><a href="../tutorials/index.html">Overview</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/resistance.analyzers.html"><strong>Resistance</strong></a></li><li class="breadcrumb-item"><a href="../api/resistance.strains.html">strains</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -321,26 +356,14 @@ ul.task-list li input[type="checkbox"] {
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../whatsnew.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><strong>What’s new</strong></span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../user_guide/installation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><strong>Installation</strong></span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../user_guide/quickstart.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><strong>Quick start</strong></span></a>
+  <a href="../api/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>API reference</strong></span></a>
   </div>
 </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
- <span class="menu-text"><strong>Tutorials</strong></span></a>
+ <span class="menu-text"><strong>Core</strong></span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
@@ -348,50 +371,32 @@ ul.task-list li input[type="checkbox"] {
       <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../tutorials/index.html" class="sidebar-item-text sidebar-link active">
- <span class="menu-text">Overview</span></a>
+  <a href="../api/sim.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">sim</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../tutorials/tuberculosis_sim.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">How to create a TB simulation</span></a>
+  <a href="../api/tb.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tb</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../tutorials/tb_interventions_tutorial.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">TB Interventions Tutorial</span></a>
+  <a href="../api/networks.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">networks</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../tutorials/run_tbhiv_scens.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Running TB HIV scenarios</span></a>
+  <a href="../api/analyzers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">analyzers</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../tutorials/tbhiv_comorbidity.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">HIV Comorbidity in TBSim</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../tutorials/malnutrition_tutorial.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Malnutrition Tutorial</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../tutorials/comprehensive_analyzer_plots_example.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Comprehensive Analyzer Plots Example</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../tutorials/resistance_tutorial.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Drug resistance and multi-strain TB</span></a>
+  <a href="../api/plots.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">plots</span></a>
   </div>
 </li>
       </ul>
@@ -399,7 +404,7 @@ ul.task-list li input[type="checkbox"] {
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
- <span class="menu-text"><strong>User guide</strong></span></a>
+ <span class="menu-text"><strong>Interventions</strong></span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
@@ -407,48 +412,141 @@ ul.task-list li input[type="checkbox"] {
       <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../user_guide/index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Overview</span></a>
+  <a href="../api/interventions.bcg.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">bcg</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../user_guide/resistance.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Drug resistance</span></a>
+  <a href="../api/interventions.beta.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">beta</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.diagnostics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">diagnostics</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.health_seeking.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">health_seeking</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.interventions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">interventions</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.products.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">products</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.tpt.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tpt</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/interventions.treatments.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">treatments</span></a>
   </div>
 </li>
       </ul>
   </li>
-        <li class="sidebar-item">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Comorbidities</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../user_guide/examples.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><strong>Examples</strong></span></a>
+  <a href="../api/comorbidities.hiv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">hiv</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
+          <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../user_guide/scripts.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><strong>Scripts</strong></span></a>
+  <a href="../api/comorbidities.malnutrition.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">malnutrition</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Resistance</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../api/index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><strong>API reference</strong></span></a>
+  <a href="../api/resistance.analyzers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">analyzers</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
+          <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../contributing.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><strong>Contributing</strong></span></a>
+  <a href="../api/resistance.dst.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">dst</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
+          <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../code_of_conduct.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><strong>Code of conduct</strong></span></a>
+  <a href="../api/resistance.strains.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">strains</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/resistance.tb_resistant.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tb_resistant</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/resistance.tpt.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tpt</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/resistance.treatments.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">treatments</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Compartmental</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/compartmental.lshtm_ode.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">lshtm_ode</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
     </ul>
     </div>
 </nav>
@@ -459,60 +557,361 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#tutorials" id="toc-tutorials" class="nav-link active" data-scroll-target="#tutorials">Tutorials</a>
+  <li><a href="#tbsim.resistance.strains" id="toc-tbsim.resistance.strains" class="nav-link active" data-scroll-target="#tbsim.resistance.strains">resistance.strains</a>
   <ul>
-  <li><a href="#getting-started" id="toc-getting-started" class="nav-link" data-scroll-target="#getting-started">Getting started</a></li>
-  <li><a href="#tb-interventions-and-scenarios" id="toc-tb-interventions-and-scenarios" class="nav-link" data-scroll-target="#tb-interventions-and-scenarios">TB interventions and scenarios</a></li>
-  <li><a href="#drug-resistance" id="toc-drug-resistance" class="nav-link" data-scroll-target="#drug-resistance">Drug resistance</a></li>
-  <li><a href="#comorbidities" id="toc-comorbidities" class="nav-link" data-scroll-target="#comorbidities">Comorbidities</a></li>
-  <li><a href="#analysis" id="toc-analysis" class="nav-link" data-scroll-target="#analysis">Analysis</a></li>
+  <li><a href="#classes" id="toc-classes" class="nav-link" data-scroll-target="#classes">Classes</a>
+  <ul>
+  <li><a href="#tbsim.resistance.strains.Strains" id="toc-tbsim.resistance.strains.Strains" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains">Strains</a>
+  <ul class="collapse">
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#attributes" id="toc-attributes" class="nav-link" data-scroll-target="#attributes">Attributes</a></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
+  <ul class="collapse">
+  <li><a href="#tbsim.resistance.strains.Strains.add_resistance" id="toc-tbsim.resistance.strains.Strains.add_resistance" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains.add_resistance">add_resistance</a></li>
+  <li><a href="#tbsim.resistance.strains.Strains.carried" id="toc-tbsim.resistance.strains.Strains.carried" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains.carried">carried</a></li>
+  <li><a href="#tbsim.resistance.strains.Strains.covered" id="toc-tbsim.resistance.strains.Strains.covered" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains.covered">covered</a></li>
+  <li><a href="#tbsim.resistance.strains.Strains.covered_mask" id="toc-tbsim.resistance.strains.Strains.covered_mask" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains.covered_mask">covered_mask</a></li>
+  <li><a href="#tbsim.resistance.strains.Strains.drug_bit" id="toc-tbsim.resistance.strains.Strains.drug_bit" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains.drug_bit">drug_bit</a></li>
+  <li><a href="#tbsim.resistance.strains.Strains.max_fitness" id="toc-tbsim.resistance.strains.Strains.max_fitness" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains.max_fitness">max_fitness</a></li>
+  <li><a href="#tbsim.resistance.strains.Strains.phenotype_any" id="toc-tbsim.resistance.strains.Strains.phenotype_any" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains.phenotype_any">phenotype_any</a></li>
+  <li><a href="#tbsim.resistance.strains.Strains.resistant_frac" id="toc-tbsim.resistance.strains.Strains.resistant_frac" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains.resistant_frac">resistant_frac</a></li>
+  <li><a href="#tbsim.resistance.strains.Strains.transmit_probs" id="toc-tbsim.resistance.strains.Strains.transmit_probs" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains.transmit_probs">transmit_probs</a></li>
+  <li><a href="#tbsim.resistance.strains.Strains.validate_drugs" id="toc-tbsim.resistance.strains.Strains.validate_drugs" class="nav-link" data-scroll-target="#tbsim.resistance.strains.Strains.validate_drugs">validate_drugs</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
   </ul></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/starsimhub/tbsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../tutorials/index.html"><strong>Tutorials</strong></a></li><li class="breadcrumb-item"><a href="../tutorials/index.html">Overview</a></li></ol></nav></header>
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/resistance.analyzers.html"><strong>Resistance</strong></a></li><li class="breadcrumb-item"><a href="../api/resistance.strains.html">strains</a></li></ol></nav></header>
 
 
 
 
 
-<section id="tutorials" class="level1">
-<h1>Tutorials</h1>
-<p>These tutorials walk through TBsim’s core functionality, from a first simulation to more advanced comorbidity and analysis workflows. Each is a runnable notebook – start with the basics and progress to the advanced topics as you become familiar with the framework.</p>
-<section id="getting-started" class="level2">
-<h2 class="anchored" data-anchor-id="getting-started">Getting started</h2>
-<ul>
-<li><a href="../tutorials/tuberculosis_sim.html">How to create a TB simulation</a> – Build and run your first TB simulation, then plot the results</li>
-</ul>
+<section id="tbsim.resistance.strains" class="level1">
+<h1>resistance.strains</h1>
+<p><code>resistance.strains</code></p>
+<p>Strain registry for multi-strain (drug-resistance) TB.</p>
+<p>A <em>strain</em> is an <code>n</code>-bit resistance profile over a fixed, ordered set of drugs (bit <code>i</code> = resistant to drug <code>i</code>). For <code>n</code> drugs there are <code>m = 2**n</code> possible strains, enumerated as integer ids <code>0..m-1</code> (id 0 = pan-susceptible).</p>
+<p>An <em>agent</em> carries a subset of the <code>m</code> strains, stored elsewhere as a single integer <code>strain_mask</code> (bit <code>j</code> set = carries strain <code>j</code>); see <code>tbsim.resistance.TBResistant</code>. This registry holds the strain-level lookups (fitness, resistance profiles, labels) and the bit helpers used to reason about masks.</p>
+<p>The two-strain reference ODE (<code>tbsim.compartmental.TwoStrainODE</code>) is the <code>n=1</code> special case: <code>drugs=['TX']</code> gives strain 0 = A (susceptible) and strain 1 = B (resistant).</p>
+<section id="classes" class="level2">
+<h2 class="anchored" data-anchor-id="classes">Classes</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="#tbsim.resistance.strains.Strains">Strains</a></td>
+<td>Registry of the possible strains for a given drug set.</td>
+</tr>
+</tbody>
+</table>
+<section id="tbsim.resistance.strains.Strains" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains">Strains</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains(drugs, rel_fitness<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Registry of the possible strains for a given drug set.</p>
+<section id="parameters" class="level4 doc-section doc-section-parameters">
+<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h4>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>drugs</td>
+<td><a href="https://docs.python.org/3/library/stdtypes.html#list">list</a></td>
+<td>ordered drug/class names; index = resistance bit position, e.g.&nbsp;<code>['RIF', 'BDQ']</code> (or <code>['TX']</code> for the two-strain reference).</td>
+<td><em>required</em></td>
+</tr>
+<tr class="even">
+<td>rel_fitness</td>
+<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
+<td>per-drug multiplicative transmission fitness cost <code>r_i</code> in <code>[0, 1]</code>, e.g.&nbsp;<code>{'RIF': 0.5}</code>. Drugs absent from the dict have no cost (<code>r_i = 1</code>). A strain’s fitness is the product of the costs of the drugs it is resistant to (pan-susceptible = 1.0).</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+</tbody>
+</table>
 </section>
-<section id="tb-interventions-and-scenarios" class="level2">
-<h2 class="anchored" data-anchor-id="tb-interventions-and-scenarios">TB interventions and scenarios</h2>
-<ul>
-<li><a href="../tutorials/tb_interventions_tutorial.html">TB interventions</a> – Implementing and analyzing BCG, TPT, and treatment interventions</li>
-<li><a href="../tutorials/run_tbhiv_scens.html">Running TB-HIV scenarios</a> – Setting up and comparing TB-HIV co-infection scenarios</li>
-</ul>
+<section id="attributes" class="level4 doc-section doc-section-attributes">
+<h4 class="doc-section doc-section-attributes anchored" data-anchor-id="attributes">Attributes</h4>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>n</td>
+<td><a href="https://docs.python.org/3/library/functions.html#int">int</a></td>
+<td>number of drugs.</td>
+</tr>
+<tr class="even">
+<td>m</td>
+<td><a href="https://docs.python.org/3/library/functions.html#int">int</a></td>
+<td>number of possible strains (<code>2**n</code>).</td>
+</tr>
+<tr class="odd">
+<td>profile</td>
+<td><a href="https://numpy.org/doc/stable/reference/index.html#module-numpy">np</a>.<a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray">ndarray</a></td>
+<td><code>(m, n)</code> bool; <code>profile[j, i]</code> = strain <code>j</code> resistant to drug <code>i</code>.</td>
+</tr>
+<tr class="even">
+<td>fitness</td>
+<td><a href="https://numpy.org/doc/stable/reference/index.html#module-numpy">np</a>.<a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray">ndarray</a></td>
+<td>length-<code>m</code> float; per-strain transmission fitness.</td>
+</tr>
+<tr class="odd">
+<td>labels</td>
+<td><a href="https://docs.python.org/3/library/stdtypes.html#list">list</a></td>
+<td>length-<code>m</code> human-readable strain labels (e.g.&nbsp;<code>'pan'</code>, <code>'RIF+FQ'</code>).</td>
+</tr>
+</tbody>
+</table>
 </section>
-<section id="drug-resistance" class="level2">
-<h2 class="anchored" data-anchor-id="drug-resistance">Drug resistance</h2>
-<ul>
-<li><a href="../tutorials/resistance_tutorial.html">Drug resistance and multi-strain TB</a> – Defining strains, superinfection and competition, de-novo and treatment-acquired resistance, DST-routed regimens, treatment monitoring, and strain-aware preventive therapy</li>
-</ul>
+<section id="methods" class="level4">
+<h4 class="anchored" data-anchor-id="methods">Methods</h4>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="#tbsim.resistance.strains.Strains.add_resistance">add_resistance</a></td>
+<td>Return the strain id(s) obtained by adding resistance to <code>drug</code>.</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.resistance.strains.Strains.carried">carried</a></td>
+<td>Decode agent strain masks into a boolean membership matrix.</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.resistance.strains.Strains.covered">covered</a></td>
+<td><code>(m,)</code> bool: strain <code>j</code> is <em>covered</em> by <code>regimen_drugs</code> iff it is susceptible to every</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.resistance.strains.Strains.covered_mask">covered_mask</a></td>
+<td>Bitmask over strain ids of the strains covered by <code>regimen_drugs</code> (see :meth:<code>covered</code>).</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.resistance.strains.Strains.drug_bit">drug_bit</a></td>
+<td>Resistance-profile bit (within a strain id) for a drug name.</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.resistance.strains.Strains.max_fitness">max_fitness</a></td>
+<td>Per-agent maximum strain fitness over carried strains (0 if none carried).</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.resistance.strains.Strains.phenotype_any">phenotype_any</a></td>
+<td>Aggregate observed resistance phenotype per agent: OR of the resistance</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.resistance.strains.Strains.resistant_frac">resistant_frac</a></td>
+<td>Fraction of the given (infected) agents whose aggregate phenotype is resistant to <code>drug</code>.</td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.resistance.strains.Strains.transmit_probs">transmit_probs</a></td>
+<td>Per-agent probability of transmitting each strain, <code>\propto count × fitness</code> over</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.resistance.strains.Strains.validate_drugs">validate_drugs</a></td>
+<td>Raise <a href="https://docs.python.org/3/library/exceptions.html#ValueError" title="1"><code>ValueError</code></a> if any name in <code>names</code> (iterable of drug names, e.g.&nbsp;a list or the keys</td>
+</tr>
+</tbody>
+</table>
+<section id="tbsim.resistance.strains.Strains.add_resistance" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains.add_resistance">add_resistance</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains.add_resistance(strain_ids, drug)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Return the strain id(s) obtained by adding resistance to <code>drug</code>.</p>
 </section>
-<section id="comorbidities" class="level2">
-<h2 class="anchored" data-anchor-id="comorbidities">Comorbidities</h2>
-<ul>
-<li><a href="../tutorials/tbhiv_comorbidity.html">TB-HIV comorbidity</a> – Modeling the interaction between TB and HIV</li>
-<li><a href="../tutorials/malnutrition_tutorial.html">Malnutrition</a> – TB-malnutrition comorbidity and nutritional status effects</li>
-</ul>
+<section id="tbsim.resistance.strains.Strains.carried" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains.carried">carried</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains.carried(mask)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Decode agent strain masks into a boolean membership matrix.</p>
+<section id="parameters-1" class="level6 doc-section doc-section-parameters">
+<h6 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-1">Parameters</h6>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>mask</td>
+<td><a href="https://docs.python.org/3/library/array.html#module-array">array</a></td>
+<td>per-agent <code>strain_mask</code> integers.</td>
+<td><em>required</em></td>
+</tr>
+</tbody>
+</table>
 </section>
-<section id="analysis" class="level2">
-<h2 class="anchored" data-anchor-id="analysis">Analysis</h2>
-<ul>
-<li><a href="../tutorials/comprehensive_analyzer_plots_example.html">Comprehensive analyzer plots</a> – Using TBsim’s built-in dwell-time analyzer and plotting tools</li>
-</ul>
+<section id="returns" class="level6 doc-section doc-section-returns">
+<h6 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h6>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 79%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td></td>
+<td></td>
+<td><code>(len(mask), m)</code> bool; <code>[k, j]</code> = agent <code>k</code> carries strain <code>j</code>.</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="tbsim.resistance.strains.Strains.covered" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains.covered">covered</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains.covered(regimen_drugs)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>(m,)</code> bool: strain <code>j</code> is <em>covered</em> by <code>regimen_drugs</code> iff it is susceptible to every drug in the regimen (so a regimen with no drugs covers nothing to be resistant to = all strains). Used by TPT / latent-treatment sterilization.</p>
+</section>
+<section id="tbsim.resistance.strains.Strains.covered_mask" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains.covered_mask">covered_mask</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains.covered_mask(regimen_drugs)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Bitmask over strain ids of the strains covered by <code>regimen_drugs</code> (see :meth:<code>covered</code>).</p>
+</section>
+<section id="tbsim.resistance.strains.Strains.drug_bit" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains.drug_bit">drug_bit</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains.drug_bit(drug)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Resistance-profile bit (within a strain id) for a drug name.</p>
+</section>
+<section id="tbsim.resistance.strains.Strains.max_fitness" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains.max_fitness">max_fitness</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains.max_fitness(mask)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Per-agent maximum strain fitness over carried strains (0 if none carried).</p>
+</section>
+<section id="tbsim.resistance.strains.Strains.phenotype_any" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains.phenotype_any">phenotype_any</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains.phenotype_any(mask)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Aggregate observed resistance phenotype per agent: OR of the resistance profiles over all carried strains.</p>
+<section id="returns-1" class="level6 doc-section doc-section-returns">
+<h6 class="doc-section doc-section-returns anchored" data-anchor-id="returns-1">Returns</h6>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 83%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td></td>
+<td></td>
+<td><code>(len(mask), n)</code> bool; <code>[k, i]</code> = agent <code>k</code> carries some strain resistant to drug <code>i</code>.</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="tbsim.resistance.strains.Strains.resistant_frac" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains.resistant_frac">resistant_frac</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains.resistant_frac(mask, drug)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Fraction of the given (infected) agents whose aggregate phenotype is resistant to <code>drug</code>.</p>
+</section>
+<section id="tbsim.resistance.strains.Strains.transmit_probs" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains.transmit_probs">transmit_probs</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains.transmit_probs(mask, counts<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Per-agent probability of transmitting each strain, <code>\propto count × fitness</code> over carried strains (the spec’s <code>r_j / \sum r</code>, generalized so an agent carrying multiple copies of a strain is proportionally more likely to pass it). Rows for uninfected agents (mask 0) are left all-zero. The <em>overall</em> per-contact transmission probability (<code>rel_trans = max fitness</code>) does not depend on <code>counts</code> — only the which-strain split does.</p>
+<section id="parameters-2" class="level6 doc-section doc-section-parameters">
+<h6 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-2">Parameters</h6>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>mask</td>
+<td><a href="https://docs.python.org/3/library/array.html#module-array">array</a></td>
+<td>per-agent <code>strain_mask</code> integers.</td>
+<td><em>required</em></td>
+</tr>
+<tr class="even">
+<td>counts</td>
+<td><a href="https://docs.python.org/3/library/array.html#module-array">array</a></td>
+<td>optional <code>(len(mask), m)</code> per-strain multiplicity. If <a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a>, every carried strain is weighted as a single copy (fitness-only, the pre-counter behavior).</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="returns-2" class="level6 doc-section doc-section-returns">
+<h6 class="doc-section doc-section-returns anchored" data-anchor-id="returns-2">Returns</h6>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 75%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td></td>
+<td></td>
+<td><code>(len(mask), m)</code> float, each infected row summing to 1.</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="tbsim.resistance.strains.Strains.validate_drugs" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.strains.Strains.validate_drugs">validate_drugs</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>resistance.strains.Strains.validate_drugs(names, where<span class="op">=</span><span class="st">''</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Raise <a href="https://docs.python.org/3/library/exceptions.html#ValueError" title="1"><code>ValueError</code></a> if any name in <code>names</code> (iterable of drug names, e.g.&nbsp;a list or the keys of a per-drug dict) is not a known drug — fail-fast on typos that otherwise resolve silently via <code>.get()</code> (L8). <code>where</code> labels the call site in the message.</p>
+<p>Example::</p>
+<pre><code>strains.validate_drugs(['RIF', 'BDQ'], where='TxR.regimen_drugs')</code></pre>
 
 
+</section>
+</section>
+</section>
 </section>
 </section>
 
@@ -932,13 +1331,13 @@ ul.task-list li input[type="checkbox"] {
   </script>
 <nav class="page-navigation">
   <div class="nav-page nav-page-previous">
-      <a href="../user_guide/quickstart.html" class="pagination-link" aria-label="**Quick start**">
-        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><strong>Quick start</strong></span>
+      <a href="../api/resistance.dst.html" class="pagination-link" aria-label="dst">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">dst</span>
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../tutorials/tuberculosis_sim.html" class="pagination-link" aria-label="How to create a TB simulation">
-        <span class="nav-page-text">How to create a TB simulation</span> <i class="bi bi-arrow-right-short"></i>
+      <a href="../api/resistance.tb_resistant.html" class="pagination-link" aria-label="tb_resistant">
+        <span class="nav-page-text">tb_resistant</span> <i class="bi bi-arrow-right-short"></i>
       </a>
   </div>
 </nav>

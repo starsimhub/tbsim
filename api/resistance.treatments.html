@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>sim – TBsim</title>
+<title>resistance.treatments – TBsim</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -68,8 +68,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<link href="../api/tb.html" rel="next">
-<link href="../api/index.html" rel="prev">
+<link href="../api/compartmental.lshtm_ode.html" rel="next">
+<link href="../api/resistance.tpt.html" rel="prev">
 <link href="..//assets/favicon.ico" rel="icon">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -336,7 +336,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/sim.html"><strong>Core</strong></a></li><li class="breadcrumb-item"><a href="../api/sim.html">sim</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/resistance.analyzers.html"><strong>Resistance</strong></a></li><li class="breadcrumb-item"><a href="../api/resistance.treatments.html">treatments</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -371,7 +371,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../api/sim.html" class="sidebar-item-text sidebar-link active">
+  <a href="../api/sim.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">sim</span></a>
   </div>
 </li>
@@ -524,7 +524,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../api/resistance.treatments.html" class="sidebar-item-text sidebar-link">
+  <a href="../api/resistance.treatments.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">treatments</span></a>
   </div>
 </li>
@@ -557,45 +557,57 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#tbsim.sim" id="toc-tbsim.sim" class="nav-link active" data-scroll-target="#tbsim.sim">sim</a>
+  <li><a href="#tbsim.resistance.treatments" id="toc-tbsim.resistance.treatments" class="nav-link active" data-scroll-target="#tbsim.resistance.treatments">resistance.treatments</a>
   <ul>
   <li><a href="#classes" id="toc-classes" class="nav-link" data-scroll-target="#classes">Classes</a>
   <ul>
-  <li><a href="#tbsim.sim.Sim" id="toc-tbsim.sim.Sim" class="nav-link" data-scroll-target="#tbsim.sim.Sim">Sim</a>
+  <li><a href="#tbsim.resistance.treatments.TxDeliveryR" id="toc-tbsim.resistance.treatments.TxDeliveryR" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.TxDeliveryR">TxDeliveryR</a>
   <ul class="collapse">
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
   <ul class="collapse">
-  <li><a href="#tbsim.sim.Sim.get_dx" id="toc-tbsim.sim.Sim.get_dx" class="nav-link" data-scroll-target="#tbsim.sim.Sim.get_dx">get_dx</a></li>
-  <li><a href="#tbsim.sim.Sim.get_hsb" id="toc-tbsim.sim.Sim.get_hsb" class="nav-link" data-scroll-target="#tbsim.sim.Sim.get_hsb">get_hsb</a></li>
-  <li><a href="#tbsim.sim.Sim.get_tb" id="toc-tbsim.sim.Sim.get_tb" class="nav-link" data-scroll-target="#tbsim.sim.Sim.get_tb">get_tb</a></li>
-  <li><a href="#tbsim.sim.Sim.plot" id="toc-tbsim.sim.Sim.plot" class="nav-link" data-scroll-target="#tbsim.sim.Sim.plot">plot</a></li>
+  <li><a href="#tbsim.resistance.treatments.TxDeliveryR.failure_case_eligibility" id="toc-tbsim.resistance.treatments.TxDeliveryR.failure_case_eligibility" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.TxDeliveryR.failure_case_eligibility">failure_case_eligibility</a></li>
+  <li><a href="#tbsim.resistance.treatments.TxDeliveryR.interrupt" id="toc-tbsim.resistance.treatments.TxDeliveryR.interrupt" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.TxDeliveryR.interrupt">interrupt</a></li>
+  <li><a href="#tbsim.resistance.treatments.TxDeliveryR.step" id="toc-tbsim.resistance.treatments.TxDeliveryR.step" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.TxDeliveryR.step">step</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#tbsim.resistance.treatments.TxR" id="toc-tbsim.resistance.treatments.TxR" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.TxR">TxR</a>
+  <ul class="collapse">
+  <li><a href="#parameters-1" id="toc-parameters-1" class="nav-link" data-scroll-target="#parameters-1">Parameters</a></li>
+  <li><a href="#methods-1" id="toc-methods-1" class="nav-link" data-scroll-target="#methods-1">Methods</a>
+  <ul class="collapse">
+  <li><a href="#tbsim.resistance.treatments.TxR.acquire_counts" id="toc-tbsim.resistance.treatments.TxR.acquire_counts" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.TxR.acquire_counts">acquire_counts</a></li>
+  <li><a href="#tbsim.resistance.treatments.TxR.roll_survivors" id="toc-tbsim.resistance.treatments.TxR.roll_survivors" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.TxR.roll_survivors">roll_survivors</a></li>
   </ul></li>
   </ul></li>
   </ul></li>
   <li><a href="#functions" id="toc-functions" class="nav-link" data-scroll-target="#functions">Functions</a>
   <ul>
-  <li><a href="#tbsim.sim.demo" id="toc-tbsim.sim.demo" class="nav-link" data-scroll-target="#tbsim.sim.demo">demo</a>
+  <li><a href="#tbsim.resistance.treatments.eligibility_all" id="toc-tbsim.resistance.treatments.eligibility_all" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.eligibility_all">eligibility_all</a></li>
+  <li><a href="#tbsim.resistance.treatments.eligibility_any" id="toc-tbsim.resistance.treatments.eligibility_any" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.eligibility_any">eligibility_any</a></li>
+  <li><a href="#tbsim.resistance.treatments.treatment_monitoring_eligibility" id="toc-tbsim.resistance.treatments.treatment_monitoring_eligibility" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.treatment_monitoring_eligibility">treatment_monitoring_eligibility</a>
   <ul class="collapse">
-  <li><a href="#parameters-3" id="toc-parameters-3" class="nav-link" data-scroll-target="#parameters-3">Parameters</a></li>
-  <li><a href="#returns-2" id="toc-returns-2" class="nav-link" data-scroll-target="#returns-2">Returns</a></li>
+  <li><a href="#parameters-2" id="toc-parameters-2" class="nav-link" data-scroll-target="#parameters-2">Parameters</a></li>
   </ul></li>
+  <li><a href="#tbsim.resistance.treatments.will_fail" id="toc-tbsim.resistance.treatments.will_fail" class="nav-link" data-scroll-target="#tbsim.resistance.treatments.will_fail">will_fail</a></li>
   </ul></li>
   </ul></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/starsimhub/tbsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/sim.html"><strong>Core</strong></a></li><li class="breadcrumb-item"><a href="../api/sim.html">sim</a></li></ol></nav></header>
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/resistance.analyzers.html"><strong>Resistance</strong></a></li><li class="breadcrumb-item"><a href="../api/resistance.treatments.html">treatments</a></li></ol></nav></header>
 
 
 
 
 
-<section id="tbsim.sim" class="level1">
-<h1>sim</h1>
-<p><code>sim</code></p>
-<p>TB simulation class – a convenience wrapper around ss.Sim with TB-specific defaults.</p>
+<section id="tbsim.resistance.treatments" class="level1">
+<h1>resistance.treatments</h1>
+<p><code>resistance.treatments</code></p>
+<p>Strain-aware TB treatment.</p>
+<p><code>TxR</code> (product) holds the regimen’s per-strain efficacy, agent-level adherence, and acquisition-on-failure rules. <code>TxDeliveryR</code> (delivery) initiates treatment from the active-disease states at state-specific rates (or from a custom eligibility callable), freezes the outcome at initiation, and resolves it after a fixed course. It also supports treatment monitoring / regimen switching via <code>interrupt</code> + <code>supersedes</code> (see <code>treatment_monitoring_eligibility</code>).</p>
+<p>Per the reference treatment operator (the ODE’s <code>π(m→s)</code>): each carried strain is cured independently (efficacy reduced for strains resistant to <em>regimen</em> drugs), the whole course’s outcomes are correlated through a single agent-level adherence draw, failures return to the state treatment was initiated from with the surviving strains, and each surviving treatment-susceptible strain independently acquires resistance to each regimen drug with probability <code>q_acq[drug]</code> (× a per-state RR) as <strong>replacement</strong> — so multiple strains may acquire resistance in one course, mirroring de-novo acquisition, with multiplicity transferred source→target. This reproduces the ODE’s <code>π(m → s)</code> outcome table exactly for the single-strain-per-agent two-strain case.</p>
 <section id="classes" class="level2">
 <h2 class="anchored" data-anchor-id="classes">Classes</h2>
 <table class="caption-top table">
@@ -607,23 +619,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td><a href="#tbsim.sim.Sim">Sim</a></td>
-<td>A subclass of ss.Sim specifically designed for TB simulations.</td>
+<td><a href="#tbsim.resistance.treatments.TxDeliveryR">TxDeliveryR</a></td>
+<td>Rate-based strain-aware treatment delivery.</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.resistance.treatments.TxR">TxR</a></td>
+<td>Strain-aware treatment product.</td>
 </tr>
 </tbody>
 </table>
-<section id="tbsim.sim.Sim" class="level3">
-<h3 class="anchored" data-anchor-id="tbsim.sim.Sim">Sim</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>sim.Sim(</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    sim_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    tb_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    tb_model<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">'tb'</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>A subclass of ss.Sim specifically designed for TB simulations.</p>
-<p>Parses input parameters among the sim and the TB module, and provides default demographics (births and deaths), networks (random), and disease (TB).</p>
+<section id="tbsim.resistance.treatments.TxDeliveryR" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.resistance.treatments.TxDeliveryR">TxDeliveryR</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.TxDeliveryR(</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    product,</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    rate_asym<span class="op">=</span>ss.peryear(<span class="fl">0.0</span>),</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    rate_sym<span class="op">=</span>ss.peryear(<span class="fl">2.0</span>),</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    dur_treatment<span class="op">=</span>ss.months(<span class="dv">6</span>),</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    eligibility<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    supersedes<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    retreat_after<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    treat_latent<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Rate-based strain-aware treatment delivery.</p>
+<p>Each step, active-TB agents not already on treatment start a course at state-specific rates (<code>rate_asym</code> from ASYMPTOMATIC, <code>rate_sym</code> from SYMPTOMATIC), or from a custom <code>eligibility</code> callable (e.g.&nbsp;a DST-routed regimen). The per-strain outcome is frozen at initiation and resolved after <code>dur_treatment</code>: fully cleared courses go to CLEARED (with post-treatment reinfection protection); otherwise the agent returns to the state it was treated from carrying the surviving (and possibly newly resistant) strains.</p>
+<p>Treatment monitoring / regimen switching: a delivery given <code>supersedes=[name, ...]</code> will <code>interrupt</code> any ongoing course on those deliveries for its eligible agents before starting them, so a second-line regimen can take over an in-progress first-line course.</p>
 <section id="parameters" class="level4 doc-section doc-section-parameters">
 <h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h4>
 <table class="caption-top table">
@@ -637,57 +657,55 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td>pars</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
-<td>Flat parameter dict; keys are auto-routed to sim vs TB pars.</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="even">
-<td>sim_pars</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
-<td>Explicit sim-level parameter overrides.</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="odd">
-<td>tb_pars</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
-<td>Explicit TB parameter overrides.</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="even">
-<td>tb_model</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#str">str</a> / <code>Disease</code></td>
-<td>Which TB model to use. Options: ‘default’ (default), or a pre-built Disease instance.</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="odd">
-<td>location</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#str">str</a></td>
-<td>Placeholder for future location-based data.</td>
+<td>product</td>
+<td><a href="../api/resistance.treatments.html#tbsim.resistance.treatments.TxR">TxR</a></td>
+<td>the strain-aware treatment product.</td>
 <td><em>required</em></td>
 </tr>
 <tr class="even">
-<td>**kwargs</td>
-<td></td>
-<td>Additional parameters (auto-routed like <code>pars</code>).</td>
-<td><code>{}</code></td>
+<td>rate_asym</td>
+<td><code>ss</code>.<a href="https://docs.starsim.org/api/time.html#starsim.time.rate">rate</a></td>
+<td>treatment initiation rate from ASYMPTOMATIC.</td>
+<td><code>ss.peryear(0.0)</code></td>
+</tr>
+<tr class="odd">
+<td>rate_sym</td>
+<td><code>ss</code>.<a href="https://docs.starsim.org/api/time.html#starsim.time.rate">rate</a></td>
+<td>treatment initiation rate from SYMPTOMATIC.</td>
+<td><code>ss.peryear(2.0)</code></td>
+</tr>
+<tr class="even">
+<td>dur_treatment</td>
+<td><code>ss</code>.<a href="https://docs.starsim.org/api/time.html#starsim.time.dur">dur</a></td>
+<td>course duration (fixed).</td>
+<td><code>ss.months(6)</code></td>
+</tr>
+<tr class="odd">
+<td>eligibility</td>
+<td><a href="https://docs.python.org/3/library/functions.html#callable">callable</a></td>
+<td>optional <code>sim -&gt; uids</code> override; if given, those agents start treatment instead of the rate-based rule.</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="even">
+<td>supersedes</td>
+<td><a href="https://docs.python.org/3/library/stdtypes.html#str">str</a> / <a href="https://docs.python.org/3/library/stdtypes.html#list">list</a></td>
+<td>name(s) of other <code>TxDeliveryR</code> whose ongoing course is interrupted for eligible agents before this delivery starts them (regimen switching).</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="odd">
+<td>retreat_after</td>
+<td><code>ss</code>.<a href="https://docs.starsim.org/api/time.html#starsim.time.dur">dur</a></td>
+<td>refractory period after a course ends before the <em>same</em> agent may be re-treated by this delivery. Prevents a failing agent from being re-treated on every resolution off a single stale DST result (L1). Default <a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a> = no guard.</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="even">
+<td>treat_latent</td>
+<td><a href="https://docs.python.org/3/library/functions.html#bool">bool</a></td>
+<td>how latent (<code>INFECTION</code>) agents selected for treatment are handled. <a href="https://docs.python.org/3/library/constants.html#False" title="1"><code>False</code></a> (default): strain-aware sterilization — every carried strain susceptible to <em>all</em> regimen drugs is cleared with certainty, any regimen-resistant strain persists (the agent stays latent carrying it), and an agent left carrying no strain moves to <code>CLEARED</code>. No course is run and no resistance is acquired. For a pan-susceptible agent this clears the only strain → <code>CLEARED</code>, matching the single-strain behavior of base <code>tbsim.TxDelivery</code>. <a href="https://docs.python.org/3/library/constants.html#True" title="1"><code>True</code></a>: run through a full course that can fail / select for resistance. See L3 / implementation-decisions.md D-L3. (The default rate-based eligibility never selects latent agents, so this only affects custom / DST-routed eligibilities.)</td>
+<td><a href="https://docs.python.org/3/library/constants.html#False" title="1"><code>False</code></a></td>
 </tr>
 </tbody>
 </table>
-<p>Examples::</p>
-<pre><code>import tbsim
-
-# Simplest usage -- all defaults
-sim = tbsim.Sim()
-sim.run()
-sim.plot()
-
-# Override TB and sim parameters via flat dict
-sim = tbsim.Sim(n_agents=2000, beta=ss.peryear(0.3), start=1990, stop=2020)
-
-# Pass a pre-built TB instance
-tb = tbsim.TB(pars=dict(beta=ss.peryear(0.5)))
-sim = tbsim.Sim(tb_model=tb)</code></pre>
 </section>
 <section id="methods" class="level4">
 <h4 class="anchored" data-anchor-id="methods">Methods</h4>
@@ -700,39 +718,62 @@ sim = tbsim.Sim(tb_model=tb)</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
-<td><a href="#tbsim.sim.Sim.get_dx">get_dx</a></td>
-<td>Get a DxDelivery instance. Returns None if not found.</td>
+<td><a href="#tbsim.resistance.treatments.TxDeliveryR.failure_case_eligibility">failure_case_eligibility</a></td>
+<td>Classify a later treatment episode as <em>treatment failure/retreatment</em> vs a <em>new case</em>.</td>
 </tr>
 <tr class="even">
-<td><a href="#tbsim.sim.Sim.get_hsb">get_hsb</a></td>
-<td>Get the HealthSeekingBehavior instance. Returns None if not found.</td>
+<td><a href="#tbsim.resistance.treatments.TxDeliveryR.interrupt">interrupt</a></td>
+<td>Prematurely stop this delivery’s ongoing courses for <em>uids</em> (treatment monitoring / switch).</td>
 </tr>
 <tr class="odd">
-<td><a href="#tbsim.sim.Sim.get_tb">get_tb</a></td>
-<td>Get the TB disease module from this sim.</td>
-</tr>
-<tr class="even">
-<td><a href="#tbsim.sim.Sim.plot">plot</a></td>
-<td>Plot sim results. If key is ‘tb’, shows a curated panel of TB results.</td>
+<td><a href="#tbsim.resistance.treatments.TxDeliveryR.step">step</a></td>
+<td>Resolve completed courses, then initiate new ones.</td>
 </tr>
 </tbody>
 </table>
-<section id="tbsim.sim.Sim.get_dx" class="level5">
-<h5 class="anchored" data-anchor-id="tbsim.sim.Sim.get_dx">get_dx</h5>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>sim.Sim.get_dx(name<span class="op">=</span><span class="va">None</span>, result_state<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Get a DxDelivery instance. Returns None if not found.</p>
+<section id="tbsim.resistance.treatments.TxDeliveryR.failure_case_eligibility" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.treatments.TxDeliveryR.failure_case_eligibility">failure_case_eligibility</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.TxDeliveryR.failure_case_eligibility(</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    within,</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    base<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    new_case<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Classify a later treatment episode as <em>treatment failure/retreatment</em> vs a <em>new case</em>.</p>
+<p>Implements the spec’s requirement (§Diagnostics) to “track time since last treatment initiation to inform whether later treatment is managed as treatment failure, with need for DST/second-line treatments, or as a new case.” Reads the durable, cross-regimen <code>tb.ti_last_treatment</code> written by every :class:<code>TxDeliveryR</code> at initiation.</p>
+<p>Returns a <code>sim -&gt; uids</code> eligibility callable selecting agents whose most recent treatment initiation was within <code>within</code> (an <a href="https://docs.starsim.org/api/time.html#starsim.time.dur" title="0"><code>ss.dur</code></a>) of the current step — i.e.&nbsp;to be managed as a treatment failure (route to DST / second-line). Pass <code>new_case=True</code> for the complement (agents with no treatment within the window → managed as a new case). <code>base</code> optionally restricts the candidate pool (default: current active TB), e.g.&nbsp;<code>base=dst.matches(RIF=True)</code>.</p>
+<p>Feed as <code>eligibility=</code> to a DST or <code>TxDeliveryR</code> (optionally via :func:<code>eligibility_all</code>)::</p>
+<pre><code>failed = TxDeliveryR.failure_case_eligibility(within=ss.years(2))
+second_line = tbsim.TxDeliveryR(eligibility=failed, supersedes=['first'], product=...)</code></pre>
 </section>
-<section id="tbsim.sim.Sim.get_hsb" class="level5">
-<h5 class="anchored" data-anchor-id="tbsim.sim.Sim.get_hsb">get_hsb</h5>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>sim.Sim.get_hsb()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Get the HealthSeekingBehavior instance. Returns None if not found.</p>
+<section id="tbsim.resistance.treatments.TxDeliveryR.interrupt" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.treatments.TxDeliveryR.interrupt">interrupt</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.TxDeliveryR.interrupt(uids)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Prematurely stop this delivery’s ongoing courses for <em>uids</em> (treatment monitoring / switch).</p>
+<p>Reverts interrupted agents to the state treatment was initiated from, keeping their current strains, so another delivery can re-treat them. Only agents actually on <em>this</em> delivery’s course (<code>on_course</code>) are affected — the flag is delivery-scoped, so a shared TREATMENT state never lets one delivery interrupt another delivery’s patients (#447).</p>
 </section>
-<section id="tbsim.sim.Sim.get_tb" class="level5">
-<h5 class="anchored" data-anchor-id="tbsim.sim.Sim.get_tb">get_tb</h5>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>sim.Sim.get_tb(which<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Get the TB disease module from this sim.</p>
-<section id="parameters-1" class="level6 doc-section doc-section-parameters">
-<h6 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-1">Parameters</h6>
+<section id="tbsim.resistance.treatments.TxDeliveryR.step" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.treatments.TxDeliveryR.step">step</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.TxDeliveryR.step()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Resolve completed courses, then initiate new ones.</p>
+</section>
+</section>
+</section>
+<section id="tbsim.resistance.treatments.TxR" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.resistance.treatments.TxR">TxR</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.TxR(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    strains,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    base_efficacy<span class="op">=</span><span class="fl">0.85</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    resist_penalty<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    efficacy_by_strain<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    adherence<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    q_acq<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    acq_state_rr<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    regimen_drugs<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Strain-aware treatment product.</p>
+<section id="parameters-1" class="level4 doc-section doc-section-parameters">
+<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-1">Parameters</h4>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -744,94 +785,87 @@ sim = tbsim.Sim(tb_model=tb)</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
-<td>which</td>
-<td><a href="https://docs.python.org/3/library/functions.html#type">type</a></td>
-<td>Class of TB module to find (e.g.&nbsp;TB). If None, returns the first BaseTB subclass found.</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+<td>strains</td>
+<td><a href="../api/resistance.strains.html#tbsim.resistance.strains.Strains">Strains</a></td>
+<td>the strain registry (e.g.&nbsp;<code>tb.strains</code>).</td>
+<td><em>required</em></td>
 </tr>
-</tbody>
-</table>
-</section>
-<section id="returns" class="level6 doc-section doc-section-returns">
-<h6 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h6>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 12%">
-<col style="width: 12%">
-<col style="width: 47%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
+<tr class="even">
+<td>base_efficacy</td>
+<td><a href="https://docs.python.org/3/library/functions.html#float">float</a></td>
+<td>per-course cure probability for a treatment-susceptible strain.</td>
+<td><code>0.85</code></td>
 </tr>
-</thead>
-<tbody>
 <tr class="odd">
-<td></td>
-<td></td>
-<td>The TB disease module instance.</td>
-</tr>
-</tbody>
-</table>
-</section>
-</section>
-<section id="tbsim.sim.Sim.plot" class="level5">
-<h5 class="anchored" data-anchor-id="tbsim.sim.Sim.plot">plot</h5>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>sim.Sim.plot(key<span class="op">=</span><span class="va">None</span>, <span class="op">**</span>kwargs)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Plot sim results. If key is ‘tb’, shows a curated panel of TB results. Otherwise falls back to the standard starsim plot.</p>
-<section id="parameters-2" class="level6 doc-section doc-section-parameters">
-<h6 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-2">Parameters</h6>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>key</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#str">str</a> / <a href="https://docs.python.org/3/library/stdtypes.html#list">list</a></td>
-<td>Result key(s) to plot, or ‘tb’ for curated TB panel.</td>
+<td>resist_penalty</td>
+<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
+<td>per-drug multiplicative efficacy penalty applied for each <em>regimen</em> drug a strain is resistant to, e.g.&nbsp;<code>{'TX': 0.333}</code> gives a resistant strain 1/3 the cure probability. Resistance to a drug outside the regimen does not reduce efficacy.</td>
 <td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
 </tr>
 <tr class="even">
-<td>**kwargs</td>
-<td></td>
-<td>Passed to ss.Sim.plot().</td>
-<td><code>{}</code></td>
+<td>efficacy_by_strain</td>
+<td><a href="https://docs.python.org/3/library/array.html#module-array">array</a></td>
+<td>optional explicit per-strain cure-probability vector <code>T_l = {t_1,l, ..., t_m,l}</code> (length <code>strains.m</code>, spec §“Treatment efficacy”). When given it <em>is</em> the per-strain efficacy and <code>base_efficacy</code>/<code>resist_penalty</code> are ignored; use it when the constrained <code>base × ∏penalty</code> parameterization cannot express the desired vector.</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="odd">
+<td>adherence</td>
+<td><a href="https://docs.python.org/3/library/functions.html#float">float</a> or <a href="https://docs.python.org/3/library/functions.html#callable">callable</a></td>
+<td>per-course completion probability correlating outcomes across an agent’s strains (non-completers clear no strains this course). A float applies one regimen-level probability to every agent; a callable <code>uids -&gt; per-agent probability</code> makes adherence a <em>regimen-level distribution that varies by agent</em> and is applied across all that agent’s strains (spec §“Treatment efficacy”), e.g.&nbsp;<code>adherence=lambda uids: my_dist.rvs(uids)</code>.</td>
+<td><code>1.0</code></td>
+</tr>
+<tr class="even">
+<td>q_acq</td>
+<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
+<td>per-drug probability <code>{drug: prob}</code> that a surviving treatment-susceptible strain acquires resistance to that regimen drug on a failed course (always replacement). Default none (off).</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="odd">
+<td>acq_state_rr</td>
+<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
+<td>per-TB-state multiplier on <code>q_acq</code> at time of failure (spec’s RR on q). Default 1 for ASYMPTOMATIC/SYMPTOMATIC, 0 for all other states.</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="even">
+<td>regimen_drugs</td>
+<td><a href="https://docs.python.org/3/library/stdtypes.html#list">list</a></td>
+<td>drugs the regimen acts on; determines which strains can be cured/acquire resistance. Default: all drugs in <code>strains</code>.</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
 </tr>
 </tbody>
 </table>
 </section>
-<section id="returns-1" class="level6 doc-section doc-section-returns">
-<h6 class="doc-section doc-section-returns anchored" data-anchor-id="returns-1">Returns</h6>
+<section id="methods-1" class="level4">
+<h4 class="anchored" data-anchor-id="methods-1">Methods</h4>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 12%">
-<col style="width: 12%">
-<col style="width: 37%">
-</colgroup>
 <thead>
 <tr class="header">
 <th>Name</th>
-<th>Type</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td></td>
-<td></td>
-<td>matplotlib.figure.Figure</td>
+<td><a href="#tbsim.resistance.treatments.TxR.acquire_counts">acquire_counts</a></td>
+<td>Apply acquisition-on-failure (replacement) to the surviving <em>counts</em> of failed courses.</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.resistance.treatments.TxR.roll_survivors">roll_survivors</a></td>
+<td>Pre-roll the surviving strain mask for each treated agent (adherence, then per-strain cure).</td>
 </tr>
 </tbody>
 </table>
+<section id="tbsim.resistance.treatments.TxR.acquire_counts" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.treatments.TxR.acquire_counts">acquire_counts</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.TxR.acquire_counts(tb, uids, counts0, states<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Apply acquisition-on-failure (replacement) to the surviving <em>counts</em> of failed courses.</p>
+<p>Each surviving carried strain independently rolls, once per regimen drug it is susceptible to, whether it acquires that resistance (prob <code>q_acq[drug]</code> × the per-agent state RR <code>acq_state_rr</code>; default 0 outside ASYMPTOMATIC/SYMPTOMATIC). Hits mutate the strain to its resistant counterpart, transferring multiplicity source→target via :meth:<code>TBResistant._apply_acquisition</code>. Multiple strains may acquire resistance in one course.</p>
+<p>Returns <code>(counts, mask, n_events)</code> for the treated agents.</p>
 </section>
+<section id="tbsim.resistance.treatments.TxR.roll_survivors" class="level5">
+<h5 class="anchored" data-anchor-id="tbsim.resistance.treatments.TxR.roll_survivors">roll_survivors</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.TxR.roll_survivors(tb, uids)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Pre-roll the surviving strain mask for each treated agent (adherence, then per-strain cure).</p>
 </section>
 </section>
 </section>
@@ -847,17 +881,45 @@ sim = tbsim.Sim(tb_model=tb)</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
-<td><a href="#tbsim.sim.demo">demo</a></td>
-<td>Create a demo TB simulation.</td>
+<td><a href="#tbsim.resistance.treatments.eligibility_all">eligibility_all</a></td>
+<td>Combinator (L5): return a <code>sim -&gt; uids</code> selecting agents returned by <strong>all</strong> of <code>callables</code></td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.resistance.treatments.eligibility_any">eligibility_any</a></td>
+<td>Combinator (L5): return a <code>sim -&gt; uids</code> selecting agents returned by <strong>any</strong> of <code>callables</code></td>
+</tr>
+<tr class="odd">
+<td><a href="#tbsim.resistance.treatments.treatment_monitoring_eligibility">treatment_monitoring_eligibility</a></td>
+<td>Eligibility callable selecting agents on <code>tx_name</code>’s course for at least <code>after_steps</code> steps.</td>
+</tr>
+<tr class="even">
+<td><a href="#tbsim.resistance.treatments.will_fail">will_fail</a></td>
+<td>Eligibility factory (L5): on-treatment agents on <code>tx_name</code> whose pre-rolled course outcome is a</td>
 </tr>
 </tbody>
 </table>
-<section id="tbsim.sim.demo" class="level3">
-<h3 class="anchored" data-anchor-id="tbsim.sim.demo">demo</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>sim.demo(run<span class="op">=</span><span class="va">True</span>, plot<span class="op">=</span><span class="va">True</span>, <span class="op">**</span>kwargs)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Create a demo TB simulation.</p>
-<section id="parameters-3" class="level4 doc-section doc-section-parameters">
-<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-3">Parameters</h4>
+<section id="tbsim.resistance.treatments.eligibility_all" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.resistance.treatments.eligibility_all">eligibility_all</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.eligibility_all(<span class="op">*</span>callables)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Combinator (L5): return a <code>sim -&gt; uids</code> selecting agents returned by <strong>all</strong> of <code>callables</code> (set intersection). E.g. <code>eligibility_all(treatment_monitoring_eligibility('first'), dst.matches(RIF=True))</code> switches only agents that are both far enough into first-line and observed RIF-resistant.</p>
+</section>
+<section id="tbsim.resistance.treatments.eligibility_any" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.resistance.treatments.eligibility_any">eligibility_any</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.eligibility_any(<span class="op">*</span>callables)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Combinator (L5): return a <code>sim -&gt; uids</code> selecting agents returned by <strong>any</strong> of <code>callables</code> (set union).</p>
+</section>
+<section id="tbsim.resistance.treatments.treatment_monitoring_eligibility" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.resistance.treatments.treatment_monitoring_eligibility">treatment_monitoring_eligibility</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.treatment_monitoring_eligibility(</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    tx_name,</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    after_steps<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    every_steps<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    require<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Eligibility callable selecting agents on <code>tx_name</code>’s course for at least <code>after_steps</code> steps.</p>
+<p>Feed as <code>eligibility=</code> to a monitoring <code>DxDelivery</code> (to flag still-bacteriologically-positive agents by TB state), or — combined with <code>supersedes=[tx_name]</code> on a second-line <code>TxDeliveryR</code> — to switch regimens mid-course (spec §“Treatment monitoring”).</p>
+<section id="parameters-2" class="level4 doc-section doc-section-parameters">
+<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-2">Parameters</h4>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -869,56 +931,39 @@ sim = tbsim.Sim(tb_model=tb)</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
-<td>run</td>
-<td><a href="https://docs.python.org/3/library/functions.html#bool">bool</a></td>
-<td>Whether to run the sim.</td>
-<td><a href="https://docs.python.org/3/library/constants.html#True" title="1"><code>True</code></a></td>
+<td>tx_name</td>
+<td><a href="https://docs.python.org/3/library/stdtypes.html#str">str</a></td>
+<td>the <code>name</code> of the <code>TxDeliveryR</code> to monitor.</td>
+<td><em>required</em></td>
 </tr>
 <tr class="even">
-<td>plot</td>
-<td><a href="https://docs.python.org/3/library/functions.html#bool">bool</a></td>
-<td>Whether to plot results (only if run=True).</td>
-<td><a href="https://docs.python.org/3/library/constants.html#True" title="1"><code>True</code></a></td>
+<td>after_steps</td>
+<td><a href="https://docs.python.org/3/library/functions.html#int">int</a></td>
+<td>minimum sim steps since <code>ti_treatment_start</code> before eligibility. Default 4.</td>
+<td><code>4</code></td>
 </tr>
 <tr class="odd">
-<td>**kwargs</td>
-<td></td>
-<td>Passed to Sim().</td>
-<td><code>{}</code></td>
+<td>every_steps</td>
+<td><a href="https://docs.python.org/3/library/functions.html#int">int</a> / <a href="https://docs.python.org/3/library/constants.html#None">None</a></td>
+<td>if given, re-test every N steps after the first; else a single test at <code>after_steps</code>.</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="even">
+<td>require</td>
+<td><a href="https://docs.python.org/3/library/functions.html#callable">callable</a></td>
+<td>optional additional <code>sim -&gt; uids</code> AND-ed in (sugar over :func:<code>eligibility_all</code>), e.g.&nbsp;<code>require=dst.matches(RIF=True, exclude_on_treatment=False)</code> to make monitoring contingent on an observed DST profile (L5). Note monitored agents are on treatment, so pass <code>exclude_on_treatment=False</code> to a <code>matches</code> used here.</td>
+<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
 </tr>
 </tbody>
 </table>
 </section>
-<section id="returns-2" class="level4 doc-section doc-section-returns">
-<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns-2">Returns</h4>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 12%">
-<col style="width: 12%">
-<col style="width: 63%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Sim</td>
-<td></td>
-<td>Configured (and optionally run) simulation.</td>
-</tr>
-</tbody>
-</table>
-<p>Examples::</p>
-<pre><code>import tbsim
-tbsim.demo()                                  # Run simple default demo
-sim = tbsim.demo(run=False, n_agents=500)     # Just create it</code></pre>
-
-
 </section>
+<section id="tbsim.resistance.treatments.will_fail" class="level3">
+<h3 class="anchored" data-anchor-id="tbsim.resistance.treatments.will_fail">will_fail</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>resistance.treatments.will_fail(tx_name)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Eligibility factory (L5): on-treatment agents on <code>tx_name</code> whose pre-rolled course outcome is a failure (<code>pending_surv != 0</code>). Because the outcome is frozen at initiation, this is an <em>oracle</em> — it selects agents whose course will fail before it completes — useful for constructing failure-contingent regimen-switch scenarios.</p>
+
+
 </section>
 </section>
 </section>
@@ -1339,13 +1384,13 @@ sim = tbsim.demo(run=False, n_agents=500)     # Just create it</code></pre>
   </script>
 <nav class="page-navigation">
   <div class="nav-page nav-page-previous">
-      <a href="../api/index.html" class="pagination-link" aria-label="**API reference**">
-        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><strong>API reference</strong></span>
+      <a href="../api/resistance.tpt.html" class="pagination-link" aria-label="tpt">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">tpt</span>
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../api/tb.html" class="pagination-link" aria-label="tb">
-        <span class="nav-page-text">tb</span> <i class="bi bi-arrow-right-short"></i>
+      <a href="../api/compartmental.lshtm_ode.html" class="pagination-link" aria-label="lshtm_ode">
+        <span class="nav-page-text">lshtm_ode</span> <i class="bi bi-arrow-right-short"></i>
       </a>
   </div>
 </nav>
