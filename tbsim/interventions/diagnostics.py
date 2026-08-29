@@ -224,8 +224,8 @@ class DxDelivery(ss.Intervention):
         if len(positive_uids) == 0:
             return
 
-        # Convert validity from days to timesteps
-        validity_steps = float(self.result_validity) / self.sim.t.dt.days
+        # Convert validity to timesteps
+        validity_steps = self.result_validity / self.t.dt
         ti_set = self.ti_result_set[positive_uids]
         expired = positive_uids[~np.isnan(ti_set) & (self.ti >= ti_set + validity_steps)]
         if len(expired) > 0:

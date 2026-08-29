@@ -264,6 +264,7 @@ class TBResistant(TB):
         (entering ``INFECTION`` from a susceptible state, or keeping the current state for a
         superinfection) at count 1, regardless of how many copies the source carried.
         """
+        super().set_prognoses(uids, sources)  # Record the new infections; also clears `susceptible`
         if len(uids) == 0:
             return
         ti = self.ti
