@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.37">
+<meta name="generator" content="quarto-1.10.18">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -12,10 +12,13 @@
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
 */
-code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
-div.columns{display: flex; gap: min(4vw, 1.5em);}
-div.column{flex: auto; overflow-x: auto;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
@@ -77,14 +80,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-23bbe8b5e4efc1e257f6d59dce478b08.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-5a1953863e1f72ef3b996ef827f01ca7.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-b8d35f6d858c1e6bbf659b4b83919473.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-f0ffb6172689ed7439ef1c664ffff6bb.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-d074071b0ab3afe5023f3c0d05f1b529.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-f0ffb6172689ed7439ef1c664ffff6bb.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -526,7 +529,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <p>Usage sample (with scenarios and plotting)</p>
 <p>To use the hiv comorbidity features, you will need to add these 3 things to the simulation: - <code>HIV disease</code> to the disease list: Configure it as requested. Also, please note that if no intervention is specified, the model will use a initial prevalence and art coverage as specified in the HIV disease. - <code>TB_HIV connector</code> to the connector list: You will have the hability to update the values of each modifier as specified in the connector. - <code>HivIntervention</code> to the intervention list: The same intervention can be used for managing the art coverage and the prevalence depending on the specified parameters.</p>
-<div id="8a96d8e7" class="cell" data-execution_count="1">
+<div id="bee1149f" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Import required packages</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
@@ -536,7 +539,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <section id="build-tb-hiv-simulation" class="level2">
 <h2 class="anchored" data-anchor-id="build-tb-hiv-simulation">Build TB-HIV Simulation</h2>
-<div id="3455f591" class="cell" data-execution_count="2">
+<div id="4a51ad17" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> build_tbhiv_sim(simpars<span class="op">=</span><span class="va">None</span>, tbpars<span class="op">=</span><span class="va">None</span>, hivinv_pars<span class="op">=</span><span class="va">None</span>) <span class="op">-&gt;</span> ss.Sim:</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Build a TB-HIV simulation with current disease and intervention models."""</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    </span>
@@ -601,7 +604,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="run-hiv-intervention-scenarios" class="level2">
 <h2 class="anchored" data-anchor-id="run-hiv-intervention-scenarios">Run HIV Intervention Scenarios</h2>
 <p>This function runs multiple intervention strategies, each with varying HIV prevalence, ART coverage, and target age ranges.</p>
-<div id="e5aba57e" class="cell" data-execution_count="3">
+<div id="33fa8a20" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> run_scenarios():</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>   </span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Run the scenarios and return the results."""</span></span>
@@ -643,7 +646,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="plotting-results" class="level2">
 <h2 class="anchored" data-anchor-id="plotting-results">Plotting Results</h2>
 <p>We extract relevant metrics across scenarios and generate time series plots to visualize their trends. Metrics can be filtered by keywords or exclusions.</p>
-<div id="1095cb1b" class="cell" data-execution_count="4">
+<div id="0ce2268b" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> plot_results(flat_results, keywords<span class="op">=</span><span class="va">None</span>, exclude<span class="op">=</span>[<span class="st">'15'</span>]):</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    metrics <span class="op">=</span> <span class="bu">sorted</span>({k <span class="cf">for</span> flat <span class="kw">in</span> flat_results.values() <span class="cf">for</span> k <span class="kw">in</span> flat.keys() <span class="cf">if</span> (<span class="kw">not</span> keywords <span class="kw">or</span> <span class="bu">any</span>(kw <span class="kw">in</span> k <span class="cf">for</span> kw <span class="kw">in</span> keywords))}, reverse<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    metrics <span class="op">=</span> [m <span class="cf">for</span> m <span class="kw">in</span> metrics <span class="cf">if</span> <span class="kw">not</span> <span class="bu">any</span>(excl <span class="kw">in</span> m <span class="cf">for</span> excl <span class="kw">in</span> exclude)]</span>
@@ -673,7 +676,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="plotting" class="level2">
 <h2 class="anchored" data-anchor-id="plotting">Plotting</h2>
-<div id="3277ccc7" class="cell" data-execution_count="5">
+<div id="fc50b1db" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run everything</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>flat_results <span class="op">=</span> run_scenarios()</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>plot_results(flat_results)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -687,36 +690,24 @@ Running scenario: early_art_delivery
 Running scenario: high_art_delivery</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>/home/cliffk/idm/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning:
-
-
+<pre><code>/home/runner/work/tbsim/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning: 
 Not enough candidates for ART. Expected: 107, Available: 54
-
-/home/cliffk/idm/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning:
-
-
+  ss.warn(msg=f"Not enough candidates for ART. Expected: {delta}, Available: {len(candidates)}")
+/home/runner/work/tbsim/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning: 
 Not enough candidates for ART. Expected: 74, Available: 21
-
-/home/cliffk/idm/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning:
-
-
+  ss.warn(msg=f"Not enough candidates for ART. Expected: {delta}, Available: {len(candidates)}")
+/home/runner/work/tbsim/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning: 
 Not enough candidates for ART. Expected: 61, Available: 8
-
-/home/cliffk/idm/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning:
-
-
+  ss.warn(msg=f"Not enough candidates for ART. Expected: {delta}, Available: {len(candidates)}")
+/home/runner/work/tbsim/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning: 
 Not enough candidates for ART. Expected: 56, Available: 3
-
-/home/cliffk/idm/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning:
-
-
+  ss.warn(msg=f"Not enough candidates for ART. Expected: {delta}, Available: {len(candidates)}")
+/home/runner/work/tbsim/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning: 
 Not enough candidates for ART. Expected: 54, Available: 1
-
-/home/cliffk/idm/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning:
-
-
+  ss.warn(msg=f"Not enough candidates for ART. Expected: {delta}, Available: {len(candidates)}")
+/home/runner/work/tbsim/tbsim/tbsim/comorbidities/hiv.py:272: RuntimeWarning: 
 Not enough candidates for ART. Expected: 53, Available: 0
-</code></pre>
+  ss.warn(msg=f"Not enough candidates for ART. Expected: {delta}, Available: {len(candidates)}")</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div>

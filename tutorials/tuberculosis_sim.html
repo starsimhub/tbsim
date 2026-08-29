@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.37">
+<meta name="generator" content="quarto-1.10.18">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -12,10 +12,13 @@
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
 */
-code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
-div.columns{display: flex; gap: min(4vw, 1.5em);}
-div.column{flex: auto; overflow-x: auto;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
@@ -77,14 +80,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-23bbe8b5e4efc1e257f6d59dce478b08.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-5a1953863e1f72ef3b996ef827f01ca7.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-b8d35f6d858c1e6bbf659b4b83919473.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-f0ffb6172689ed7439ef1c664ffff6bb.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-d074071b0ab3afe5023f3c0d05f1b529.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-f0ffb6172689ed7439ef1c664ffff6bb.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -556,7 +559,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="packages" class="level2">
 <h2 class="anchored" data-anchor-id="packages">Packages</h2>
 <p>The code in this section imports the <code>starsim</code> package, which provides the capabilities to create and run simulations. Note that while <code>tbsim</code> enables some functionality, the full capabilities are provided by <code>starsim</code>.</p>
-<div id="ddbaa45a" class="cell" data-execution_count="1">
+<div id="7a9658a0" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Import necessary libraries</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tbsim</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> starsim <span class="im">as</span> ss</span>
@@ -637,7 +640,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>This returns the initialized simulation object so that it can be run or further interacted with outside of the <code>make_tb</code> function.</li>
 </ul></li>
 </ol>
-<div id="b5f35aa4" class="cell" data-execution_count="2">
+<div id="6f5c6781" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Define the function to create a tuberculosis simulation</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_tb():</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="co"># --------------- People ----------</span></span>
@@ -685,7 +688,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="run-the-simulation">Run the Simulation</h3>
 <p>We will now create and run the first simulation using the <code>make_tb</code> function with the parameters set above.</p>
 <p>Please note, at some point it may be convenient to parameterize the <code>make_tb</code> function and make it even more re-usable (for intance for scenarios creation).</p>
-<div id="969bb183" class="cell" data-execution_count="3">
+<div id="88874dd3" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create and run the first simulation</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>sim <span class="op">=</span> make_tb()  <span class="co"># Create the simulation - running make_tb returns a tbsim.Sim (a subclass of ss.Sim from the starsim library), so we can use all the methods of the ss.Sim class as well as tbsim.Sim conveniences like sim.get_tb()</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>sim.run()        <span class="co"># Run the simulation </span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -705,7 +708,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Epidemiological indicators</strong>: Prevalence, incidence rates, and detection metrics</li>
 </ul>
 <p>For more detailed information, please refer to the official documentation at <a href="https://docs.starsim.org/api/results.html">Starsim Results API</a>.</p>
-<div id="f2dc3491" class="cell" data-execution_count="4">
+<div id="1e1600cf" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>tbr <span class="op">=</span> sim.get_tb().results</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"This is a dictionary of the results that you can plot: </span><span class="ch">\n</span><span class="st">"</span>,tbr.keys())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -715,16 +718,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <p>now, below we show the plotting of a single channel (result):</p>
-<div id="cae30757" class="cell" data-execution_count="5">
+<div id="6ef75972" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>plt.plot(<span class="bu">range</span>(<span class="dv">0</span>,<span class="bu">len</span>(tbr[<span class="st">'prevalence'</span>])),tbr[<span class="st">'prevalence'</span>])</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"The most basic plotting sample </span><span class="ch">\n</span><span class="st"> TB Prevalence </span><span class="ch">\n</span><span class="st"> (raw data)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<pre><code>Text(0.5, 1.0, 'The most basic plotting sample \n TB Prevalence \n (raw data)')</code></pre>
-</div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="tuberculosis_sim_files/figure-html/cell-6-output-2.png" width="583" height="472" class="figure-img"></p>
+<p><img src="tuberculosis_sim_files/figure-html/cell-6-output-1.png" width="583" height="472" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -743,8 +743,8 @@ Once you get familiar with the available data in the results array, you can proc
 <p>
 Plot the results of the simulation - inherited from the starsim library which is available under the diseases attribute of the simulation: <code> sim.plot() </code>
 </p>
-<div id="7a9b313c" class="cell" data-execution_count="6">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>sim.plot()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="5a1dae2b" class="cell" data-execution_count="6">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>sim.plot()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Figure(768x576)</code></pre>
 </div>
@@ -759,12 +759,12 @@ Plot the results of the simulation - inherited from the starsim library which is
 <section id="using-tbsim-plots" class="level3">
 <h3 class="anchored" data-anchor-id="using-tbsim-plots">Using TBSim plots:</h3>
 <p>The <code>plot</code> function from tbsim can be used to create comprehensive plots:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>tbsim.plot({<span class="st">'single simulation'</span>: sim.results.flatten(), <span class="st">'tb only results'</span>: sim.get_tb().results.flatten()})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>tbsim.plot({<span class="st">'single simulation'</span>: sim.results.flatten(), <span class="st">'tb only results'</span>: sim.get_tb().results.flatten()})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>where each key represents a scenario that will be plotted with a different color.</p>
 <p>For more information, see the <code>plot</code> function documentation.</p>
-<div id="4bcfce6e" class="cell" data-execution_count="7">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create comprehensive plots using tbsim's plot function</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>tbsim.plot({<span class="st">'ALL SIM metrics'</span>: sim.results.flatten(),<span class="st">'TB ONLY metrics'</span>: sim.get_tb().results.flatten()}, n_cols<span class="op">=</span><span class="dv">4</span>, row_height<span class="op">=</span><span class="dv">2</span> )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="813353b6" class="cell" data-execution_count="7">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create comprehensive plots using tbsim's plot function</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>tbsim.plot({<span class="st">'ALL SIM metrics'</span>: sim.results.flatten(),<span class="st">'TB ONLY metrics'</span>: sim.get_tb().results.flatten()}, n_cols<span class="op">=</span><span class="dv">4</span>, row_height<span class="op">=</span><span class="dv">2</span> )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -784,23 +784,20 @@ Plot the results of the simulation - inherited from the starsim library which is
 <section id="using-your-own-function" class="level3">
 <h3 class="anchored" data-anchor-id="using-your-own-function">Using your own function</h3>
 <p>Take a look at the sample below, it will show you how to access the results dataframe (dict) and how with a simple function you can plot your simulation’s results.</p>
-<div id="7dc257d7" class="cell" data-execution_count="8">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Method 3: Custom plotting using TB results directly</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>fig <span class="op">=</span> plt.figure()</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>tb_results <span class="op">=</span> sim.get_tb().results</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> rkey <span class="kw">in</span> [<span class="st">'n_INFECTION'</span>, <span class="st">'n_NON_INFECTIOUS'</span>, <span class="st">'n_ASYMPTOMATIC'</span>, <span class="st">'n_SYMPTOMATIC'</span>, <span class="st">'n_TREATMENT'</span>]:</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    plt.plot(tb_results[<span class="st">'timevec'</span>], tb_results[rkey], label<span class="op">=</span>rkey.replace(<span class="st">'n_'</span>, <span class="st">''</span>).replace(<span class="st">'_'</span>, <span class="st">' '</span>).title())</span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>plt.legend()</span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"TB State Counts Over Time"</span>)</span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Time"</span>)</span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Number of Individuals"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<pre><code>Text(0, 0.5, 'Number of Individuals')</code></pre>
-</div>
+<div id="de514f00" class="cell" data-execution_count="8">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Method 3: Custom plotting using TB results directly</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>fig <span class="op">=</span> plt.figure()</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>tb_results <span class="op">=</span> sim.get_tb().results</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> rkey <span class="kw">in</span> [<span class="st">'n_INFECTION'</span>, <span class="st">'n_NON_INFECTIOUS'</span>, <span class="st">'n_ASYMPTOMATIC'</span>, <span class="st">'n_SYMPTOMATIC'</span>, <span class="st">'n_TREATMENT'</span>]:</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    plt.plot(tb_results[<span class="st">'timevec'</span>], tb_results[rkey], label<span class="op">=</span>rkey.replace(<span class="st">'n_'</span>, <span class="st">''</span>).replace(<span class="st">'_'</span>, <span class="st">' '</span>).title())</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>plt.legend()</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"TB State Counts Over Time"</span>)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Time"</span>)</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Number of Individuals"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="tuberculosis_sim_files/figure-html/cell-9-output-2.png" width="585" height="451" class="figure-img"></p>
+<p><img src="tuberculosis_sim_files/figure-html/cell-9-output-1.png" width="585" height="451" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -828,15 +825,15 @@ Plot the results of the simulation - inherited from the starsim library which is
 <section id="time-varying-front-loaded-progression" class="level3">
 <h3 class="anchored" data-anchor-id="time-varying-front-loaded-progression">Time-varying (front-loaded) progression</h3>
 <p>By default the hazards of progressing from latent <code>INFECTION</code> to active TB are constant per year. Real household-contact data are instead <em>front-loaded</em>: most people who ever progress do so within about a year of infection. You can reproduce this by letting the <code>INFECTION → ASYMPTOMATIC</code> hazard decline exponentially with time since infection, <code>inf_asy(τ) = inf_asy · exp(−k_asy · τ)</code>, where <code>τ</code> is the number of years since the agent was infected (reinfection restarts the clock). This is controlled by a single new parameter, <code>k_asy</code> (per year); the analogous <code>k_non</code> does the same for <code>INFECTION → NON_INFECTIOUS</code>. Both default to <code>0</code>, which is exactly the constant-hazard model, so existing calibrations and results are unchanged.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Front-load progression to active TB (larger k_asy concentrates progression in year 1);</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="co"># k_asy = 0 (the default) recovers the original constant-rate behaviour.</span></span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>tb <span class="op">=</span> tbsim.TB(k_asy<span class="op">=</span><span class="fl">6.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Front-load progression to active TB (larger k_asy concentrates progression in year 1);</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="co"># k_asy = 0 (the default) recovers the original constant-rate behaviour.</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>tb <span class="op">=</span> tbsim.TB(k_asy<span class="op">=</span><span class="fl">6.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="reinfection-of-latent-agents" class="level3">
 <h3 class="anchored" data-anchor-id="reinfection-of-latent-agents">Reinfection of latent agents</h3>
 <p>Latent (<code>INFECTION</code>) and non-infectious (<code>NON_INFECTIOUS</code>) agents can be reinfected: a re-exposure resets the agent’s <code>ti_infected</code> clock (raising the progression hazard under front-loading) without otherwise changing its state. The relative susceptibility to reinfection in these states is set by <code>rr_reinfection_inf</code> (σ_L, defaults to <code>rr_reinfection_rec</code>) and <code>rr_reinfection_non</code> (σ_N, defaults to <code>rr_reinfection_inf</code>). Setting them to <code>0</code> closes reinfection of already-infected agents.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Latent agents reinfect at the recovered-agent RR by default; set to 0 to disable.</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>tb <span class="op">=</span> tbsim.TB(rr_reinfection_inf<span class="op">=</span><span class="fl">0.21</span>, rr_reinfection_non<span class="op">=</span><span class="fl">0.21</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Latent agents reinfect at the recovered-agent RR by default; set to 0 to disable.</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>tb <span class="op">=</span> tbsim.TB(rr_reinfection_inf<span class="op">=</span><span class="fl">0.21</span>, rr_reinfection_non<span class="op">=</span><span class="fl">0.21</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="next-steps" class="level3">
 <h3 class="anchored" data-anchor-id="next-steps">Next Steps</h3>
