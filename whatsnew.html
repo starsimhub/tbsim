@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.9.37">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -12,13 +12,10 @@
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
 */
+code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
-div.columns{display: flex; gap: 1.5em;}
-div.column{flex: auto;}
-@media screen {
-div.columns{gap: min(4vw, 1.5em);}
-div.column{overflow-x: auto;}
-}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
@@ -45,14 +42,14 @@ ul.task-list li input[type="checkbox"] {
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-5a1953863e1f72ef3b996ef827f01ca7.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-23bbe8b5e4efc1e257f6d59dce478b08.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-cd2179aaae4b775b664ba2d87bf1ea05.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-d9810d97357975cc6fb43885eb33278f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="site_libs/bootstrap/bootstrap-cd2179aaae4b775b664ba2d87bf1ea05.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-b8d35f6d858c1e6bbf659b4b83919473.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-1a48881509515afabb489632eb5ce46c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -464,6 +461,7 @@ ul.task-list li input[type="checkbox"] {
   <ul>
   <li><a href="#whats-new" id="toc-whats-new" class="nav-link active" data-scroll-target="#whats-new">What’s new</a>
   <ul>
+  <li><a href="#version-0.10.3-2026-08-29" id="toc-version-0.10.3-2026-08-29" class="nav-link" data-scroll-target="#version-0.10.3-2026-08-29">Version 0.10.3 (2026-08-29)</a></li>
   <li><a href="#version-0.10.2-2026-07-20" id="toc-version-0.10.2-2026-07-20" class="nav-link" data-scroll-target="#version-0.10.2-2026-07-20">Version 0.10.2 (2026-07-20)</a></li>
   <li><a href="#version-0.10.1-2026-07-15" id="toc-version-0.10.1-2026-07-15" class="nav-link" data-scroll-target="#version-0.10.1-2026-07-15">Version 0.10.1 (2026-07-15)</a></li>
   <li><a href="#version-0.10.0-2026-07-10" id="toc-version-0.10.0-2026-07-10" class="nav-link" data-scroll-target="#version-0.10.0-2026-07-10">Version 0.10.0 (2026-07-10)</a></li>
@@ -485,6 +483,16 @@ ul.task-list li input[type="checkbox"] {
 <section id="whats-new" class="level1">
 <h1>What’s new</h1>
 <p>All notable changes to the codebase are documented in this file.</p>
+<section id="version-0.10.3-2026-08-29" class="level2">
+<h2 class="anchored" data-anchor-id="version-0.10.3-2026-08-29">Version 0.10.3 (2026-08-29)</h2>
+<ul>
+<li>Updated for Starsim 3.6.0, which makes <a href="https://docs.python.org/3/library/functions.html#float" title="1"><code>float()</code></a> on an <a href="https://docs.starsim.org/api/time.html#starsim.time.TimePar" title="0"><code>ss.TimePar</code></a> raise a <a href="https://docs.python.org/3/library/exceptions.html#TypeError" title="1"><code>TypeError</code></a> (it silently discarded the unit) and records <code>new_infections</code> inside <a href="https://docs.starsim.org/api/diseases.html#starsim.diseases.Infection.set_prognoses" title="0"><code>ss.Infection.set_prognoses()</code></a> rather than inferring them from <code>ti_infected</code> afterwards.</li>
+<li><strong>Fixed <code>DxDelivery(result_validity=...)</code></strong>: <code>step_expire_results</code> converted the validity window with <code>float(self.result_validity)</code>, which now raises. It divides by the module’s own <code>dt</code> instead (<code>self.result_validity / self.t.dt</code>), matching <code>DSTDelivery._expire_stale</code>.</li>
+<li><strong>Fixed the LSHTM reference ODE</strong> (<code>tbsim.compartmental.TB_SS</code>): its Euler step took <code>float(self.dt)</code> for a timestep in years, which now raises; it uses <code>self.dt.years</code> explicitly.</li>
+<li><strong>Fixed silently-zero incidence results for <code>TBResistant</code></strong>: <code>TBResistant.set_prognoses</code> overrode the base method without calling <a href="https://docs.python.org/3/library/functions.html#super" title="1"><code>super()</code></a>, so under Starsim 3.6.0 its <code>new_infections</code> and <code>cum_infections</code> results stayed zero for the whole run (under 3.5.x the base class recomputed them afterwards, hiding the omission). Added a regression test.</li>
+<li>Raised minimum Starsim dependency to <code>&gt;=3.6.0</code>.</li>
+</ul>
+</section>
 <section id="version-0.10.2-2026-07-20" class="level2">
 <h2 class="anchored" data-anchor-id="version-0.10.2-2026-07-20">Version 0.10.2 (2026-07-20)</h2>
 <ul>
@@ -1006,7 +1014,7 @@ ul.task-list li input[type="checkbox"] {
       &nbsp;
     </div>   
     <div class="nav-footer-center">
-<p>Docs built for TBsim v0.10.2 (2026-07-20).<br>© 2023–2026, Gates Foundation and collaborators. All rights reserved. <a href="https://www.gatesfoundation.org/Privacy-and-Cookies-Notice">Privacy and Cookies Notice</a> | <a href="https://www.gatesfoundation.org/Terms-of-Use">Terms of Use</a></p>
+<p>Docs built for TBsim v0.10.3 (2026-08-29).<br>© 2023–2026, Gates Foundation and collaborators. All rights reserved. <a href="https://www.gatesfoundation.org/Privacy-and-Cookies-Notice">Privacy and Cookies Notice</a> | <a href="https://www.gatesfoundation.org/Terms-of-Use">Terms of Use</a></p>
 <div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/starsimhub/tbsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div>
     <div class="nav-footer-right">
       <ul class="footer-items list-unstyled">
