@@ -2,6 +2,13 @@
 
 All notable changes to the codebase are documented in this file.
 
+## Version 0.10.3 (2026-08-29)
+- Updated for Starsim 3.6.0, which makes `float()` on an `ss.TimePar` raise a `TypeError` (it silently discarded the unit) and records `new_infections` inside `ss.Infection.set_prognoses()` rather than inferring them from `ti_infected` afterwards.
+- **Fixed `DxDelivery(result_validity=...)`**: `step_expire_results` converted the validity window with `float(self.result_validity)`, which now raises. It divides by the module's own `dt` instead (`self.result_validity / self.t.dt`), matching `DSTDelivery._expire_stale`.
+- **Fixed the LSHTM reference ODE** (`tbsim.compartmental.TB_SS`): its Euler step took `float(self.dt)` for a timestep in years, which now raises; it uses `self.dt.years` explicitly.
+- **Fixed silently-zero incidence results for `TBResistant`**: `TBResistant.set_prognoses` overrode the base method without calling `super()`, so under Starsim 3.6.0 its `new_infections` and `cum_infections` results stayed zero for the whole run (under 3.5.x the base class recomputed them afterwards, hiding the omission). Added a regression test.
+- Raised minimum Starsim dependency to `>=3.6.0`.
+
 ## Version 0.10.2 (2026-07-20)
 - Reworked several multi-strain / drug-resistance behaviors (`tbsim.resistance`) and lifted latent reinfection into base `TB`.
 - **Latent reinfection in base `TB`**: `rr_reinfection_inf` (σ_L) and `rr_reinfection_non` (σ_N) are now base-`TB` parameters, so latent (`INFECTION`) and non-infectious (`NON_INFECTIOUS`) agents are reinfection-eligible in single-strain models too. A re-exposure resets the `ti_infected` clock without otherwise changing the agent's state (clock reset only). σ_L defaults to `rr_reinfection_rec` and σ_N to σ_L; set them to `0` to disable.

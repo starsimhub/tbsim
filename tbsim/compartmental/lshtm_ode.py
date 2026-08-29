@@ -231,7 +231,7 @@ class TB_SS(ss.Module):
         """Euler integration of the ODE system."""
         p = self.pars
         c = self.c
-        dt = float(self.dt)  # hard-coded in years
+        dt = self.dt.years  # rates in pars are per-year, so integrate in years
 
         foi = (p.beta / p.N) * (p.trans_asymp * c.ASYMPTOMATIC + c.SYMPTOMATIC)
 

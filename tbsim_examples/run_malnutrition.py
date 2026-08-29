@@ -29,14 +29,14 @@ def make_tb_nut():
         n_agents=1000,
         start=1980,
         stop=1995,
-        dt=float(ss.days(7))/365,
+        dt=ss.days(7),
         beta=0.01,
         init_prev=0.25,
         diseases=[nut],
         demographics=[ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))],
         connectors=connector,
     )
-    sim.pars.verbose = float(sim.pars.dt) / 5
+    sim.pars.verbose = sim.pars.dt.years / 5
     return sim
 
 

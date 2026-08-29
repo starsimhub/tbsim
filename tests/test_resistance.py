@@ -784,6 +784,21 @@ def test_dst_retreat_after_guard_bounds_treatments():
     assert unguarded > 2 * guarded  # continuous retreatment inflates the unguarded count
 
 
+def test_incidence_results_are_recorded():
+    """TBResistant records new/cum infections and incidence like base TB.
+
+    Regression test: `set_prognoses` must call `super()`, since Starsim v3.6.0 counts infections
+    as they happen rather than inferring them from `ti_infected` afterwards. Without the call,
+    `new_infections` and `cum_infections` stay silently zero for the whole run.
+    """
+    tb = tbsim.TBResistant(init_prev=ss.bernoulli(0.02))
+    sim = make_sim(tb, seed=0, n=1000, stop='2010-12-31')
+    sim.run()
+    res = sim.results[tb.name]
+    assert res.new_infections.sum() > 0
+    assert res.cum_infections[-1] == res.new_infections.sum()
+
+
 if __name__ == '__main__':
     import sys
     sys.exit(pytest.main([__file__, '-v']))
