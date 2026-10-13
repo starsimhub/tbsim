@@ -12,6 +12,10 @@ class HealthSeekingBehavior(ss.Intervention):
     at a rate per timestep. If the people object has a sought_care attribute, it is set
     to True for agents who seek care (for use by downstream interventions).
 
+    Each agent's rate is scaled by its ``care_seeking_multiplier`` (default 1), which
+    ``DxDelivery`` raises after a false-negative result and ``TxDelivery`` raises after
+    a treatment failure.
+
     Example
     -------
     ::
@@ -41,9 +45,16 @@ class HealthSeekingBehavior(ss.Intervention):
             ss.BoolState('sought_care', default=False),
             ss.IntArr('n_care_sought_total', default=0),    # lifetime count; never resets
             ss.FloatArr('ti_last_sought',    default=-np.inf),
+            ss.FloatArr('care_seeking_multiplier', default=1.0), # Per-agent multiplier on the care-seeking rate
         )
-        self.care_seeking_dist = ss.bernoulli(p=self.pars.initial_care_seeking_rate.to_prob())
+        self.care_seeking_dist = ss.bernoulli(p=self.p_care_seeking)
         return
+
+    @staticmethod
+    def p_care_seeking(self, sim, uids):
+        """ Calculate the per-timestep probability of seeking care; the rate is scaled by each agent's multiplier before conversion """
+        rate = self.pars.initial_care_seeking_rate * self.care_seeking_multiplier[uids]
+        return rate.to_prob()
 
     def init_post(self):
         """Locate the TB disease module and resolve eligible states."""
@@ -91,8 +102,6 @@ class HealthSeekingBehavior(ss.Intervention):
         if len(not_yet_sought) == 0:
             return
 
-        rate = self.pars.initial_care_seeking_rate
-        self.care_seeking_dist.set(p=rate.to_prob())
         seeking_uids = self.care_seeking_dist.filter(not_yet_sought)
 
         if len(seeking_uids) == 0:
@@ -122,4 +131,9 @@ class HealthSeekingBehavior(ss.Intervention):
         self.results['new_sought_care'][self.ti] = self._new_seekers_count
         active = self._tb.state.isin(self._states)
         self.results['n_eligible'][self.ti] = np.count_nonzero(active & (~self.sought_care))
+        return
+
+    def shrink(self):
+        """ Delete link to the TB module """
+        self._tb = None
         return
