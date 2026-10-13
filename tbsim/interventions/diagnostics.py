@@ -153,7 +153,7 @@ class DxDelivery(ss.Intervention):
         coverage: Fraction of eligible agents tested (float or ss.Dist). Default 1.0.
         eligibility: Callable (sim) -> uids. Default: sought_care & ~diagnosed & alive.
         result_state: People-state name set True on positive result. Default 'diagnosed'.
-        care_seeking_multiplier: Multiplier on care-seeking rate for false negatives. Default 1.0.
+        care_seeking_multiplier: Multiplier on the care-seeking rate of false negatives, applied once per agent via HealthSeekingBehavior. Default 1.0.
     """
 
     def __init__(self, product, coverage=1.0, eligibility=None, result_state='diagnosed',
@@ -175,7 +175,6 @@ class DxDelivery(ss.Intervention):
             ss.BoolArr('tested', default=False),
             ss.IntArr('n_times_tested', default=0),
             ss.BoolState('test_result', default=False),
-            ss.FloatArr('care_seeking_multiplier', default=1.0),
             ss.BoolState('multiplier_applied', default=False),
             ss.FloatArr('ti_result_set', default=np.nan),
         )
@@ -277,17 +276,17 @@ class DxDelivery(ss.Intervention):
         has_tb = np.isin(tb_states, TBS.ACTIVE)
         false_neg_uids = neg_uids[has_tb]
 
-        if len(false_neg_uids) > 0 and self.care_seeking_multiplier_value != 1.0:
-            unboosted = false_neg_uids[~self.multiplier_applied[false_neg_uids]]
-            if len(unboosted) > 0:
-                self.care_seeking_multiplier[unboosted] *= self.care_seeking_multiplier_value
-                self.multiplier_applied[unboosted] = True
+        if len(false_neg_uids) == 0:
+            return
 
-        # Reset flags for false negatives to allow retry
-        if len(false_neg_uids) > 0:
-            if hsb := self.sim.get_hsb():
-                hsb.sought_care[false_neg_uids] = False
-            self.tested[false_neg_uids] = False
+        # Reset flags for false negatives to allow retry, and boost their care seeking (once per agent)
+        if hsb := self.sim.get_hsb():
+            hsb.sought_care[false_neg_uids] = False
+            if self.care_seeking_multiplier_value != 1.0:
+                unboosted = false_neg_uids[~self.multiplier_applied[false_neg_uids]]
+                hsb.care_seeking_multiplier[unboosted] *= self.care_seeking_multiplier_value
+                self.multiplier_applied[unboosted] = True
+        self.tested[false_neg_uids] = False
         return
     
     def update_results(self):

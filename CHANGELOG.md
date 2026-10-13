@@ -2,6 +2,11 @@
 
 All notable changes to the codebase are documented in this file.
 
+## Version 0.10.4 (2026-10-13)
+- **Fixed care-seeking multipliers having no effect (#397)**: `DxDelivery(care_seeking_multiplier=...)` (after a false-negative result) and `TxDelivery(reseek_multiplier=...)` (after a treatment failure) wrote to a per-agent multiplier that `HealthSeekingBehavior` never read. The multiplier now lives on `HealthSeekingBehavior` as `care_seeking_multiplier`; `DxDelivery` and `TxDelivery` write to it, and `HealthSeekingBehavior` scales each agent's rate by it before converting to a per-timestep probability. **Regression:** results change for any sim that uses `HealthSeekingBehavior` with `TxDelivery`, since the default `reseek_multiplier=2.0` now takes effect (in a 5,000-agent, 10-year cascade, treatment failures rose from 25.8 to 28.8 on average over 5 seeds).
+- Removed the unused rate-to-probability conversion in `HealthSeekingBehavior.__init__` (it ran before the timestep was set; `step` already converted correctly), and added `HealthSeekingBehavior.shrink()`.
+- Added tests for the per-timestep care-seeking probability at daily and weekly timesteps, for the multiplier, and for the diagnosis/treatment cascade.
+
 ## Version 0.10.3 (2026-08-29)
 - Updated for Starsim 3.6.0, which makes `float()` on an `ss.TimePar` raise a `TypeError` (it silently discarded the unit) and records `new_infections` inside `ss.Infection.set_prognoses()` rather than inferring them from `ti_infected` afterwards.
 - **Fixed `DxDelivery(result_validity=...)`**: `step_expire_results` converted the validity window with `float(self.result_validity)`, which now raises. It divides by the module's own `dt` instead (`self.result_validity / self.t.dt`), matching `DSTDelivery._expire_stale`.
