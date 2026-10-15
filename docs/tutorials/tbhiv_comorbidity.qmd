@@ -1,227 +1,134 @@
 ---
-title: HIV Comorbidity in TBSim
+title: HIV comorbidity in TBsim
 jupyter: python3
 ---
 
-
-This notebook demonstrates how to use the **HIV comorbidity module** in the `tbsim` package.
-
-**Module Location:** `tbsim/comorbidities/hiv.py`
-
----
+This tutorial shows how to use the HIV comorbidity module (`tbsim/comorbidities/hiv.py`) to simulate the effect of HIV infection on TB.
 
 ## Overview
 
-The HIV comorbidity module in TBSim allows users to simulate the impact of **HIV infection on TB disease dynamics**. Rather than modeling HIV progression in detail, it serves as a **lightweight comorbidity** that modifies TB risks based on HIV state.
+The HIV module is a lightweight comorbidity: rather than modeling HIV transmission in detail, it infects people at a given incidence, tracks their HIV state and whether they are on ART, and uses this to change their risk of TB. It has two parts:
 
-The module is composed of three key components:
+- `tbsim.HIV`: the HIV disease model, which tracks HIV state and ART.
+- `tbsim.hiv_effects()`: modifiers that act on the TB model, speeding progression from latent infection to active TB according to HIV state.
 
-- **HIV Model**: Represents HIV infection as a comorbidity.
-- **HIV Intervention**: Enables scenario testing via prevalence and ART coverage.
-- **TB-HIV Connector**: Bridges HIV and TB models, applying comorbidity risk logic.
+Like the TB model, the HIV model is declared as states and transitions, so a TB-HIV sim runs under any solver. With no network, it runs as an ODE (the default), and TB and HIV are tracked jointly: each TB state is split by HIV state and ART (see `ss.Crossing`). To run it as agents instead, use `solver='abm'`.
 
----
+## HIV model
 
-## HIV Model
+Everyone is in one of four HIV states: `atrisk` (uninfected), `acute`, `latent` (chronic infection), and `aids`. People at risk are infected at a per-person rate, `incidence`, and progress from `acute` to `latent` to `aids`. People with HIV are also split by whether they are on ART (the dimension `art`, `False` or `True`), which slows their progression. New infections start off ART. The model has no HIV transmission and no HIV mortality.
 
-The **HIV model** simulates HIV infection status and its progression through simplified states:
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `incidence` | 0 | New HIV infections per person at risk per year; can vary in time |
+| `acute_to_latent` | 1/(12 weeks) | Rate of progression from `acute` to `latent` |
+| `latent_to_aids` | 1/(8 years) | Rate of progression from `latent` to `aids` |
+| `art_start` | 0 | The rate at which people with HIV start ART, per year |
+| `art_progression` | 0.1 | Multiplier on both progression rates for people on ART |
 
-- `ACUTE`
-- `LATENT`
-- `AIDS`
+Parameters are given as keywords, e.g. `tbsim.HIV(incidence=0.01, art_progression=0.2)`; rates given as numbers are per year for `incidence` and `art_start`, and per day for the progression rates. Two more arguments set the start: `init_prev`, the share of people with (acute) HIV, and `init_onart`, the share of them on ART.
 
-This implementation is intended as a modifier for TB outcomes, rather than a standalone disease model.
+Incidence can vary in time with `ss.timeseries()`, which holds each value until the next (and the first value before its time), e.g. `incidence=ss.timeseries({2000: ss.peryear(0.02), 2020: ss.peryear(0.005)})`.
 
-### Key Parameters
+## ART
 
-| Parameter              | Description                                                                 |
-|------------------------|-----------------------------------------------------------------------------|
-| `init_prev`            | Probability of being HIV-positive (ACUTE stage) at simulation start         |
-| `init_onart`           | Probability of being on ART if HIV-positive                                 |
-| `acute_to_latent`      | Daily probability of transitioning from ACUTE to LATENT                     |
-| `LATENT_to_aids`       | Daily probability of transitioning from LATENT to AIDS                      |
-| `aids_to_dead`         | Daily probability of death after reaching AIDS (currently unused)           |
-| `art_progression_factor` | Multiplier reducing HIV progression for agents on ART                      |
+People start ART in one of two ways:
 
+- **All the time**, at the rate `art_start`, e.g. `tbsim.HIV(art_start=0.2)`.
+- **By a delivery**, at given times: `ss.transfer()` moves a share of the eligible people to a level of a dimension, e.g. `ss.transfer(art=True, coverage=0.5, years=[2005], eligible=hiv.acute | hiv.latent | hiv.aids)`, passed to the sim in `interventions`.
 
-### *** Important: ***
->    At step 0, the model looks for the existance of an `HivIntervention` handling the HIV infection and art coverage, if none is found then it uses the values defined at Disease level to set the initial values.
+People on ART stay on it.
 
----
+## Effect of HIV on TB
 
-## HIV Intervention
+`tbsim.hiv_effects(tb, hiv)` returns modifiers, which are passed to the sim as `connectors`. They multiply the TB model's progression from latent infection to active TB (its `latent_asy` and `latent_non` transitions) by a factor that depends on each person's HIV state:
 
-The `HivIntervention` class allows control over **HIV prevalence and ART coverage** in the population. This is useful for scenario testing and simulating public health campaigns.
+| HIV state | Multiplier on TB progression |
+|-----------|------------------------------|
+| `atrisk` | 1 |
+| `acute` | 1.2202 |
+| `latent` | 1.9001 |
+| `aids` | 2.5955 |
 
-### Parameters
-
-- `use_prevalence` (bool): Whether to adjust HIV infection prevalence each step
-- `use_art` (bool): Whether to adjust ART coverage each step
-
-### What It Does
-
-- Applies changes to the **HIV state** of the population
-- Operates within a specified time range (`start` to `stop`)
-- Can be targeted to specific age groups or entire population
-
-```python
-intervention = HivInterventions(pars=dict(
-    use_prevalence=True,
-    use_art=True,
-    prevalence=0.2,
-    percent_on_ART=0.5,
-    min_age=15,
-    max_age=49,
-    start=ss.date('2000-01-01'),
-    stop=ss.date('2010-12-31'),
-))
-```
-
-Also, the parameters shown above are the same ones that you can modify in order to run a different scenario. 
-
----
-
-## TB-HIV Connector
-
-The `TB_HIV_Connector` class links the TB and HIV models, simulating the **comorbidity effect** of HIV on TB progression.
-
-### Purpose
-
-Modifies TB progression parameters based on an individual's **current HIV state**.
-
-### Risk Multiplier Table
-
-| HIV State | TB Progression Risk Multiplier |
-|-----------|-------------------------------|
-| `ACUTE`   | 1.5                           |
-| `LATENT`  | 2.0                           |
-| `AIDS`    | 3.0                           |
-
-### Behavior at Each Time Step
-
-1. Identify all **TB-infected** individuals.
-2. Look up their current **HIV state**.
-3. Apply a **multiplier** to their TB `rr_activation` value (risk of progressing to active TB).
-
----
-
-## Process Flow Diagram
+The multipliers can be changed, e.g. `tbsim.hiv_effects(tb, hiv, aids=3.0)`. ART has no direct effect on TB: it acts by slowing progression to `aids`, where the TB risk is highest.
 
 ```text
-+-----------------+
-|   TB Infection  |
-+-----------------+
-        |
-        v
-+-----------------+     +-----------------------+
-|  HIV Comorbidity| --> | HIV State (ACUTE,...) |
-+-----------------+     +-----------------------+
-        |                          |
-        |      TB_HIV_Connector    |
-        +-------------------------> Applies RR Multiplier
-                                   |
-                                   v
-                    +-------------------------------+
-                    | TB rr_activation Adjusted     |
-                    | Based on HIV State            |
-                    +-------------------------------+
+incidence, ART (art_start or ss.transfer)
+                  │
+                  v
+HIV state (atrisk, acute, latent, aids), on ART or not
+                  │
+                  │  tbsim.hiv_effects()
+                  v
+TB progression from latent infection to active TB
+     (the latent_asy and latent_non transitions)
 ```
 
----
-
-## Example Code
-
-
-# Example
+## Example
 
 ```{python}
-import tbsim
 import starsim as ss
-import sciris as sc
-import numpy as np
-import matplotlib.pyplot as plt# Rendering with Quatro
+import tbsim
 ```
 
-## Intervention
-Adding a function to simplify the generation of an intervention.
+### Creating the simulation
 
-This intervention will try to simulate a steady prevalence and on ART values along the entire simulation
-
-```{python}
-def make_hiv_intervention(pars=None):
-    if pars is None:
-        pars=dict(
-                use_prevalence=True,
-                use_art=True,
-                prevalence=0.30,            # Maintain 30 percent of the alive population infected
-                percent_on_ART=0.50,        # Maintain 50 percent of the % infected population on ART
-                min_age=15, max_age=60,     # Min and Max age of agents that can be hit with the intervention
-                start=ss.date('2000-01-01'), stop=ss.date('2035-12-31'),   # Intervention's start and stop dates
-        )
-    intervention = tbsim.HivInterventions(pars=pars)
-    return intervention
-```
-
-## Creating the simulation
+There is no HIV until 1990; HIV incidence then rises, peaks in the late 1990s, and falls after 2010. ART is delivered in 2005, 2010, 2015, and 2020, each time to half of the people with HIV (people already on ART stay on it):
 
 ```{python}
-
-def build_tbhiv_sim(simpars=None, tbpars=None, hivinv_pars=None) -> ss.Sim:
-    sim_pars = dict(
-        dt=ss.days(7),
-        start=ss.date('1980-01-01'),
-        stop=ss.date('2035-12-31'),
-        rand_seed=123,
-        verbose=0,
-    )
-    tb_pars = dict(
-        init_prev=ss.bernoulli(p=0.25),
-    )
-
-    hivinv_pars = hivinv_pars or dict(
-        use_prevalence=True,
-        use_art=True,
-        prevalence=0.20,
-        percent_on_ART=0.20,
-        min_age=15, max_age=49,
-        start=ss.date('2000-01-01'),
-        stop=ss.date('2010-12-31'),
-    )
-    hiv_intervention = make_hiv_intervention(hivinv_pars)
-    hiv = tbsim.HIV()
-    connector = tbsim.TB_HIV_Connector()
-    
-    tb = tbsim.TB(pars=tb_pars)
-    people = ss.People(n_agents=1_000)
-    network = ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=2), dur=0))
-
-    # --- Assemble Simulation ---
-    sim = ss.Sim(
-        people=people,
-        diseases=[tb, hiv],
-        interventions=[hiv_intervention], 
-        networks=network,
-        connectors=[connector],
-        pars=sim_pars,
+def make_sim():
+    tb = tbsim.TB(init=dict(infection=0.25)) # 25% start with a latent infection
+    incidence = ss.timeseries({
+        1980: ss.peryear(0.0),
+        1990: ss.peryear(0.01),
+        1995: ss.peryear(0.02),
+        2010: ss.peryear(0.005),
+    })
+    hiv = tbsim.HIV(incidence=incidence)
+    art = ss.transfer(art=True, coverage=0.5, years=[2005, 2010, 2015, 2020], eligible=hiv.acute | hiv.latent | hiv.aids)
+    sim = tbsim.Sim(
+        tb = tb,
+        diseases = hiv,
+        connectors = tbsim.hiv_effects(tb, hiv),
+        interventions = art,
+        start = 1980,
+        stop = 2035,
+        verbose = 0,
     )
     return sim
 ```
 
-## Running the simulation
+### Running the simulation
 
 ```{python}
-
-# Run the simulation: 
-sim = build_tbhiv_sim()
+sim = make_sim()
 sim.run()
 ```
 
-## Plot the results
+### Plotting the results
+
+`sim.plot()` shows the main TB results; the rise in active TB after 1990 is the effect of HIV:
 
 ```{python}
-
 sim.plot()
-plt.show()
 ```
 
+The HIV results are in `sim.results.hiv`, e.g. the number of people with HIV and HIV prevalence:
 
+```{python}
+sim.plot(key=['hiv_infected', 'hiv_hiv_prevalence'])
+```
+
+The number of people with HIV off ART and on it is `infected` split by the dimension `art`:
+
+```{python}
+on_art = sim.results.hiv.infected.by('art')
+on_art.plot()
+```
+
+```{python}
+res = sim.results
+print(f'HIV prevalence at the end: {res.hiv.hiv_prevalence[-1]:.1%}')
+print(f'Share of people with HIV on ART at the end: {on_art.values[-1, 1]/res.hiv.infected[-1]:.1%}')
+print(f'Active TB prevalence at the end: {res.tb.prevalence_active[-1]:.2%}')
+```

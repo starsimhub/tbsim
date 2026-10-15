@@ -3,261 +3,188 @@ title: How to create a TB simulation
 jupyter: python3
 ---
 
+## High-level steps
 
+Following Starsim's [getting started tutorial](https://docs.starsim.org/tutorials/t1_intro.html), we will go through the most common tasks for modeling an infectious disease, in our case TB:
 
-## High level steps
+1. Defining the simulation (the disease, the population, and how people mix)
+2. Running the simulation
+3. Plotting the results
 
-Following Starsim's [Getting Started tutorial](https://docs.starsim.org/tutorials/t1_intro.html), we will proceed with the most common tasks for modeling infectious diseases, in our case, TB:
-
-1. Defining parameters (Building the simulation):
-2. Running a simulation 
-3. Plotting results
-
-
-This notebook demonstrates how to create and run simulations for tuberculosis (TB) using the `tbsim` and `starsim` libraries. The simulations will model the spread and impact of TB over time on a population.
+This notebook shows how to create and run TB simulations with `tbsim` and `starsim`. `tbsim` provides the TB model and TB-specific tools; everything else (the simulation, networks, demographics, results, and plotting) comes from Starsim.
 
 ## Packages
 
-The code in this section imports the `starsim` package, which provides the capabilities to create and run simulations.
-Note that while `tbsim` enables some functionality, the full capabilities are provided by `starsim`.
-
 ```{python}
-
-# Import necessary libraries
 import tbsim
 import starsim as ss
 import matplotlib.pyplot as plt
-import numpy as np
 ```
 
+## The simplest simulation
 
-## Building the simulation
-
-In this case, in order to make our code reusable  we will encapsulate all our preparation steps in the following function, `make_tb`. This function puts together all what is needed for a simulation to run and returns a <b style="color: gold; "> simulation object</b> with a tuberculosis disease, methods, etc., and with user specified parameters. NOTE: Default values are generally specified as part of the __init__ method for each class, i.e. people, network, tb, etc.).
-
-
-### People:
-- Creates a population of 1,000 agents using the People class from the starsim (aliased as ss) library.
-
-### TB Disease
-- Defines the disease parameters for TB:
-    - beta: Transmission rate (default: 0.025 per year using ss.peryear()).
-    - init_prev: Initial prevalence of TB (default: 10% using ss.bernoulli()).
-- Initializes the TB model with these parameters using the tbsim library.
-- The TB class includes comprehensive disease progression with multiple states: latent (slow/fast), active (pre-symptomatic, smear positive/negative, extra-pulmonary), and treatment effects.
-
-### Network
-- Defines the network parameters:
-    - n_contacts: Number of contacts per agent, following a Poisson distribution with a mean (lambda) of 5.
-    - dur: Duration of contact (0 means end after one timestep).
-- Initializes a random network with these parameters.
-
-### Demographics
-
-The demographics section sets up two demographic processes for the simulation: pregnancy and death rates. These, define and incorporate key demographic events into the simulation model:
-
-- **Pregnancy**: Adds new agents to the population at a rate of 25 per 1,000 people. (TODO: Verify if this is done every time every step or if this is a one time event at set_prognoses)
-- **Deaths**: Removes agents from the population at a rate of 10 per 1,000 people. (same question as above)
-
-This setup ensures the simulation realistically accounts for population changes over time due to births and deaths.
-
-### Simulation Parameters and Initialization
-
-This part of the code defines the parameters for the simulation and initializes it using these parameters:
-
-1. **Defining Simulation Parameters**:
-    - **`dt = ss.days(7)`**: This defines the time step (`dt`) for the simulation. Here, `ss.days(7)` represents a weekly time step, so the simulation progresses in weekly increments.
-    - **`start = ss.date(1990,1,1)`**: This sets the starting date of the simulation to January 1, 1990.
-    - **`stop = ss.date(2020,1,1)`**: This sets the ending date of the simulation to January 1, 2020.
-
-2. **Initializing the Simulation**:
-    - **`tbsim.Sim`**: This is a convenience subclass of `starsim`'s `ss.Sim`, used to create a simulation object (it adds TB-specific conveniences such as `sim.get_tb()`).
-    - **Parameters**:
-        - **`people=pop`**: Specifies the population object created earlier.
-        - **`networks=net`**: Specifies the network object that describes how agents are connected.
-        - **`diseases=tb`**: Specifies the TB disease model initialized earlier.
-        - **`pars=sim_pars`**: Passes the simulation parameters defined above.
-        - **`demographics=dems`**: Specifies the list of demographic events (pregnancy and death rates).
-
-3. **Setting Verbosity**:
-    - This line adjusts how frequently the simulation prints its status updates.
-    - **`sim.pars.verbose = 0`**: This sets the verbosity to 0, which means no status updates will be printed during the simulation run.
-
-4. **Returning the Simulation Object**:
-    - This returns the initialized simulation object so that it can be run or further interacted with outside of the `make_tb` function.
-
+`tbsim.Sim` is an `ss.Sim` that comes with a TB model (`tbsim.TB`). TB parameters can be given to it directly, and go to the TB model. Here, `beta` is the number of effective contacts per person per year; by default, 5% of people start with a latent infection:
 
 ```{python}
-# Define the function to create a tuberculosis simulation
+ode = tbsim.Sim(beta=9, start=1990, stop=2020, label='ODE')
+ode.run()
+ode.plot()
+```
+
+With no contact network, people mix homogeneously, so the simulation runs as an ordinary differential equation (ODE) model of a population of `total_pop` people (100,000 by default). This takes well under a second, which makes it the best place to start exploring the model.
+
+## The TB model
+
+The TB model (the LSHTM spectrum-of-disease model) is declared as states and the transitions between them. The states are:
+
+- `susceptible`: never infected
+- `infection`: latent infection
+- `non_infectious`, `asymptomatic`, and `symptomatic`: active TB (the last two are infectious, asymptomatic TB less so, by the factor `trans_asymp`)
+- `treatment` and `treated`: on treatment, and after completing it
+- `cleared` and `recovered`: no longer infected, after clearing a latent infection or recovering from non-infectious TB
+
+The rates of the transitions are parameters (all per year), e.g. `inf_asy` (from latent infection to asymptomatic TB) or `sym_dead` (TB mortality). `tbsim.tb_pars()` lists every parameter with its default value:
+
+```{python}
+tbsim.tb_pars()
+```
+
+## Building an agent-based simulation
+
+The same model also runs with agents, which lets people be connected by a contact network and have individual histories. To make our code reusable, we put all the steps in a function, `make_tb()`, which returns a simulation:
+
+**People**: 5,000 agents, which represent the 100,000 people of the simulation (`total_pop`).
+
+**TB disease**: the TB model, with:
+
+- `beta`: the transmission rate per contact per year (with a network, `beta` is per contact rather than per person)
+- `init`: the share of people starting in each state; here 10% start with a latent infection
+- `mu=0`: by default, the TB model has its own background mortality, with births replacing every death; we turn this off, so that births and deaths come from the demographic modules below instead
+
+**Network**: a random network in which each agent has 5 contacts on average (`n_contacts`), which change every time step (`dur=0`).
+
+**Demographics**: births at a rate of 25 per 1,000 people per year (`ss.Births`) and deaths at 10 per 1,000 people per year (`ss.Deaths`), so the population grows over time.
+
+**Simulation parameters**: a weekly time step (`dt=ss.weeks(1)`), from 1990 to 2020.
+
+Since there is a network, the simulation runs with agents.
+
+```{python}
 def make_tb():
-    # --------------- People ----------
-    initial_population_size = 1000
-    pop = ss.People(n_agents=initial_population_size)
-    
-    # --------------- TB disease --------
-    # Using current default parameters from TB class
-    tb_pars = dict(  # Disease parameters
-        beta = ss.peryear(0.025),  # Updated to match current default
-        init_prev = ss.bernoulli(0.10),  # 10% initial prevalence
-        )
-    tb = tbsim.TB(tb_pars) # Initialize
-
-    # --------------- Network ---------
-    net_pars = dict(    # Network parameters
-        n_contacts=ss.poisson(lam=5),
-        dur = 0, # End after one timestep
-        )
-    net = ss.RandomNet(net_pars)  # Initialize a random network
-
-    # --------------- Demographics --------
-    dems = [
-        ss.Pregnancy(pars=dict(fertility_rate=25)), # Per 1,000 people
-        ss.Deaths(pars=dict(death_rate=10)), # Per 1,000 people
-    ]
-
-    # --------------- simulation -------
-    sim_pars= dict(
-        dt = ss.days(7),
-        start = ss.date(1990,1,1),
-        stop = ss.date(2020,1,1),
-        )
-    sim = tbsim.Sim(people=pop,
-                 networks=net,
-                 diseases=tb,
-                 pars=sim_pars,
-                 demographics=dems
-                 )   # initialize the simulation
-    sim.pars.verbose = 0 # Print status every 100 steps
+    """ Create an agent-based TB simulation """
+    tb = tbsim.TB(beta=3, init=dict(infection=0.10), mu=0)
+    net = ss.RandomNet(n_contacts=5, dur=0)
+    dems = [ss.Births(birth_rate=25), ss.Deaths(death_rate=10)]
+    sim = tbsim.Sim(
+        tb = tb,
+        networks = net,
+        demographics = dems,
+        n_agents = 5_000,
+        dt = ss.weeks(1),
+        start = 1990,
+        stop = 2020,
+        label = 'Agents',
+        verbose = 0,
+    )
     return sim
 ```
 
+### Run the simulation
 
-### Run the Simulation
-
-We will now create and run the first simulation using the `make_tb` function with the parameters set above. 
-
-Please note, at some point it may be convenient to parameterize the `make_tb` function and make it even more re-usable (for intance for scenarios creation).
+Now we create and run the simulation. `make_tb()` returns a `tbsim.Sim`, so we can use all the methods of `ss.Sim`, as well as TB conveniences such as `sim.get_tb()`.
 
 ```{python}
-
-# Create and run the first simulation
-sim = make_tb()  # Create the simulation - running make_tb returns a tbsim.Sim (a subclass of ss.Sim from the starsim library), so we can use all the methods of the ss.Sim class as well as tbsim.Sim conveniences like sim.get_tb()
-sim.run()        # Run the simulation 
+sim = make_tb()
+sim.run()
 ```
 
-## Analyzing The Results
+As the model grows, it may be convenient to give `make_tb()` arguments (e.g. for `beta`), to create scenarios.
 
+## Analyzing the results
 
-Let's first review the data that was generated (and is available in the results array). This collected data is specified in the `init_results()` method and then updated in the `update_results()` method of the TB class. The results include:
-
-- **State counts**: Number of individuals in each TB state (latent, active, infectious)
-- **Age-specific metrics**: Separate tracking for individuals 15+ years old
-- **Incidence and mortality**: New cases, deaths, and cumulative measures
-- **Epidemiological indicators**: Prevalence, incidence rates, and detection metrics
-
-For more detailed information, please refer to the official documentation at [Starsim Results API](https://docs.starsim.org/api/results.html).
+The results of the TB model are in `sim.results.tb`. For every state there is the number of people in it (e.g. `n_symptomatic`), and for every transition the number of people taking it in each time step (e.g. `latent_asy`, or `tb_death` for TB deaths), with its cumulative sum (e.g. `cum_tb_death`). There are also summary results: `new_infections`, `infectious` (asymptomatic and symptomatic TB), `active` (also non-infectious TB), and `prevalence_active` (infectious TB, as a share of everyone). For more information about results, see the [Starsim results API](https://docs.starsim.org/api/results.html).
 
 ```{python}
-tbr = sim.get_tb().results
-
-print("This is a dictionary of the results that you can plot: \n",tbr.keys())
+res = sim.results.tb
+print('The results that you can plot:\n', res.keys())
 ```
 
-now, below we show the plotting of a single channel (result):
+Each result has the times it was recorded at (`timevec`), so it is simple to plot a single one:
 
 ```{python}
-
-plt.plot(range(0,len(tbr['prevalence'])),tbr['prevalence'])
-plt.title("The most basic plotting sample \n TB Prevalence \n (raw data)")
+plt.figure()
+plt.plot(res.timevec, res.prevalence_active)
+plt.title('Prevalence of infectious TB')
+plt.show()
 ```
 
+## Plotting
 
-## <h1 style="color: orange; ">Plotting</h1>
-<p>Once you get familiar with the available data in the results array, you can proceed to plot your results using your favorite method.</p>
+Once you are familiar with the results, you can plot them in several ways.
 
-### <h3 style="color: lightblue; ">1: Using the starsim library</h3>
-<p>Plot the results of the simulation - inherited from the starsim library which is available under the diseases attribute of the simulation: <code> sim.plot() </code> </p>
+### Using Starsim
 
+`sim.plot()` plots a selection of the TB results; give it a list of names to choose others:
 
 ```{python}
 sim.plot()
+sim.plot(['tb_n_infection', 'tb_n_non_infectious', 'tb_n_asymptomatic', 'tb_n_symptomatic'])
 ```
 
-### Using TBSim plots:
-The `plot` function from tbsim can be used to create comprehensive plots:
-```python
-tbsim.plot({'single simulation': sim.results.flatten(), 'tb only results': sim.get_tb().results.flatten()})
-```
-where each key represents a scenario that will be plotted with a different color.
+### Using TBsim
 
-For more information, see the `plot` function documentation.
+`tbsim.plot()` plots many results at once, for one or more simulations, each in its own color. Here we compare the ODE with the agent-based simulation. They differ, since with a network `beta` means something else, and the agents' population grows. `select` chooses which results to plot (see the `tbsim.plot()` documentation for other ways to select them):
 
 ```{python}
-# Create comprehensive plots using tbsim's plot function
-tbsim.plot({'ALL SIM metrics': sim.results.flatten(),'TB ONLY metrics': sim.get_tb().results.flatten()}, n_cols=4, row_height=2 )
+tbsim.plot(ss.MultiSim([ode, sim]), select=['infectious', 'prevalence_active', 'new_infections', 'tb_death', 'n_infection', 'n_treatment'], n_cols=3, row_height=2)
 ```
 
 ### Using your own function
 
-Take a look at the sample below, it will show you how to access the results dataframe (dict) and how with a simple function you can plot your simulation's results.
+The results are arrays, so you can also plot them however you like:
 
 ```{python}
-# Method 3: Custom plotting using TB results directly
-fig = plt.figure()
-tb_results = sim.get_tb().results
-for rkey in ['n_INFECTION', 'n_NON_INFECTIOUS', 'n_ASYMPTOMATIC', 'n_SYMPTOMATIC', 'n_TREATMENT']:
-    plt.plot(tb_results['timevec'], tb_results[rkey], label=rkey.replace('n_', '').replace('_', ' ').title())
+plt.figure()
+for state in ['infection', 'non_infectious', 'asymptomatic', 'symptomatic']:
+    result = res[f'n_{state}']
+    plt.plot(res.timevec, result, label=result.label)
 plt.legend()
-plt.title("TB State Counts Over Time")
-plt.xlabel("Time")
-plt.ylabel("Number of Individuals")
+plt.title('People in each TB state')
+plt.xlabel('Time')
+plt.ylabel('Number of people')
+plt.show()
 ```
 
-## Additional Information
+## Additional information
 
-### Current TB Model Features
+### Front-loaded progression
 
-The TB model in this notebook uses the latest implementation from the `tbsim` library, which includes:
-
-- **Comprehensive Disease States**: The model tracks multiple TB states including latent (slow/fast progression), active (pre-symptomatic, smear positive/negative, extra-pulmonary), and treatment effects.
-
-- **Realistic Parameters**: Default parameters are based on epidemiological literature and include:
-  - Transmission rate: 0.025 per year
-  - Initial prevalence: 10% of population (as used in this tutorial)
-  - State-specific progression rates and mortality
-  - Treatment effects on transmission and mortality
-
-- **Age-Specific Tracking**: Separate metrics for individuals 15+ years old, important for TB epidemiology.
-
-- **Treatment Integration**: The model includes treatment effects that reduce transmission and prevent mortality.
-
-### Time-varying (front-loaded) progression
-
-By default the hazards of progressing from latent `INFECTION` to active TB are constant per year. Real household-contact data are instead *front-loaded*: most people who ever progress do so within about a year of infection. You can reproduce this by letting the `INFECTION → ASYMPTOMATIC` hazard decline exponentially with time since infection, `inf_asy(τ) = inf_asy · exp(−k_asy · τ)`, where `τ` is the number of years since the agent was infected (reinfection restarts the clock). This is controlled by a single new parameter, `k_asy` (per year); the analogous `k_non` does the same for `INFECTION → NON_INFECTIOUS`. Both default to `0`, which is exactly the constant-hazard model, so existing calibrations and results are unchanged.
+By default, the rates of progression from latent infection to active TB are constant. Real household-contact data are instead *front-loaded*: most people who ever progress do so within a year or two of infection. The model can reproduce this with a second, *remote* stage of latent infection: recent infections become remote at the rate `k_latent` (per year), after which they progress at the slower rates `inf_asy_remote` and `inf_non_remote`. Reinfection makes a remote infection recent again, with the relative risk `rr_reinfection_inf`. With `k_latent=0` (the default) there is no remote stage, which is the constant-rate model.
 
 ```python
-# Front-load progression to active TB (larger k_asy concentrates progression in year 1);
-# k_asy = 0 (the default) recovers the original constant-rate behaviour.
-tb = tbsim.TB(k_asy=6.0)
+# Most progression happens within a year or two of infection, and rarely after
+tb = tbsim.TB(k_latent=1.0, inf_asy_remote=0.002, inf_non_remote=0.005)
 ```
 
-### Reinfection of latent agents
+See `tbsim_examples/run_time_varying_progression.py` for a comparison with the cumulative risk of progression observed in cohorts.
 
-Latent (`INFECTION`) and non-infectious (`NON_INFECTIOUS`) agents can be reinfected: a re-exposure resets the agent's `ti_infected` clock (raising the progression hazard under front-loading) without otherwise changing its state. The relative susceptibility to reinfection in these states is set by `rr_reinfection_inf` (σ_L, defaults to `rr_reinfection_rec`) and `rr_reinfection_non` (σ_N, defaults to `rr_reinfection_inf`). Setting them to `0` closes reinfection of already-infected agents.
+### Reinfection
+
+People who are no longer infected can be infected again, with a risk relative to someone susceptible: `rr_reinfection_cleared` after clearing a latent infection (1 by default), `rr_reinfection_rec` after recovering from non-infectious TB (0.21), and `rr_reinfection_treat` after completing treatment (3.15). This protection (or extra risk) lasts for life, unless `dur_reinfection_protection` is given, after which people become susceptible again.
 
 ```python
-# Latent agents reinfect at the recovered-agent RR by default; set to 0 to disable.
-tb = tbsim.TB(rr_reinfection_inf=0.21, rr_reinfection_non=0.21)
+# No reinfection after recovery, and protection that lasts 10 years on average
+tb = tbsim.TB(rr_reinfection_rec=0, dur_reinfection_protection=ss.years(10))
 ```
 
-### Next Steps
+### Next steps
 
 To extend this simulation, you can:
-1. Add interventions (diagnostics, treatment programs, vaccination)
+
+1. Add interventions: diagnosis and treatment (`tbsim.care()`), vaccination (`tbsim.BCG()`), and preventive therapy (`tbsim.TPT()`)
 2. Include comorbidities (HIV, malnutrition)
-3. Modify network structures (household networks, spatial networks)
+3. Change the network structure (e.g. household networks)
 4. Run scenario analyses with different parameter sets
-5. Use the comprehensive analyzers for detailed epidemiological analysis
+5. Use analyzers for more detailed analyses (e.g. `tbsim.DwellTime`)
 
-For more advanced examples, see the other tutorials in this documentation.
-
+For more examples, see the other tutorials in this documentation.

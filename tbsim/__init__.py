@@ -11,4 +11,3 @@ from .networks import *
 from .analyzers import *
 from .plots import *
 from .sim import *
-# Not yet ported to Starsim v4: from .migration import *

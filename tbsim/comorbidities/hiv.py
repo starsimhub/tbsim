@@ -1,317 +1,98 @@
-"""Simplified HIV disease model and TB-HIV connector for co-infection simulations."""
-
-from enum import IntEnum
-import numpy as np
+"""
+HIV, declared as states and transitions (so that it runs as an ODE, as a stochastic compartmental model, or as agents), and its effect on TB
+"""
+import sciris as sc
 import starsim as ss
 import tbsim
 
-__all__ = ['HIVState', 'HIV', 'HivInterventions', 'hiv_effects']
-
-class HIVState(IntEnum):
-    """ HIV states: uninfected through advanced disease. """
-    ATRISK = 0   # Uninfected
-    ACUTE  = 1   # Newly infected (early stage)
-    LATENT = 2   # Chronic infection
-    AIDS   = 3   # Advanced disease
+__all__ = ['HIV', 'hiv_pars', 'hiv_effects']
 
 
-
-
-# HIV-positive states, for membership tests, e.g. ``hiv.state.isin(HIVState.INFECTED)``.
-HIVState.INFECTED = (HIVState.ACUTE, HIVState.LATENT, HIVState.AIDS)
+def hiv_pars():
+    """ The parameters of the HIV model """
+    return sc.objdict(
+        incidence       = ss.par(ss.peryear(0.0), bounds=[0, 0.2], doc='New HIV infections per person at risk per year'),
+        acute_to_latent = ss.perday(1/(7*12)),  # ACUTE -> LATENT (12 weeks)
+        latent_to_aids  = ss.perday(1/(365*8)), # LATENT -> AIDS (8 years)
+        art_start       = ss.peryear(0.0),      # The rate at which people with HIV start ART (0: none, or by a delivery, e.g. ss.transfer(art=True, coverage=0.8, years=[2010]))
+        art_progression = 0.1,                  # The multiplier on progression for people on ART
+    )
 
 
 class HIV(ss.Disease):
     """
-    A simplified agent-based HIV disease model for use with the Starsim framework.
+    A simple HIV model, declared as states and transitions
 
-    This model tracks HIV state progression through ACUTE, LATENT, and AIDS phases,
-    influenced by whether the agent is receiving ART (antiretroviral therapy).
+    People at risk (`atrisk`) are infected at a given incidence (`acute`), and progress
+    to chronic infection (`latent`) and advanced disease (`aids`). People with HIV are
+    stratified by `art`, whether they are on ART, which slows progression; new infections
+    start off ART. People start ART at the rate `art_start`, or by a delivery,
+    e.g. `ss.transfer(art=True, coverage=0.8, years=[2010])`.
+
+    Results, besides those of every state and transition: `infected` (people with HIV)
+    and `hiv_prevalence` (as a share of everyone). The number on ART is
+    `sim.results.hiv.infected.by('art')`.
 
     Args:
-        - init_prev: Initial probability of infection (ACUTE).
-        - init_onart: Probability of being on ART at initialization (if infected).
-        - acute_to_latent: Daily transition probability from ACUTE to LATENT.
-        - latent_to_aids: Daily transition probability from LATENT to AIDS.
-        - aids_to_dead: Daily transition probability from AIDS to DEAD (unused).
-        - art_progression_factor: Multiplier applied to progression probabilities for agents on ART.
+        pars (dict): parameters, by name (as `kwargs`)
+        init_prev (float): the share of people with (acute) HIV at the start
+        init_onart (float): the share of them on ART at the start
+        kwargs (dict): parameters, by name (see `hiv_pars()`): numbers (rates per day for the progression, per year for the others), or `ss.par` objects;
+            `incidence` can vary in time, e.g. `ss.timeseries({2000: ss.peryear(0.01), 2020: ss.peryear(0.002)})`
 
-    States:
-        - state: HIV progression state (ATRISK, ACUTE, LATENT, AIDS, DEAD).
-        - on_ART: Boolean indicating whether agent is on ART.
+    Examples::
 
-    Results:
-        - hiv_prevalence: Proportion of total agents with HIV.
-        - infected: Total number of HIV-positive agents.
-        - on_art: Number of agents on ART.
-        - atrisk, acute, latent, aids: Percent of population in each state.
-        - n_active: Total number of agents in ACUTE, LATENT, or AIDS states.
-
-    Example
-    -------
-    ::
-
-        import starsim as ss
-        from tbsim.comorbidities.hiv import HIV
-
-        sim = ss.Sim(diseases=HIV(), pars=dict(start='2000', stop='2020'))
-        sim.run()
+        hiv = tbsim.HIV(incidence=0.01, art_start=0.2, init_prev=0.1)
+        tb = tbsim.TB()
+        sim = ss.Sim(tb, diseases=hiv, connectors=tbsim.hiv_effects(tb, hiv), start=2000, stop=2030)
     """
-    def __init__(self, pars=None, **kwargs):
-        """Initialize with default HIV progression parameters; override via ``pars``."""
-        super().__init__(**kwargs)
-        # Define progression parameters (using a time step in weeks).
-        self.define_pars(
-            init_prev = ss.bernoulli(p=0.00),  # Initial prevalence of HIV
-            init_onart = ss.bernoulli(p=0.00),  # Initial probability of being on ART (if infected).
-            art_progression_factor  = 0.1, # Multiplier to reduce progression rates if on ART.
-            acute_to_latent       = ss.perday(1/(7*12)), # 1-np.exp(-1/8),  # 8 weeks
-            latent_to_aids        = ss.perday(1/(365*8)), # 1-np.exp(-1/416), # 416 weeks
+    def __init__(self, pars=None, init_prev=0.0, init_onart=0.0, name='hiv', **kwargs):
+        kwargs = sc.mergedicts(pars, kwargs)
+        p = tbsim.make_pars(hiv_pars(), kwargs)
+        atrisk = ss.State('atrisk', label='At risk')
+        acute  = ss.State('acute', label='Acute HIV')
+        latent = ss.State('latent', label='Chronic HIV')
+        aids   = ss.State('aids', label='AIDS')
+        infection = ss.Transition(atrisk, acute, rate=p.incidence, move=dict(art=False), name='infection')
+        to_latent = ss.Transition(acute, latent, rate=p.acute_to_latent, name='to_latent')
+        to_aids   = ss.Transition(latent, aids, rate=p.latent_to_aids, name='to_aids')
+        super().__init__(
+            atrisk, acute, latent, aids,
+            infection      = infection,
+            to_latent      = to_latent,
+            to_aids        = to_aids,
+            infected       = acute + latent + aids,
+            hiv_prevalence = (acute + latent + aids)/(atrisk | acute | latent | aids),
+            init           = dict(acute=init_prev),
+            name           = name,
         )
-        self.update_pars(pars, **kwargs)
-
-        # Define extra attributes for Agents of this disease.
-        self.define_states(
-            ss.FloatArr('state', default=HIVState.ATRISK),  # Column name to store HIV state.
-            ss.BoolArr('on_ART', default=False),            # Column name to store Whether agent is on ART.
-        )
-
-        self.dist_acute_to_latent = ss.bernoulli(p=self.p_acute_to_latent)
-        self.dist_latent_to_aids  = ss.bernoulli(p=self.p_latent_to_aids)
-
-        return
-
-    @staticmethod
-    def p_acute_to_latent(self, sim, uids):
-        """ Calculate probability of HIV ACUTE → LATENT transition. """
-        acute_to_latent = self.pars.acute_to_latent.to_prob()
-        art_factor = self.pars['art_progression_factor']
-        art_multiplier = np.where(self.on_ART[uids], art_factor, 1.0)
-        return acute_to_latent * art_multiplier
-
-    @staticmethod
-    def p_latent_to_aids(self, sim, uids):
-        """ Calculate probability of HIV LATENT → AIDS transition. """
-        latent_to_aids = self.pars.latent_to_aids.to_prob()
-        art_factor = self.pars['art_progression_factor']
-        art_multiplier = np.where(self.on_ART[uids], art_factor, 1.0)
-        return latent_to_aids * art_multiplier
-
-    def set_prognoses(self):
-        """ Assign initial HIV infection and ART status (called at t=0). """
-        uids = self.sim.people.auids
-
-        if not (self.state == HIVState.ACUTE).any():
-            initial_infected = self.pars.init_prev.filter(uids)
-            self.state[initial_infected] = HIVState.ACUTE
-
-        current = self.state[uids].copy()
-        if not self.on_ART.any():
-            infected = uids[current == HIVState.ACUTE]
-            initial_onart = self.pars.init_onart.filter(infected)
-            self.on_ART[initial_onart] = True
-
-        return
-
-    def step(self):
-        """ Progress HIV states; ART reduces transition probabilities. """
-        if self.sim.ti == 0:
-            # Set initial prognoses for all agents
-            self.set_prognoses()
-            return
-
-        uids = self.sim.people.auids
-        current = self.state[uids].copy()
-
-        # HIV ACUTE → LATENT:
-        hiv_ids = uids[current == HIVState.ACUTE]
-        self.state[self.dist_acute_to_latent.filter(hiv_ids)] = HIVState.LATENT
-
-        # HIV LATENT → AIDS:
-        latent_ids = uids[current == HIVState.LATENT]
-        self.state[self.dist_latent_to_aids.filter(latent_ids)] = HIVState.AIDS
-
-        return
-
-    def init_results(self):
-        """Define HIV result channels (prevalence, state counts, ART coverage)."""
-        super().init_results()
-        self.define_results(
-            ss.Result(name='hiv_prevalence', dtype=float, label='Prevalence (% Infected)'),
-            ss.Result(name='infected', dtype=int, label='Infected'),
-            ss.Result(name='on_art', dtype=float, label='On ART'),
-            ss.Result(name='atrisk', dtype=float, label='% ATRISK (Alive)'),
-            ss.Result(name='acute', dtype=float, label='% ACUTE'),
-            ss.Result(name='latent', dtype=float, label='% LATENT'),
-            ss.Result(name='aids', dtype=float, label='% AIDS'),
-        )
-
-        return
-
-    def update_results(self):
-        """Record HIV state distribution and ART counts for the current timestep."""
-        super().update_results()
-        ti = self.sim.ti
-        n_alive = np.count_nonzero(self.sim.people.alive)
-        res = self.results
-
-        if n_alive > 0:
-            res.hiv_prevalence[ti] = self.state.isin(HIVState.INFECTED).count() / n_alive
-        else:
-            res.hiv_prevalence[ti] = 0.0
-        res.infected[ti] = self.state.isin(HIVState.INFECTED).count()
-        res.atrisk[ti]     = np.count_nonzero(self.state == HIVState.ATRISK)/n_alive
-        res.acute[ti]      = np.count_nonzero(self.state == HIVState.ACUTE)/n_alive
-        res.latent[ti]     = np.count_nonzero(self.state == HIVState.LATENT)/n_alive
-        res.aids[ti]       = np.count_nonzero(self.state == HIVState.AIDS)/n_alive
-        res.on_art[ti]     = self.on_ART.count()
-
+        starts = isinstance(kwargs.get('art_start'), ss.par) or p.art_start.raw.value > 0 # Given to be fitted, or not zero
+        slow = [1.0, p.art_progression.raw]
+        move = dict(move=ss.transfer(art=True, rate=p.art_start)) if starts else {}
+        self.stratify(art=[False, True], states=['acute', 'latent', 'aids'], split=[1 - init_onart, init_onart], adjust=dict(to_latent=slow, to_aids=slow), **move)
         return
 
 
-class HivInterventions(ss.Intervention):
+def hiv_effects(tb, hiv, acute=1.2202, latent=1.9001, aids=2.5955):
     """
-    Adjust HIV prevalence and/or ART coverage in a simulated population at each
-    timestep within a date window.
-    """
+    The effect of HIV on TB: a multiplier on progression from latent infection to active TB, by HIV state
 
-    def __init__(self, pars=None, **kwargs):
-        """Initialize with target prevalence and ART coverage parameters."""
-        super().__init__(**kwargs)
-        self.define_pars(
-            use_prevalence=True,    # Whether to adjust HIV prevalence each step
-            use_art=True,           # Whether to adjust ART coverage each step
-            prevalence=0.20,        # Target prevalence of HIV in the population (20%)
-            percent_on_ART=0.775,   # % infected individuals on ART - https://pmc.ncbi.nlm.nih.gov/articles/PMC6772052/
-            min_age=0,              # Minimum age for prevalence (in years)
-            max_age=200,            # Maximum age for prevalence (in years)
-            start=ss.date('2000-01-01'),
-            stop=ss.date('2035-12-31'),
-        )
-        self.update_pars(pars, **kwargs)
-
-        return
-
-    def step(self):
-        """Adjust HIV prevalence and ART coverage to match targets each timestep."""
-        t = self.sim.now
-        if t < self.pars.start or t > self.pars.stop:
-            return
-        if self.pars.use_prevalence:
-            self._apply_prevalence()
-        if self.pars.use_art:
-            self._apply_onart()
-
-        return
-
-    def _apply_prevalence(self):
-        """Add or remove acute infections to match the target HIV prevalence."""
-        self.hiv = self.sim.diseases.hiv
-        alive = len(self.sim.people.alive)
-
-        target_prev = self.pars.prevalence(self.sim) if callable(self.pars.prevalence) else self.pars.prevalence
-        expected_infectious = int(np.round(alive * target_prev))
-        infectious_uids = self.hiv.state.isin(HIVState.INFECTED).uids
-        n_current = len(infectious_uids)
-        delta = expected_infectious - n_current
-        min_age = self.pars.min_age
-        max_age = self.pars.max_age
-
-        if delta > 0:
-            # Not enough infections → add more
-            at_risk_uids = (self.hiv.state == HIVState.ATRISK).uids
-            is_within_age_range = ((self.sim.people.age[at_risk_uids] >= min_age)
-                                 & (self.sim.people.age[at_risk_uids] <= (max_age if max_age is not None else np.inf)))
-
-            eligible = at_risk_uids[is_within_age_range]
-
-            if delta > len(eligible):
-                ss.warn(msg=f"Not enough eligible people to infect. Expected: {delta}, Available: {len(eligible)}")
-
-
-            n_to_add = min(delta, len(eligible))
-            if n_to_add:
-                dist = ss.randint(0, len(eligible), strict=False).init()
-                chosen = eligible[dist(n_to_add)]
-                self.hiv.state[chosen] = HIVState.ACUTE
-
-        elif delta < 0:
-            # Too many infections → revert some ACUTE cases to ATRISK
-            acute_uids = (self.hiv.state == HIVState.ACUTE).uids
-
-            if -delta > len(acute_uids):
-                ss.warn(msg=f"Not enough acute cases to revert. Expected: {-delta}, Available: {len(acute_uids)}")
-
-
-            n_to_remove = min(-delta, len(acute_uids))
-            if n_to_remove:
-                dist = ss.randint(0, len(acute_uids), strict=False).init()
-                chosen = acute_uids[dist(n_to_remove)]
-                self.hiv.state[chosen] = HIVState.ATRISK
-
-        return
-
-    def _apply_onart(self):
-        """Add or remove agents from ART to match the target coverage."""
-        self.hiv = self.sim.diseases.hiv
-
-        alive = len(self.sim.people.alive)
-        target_prev = self.pars.prevalence(self.sim) if callable(self.pars.prevalence) else self.pars.prevalence
-        expected_on_art = int(np.round(alive * self.pars.percent_on_ART * target_prev))
-
-        current_on_art = self.hiv.on_ART.uids
-        n_current = len(current_on_art)
-        delta = expected_on_art - n_current
-
-        if delta > 0:
-            # Need to add people to ART
-            candidates = ((~self.hiv.on_ART)
-                          & (self.hiv.state != HIVState.ATRISK)).uids
-            if delta > len(candidates):
-                # Raise a warning
-                ss.warn(msg=f"Not enough candidates for ART. Expected: {delta}, Available: {len(candidates)}")
-
-
-            n_to_add = min(delta, len(candidates))
-            if n_to_add:
-                dist = ss.randint(0, len(candidates), strict=False).init()
-                chosen = candidates[dist(n_to_add)]
-                self.hiv.on_ART[chosen] = True
-
-        elif delta < 0:
-            # Need to remove people from ART
-            if -delta > len(current_on_art):
-                ss.warn(msg=f"Not enough people on ART to remove. Expected: {-delta}, Available: {len(current_on_art)}")
-
-            n_to_remove = min(-delta, len(current_on_art))
-            if n_to_remove:
-                dist = ss.randint(0, len(current_on_art), strict=False).init()
-                chosen = current_on_art[dist(n_to_remove)]
-                self.hiv.on_ART[chosen] = False
-
-        return
-
-def hiv_effects(tb, acute=1.2202, latent=1.9001, aids=2.5955, hiv='hiv'):
-    """
-    The effect of HIV on TB: a multiplier on progression from latent infection to active TB, by HIV state (agents only)
-
-    Returns modifiers, to pass to the sim as `connectors`.
+    Returns modifiers, to pass to the sim as `connectors`. In a compartmental run, the states
+    of TB and HIV are then tracked jointly (see `ss.Crossing`).
 
     Args:
         tb (`tbsim.TB`): the TB model
+        hiv (`tbsim.HIV`): the HIV model
         acute, latent, aids (float): the multiplier for each HIV state (TODO: citation needed)
-        hiv (str): the name of the HIV module
 
     Example::
 
         tb = tbsim.TB()
-        sim = ss.Sim(tb, diseases=tbsim.HIV(), connectors=tbsim.hiv_effects(tb), interventions=tbsim.HivInterventions(), solver='abm')
+        hiv = tbsim.HIV(incidence=0.01, init_prev=0.1)
+        sim = ss.Sim(tb, diseases=hiv, connectors=tbsim.hiv_effects(tb, hiv))
     """
-    mults = {HIVState.ACUTE:acute, HIVState.LATENT:latent, HIVState.AIDS:aids}
-    def activation(sim):
-        states = sim.diseases[hiv].state[sim.people.auids]
-        rr = np.ones(len(states))
-        for state,mult in mults.items():
-            rr[states == state] = mult
-        return rr
-    return [ss.modify(tb.latent_asy, multiply=activation, name='hiv_latent_asy'), ss.modify(tb.latent_non, multiply=activation, name='hiv_latent_non')]
+    out = []
+    for state,mult in dict(acute=acute, latent=latent, aids=aids).items():
+        for tr in [tb.latent_asy, tb.latent_non]:
+            out.append(ss.modify(tr, multiply=mult, where=getattr(hiv, state), name=f'hiv_{state}_{tr.name}'))
+    return out

@@ -37,6 +37,8 @@ def tb_pars():
         p_relapse              = 0.0,              # The share of completed treatments that relapse to symptomatic TB
         dur_relapse            = ss.years(1.5),    # The time from the end of treatment to relapse
         mu                     = ss.peryear(1/70), # Background mortality, with births replacing every death (0: none, e.g. to use ss.Births and ss.Deaths as agents)
+        immigration            = ss.peryear(0.0),  # People arriving per year (a number, not per person), into the states given by immigrants=
+        emigration             = ss.peryear(0.0),  # People leaving, per person per year
     )
 
 
@@ -99,10 +101,12 @@ class TB(ss.Disease):
     `delta + phi`, in success for people with every strain cured.
 
     Args:
+        pars (dict): parameters, by name (as `kwargs`)
         init (dict): the number (or share) of people starting in each state (default: 5% with a latent infection)
         drugs (list): the drugs that strains can be resistant to (default: none, so one strain)
         max_strains (int): with drugs, the most strains anyone can carry at once
         strains (dict): with drugs, the share of each set of strains among people infected at the start (default: all drug-susceptible), e.g. `dict(DS=0.99, RIF=0.01)`
+        immigrants (dict): with `immigration`, the share of people arriving in each state (default: all susceptible), e.g. `dict(susceptible=0.7, infection=0.3)`
         kwargs (dict): parameters, by name (see `tb_pars()`, and `tbsim.resistance_pars()` with drugs): numbers (rates per year), or `ss.par` objects
 
     Examples::
@@ -113,7 +117,8 @@ class TB(ss.Disease):
 
         tb = tbsim.TB(drugs=['RIF', 'INH'], fitness=dict(RIF=0.6, INH=0.9), theta=0.5)
     """
-    def __init__(self, init=None, drugs=None, max_strains=2, strains=None, name='tb', **kwargs):
+    def __init__(self, pars=None, init=None, drugs=None, max_strains=2, strains=None, immigrants=None, name='tb', **kwargs):
+        kwargs = sc.mergedicts(pars, kwargs)
         res_kw = {key:kwargs.pop(key) for key in list(kwargs) if key in tbsim.resistance_pars()}
         if res_kw and not drugs:
             errormsg = f'The parameters {sc.strjoin(res_kw.keys())} are for drug resistance: give drugs= as well'
@@ -177,6 +182,17 @@ class TB(ss.Disease):
         T.births  = ss.birth('-> susceptible', rate=p.mu, name='births')
         T.replace = ss.null >> S.susceptible @ (p.sym_dead*S.symptomatic.n) # Births that replace TB deaths
         T.deaths  = ss.death(rate=p.mu, name='deaths')
+        migrates = lambda key: isinstance(kwargs.get(key), ss.par) or p[key].raw.value > 0 # Given to be fitted, or not zero
+        if migrates('immigration'): # People arriving from elsewhere, at ages like the population's
+            immigrants = sc.ifelse(immigrants, dict(susceptible=1.0))
+            total = sum(immigrants.values())
+            for key,share in immigrants.items():
+                T[f'immigrants_{key}'] = ss.immigration(f'-> {key}', rate=p.immigration*(share/total), name=f'immigrants_{key}')
+        elif immigrants is not None:
+            errormsg = 'immigrants= gives the states that people arrive in: give immigration= as well'
+            raise ValueError(errormsg)
+        if migrates('emigration'):
+            T.emigrants = ss.emigration(rate=p.emigration, name='emigrants')
 
         if drugs: # Strains resistant to them, as a dimension
             remote = ['remote_asy'] if front else []

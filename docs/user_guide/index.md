@@ -1,213 +1,55 @@
-# User Guide
+# User guide
 
-TBsim is a comprehensive tuberculosis simulation framework built on the Starsim platform, designed for modeling TB transmission, natural history, and intervention impacts in realistic populations.
+TBsim is a tuberculosis model built on Starsim. Its model of TB is declared as states and transitions, so the same model runs as an ODE, as a stochastic compartmental model, or as agents on contact networks, and its parameters can be fitted to data.
 
-## Core Framework
+## The model
 
-TBsim leverages the Starsim individual-based modeling framework with the following key capabilities:
+`tbsim.TB` is the LSHTM "spectrum of TB disease" model ([Schwalb et al. 2025](https://journals.plos.org/globalpublichealth/article?id=10.1371/journal.pgph.0005050)). Its states are:
 
-**Individual-Based Modeling (IBM)**  
-Each person in the simulation is represented as an individual agent with unique characteristics, health states, and behaviors.
+- **`susceptible`**: never infected
+- **`infection`**: latent infection
+- **`cleared`**, **`recovered`**, and **`treated`**: no longer infected, after clearing a latent infection, recovering from non-infectious TB, or completing treatment; each has its own risk of reinfection
+- **`non_infectious`**: subclinical TB that is not infectious
+- **`asymptomatic`**: infectious TB without symptoms
+- **`symptomatic`**: infectious TB with symptoms, from which people can die of TB
+- **`treatment`**: on treatment, which ends in completion or failure
 
-**Network-Based Transmission**  
-Social connections between individuals are modeled as networks, enabling realistic transmission dynamics through household and community structures.
-
-**Modular Architecture**  
-Components can be mixed and matched to create custom simulation scenarios with flexible parameterization.
-
-## TB Natural History and Disease States
-
-TBsim implements a comprehensive TB natural history model with the following disease states:
-
-**Core Disease States**
-
-- **Susceptible (NONE)**: No TB infection
-- **Latent TB (LATENT_SLOW/FAST)**: Two progression rates for latent infection
-- **Active Pre-symptomatic (ACTIVE_PRESYMP)**: Early active disease before symptoms
-- **Active Symptomatic Smear+ (ACTIVE_SMPOS)**: Most infectious form of TB
-- **Active Symptomatic Smear- (ACTIVE_SMNEG)**: Moderately infectious TB
-- **Extra-pulmonary TB (ACTIVE_EXPTB)**: TB outside the lungs
-- **Protected (PROTECTED)**: Protected state from vaccines or preventive therapy
-- **TB Death (DEAD)**: TB-related mortality
-
-**Transmission Dynamics**
-
-- Airborne transmission through social networks
-- Smear-based infectiousness (smear+ > smear- > extra-pulmonary)
-- Age-dependent transmission rates
-- Individual transmission heterogeneity
-- Household and community network structures
-
-## Diagnostic Capabilities
-
-TBsim includes comprehensive diagnostic modeling with multiple test types:
-
-**Available Diagnostic Tests**
-
-- **Xpert MTB/RIF**: Molecular testing for TB and rifampin resistance
-- **FujiLAM**: Urine-based testing for HIV+ individuals
-- **CAD CXR**: Computer-aided chest X-ray interpretation
-- **Oral Swab**: Non-sputum based testing
-
-**Diagnostic Features**
-
-- Age and HIV-specific sensitivity/specificity parameters
-- TB state-specific test performance
-- False negative handling with care-seeking multipliers
-- Enhanced diagnostic interventions with comprehensive result tracking
-
-## Treatment and Interventions
-
-**Drug Treatment**
-
-- **DOTS**: Directly Observed Treatment, Short-course implementation
-- **Latent Treatment**: TB Preventive Therapy (TPT) with multiple regimens
-- **Treatment Success/Failure**: Configurable treatment outcomes
-- **Treatment Relapse**: Post-treatment disease recurrence modeling
-
-**Preventive Interventions**
-
-- **BCG Vaccination**: Comprehensive BCG protection with age targeting
-- **TB Preventive Therapy (TPT)**: Household-based and individual TPT
-- **Vaccine Campaigns**: Mass vaccination strategies
-
-**Health Seeking Behavior**
-
-- Configurable care-seeking rates
-- Care-seeking multipliers for different populations
-- Re-seeking behavior after treatment failure
-- Age-dependent health seeking patterns
-
-## Disease Connectors and Co-infections
-
-TBsim includes sophisticated connectors to link TB with other diseases:
-
-**TB-HIV Co-infection**
-
-- **HIV State Integration**: Uses HIV disease states (ACUTE, LATENT, AIDS) to modify TB progression
-- **CD4-dependent Effects**: TB progression varies with HIV disease stage
-- **ART Effects**: Antiretroviral therapy impacts on TB natural history
-- **Risk Multipliers**: HIV increases TB activation risk (ACUTE: 1.22x, LATENT: 1.90x, AIDS: 2.60x)
-
-**TB-Malnutrition Integration**
-
-- **Comprehensive Malnutrition Modeling**: BMI-based nutritional status effects
-- **Nutrition-TB Connector**: Nutritional status impacts TB progression and treatment
-- **Supplementation Effects**: Nutritional intervention modeling
-
-## Drug Resistance and Multi-Strain TB
-
-TBsim includes an optional multi-strain, drug-resistance overlay (`tbsim.resistance`) built on the same agent-level natural history. `TBResistant` is a drop-in replacement for `TB` that encodes `2ⁿ` circulating strains over `n` named drugs as a per-agent bitmask, with:
-
-- **Per-drug fitness costs** — each drug carries a transmission fitness penalty, so resistant strains can be out-competed unless selected for.
-- **Superinfection and competition** — agents can carry multiple strains; a transmission/progression bottleneck governs which strain moves.
-- **De-novo and treatment-acquired resistance** — resistance can emerge by mutation at progression or on treatment failure, per drug.
-- **Strain-aware interventions** — treatment (`TxR` / `TxDeliveryR`), drug-susceptibility testing with regimen routing (`DST` / `DSTDelivery`), and preventive therapy (`TPTRx`) all resolve at the strain level.
-- **Origin decomposition** — the `ResistanceStats` analyzer attributes new resistant infections to de-novo, treatment-acquired, transmitted, and TPT-acquired channels.
-
-The agent-based model is validated against a deterministic two-strain reference ODE (`tbsim.compartmental.TwoStrainODE`). For a recipe-based how-to, see the [drug resistance user guide](resistance.qmd); for a hands-on, feature-by-feature walkthrough, see the [drug resistance tutorial](../tutorials/resistance_tutorial.qmd).
-
-## Networks and Social Structure
-
-**Network Types**
-
-- **Household Networks**: Family and household connections for transmission
-- **Trial-based Networks**: Framework for intervention trials
-- **Contact Networks**: Detailed contact tracing capabilities
-
-**Transmission Networks**
-
-- Household-based transmission modeling
-- Age-stratified contact patterns
-- Network-based intervention targeting
-
-## Analysis and Visualization Tools
-
-TBsim provides comprehensive analysis capabilities through the DWT (Dwell Time) Analyzer system:
-
-**Dwell Time Analysis**
-
-- **Real-time Tracking**: Records time spent in each TB state during simulation
-- **State Transition Analysis**: Detailed progression pathway tracking
-- **Statistical Analysis**: Comprehensive dwell time statistics
-
-**Visualization Capabilities**
-
-- **Sankey Diagrams**: Interactive state transition flows
-- **Network Graphs**: Transmission network visualization
-- **Interactive Plots**: Plotly-based interactive visualizations
-- **Kaplan-Meier Curves**: Survival analysis for TB progression
-- **Histogram Analysis**: Dwell time distribution analysis
-- **Reinfection Analysis**: Multiple infection episode tracking
-
-**Reporting Features**
-
-- **Treatment Events**: Comprehensive treatment outcome tracking
-- **Diagnostic Events**: Test result and diagnostic pathway analysis
-- **Mortality Events**: TB-related death tracking
-- **Age-stratified Reports**: Age-specific analysis capabilities
-- **TB-HIV Reports**: Co-infection specific reporting
-- **Household Analysis**: Household-level intervention impact assessment
-
-## Advanced Features
-
-**Multi-Scenario Analysis**
-
-- Run multiple parameter combinations simultaneously
-- Comparative analysis across intervention scenarios
-
-**Time-varying Parameters**
-
-- Dynamic parameter adjustment during simulation
-- Seasonal and temporal variation modeling
-
-**Trial Framework Support**
-
-- Household-based intervention trials
-- Randomized controlled trial simulation capabilities
-
-**Calibration and Optimization**
-
-- Automated parameter fitting to observed data
-- Intervention strategy optimization
-- Sensitivity analysis for parameter uncertainty
-
-## Running Simulations
-
-Basic simulation workflow:
-
-1. **Setup**: Configure TB model, networks, and interventions
-2. **Initialize**: Create population with demographic data
-3. **Run**: Execute simulation with real-time analysis
-4. **Analyze**: Process results with comprehensive visualization tools
-5. **Export**: Save results for further analysis and reporting
-
-**Example Usage**
+Its parameters (`tbsim.tb_pars()`) are rates per year. Optional parts are front-loaded progression (`k_latent`, a remote latent stage), relapse after treatment (`p_relapse`), waning protection after clearance (`dur_reinfection_protection`), and migration (`immigration`, `emigration`). Births replace deaths unless `mu=0`.
 
 ```python
-import starsim as ss
-import sciris as sc
 import tbsim
 
-# Synthetic DHS-style household data (hh_id + comma-separated ages per household)
-dhs_data = sc.dataframe(
-    hh_id=[0, 1, 2],
-    ages=['72, 17, 30', '37', '13, 55, 36'],
-)
-
-# Create simulation with TB model and analyzer
-sim = ss.Sim(
-    diseases=[tbsim.TB()],
-    networks=ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False),
-    analyzers=[tbsim.DwellTime(scenario_name="Baseline")]
-)
+sim = tbsim.Sim(beta=12, start=2000, stop=2030)  # An ODE
 sim.run()
-
-# Generate comprehensive analysis plots
-analyzer = sim.analyzers[0]
-analyzer.plot('sankey')
-analyzer.plot('network')
-analyzer.plot('kaplan_meier')
+sim.plot()
 ```
 
-For specific examples and tutorials, see the [examples](examples.qmd) and [tutorials](../tutorials/index.md) sections.
+With no network, people mix homogeneously and the sim runs as an ODE; `solver='abm'`, or a network such as `ss.RandomNet()`, runs it as agents.
+
+## Diagnosis and treatment
+
+- **Tests**: `tbsim.Xpert()`, `tbsim.OralSwab()`, `tbsim.FujiLAM()`, and `tbsim.CAD()` are `ss.Test` products whose sensitivity depends on the TB state and on age; `tbsim.test()` makes one from a table of your own.
+- **The care cascade**: `tbsim.care(tb)` has people with symptomatic TB seek care, be tested, and start treatment if they test positive.
+- **Regimens**: `tbsim.regimen('dots')` gives the model's treatment parameters (completion, failure, and relapse) for a regimen.
+
+## Prevention
+
+- **BCG**: `tbsim.BCG()` is an `ss.Vaccine` that slows progression, speeds recovery, and lowers TB mortality, delivered with `ss.vaccinate()`.
+- **Preventive therapy**: `tbsim.TPT()` is an `ss.Treatment` that slows progression from latent infection while it protects, delivered with `ss.treat()`.
+
+## Comorbidities
+
+- **HIV**: `tbsim.HIV()`, with HIV infection at a given (possibly time-varying) incidence and ART started at a rate or by `ss.transfer()`, and `tbsim.hiv_effects(tb, hiv)`, modifiers that raise progression to active TB by HIV state (as an ODE or as agents).
+- **Malnutrition**: `tbsim.Malnutrition()` with `tbsim.nutrition_effects(tb)`, modifiers on susceptibility, progression, and clearance, and `tbsim.supplementation_rr()` for nutritional supplements.
+
+## Drug resistance
+
+`tbsim.TB(drugs=['RIF', 'INH'])` has a strain for each set of drugs it is resistant to, and people can carry several strains at once. Resistant strains can be less fit, are acquired on progression and during treatment, and are cured less often; results are read by strain (`sim.results.tb.n_symptomatic.by('resistance')`, `tbsim.resistant_share(sim)`). `tbsim.LSHTMResistant` is the reference two-strain model. See the [drug resistance user guide](resistance.qmd) and the [drug resistance tutorial](../tutorials/resistance_tutorial.qmd).
+
+## Analysis
+
+- **Dwell times**: `tbsim.DwellTime` records how long agents spend in each state, with histograms, Kaplan-Meier curves, and state-transition networks (`analyzer.plot('kaplan_meier')`).
+- **Households**: `tbsim.HouseholdStats` summarizes transmission within households.
+- **Fitting**: every parameter is an `ss.par`, so `sim.calibrate()` can fit those with bounds to data.
+
+For examples and tutorials, see the [examples](examples.qmd) and [tutorials](../tutorials/index.md).

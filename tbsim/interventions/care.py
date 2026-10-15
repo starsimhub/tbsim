@@ -27,7 +27,7 @@ def test(kind='xpert', by_age=True, specificity=1.0, **kwargs):
     Args:
         kind (str/dict): one of `tbsim.tests` ('xpert', 'oralswab', 'fujilam', 'cad'), or a dict of the
             probability of a positive result for each state, as [children, adults]
-        by_age (bool): whether the sensitivity differs by age; needs the TB model to be stratified by age at 15 (as `tbsim.TB` is by default). If False, the adult values are used
+        by_age (bool): whether the sensitivity differs by age; needs the TB model to be stratified by age at 15 (`tb.stratify(age=[0, 15])`). If False, the adult values are used
         specificity (float): the probability that someone without active TB tests negative
         kwargs (dict): passed to `ss.Test`, e.g. `cost=` or `delay=`
     """
@@ -82,7 +82,7 @@ def care(tb, test=None, seeking=ss.perday(0.1), eligible=None, every=ss.weeks(1)
 
     Args:
         tb (`tbsim.TB`): the TB model
-        test (`ss.Test`): the test (default: `tbsim.Xpert()`)
+        test (`ss.Test`): the test (default: `tbsim.Xpert()`, by age if the model is stratified by age at 15)
         seeking (rate): the rate at which eligible people seek care
         eligible (Cond): who seeks care (default: people with symptomatic TB)
         every (dur): how often the rounds are; shorter is closer to seeking care at any time
@@ -93,7 +93,10 @@ def care(tb, test=None, seeking=ss.perday(0.1), eligible=None, every=ss.weeks(1)
     Returns:
         An `ss.screen` delivery
     """
-    test = sc.ifelse(test, Xpert())
+    if test is None:
+        ages = [strat.edges for strat in tb.graph.strats if strat.kind == 'age']
+        by_age = len(ages) == 1 and ages[0] is not None and list(ages[0]) == [0, 15]
+        test = Xpert(by_age=by_age)
     eligible = sc.ifelse(eligible, tb.symptomatic)
     p_seek = float(seeking.to_prob(every)) if isinstance(seeking, ss.TimePar) else float(seeking) # The chance of seeking care in each round
     start_treatment = ss.treat(ss.Treatment(efficacy=1.0, transition='diagnosis', name=f'{name}_tx'), coverage=treat)

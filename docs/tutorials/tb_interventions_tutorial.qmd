@@ -1,446 +1,325 @@
 ---
-title: TB Interventions Tutorial
+title: TB interventions tutorial
 jupyter: python3
 ---
 
-
-This notebook demonstrates how to create and run tuberculosis (TB) simulations with various interventions using the `tbsim` and `starsim` libraries. We'll explore different intervention strategies including BCG vaccination and Tuberculosis Preventive Therapy (TPT).
-
+This tutorial shows how to create and run tuberculosis (TB) simulations with interventions using `tbsim` and `starsim`. We'll explore several intervention strategies: BCG vaccination, TB preventive therapy (TPT), a change in transmission over time, and the care cascade (seeking care, diagnosis, and treatment).
 
 ## Overview
 
 In this tutorial, you will learn:
 
-1. **Building TB simulations** with intervention capabilities
-2. **Defining different intervention scenarios** (BCG, TPT, Beta changes)
+1. **Building TB simulations** with interventions
+2. **Defining intervention scenarios** (BCG, TPT, a change in transmission, and the care cascade)
 3. **Running multiple scenarios** and comparing results
 4. **Visualizing intervention impacts** on TB transmission
 
-The tutorial is based on the `run_tb_interventions.py` script and provides a comprehensive introduction to TB intervention modeling.
+The tutorial is based on the `run_tb_interventions.py` example script.
 
-## Required Packages
+Interventions in TBsim are Starsim products and deliveries: a product says *what* is given (`tbsim.BCG()`, `tbsim.TPT()`, a test such as `tbsim.Xpert()`), and a delivery says *who* gets it and *when* (`ss.vaccinate()`, `ss.treat()`, `ss.screen()`). Each product acts on the transitions of the TB model for the people who hold it, e.g. BCG slows progression from latent infection to active TB.
+
+## Required packages
 
 First, let's import the necessary libraries:
 
 ```{python}
-import tbsim
-import starsim as ss
-import sciris as sc
-import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
-
-# Set up plotting
-plt.style.use('default')
-plt.rcParams['figure.figsize'] = (12, 8)
-plt.rcParams['font.size'] = 12
+import matplotlib.pyplot as plt
+import sciris as sc
+import starsim as ss
+import tbsim
 ```
 
-## Default Parameters
+## Default parameters
 
-Let's define the default parameters for our simulations:
+Let's define the default parameters for our simulations. The sims run as agents (`solver='abm'`), with 10,000 agents standing for a population of 100,000 people who mix homogeneously; to use a contact network instead, pass one with `networks=`, e.g. `ss.RandomNet()`. A quarter of people start with a latent TB infection, and treatment follows the DOTS regimen (`tbsim.regimen('dots')` gives the parameters of the TB model for it).
 
 ```{python}
-# Simple default parameters for simulation
-DEFAULT_SPARS = dict(
-    dt=ss.days(7),
-    start=ss.date('1975-01-01'),
-    stop=ss.date('2030-12-31'),
-    rand_seed=123,
-    verbose=0,
+sim_pars = dict(
+    start     = '1975-01-01',
+    stop      = '2030-12-31',
+    dt        = ss.months(1),
+    solver    = 'abm',
+    n_agents  = 10_000,
+    rand_seed = 123,
+    verbose   = 0,
 )
 
-# Default TB parameters
-DEFAULT_TBPARS = dict(
-    beta=0.0025,  # Use simple float value
-    init_prev=0.25,  # Use simple float value
-    dt=ss.days(7),      
-    start=ss.date('1975-02-01'),
-    stop=ss.date('2030-12-31'),
+tb_pars = dict(
+    init = dict(infection=0.25, symptomatic=0.005),
+    **tbsim.regimen('dots'),
 )
 
-# Simple age distribution
-age_data = pd.DataFrame({
-    'age': [0, 2, 4, 10, 15, 20, 30, 40, 50, 60, 70, 80],
-    'value': [20, 10, 25, 15, 10, 5, 4, 3, 2, 1, 1, 1]  # Skewed toward younger ages
-})
+print('Simulation parameters:')
+for key, value in sim_pars.items():
+    print(f'  {key}: {value}')
 
-print("Default simulation parameters:")
-for key, value in DEFAULT_SPARS.items():
-    print(f"  {key}: {value}")
-
-print("\nDefault TB parameters:")
-for key, value in DEFAULT_TBPARS.items():
-    print(f"  {key}: {value}")
-
-print("\nAge distribution:")
-print(age_data)
+print('\nTB parameters:')
+for key, value in tb_pars.items():
+    print(f'  {key}: {value}')
 ```
 
-## Building the Simulation Function
+## Building the simulation function
 
-Now let's create a function that builds a complete TB simulation with intervention capabilities:
+Each intervention needs the TB model it acts on (e.g. to be eligible for TPT, people must have a latent infection, `tb.infection`) and the people (e.g. BCG is for children, `ppl.age < 5`), so we write a small function for each that makes it from those:
 
 ```{python}
-def build_sim(scenario=None, spars=None):
+def bcg(tb, ppl, coverage=0.8, start=1980, stop=2020, max_age=5):
+    """ BCG vaccination: each child under max_age is offered it once """
+    return ss.vaccinate(tbsim.BCG(), eligible=ppl.age < max_age, coverage=coverage, start=start, stop=stop, name='bcg_vx')
+
+def tpt(tb, ppl, coverage=0.7, start=1990, stop=2025, min_age=15):
+    """ TB preventive therapy: yearly rounds for adults with a latent infection """
+    return ss.treat(tbsim.TPT(), eligible=tb.infection & (ppl.age >= min_age), coverage=coverage, interval=ss.years(1), start=start, stop=stop, name='tpt_tx')
+
+def beta_change(tb, ppl, years=(1990, 2000), by=(0.5, 1.4)):
+    """ Transmission multiplied by each value from each year on """
+    return ss.change(tb.pars.beta, at=list(years), by=list(by), name='beta_change')
+
+def care(tb, ppl, seeking=ss.peryear(1), start=1990):
+    """ The care cascade: people with symptomatic TB seek care, are tested with Xpert, and start treatment """
+    return tbsim.care(tb, seeking=seeking, every=ss.months(1), start=start)
+
+intervention_makers = dict(bcg=bcg, tpt=tpt, betabyyear=beta_change, care=care)
+```
+
+Now let's create a function that builds a complete TB simulation for a scenario:
+
+```{python}
+def build_sim(scenario=None):
     """
-    Build and return a complete Starsim-based simulation instance for TB modeling,
-    incorporating optional interventions and user-defined parameters.
-    
+    Build a TB simulation for a scenario
+
     Args:
-        scenario (dict, optional): A dictionary defining scenario-specific components,
-            such as intervention parameters and TB simulation settings.
-        spars (dict, optional): General simulation parameters.
-    
-    Returns:
-        ss.Sim: A fully initialized simulation object
-    """
-    scenario = scenario or {}
-    
-    # Merge parameters
-    spars = {**DEFAULT_SPARS, **(spars or {})}
-    tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})}
-    
-    # Create interventions list
-    interventions = []
-    
-    # Add BCG interventions (can be single or multiple)
-    bcg_params = scenario.get('bcgintervention')
-    if bcg_params:
-        if isinstance(bcg_params, dict):
-            # Single BCG intervention
-            interventions.append(tbsim.BCGRoutine(pars=bcg_params))
-        elif isinstance(bcg_params, list):
-            # Multiple BCG interventions
-            for i, params in enumerate(bcg_params):
-                params['name'] = f'BCG_{i}'  # Give unique name
-                interventions.append(tbsim.BCGRoutine(pars=params))
-    
-    # Add TPT interventions (can be single or multiple)
-    tpt_params = scenario.get('tptintervention')
-    if tpt_params:
-        if isinstance(tpt_params, dict):
-            # Single TPT intervention
-            interventions.append(tbsim.TPTSimple(pars=tpt_params))
-        elif isinstance(tpt_params, list):
-            # Multiple TPT interventions
-            for i, params in enumerate(tpt_params):
-                params['name'] = f'TPT_{i}'  # Give unique name
-                interventions.append(tbsim.TPTSimple(pars=params))
-    
-    # Add Beta interventions (can be single or multiple)
-    beta_params = scenario.get('betabyyear')
-    if beta_params:
-        if isinstance(beta_params, dict):
-            # Single Beta intervention
-            interventions.append(tbsim.BetaByYear(pars=beta_params))
-        elif isinstance(beta_params, list):
-            # Multiple Beta interventions
-            for i, params in enumerate(beta_params):
-                params['name'] = f'Beta_{i}'  # Give unique name
-                interventions.append(tbsim.BetaByYear(pars=params))
-    
-    # Create simulation components
-    pop = ss.People(n_agents=500, age_data=age_data)
-    tb = tbsim.TB(pars=tbpars)
-    networks = [
-        ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0})
-    ]
-    
-    # Create and return simulation
-    return ss.Sim(
-        people=pop,
-        networks=networks,
-        interventions=interventions,
-        diseases=[tb],
-        pars=spars,
-    )
+        scenario (dict): the scenario: its 'name', any 'tbpars' to change, and the parameters of each intervention, by its key in intervention_makers
 
-print("Simulation builder function created successfully!")
+    Returns:
+        tbsim.Sim: the simulation, ready to run
+    """
+    scenario = sc.mergedicts(scenario)
+    ppl = ss.People(n_agents=sim_pars['n_agents'])
+    tb = tbsim.TB(**sc.mergedicts(tb_pars, scenario.get('tbpars')))
+    tb.stratify(age=[0, 15]) # By age, for the sensitivity of the tests in children and adults
+    interventions = [make(tb, ppl, **scenario[key]) for key,make in intervention_makers.items() if key in scenario]
+    return tbsim.Sim(people=ppl, tb=tb, interventions=interventions, label=scenario.get('name'), **sim_pars)
 ```
 
-## Defining Intervention Scenarios
+## Defining intervention scenarios
 
-Let's create a function that defines different intervention scenarios:
+Let's define the scenarios:
 
 ```{python}
 def get_scenarios():
-    """
-    Define a set of simulation scenarios for evaluating TB interventions.
-    
-    Returns:
-        dict: A dictionary where each key is the name of a scenario and the value is 
-        a dictionary of simulation parameters.
-    """
-    
+    """ The scenarios: each is a dict of the scenario's name, and the parameters of each of its interventions """
     return {
-        'Baseline': {
-            'name': 'No interventions',
-            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
-        },
-        'Single BCG': {
-            'name': 'Single BCG intervention',
-            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
-            'bcgintervention': dict(
-                coverage=0.8,
-                start=ss.date('1980-01-01'),
-                stop=ss.date('2020-12-31'),
-                age_range=[1, 5],
-            ),
-        },
-        'TPT Intervention': {
-            'name': 'TPT intervention',
-            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
-            'tptintervention': dict(
-                coverage=0.7,
-                start=ss.date('1990-01-01'),
-                stop=ss.date('2025-12-31'),
-                age_range=[15, 65],
-            ),
-        },
-        'Beta Change': {
-            'name': 'Beta transmission rate change',
-            'tbpars': dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
-            'betabyyear': dict(
-                years=[1990, 2000], 
-                x_beta=[0.5, 1.4]
-            )
-        },
+        'Baseline': dict(
+            name = 'No interventions',
+        ),
+        'Single BCG': dict(
+            name = 'BCG vaccination',
+            bcg  = dict(coverage=0.8, start=1980, stop=2020, max_age=5),
+        ),
+        'TPT': dict(
+            name = 'TB preventive therapy',
+            tpt  = dict(coverage=0.7, start=1990, stop=2025),
+        ),
+        'Beta change': dict(
+            name       = 'Change in transmission',
+            betabyyear = dict(years=[1990, 2000], by=[0.5, 1.4]),
+        ),
+        'Care cascade': dict(
+            name = 'Care cascade',
+            care = dict(seeking=ss.peryear(1), start=1990),
+        ),
     }
 
-# Display the scenarios
 scenarios = get_scenarios()
-print("Available scenarios:")
+print('Available scenarios:')
 for name, scenario in scenarios.items():
-    print(f"\n{name}: {scenario['name']}")
-    if 'bcgintervention' in scenario:
-        print(f"  - BCG intervention: {scenario['bcgintervention']}")
-    if 'tptintervention' in scenario:
-        print(f"  - TPT intervention: {scenario['tptintervention']}")
-    if 'betabyyear' in scenario:
-        print(f"  - Beta change: {scenario['betabyyear']}")
+    print(f'\n{name}: {scenario["name"]}')
+    for key in intervention_makers:
+        if key in scenario:
+            print(f'  - {key}: {scenario[key]}')
 ```
 
-## Running a Single Scenario
+## Running a single scenario
 
-Let's start by running a single baseline scenario to understand the basic simulation:
+Let's start by running the baseline scenario:
 
 ```{python}
-# Run baseline scenario
-print("Running baseline scenario...")
-baseline_scenario = scenarios['Baseline']
-baseline_sim = build_sim(scenario=baseline_scenario)
+baseline_sim = build_sim(scenarios['Baseline'])
 baseline_sim.run()
 ```
 
-## Exploring Baseline Results
+## Exploring baseline results
 
-Let's examine the baseline simulation results:
+The results of the TB model are in `sim.results.tb`: the number in each state (`n_infection`, `n_symptomatic`, ...), the number of people making each transition (`transmission`, `tb_death`, `diagnosis`, ...) and its cumulative total (`cum_tb_death`, ...), and summaries such as `infectious`, `active`, and `prevalence_active`:
 
 ```{python}
-# Get baseline results
-baseline_results = baseline_sim.results.flatten()
+res = baseline_sim.results.tb
+print('TB results:')
+print(sc.strjoin(res.keys()))
 
-# Display available result keys
-print("Available result metrics:")
-for key in baseline_results.keys():
-    print(f"  - {key}")
-
-# Show some key metrics
-print("\nKey TB metrics:")
-tb_metrics = [key for key in baseline_results.keys() if 'tb' in key.lower()]
-for metric in tb_metrics[:10]:  # Show first 10 TB metrics
-    value = baseline_results[metric]
-    if hasattr(value, '__len__') and len(value) > 0:
-        print(f"  {metric}: {value[-1]:.3f} (final value)")
-    else:
-        print(f"  {metric}: {value}")
+print('\nKey TB results at the end:')
+for key in ['n_infection', 'active', 'infectious', 'prevalence_active', 'cum_tb_death', 'cum_infections']:
+    print(f'  {key}: {res[key][-1]:,.4g}')
 ```
 
-## Plotting Baseline Results
+## Plotting baseline results
 
-Let's create some basic plots to visualize the baseline TB dynamics:
+`sim.plot()` plots a selection of the TB results:
 
 ```{python}
 baseline_sim.plot()
+plt.show()
 ```
 
-## Running Multiple Scenarios
+## Running multiple scenarios
 
-Now let's run multiple scenarios to compare the effects of different interventions:
+Now let's run several scenarios and compare them. `ss.MultiSim` runs a list of sims (here one after another, with `parallel=False`) and plots them together:
 
 ```{python}
 def run_scenarios(scenario_names=None, plot=True):
-    """Run multiple scenarios and optionally plot results."""
-    
+    """ Run several scenarios, and optionally plot them together """
     all_scenarios = get_scenarios()
-    
-    if scenario_names is None:
-        scenario_names = ['Baseline', 'Single BCG', 'TPT Intervention']
-    
-    results = {}
-    
-    for name in scenario_names:
-        if name in all_scenarios:
-            print(f"\nRunning: {name}")
-            scenario = all_scenarios[name]
-            sim = build_sim(scenario=scenario)
-            sim.run()
-            results[name] = sim.results.flatten()
-        else:
-            print(f"Warning: Scenario '{name}' not found")
-    
+    scenario_names = sc.ifelse(scenario_names, list(all_scenarios.keys()))
+    sims = [build_sim(sc.mergedicts(all_scenarios[name], dict(name=name))) for name in scenario_names]
+    msim = ss.MultiSim(sims)
+    msim.run(parallel=False)
     if plot:
-        tbsim.plot(results)
-    
-    return results
-
-# Run selected scenarios
-selected_scenarios = ['Baseline', 'Single BCG']
-
+        msim.plot(key=['tb_infectious', 'tb_prevalence_active', 'tb_new_infections', 'tb_cum_tb_death'])
+        plt.show()
+    return msim
 ```
 
-## Creating Comparison Plots
+## Creating comparison plots
 
-Let's create a function to compare results across different scenarios:
+Let's run every scenario and plot the results together:
 
 ```{python}
-
-results = run_scenarios(selected_scenarios, plot=True)
-
-# print(f"\nCompleted {len(results)} scenarios successfully!")
+msim = run_scenarios()
 ```
 
-## Intervention Impact Analysis
+BCG and TPT both slow progression from latent infection to active TB, so they lower TB gradually; the care cascade finds and treats people with symptomatic TB, which also stops them from transmitting, so it lowers TB the most. Halving transmission lowers TB for a decade, and transmission 1.4 times higher from 2000 raises it well above the baseline.
 
-Let's analyze the impact of interventions by calculating key metrics:
+## Intervention impact analysis
+
+Let's analyze the impact of each intervention by comparing key results with the baseline:
 
 ```{python}
-def analyze_intervention_impact(results):
-    """Analyze the impact of interventions compared to baseline."""
-    
-    if 'Baseline' not in results:
-        print("Warning: Baseline scenario not found for comparison")
+def analyze_intervention_impact(msim):
+    """ Compare the results of each scenario with the baseline """
+    sims = {sim.label:sim for sim in msim.sims}
+    if 'Baseline' not in sims:
+        print('Warning: no baseline scenario to compare with')
         return
-    
-    baseline = results['Baseline']
-    
-    print("Intervention Impact Analysis (compared to Baseline):")
-    print("=" * 60)
-    
-    for name, result in results.items():
+    base = sims['Baseline'].results.tb
+
+    print('Intervention impact (compared with the baseline):')
+    print('=' * 60)
+    for name, sim in sims.items():
         if name == 'Baseline':
             continue
-            
-        print(f"\n{name}:")
-        
-        # Compare final prevalence
-        if 'tb_prevalence' in result and 'tb_prevalence' in baseline:
-            baseline_final = baseline['tb_prevalence'][-1]
-            intervention_final = result['tb_prevalence'][-1]
-            reduction = ((baseline_final - intervention_final) / baseline_final) * 100
-            print(f"  Final TB Prevalence: {intervention_final:.3f} (vs {baseline_final:.3f})")
-            print(f"  Prevalence Reduction: {reduction:.1f}%")
-        
-        # Compare cumulative deaths
-        if 'tb_deaths' in result and 'tb_deaths' in baseline:
-            baseline_deaths = np.sum(baseline['tb_deaths'])
-            intervention_deaths = np.sum(result['tb_deaths'])
-            death_reduction = ((baseline_deaths - intervention_deaths) / baseline_deaths) * 100
-            print(f"  Total TB Deaths: {intervention_deaths:.0f} (vs {baseline_deaths:.0f})")
-            print(f"  Death Reduction: {death_reduction:.1f}%")
-        
-        # Compare average incidence
-        if 'tb_incidence' in result and 'tb_incidence' in baseline:
-            baseline_avg_incidence = np.mean(baseline['tb_incidence'])
-            intervention_avg_incidence = np.mean(result['tb_incidence'])
-            incidence_reduction = ((baseline_avg_incidence - intervention_avg_incidence) / baseline_avg_incidence) * 100
-            print(f"  Average Incidence: {intervention_avg_incidence:.3f} (vs {baseline_avg_incidence:.3f})")
-            print(f"  Incidence Reduction: {incidence_reduction:.1f}%")
+        res = sim.results.tb
+        print(f'\n{name}:')
 
-# Run the analysis
-analyze_intervention_impact(results)
+        # Final prevalence of active TB
+        before, after = base.prevalence_active[-1], res.prevalence_active[-1]
+        print(f'  Final active TB prevalence: {after:.4f} (vs {before:.4f}), {(after - before)/before:+.0%}')
+
+        # Cumulative TB deaths
+        before, after = base.cum_tb_death[-1], res.cum_tb_death[-1]
+        print(f'  Total TB deaths: {after:,.0f} (vs {before:,.0f}), {(after - before)/before:+.0%}')
+
+        # Mean new infections per month
+        before, after = np.mean(base.new_infections), np.mean(res.new_infections)
+        print(f'  Mean new infections per month: {after:,.0f} (vs {before:,.0f}), {(after - before)/before:+.0%}')
+    return
+
+analyze_intervention_impact(msim)
 ```
 
-## Advanced: Custom Scenario Creation
+## Advanced: custom scenario creation
 
-Let's create a custom scenario to demonstrate how to define your own interventions:
+Let's create a custom scenario that combines several interventions, with lower transmission than the default (`beta` is 9 contacts per person per year by default):
 
 ```{python}
-# Create a custom scenario with multiple interventions
-custom_scenario = {
-    'name': 'Combined BCG + TPT + Beta Reduction',
-    'tbpars': dict(
-        start=ss.date('1975-01-01'), 
-        stop=ss.date('2030-12-31'),
-        beta=0.0020  # Lower baseline transmission
-    ),
-    'bcgintervention': dict(
-        coverage=0.85,
-        start=ss.date('1980-01-01'),
-        stop=ss.date('2020-12-31'),
-        age_range=[0, 5],
-    ),
-    'betabyyear': dict(
-        years=[1990, 2000, 2010], 
-        x_beta=[0.8, 0.6, 0.4]  # Gradual reduction in transmission
-    )
-}
+custom_scenario = dict(
+    name       = 'Combined',
+    tbpars     = dict(beta=7), # Lower baseline transmission
+    bcg        = dict(coverage=0.85, start=1980, stop=2020),
+    tpt        = dict(coverage=0.7, start=1990, stop=2025),
+    betabyyear = dict(years=[1990, 2000, 2010], by=[0.8, 0.6, 0.4]), # A gradual fall in transmission
+)
 
-print("Custom scenario created:")
-print(f"  Name: {custom_scenario['name']}")
-print(f"  BCG coverage: {custom_scenario['bcgintervention']['coverage']}")
-print(f"  Beta reduction: {custom_scenario['betabyyear']['x_beta']}")
+print('Custom scenario:')
+for key, value in custom_scenario.items():
+    print(f'  {key}: {value}')
 
-# Run the custom scenario
-print("\nRunning custom scenario...")
-custom_sim = build_sim(scenario=custom_scenario)
+custom_sim = build_sim(custom_scenario)
 custom_sim.run()
-custom_results = custom_sim.results.flatten()
 
-print("Custom scenario completed!")
-
-# Add to results for comparison
-results['Custom Combined'] = custom_results
-
-tbsim.plot(results, n_cols=5)
+msim = ss.MultiSim([baseline_sim, custom_sim])
+msim.plot(key=['tb_infectious', 'tb_prevalence_active', 'tb_new_infections', 'tb_cum_tb_death'])
+plt.show()
 ```
 
-## Summary and Key Takeaways
+## The care cascade, step by step
+
+`tbsim.care()` is one test followed by treatment. A cascade with more steps is built from the same pieces: here people with symptomatic TB who seek care are screened with computer-aided detection of chest X-rays (CAD), those who screen positive are confirmed with Xpert, and 90% of those confirmed start treatment (the TB model's `diagnosis` transition):
+
+```{python}
+tb = tbsim.TB(**tb_pars).stratify(age=[0, 15])
+start_tx = ss.treat(ss.Treatment(efficacy=1.0, transition='diagnosis'), coverage=0.9, name='start_tx')
+confirm = ss.screen(tbsim.Xpert(), coverage=0.8, on_positive=start_tx, name='confirm')
+screen = ss.screen(tbsim.CAD(), eligible=tb.symptomatic, coverage=0.1, interval=ss.months(1), start=1990, on_positive=confirm, name='screen')
+cascade_sim = tbsim.Sim(tb=tb, interventions=screen, **sim_pars).run()
+
+r = cascade_sim.results
+print(f'Screened:  {r.screen.delivered.sum():,.0f}')
+print(f'Confirmed: {r.confirm.diagnosed.sum():,.0f} of {r.confirm.delivered.sum():,.0f} tested')
+print(f'Treated:   {r.start_tx.delivered.sum():,.0f}')
+print(f'Completed: {r.tb.completion.sum():,.0f}, failed: {r.tb.failure.sum():,.0f}')
+```
+
+## Summary and key takeaways
 
 In this tutorial, we've learned how to:
 
-1. **Build TB simulations** with intervention capabilities using `tbsim` and `starsim`
+1. **Build TB simulations** with interventions using `tbsim` and `starsim`
 2. **Define different intervention types**:
-   - **BCG vaccination**: Reduces TB transmission and severity
-   - **TPT (Tuberculosis Preventive Therapy)**: Prevents progression from latent to active TB
-   - **Beta changes**: Modifies transmission rates over time
-3. **Run multiple scenarios** and compare their impacts
-4. **Analyze intervention effectiveness** through key metrics like prevalence, incidence, and mortality
-5. **Create custom scenarios** with multiple interventions
+   - **BCG vaccination** (`tbsim.BCG()` with `ss.vaccinate()`): slows progression to active TB, speeds recovery, and lowers TB mortality for those who respond
+   - **TPT** (`tbsim.TPT()` with `ss.treat()`): slows progression from latent infection to active TB while it protects
+   - **Changes in transmission** (`ss.change()`): multiply the transmission rate from given years on
+   - **The care cascade** (`tbsim.care()`, or tests chained with `ss.screen()`): finds and treats people with TB
+3. **Run multiple scenarios** with `ss.MultiSim` and compare their impacts
+4. **Analyze intervention effectiveness** through prevalence, deaths, and new infections
+5. **Create custom scenarios** that combine interventions
 
-### Key Findings:
+### Key findings
 
-- **BCG vaccination** shows significant impact on reducing TB prevalence, especially when targeting young children
-- **TPT interventions** can be effective in reducing TB incidence and mortality
-- **Combined interventions** often provide the best outcomes
-- **Transmission rate modifications** (beta changes) can simulate public health measures or environmental changes
+In these simulations:
 
-### Next Steps:
+- **The care cascade** has the largest impact, since treating people with TB also stops them from transmitting
+- **BCG** and **TPT** lower TB more gradually, since they act on progression from latent infection
+- **Combined interventions** with lower transmission bring TB down the furthest
+- **Changes in transmission** can represent public health measures or changes in living conditions
+
+These simulations use 10,000 agents, so results vary from run to run; use more agents, or several runs with different seeds, for firm comparisons.
+
+### Next steps
 
 You can extend this tutorial by:
+
 - Exploring different parameter combinations
-- Adding more complex intervention scenarios
-- Incorporating additional comorbidities (HIV, malnutrition)
-- Analyzing cost-effectiveness of interventions
+- Adding more complex intervention scenarios, such as a contact network (`networks=ss.RandomNet()`)
+- Incorporating comorbidities (HIV, malnutrition)
+- Analyzing cost-effectiveness: products take a `cost=`
 - Running sensitivity analyses on key parameters
 
-## References and Further Reading
+## References and further reading
 
-- **tbsim documentation**: For detailed API reference and advanced features
-- **starsim documentation**: For general simulation framework capabilities
-- **TB modeling literature**: For epidemiological context and validation
-- **Intervention studies**: For real-world intervention effectiveness data
-
-This tutorial provides a foundation for TB intervention modeling that can be adapted for specific research questions and policy analysis.
-
+- **TBsim documentation**: for the API reference and other tutorials, including [drug resistance](resistance_tutorial.qmd)
+- **Starsim documentation**: for products, deliveries, and running multiple simulations
+- **TB modeling literature**: for epidemiological context and validation
+- **Intervention studies**: for real-world intervention effectiveness data

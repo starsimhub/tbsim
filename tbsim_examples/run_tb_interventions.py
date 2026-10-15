@@ -1,317 +1,79 @@
 """
-TB interventions example: scenarios with BCG, TPT, BetaByYear, and Dx/Tx cascade.
-"""
+TB interventions example: scenarios with BCG, preventive therapy (TPT), a change in transmission, and the care cascade
 
-import numpy as np
+Each scenario runs as agents, with people mixing homogeneously; the care cascade is also
+shown step by step (screening, confirmation, and treatment).
+"""
 import sciris as sc
 import starsim as ss
 import tbsim
-import matplotlib.pyplot as plt
 
-# Simple default parameters
-DEFAULT_SPARS = dict(
-    dt=ss.days(7),
-    start=ss.date('1975-01-01'),
-    stop=ss.date('2030-12-31'),
-    rand_seed=123,
-    verbose=0,
-)
-
-DEFAULT_TBPARS = dict(
-    beta=ss.peryear(0.0025),
-    init_prev=ss.bernoulli(p=0.25),
-)
-
-# Simple age distribution
-age_data = sc.dataframe({
-    'age': [0, 2, 4, 10, 15, 20, 30, 40, 50, 60, 70, 80],
-    'value': [20, 10, 25, 15, 10, 5, 4, 3, 2, 1, 1, 1]
-})
+# Default parameters
+sim_pars = dict(start='1975-01-01', stop='2030-12-31', dt=ss.months(1), solver='abm', n_agents=5_000, rand_seed=1, verbose=0)
+tb_pars = dict(init=dict(infection=0.25, symptomatic=0.005), **tbsim.regimen('dots'))
 
 
-def build_sim(scenario=None, spars=None):
+def make_sim(scenario='Baseline'):
     """
-    Build a TB simulation with optional interventions.
+    Make a TB simulation for one scenario
 
     Args:
-        scenario (dict, optional): Scenario-specific components including:
-            - 'tbpars' (dict): TB-specific simulation parameters.
-            - 'bcgintervention' (dict/list): BCG intervention parameters.
-            - 'tptintervention' (dict/list): TPT intervention parameters.
-            - 'betabyyear' (dict/list): BetaByYear intervention parameters.
-        spars (dict, optional): Sim parameter overrides.
-
-    Returns:
-        tbsim.Sim: A fully initialized simulation.
+        scenario (str): 'Baseline', 'BCG', 'TPT', 'Beta change', or 'Care cascade'
     """
-    scenario = scenario or {}
-
-    # Merge parameters
-    spars = sc.objdict({**DEFAULT_SPARS, **(spars or {})})
-    tbpars = {**DEFAULT_TBPARS, **(scenario.get('tbpars') or {})}
-
-    # Create interventions list
-    interventions = []
-
-    # Add BCG interventions (can be single or multiple)
-    bcg_params = scenario.get('bcgintervention')
-    if bcg_params:
-        if isinstance(bcg_params, dict):
-            interventions.append(tbsim.BCGRoutine(pars=bcg_params))
-        elif isinstance(bcg_params, list):
-            for i, params in enumerate(bcg_params):
-                params['name'] = f'BCG_{i}'
-                interventions.append(tbsim.BCGRoutine(pars=params))
-
-    # Add TPT interventions (can be single or multiple)
-    tpt_params = scenario.get('tptintervention')
-    if tpt_params:
-        if isinstance(tpt_params, dict):
-            interventions.append(tbsim.TPTSimple(pars=tpt_params))
-        elif isinstance(tpt_params, list):
-            for i, params in enumerate(tpt_params):
-                params['name'] = f'TPT_{i}'
-                interventions.append(tbsim.TPTSimple(pars=params))
-
-    # Add Beta interventions (can be single or multiple)
-    beta_params = scenario.get('betabyyear')
-    if beta_params:
-        if isinstance(beta_params, dict):
-            interventions.append(tbsim.BetaByYear(pars=beta_params))
-        elif isinstance(beta_params, list):
-            for i, params in enumerate(beta_params):
-                params['name'] = f'Beta_{i}'
-                interventions.append(tbsim.BetaByYear(pars=params))
-
-    # Create simulation using tbsim.Sim
-    n_households = 200
-    age_strings = [sc.strjoin(np.random.randint(1, 70, np.random.randint(2, 6))) for _ in range(n_households)]
-    dhs_data = sc.dataframe(hh_id=np.arange(n_households), ages=age_strings)
-    networks = [
-        ss.RandomNet({'n_contacts': ss.poisson(lam=5), 'dur': 0}),
-        ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False),
-    ]
-
-    spars.n_agents = 500
-
-    return tbsim.Sim(
-        people=ss.People(n_agents=spars.n_agents, age_data=age_data),
-        networks=networks,
-        interventions=interventions,
-        tb_pars=tbpars,
-        sim_pars=spars,
-    )
+    ppl = ss.People(n_agents=sim_pars['n_agents'])
+    tb = tbsim.TB(**tb_pars).stratify(age=[0, 15]) # By age, for the tests' sensitivity in children and adults
+    if scenario == 'Baseline':
+        intv = None
+    elif scenario == 'BCG': # Each child under 5 is offered BCG once
+        intv = ss.vaccinate(tbsim.BCG(), eligible=ppl.age < 5, coverage=0.8, start=1980, stop=2020, name='bcg_vx')
+    elif scenario == 'TPT': # Yearly rounds of TPT for adults with a latent infection
+        intv = ss.treat(tbsim.TPT(), eligible=tb.infection & (ppl.age >= 15), coverage=0.7, interval=ss.years(1), start=1990, stop=2025, name='tpt_tx')
+    elif scenario == 'Beta change': # Transmission halves in 1990, then is 1.4 times the original from 2000
+        intv = ss.change(tb.pars.beta, at=[1990, 2000], by=[0.5, 1.4], name='beta_change')
+    elif scenario == 'Care cascade': # People with symptomatic TB seek care, are tested with Xpert, and start treatment
+        intv = tbsim.care(tb, seeking=ss.peryear(1), every=ss.months(1), start=1990)
+    else:
+        errormsg = f'Unknown scenario "{scenario}"'
+        raise ValueError(errormsg)
+    return tbsim.Sim(people=ppl, tb=tb, interventions=intv, label=scenario, **sim_pars)
 
 
-def get_scenarios():
-    """Define simulation scenarios for evaluating TB interventions."""
-    return {
-        'Baseline': {
-            'name': 'No interventions',
-        },
-        'Baseline and BetaByYear': {
-            'name': 'No interventions',
-            'betabyyear': dict(years=[1990, 2000], x_beta=[0.5, 1.4]),
-        },
-        'Single BCG': {
-            'name': 'Single BCG intervention',
-            'bcgintervention': dict(
-                coverage=0.8,
-                start=ss.date('1980-01-01'),
-                stop=ss.date('2020-12-31'),
-                age_range=[1, 5],
-            ),
-        },
-        # NOTE: Multiple BCG scenario currently broken (duplicate product module registration)
-        # 'Multiple BCG': {
-        #     'name': 'Multiple BCG interventions',
-        #     'bcgintervention': [
-        #         dict(coverage=0.9, start=ss.date('1980-01-01'), stop=ss.date('2020-12-31'), age_range=[0, 2]),
-        #         dict(coverage=0.3, start=ss.date('1985-01-01'), stop=ss.date('2015-12-31'), age_range=[25, 40]),
-        #     ],
-        # },
-    }
-
-
-def run_scenarios(plot=True):
-    """Run all scenarios and optionally plot results."""
-    scenarios = get_scenarios()
-    results = {}
-
-    for name, scenario in scenarios.items():
-        print(f"\nRunning: {name}")
-        sim = build_sim(scenario=scenario)
-        sim.run()
-        results[name] = sim.results.flatten()
-
+def run_scenarios(scenarios=('Baseline', 'BCG', 'TPT', 'Beta change', 'Care cascade'), plot=True):
+    """ Run the scenarios one after another, and plot them together """
+    msim = ss.MultiSim([make_sim(scenario) for scenario in scenarios])
+    msim.run(parallel=False)
+    for sim in msim.sims:
+        res = sim.results.tb
+        print(f'{sim.label:13s}: {res.cum_tb_death[-1]:6,.0f} TB deaths, active TB prevalence in 2030 {res.prevalence_active[-1]:.4f}')
     if plot:
-        tbsim.plot(results, row_height=2)
-        plt.show()
-
-    return results
+        msim.plot(key=['tb_infectious', 'tb_prevalence_active', 'tb_new_infections', 'tb_cum_tb_death'])
+    return msim
 
 
-def run_dx_tx_cascade():
+def run_cascade():
     """
-    Demonstrate the Dx/Tx product + delivery API.
-
-    Cascade: HealthSeekingBehavior -> CXR screen -> Xpert confirm -> DOTS treat
+    The care cascade, step by step: people with symptomatic TB seek care and are screened with CAD,
+    those who screen positive are confirmed with Xpert, and those confirmed start DOTS
     """
-    # Cascade interventions
-    hsb = tbsim.HealthSeekingBehavior()
-    screen = tbsim.DxDelivery(
-        name='screen',
-        product=tbsim.CAD(),
-        coverage=0.9,
-        result_state='screen_positive',
-        result_validity=ss.days(180),  # Screen result valid for 6 months
-    )
-    confirm = tbsim.DxDelivery(
-        name='confirm',
-        product=tbsim.Xpert(),
-        coverage=0.8,
-        eligibility=lambda sim: (
-            sim.people.screen.screen_positive
-            & ~sim.people.confirm.tested
-        ).uids,
-        result_state='diagnosed',
-        result_validity=ss.days(365),  # Diagnosis valid for 1 year
-    )
-    treat = tbsim.TxDelivery(product=tbsim.DOTS())
-
-    sim = tbsim.Sim(
-        n_agents=5000,
-        start='2000',
-        stop='2020',
-        rand_seed=42,
-        init_prev=ss.bernoulli(p=0.30),
-        beta=ss.peryear(0.05),
-        interventions=[hsb, screen, confirm, treat],
-    )
+    tb = tbsim.TB(**tb_pars).stratify(age=[0, 15])
+    start_tx = ss.treat(ss.Treatment(efficacy=1.0, transition='diagnosis'), coverage=0.9, name='start_tx') # Starts treatment: the model's diagnosis transition
+    confirm = ss.screen(tbsim.Xpert(), coverage=0.8, on_positive=start_tx, name='confirm')
+    screen = ss.screen(tbsim.CAD(), eligible=tb.symptomatic, coverage=0.15, interval=ss.months(1), start=1990, on_positive=confirm, name='screen')
+    sim = tbsim.Sim(tb=tb, interventions=screen, **sim_pars)
     sim.run()
 
-    # Print summary
     r = sim.results
-    print(f"\nDx/Tx Cascade Results:")
-    print(f"  Screened:  {r.screen.n_tested.values.sum()}")
-    print(f"  Confirmed: {r.confirm.n_tested.values.sum()}")
-    print(f"  Treated:   {r.txdelivery.n_treated.values.sum()}")
-    print(f"  Cured:     {r.txdelivery.cum_success.values[-1]}")
-    print(f"  Failed:    {r.txdelivery.cum_failure.values[-1]}")
-    return sim
-
-
-
-def run_tpt_cascade():
-    """
-    Full TPT cascade: HSB → Dx → household contact tracing → triage.
-
-    Index case pathway:
-        HSB → CXR screen → Xpert confirm → DOTS treatment
-
-    Contact tracing pathway:
-        HouseholdContactTracing detects new treatment starts →
-        DxDelivery screens contacts →
-        Active TB contacts → TxDelivery (via diagnosed flag) →
-        Non-active contacts → TPTDelivery (preventive therapy)
-    """
-    # Create synthetic DHS household data
-    n_households = 200
-    hh_ids = np.arange(n_households)
-    age_strings = []
-    for _ in range(n_households):
-        hh_size = np.random.randint(2, 6)
-        ages = np.random.randint(1, 70, hh_size)
-        age_strings.append(sc.strjoin(ages))
-    dhs_data = sc.dataframe(hh_id=hh_ids, ages=age_strings)
-
-    # Networks
-    hh_net = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
-    community_net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=3), dur=0))
-
-    # --- Index case pathway ---
-    hsb = tbsim.HealthSeekingBehavior()
-    screen = tbsim.DxDelivery(
-        name='screen',
-        product=tbsim.CAD(),
-        coverage=0.9,
-        result_state='screen_positive',
-        result_validity=ss.days(180),
-    )
-    confirm = tbsim.DxDelivery(
-        name='confirm',
-        product=tbsim.Xpert(),
-        coverage=0.8,
-        eligibility=lambda sim: (
-            sim.people.screen.screen_positive
-            & ~sim.people.confirm.tested
-            & sim.people.alive
-        ).uids,
-        result_state='diagnosed',
-    )
-    treat = tbsim.TxDelivery(product=tbsim.DOTS())
-
-    # --- Contact tracing pathway ---
-    hh_tracing = tbsim.HouseholdContactTracing(coverage=0.8)
-
-    # Screen contacts for active TB
-    contact_screen = tbsim.DxDelivery(
-        name='contact_screen',
-        product=tbsim.Xpert(),
-        coverage=1.0,
-        eligibility=lambda sim: (
-            sim.people.householdcontacttracing.contact_identified
-            & ~sim.people.contact_screen.tested
-            & sim.people.alive
-        ).uids,
-        result_state='diagnosed',  # positive contacts → TxDelivery picks them up
-    )
-
-    # TPT for contacts screened negative (no active disease)
-    tpt = tbsim.TPTDelivery(
-        product=tbsim.TPTTx(),
-        contact_tracing='householdcontacttracing',
-        contact_screen='contact_screen',
-    )
-
-    sim = tbsim.Sim(
-        n_agents=5000,
-        start='2000',
-        stop='2020',
-        rand_seed=42,
-        init_prev=ss.bernoulli(p=0.30),
-        beta=ss.peryear(0.05),
-        networks=[hh_net, community_net],
-        interventions=[hsb, screen, confirm, treat, hh_tracing, contact_screen, tpt],
-    )
-    sim.run()
-
-    # Print summary
-    r = sim.results
-    ct_r = r.householdcontacttracing
-    cs_r = r.contact_screen
-    tx_r = r.txdelivery
-    tpt_r = r.tptdelivery
-    print(f"\nTPT Cascade Results:")
-    print(f"  Index cases followed up:  {ct_r.n_index_followed_up.values.sum()}")
-    print(f"  Contacts identified:      {ct_r.n_contacts_identified.values.sum()}")
-    print(f"  Contacts screened:        {cs_r.n_tested.values.sum()}")
-    print(f"  Contacts diagnosed (active TB): {cs_r.n_positive.values.sum()}")
-    print(f"  Total treated:            {tx_r.n_treated.values.sum()}")
-    print(f"  TPT initiated:            {tpt_r.n_tpt_initiated.values.sum()}")
-    print(f"  TPT protected (final):    {tpt_r.n_protected.values[-1]}")
+    print('\nCare cascade:')
+    print(f'  Screened:  {r.screen.delivered.sum():,.0f}')
+    print(f'  Confirmed: {r.confirm.diagnosed.sum():,.0f} of {r.confirm.delivered.sum():,.0f} tested')
+    print(f'  Treated:   {r.start_tx.delivered.sum():,.0f}')
+    print(f'  Completed: {r.tb.completion.sum():,.0f}')
+    print(f'  Failed:    {r.tb.failure.sum():,.0f}')
     return sim
 
 
 if __name__ == '__main__':
-    # Run all scenarios
-    # results = run_scenarios(plot=True)
-
-    # Run Dx/Tx cascade example
-    print("\n--- Dx/Tx Cascade Example ---")
-    sim = run_dx_tx_cascade()
-
-
-    # Run full TPT cascade example
-    print("\n--- Full TPT Cascade Example ---")
-    sim_cascade = run_tpt_cascade()
+    T = sc.timer()
+    msim = run_scenarios()
+    sim = run_cascade()
+    T.toc()

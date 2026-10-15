@@ -1,140 +1,116 @@
 ---
-title: Malnutrition Tutorial
+title: Malnutrition tutorial
 jupyter: python3
 ---
 
-
-This tutorial demonstrates how to use the **malnutrition comorbidity module** in the `tbsim` package.
-
-**Module Location:** `tbsim/comorbidities/malnutrition/`
-
----
+This tutorial shows how to use the malnutrition comorbidity module (`tbsim/comorbidities/malnutrition.py`) to simulate the effect of nutrition on TB.
 
 ## Overview
 
-The malnutrition module in TBSim allows users to simulate the impact of **malnutrition on TB disease dynamics**. Malnutrition is a significant risk factor for TB, affecting both susceptibility to infection and disease progression.
+Malnutrition is a major risk factor for TB, affecting both susceptibility to infection and progression to active disease. The module has two parts:
 
-This tutorial shows how to:
-- Set up a basic malnutrition simulation
-- Configure malnutrition parameters
-- Run the simulation and visualize results
+- `tbsim.Malnutrition`: the malnutrition model, which tracks each agent's nutritional status.
+- `tbsim.nutrition_effects()`: modifiers that act on the TB model, changing susceptibility, progression, and recovery according to nutritional status.
 
----
+Nutritional status is tracked per agent, so a TB-malnutrition sim runs as agents (`solver='abm'`, or with a network).
 
-## Malnutrition Model
+## Malnutrition model
 
-The malnutrition model simulates nutritional status and its impact on health outcomes. Key features include:
+The model tracks, for each agent:
 
-- **Nutritional Status Tracking**: Monitors individual nutritional states
-- **Health Impact**: Affects susceptibility to diseases and recovery rates
-- **Demographic Integration**: Works with birth and death processes
+| State | Description |
+|-------|-------------|
+| `height_percentile` | Height, as a percentile of the reference growth curve for the agent's age and sex (constant) |
+| `weight_percentile` | Weight, as a percentile; it follows a random walk, kept between 2.5% and 97.5% |
+| `micro` | Micronutrient status, between 0 and 1 |
+| `receiving_macro`, `receiving_micro` | Whether the agent receives macronutrient or micronutrient supplements |
 
-### Key Parameters
+Percentiles become weights and heights through the LMS (lambda-mu-sigma) method, using reference growth curves by age and sex up to age 20: `mn.weight(uids)` and `mn.height(uids)` give them in kg and cm. Since these depend on age, the sims below set `use_aging=True` so that agents age.
 
-| Parameter | Description |
-|-----------|-------------|
-| `init_prev` | Initial prevalence of malnutrition in the population |
-| `recovery_rate` | Rate at which individuals recover from malnutrition |
-| `susceptibility_multiplier` | Multiplier for disease susceptibility when malnourished |
+## Effects of nutrition on TB
 
----
+`tbsim.nutrition_effects(tb, ...)` returns modifiers, which are passed to the sim as `connectors`. Each effect is a function `(tb, mn, uids)` that returns a multiplier for each agent:
 
-## Setup and Imports
+| Argument | Acts on | Default |
+|----------|---------|---------|
+| `rr_activation` | Progression from latent infection to active TB (`latent_asy`, `latent_non`) | `tbsim.ones_rr` (no effect) |
+| `rr_clearance` | Recovery from non-infectious TB (`recovery`) | `tbsim.ones_rr` (no effect) |
+| `rel_sus` | Susceptibility to infection | `tbsim.compute_relsus`: 2 for agents with `micro` below 0.2 |
 
-First, import the required modules:
+Two functions are provided for the risk ratios:
 
+- `tbsim.lonnroth_bmi_rr`: a risk ratio that falls with BMI, following the log-linear relationship of Lönnroth et al. (close to 2 at a low BMI, 1 at a BMI of 25, and close to 0 at a high BMI).
+- `tbsim.supplementation_rr`: a rate ratio (0.5 by default) for agents who receive both macro- and micronutrient supplements.
+
+## Setup
 
 ```{python}
-import tbsim
-import starsim as ss
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
+import starsim as ss
+import tbsim
 ```
 
-## Building the Malnutrition Simulation
+## Building the simulation
 
-The `make_malnutrition()` function creates a complete simulation with malnutrition as the primary disease model:
+`make_sim()` builds a TB sim with the malnutrition model, with or without the effects of nutrition on TB. With them, BMI acts on progression to active TB, and micronutrient status on susceptibility (the default):
 
 ```{python}
-
-def make_malnutrition():
-    # --------- Disease ----------
-    nut_pars = dict()  # Use default malnutrition parameters
-    nut = tbsim.Malnutrition(nut_pars)
-    
-    # --------- People ----------
-    n_agents = 200  # Small population for demonstration
-    pop = ss.People(n_agents=n_agents)
-    
-    # -------- Simulation Parameters -------
-    sim_pars = dict(
-        dt=ss.days(7),                    # Weekly time steps
-        start=ss.date('1990'),      # Simulation start date
-        stop=ss.date('2020'),       # Simulation end date (30 years)
-    )
-    
-    # -------- Contact Network ----------
-    net = ss.RandomNet(dict(
-        n_contacts=ss.poisson(lam=5),     # Average 5 contacts per agent
-        dur=0                             # Instantaneous contacts
-    ))
-    
-    # -------- Demographics ------------
-    births = ss.Births(pars=dict(birth_rate=5))    # 5 births per 1000 per year
-    deaths = ss.Deaths(pars=dict(death_rate=5))    # 5 deaths per 1000 per year
-    
-    # -------- Assemble Simulation -----
-    sim = ss.Sim(
-        people=pop, 
-        diseases=nut, 
-        demographics=[deaths, births],
-        networks=net,
-        pars=sim_pars,
-        verbose=0,
+def make_sim(nutrition=True, label=None):
+    tb = tbsim.TB(init=dict(infection=0.25)) # 25% start with a latent infection
+    effects = tbsim.nutrition_effects(tb, rr_activation=tbsim.lonnroth_bmi_rr) if nutrition else None
+    sim = tbsim.Sim(
+        tb = tb,
+        diseases = tbsim.Malnutrition(),
+        connectors = effects,
+        solver = 'abm',
+        use_aging = True,
+        n_agents = 3000,
+        start = '1980-01-01',
+        stop = '2000-01-01',
+        rand_seed = 1,
+        verbose = 0,
+        label = label,
     )
     return sim
 ```
 
-## Running the Simulation
-
-Execute the simulation and visualize the results:
+## Running the simulations
 
 ```{python}
-# Create and run the malnutrition simulation
-sim_n = make_malnutrition()
-sim_n.run()
+sims = [
+    make_sim(nutrition=False, label='No nutrition effects'),
+    make_sim(nutrition=True, label='With nutrition effects'),
+]
+for sim in sims:
+    sim.run()
+msim = ss.MultiSim(sims)
+```
 
-# Process results for visualization
-results = {'malnutrition': sim_n.results.flatten()}
+## Results
 
-# Plot results with 3 columns in dark mode
-tbsim.plot(results, n_cols=3)
+With the effects of nutrition, more people have a latent infection (through the higher susceptibility of those with poor micronutrient status), and more progress to active TB:
+
+```{python}
+tbsim.plot(msim, select=['prevalence_active', 'active', 'n_infection', 'n_symptomatic'], n_cols=2, row_height=2.5)
+```
+
+The risk ratio for progression depends on each agent's BMI, which comes from their weight and height:
+
+```{python}
+sim = sims[1]
+mn = sim.diseases.malnutrition
+uids = sim.people.auids
+bmi = 10_000*mn.weight(uids)/mn.height(uids)**2
+rr = tbsim.lonnroth_bmi_rr(sim.diseases.tb, mn, uids)
+
+plt.figure()
+plt.scatter(bmi, rr, s=5, alpha=0.5)
+plt.xlabel('BMI (kg/m²)')
+plt.ylabel('Risk ratio for progression to active TB')
 plt.show()
 ```
 
-## Key Parameters Explained
+## Extending the model
 
-- **dt**: Time step duration (7 days = weekly updates)
-- **n_agents**: Population size (200 agents for demonstration)
-- **n_contacts**: Number of contacts per agent (Poisson distribution with mean 5)
-- **birth_rate/death_rate**: Demographic rates per 1000 population per year
-- **Simulation period**: 30 years (1990-2020)
-
-## Expected Output
-
-The simulation will generate plots showing:
-- Malnutrition prevalence over time
-- Population demographics (births, deaths)
-- Contact network statistics
-- Nutritional status transitions
-
-## Extending the Model
-
-This basic malnutrition model can be extended to:
-- Include TB as a comorbidity
-- Add nutritional interventions
-- Model seasonal variations in nutrition
-- Include age-specific nutritional requirements
-
-For more complex scenarios, see the TB-malnutrition comorbidity examples in the interventions tutorials.
-
+The effects are plain functions, so others can be passed in their place, e.g. `tbsim.nutrition_effects(tb, rr_activation=tbsim.supplementation_rr)` for a model in which supplements halve the risk of progression; an intervention would then set `receiving_macro` and `receiving_micro` for the agents who receive them.

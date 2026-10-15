@@ -40,11 +40,10 @@ dependencies = [
   "scipy",
   "pandas>=2.0.0",
   "sciris>=3.1.0",
-  "lifelines",
   "networkx",
   "matplotlib",
   "seaborn",
-  "starsim>=3.6.0",
+  "starsim>=4.0",
 ]
 
 [project.optional-dependencies]

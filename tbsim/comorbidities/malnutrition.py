@@ -147,7 +147,7 @@ class Malnutrition(ss.Disease):
         """Initialize results tracking."""
         super().init_results()
         self.define_results(
-            ss.Result(name='people_alive', dtype=float, label='People alive'),
+            ss.Result(name='people_alive', dtype=float, scale=False, label='People alive'),
         )
 
     def update_results(self):

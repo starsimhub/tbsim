@@ -190,12 +190,16 @@ class DwellTime(ss.Analyzer):
         event_observed = (data[event_observed_col]
                           if event_observed_col else [1] * len(data))
 
-        from lifelines import KaplanMeierFitter # Only needed here
-        kmf = KaplanMeierFitter()
-        kmf.fit(durations, event_observed=event_observed)
+        # Kaplan-Meier estimate: at each time with events, survival falls by the share of those still at risk who leave
+        durations = np.asarray(durations, dtype=float)
+        event_observed = np.asarray(event_observed, dtype=bool)
+        times = np.unique(durations[event_observed])
+        at_risk = len(durations) - np.searchsorted(np.sort(durations), times, side='left')
+        events = np.array([np.sum(event_observed & (durations == t)) for t in times])
+        survival = np.cumprod(1 - events/at_risk)
 
         plt.figure(figsize=(10, 6))
-        kmf.plot_survival_function()
+        plt.step(np.concatenate([[0], times]), np.concatenate([[1], survival]), where='post')
         plt.title("TBSim Kaplan-Meier Survival Curve", fontsize=16)
         plt.xlabel(f"Time ({dwell_time_col})", fontsize=14)
         plt.ylabel("Survival Probability", fontsize=14)
@@ -448,6 +452,7 @@ class DwellTime(ss.Analyzer):
                     ss.uids(relevant_rows['agent_id'].values)].copy())
 
         state_dict = {i:name.replace('_', ' ').capitalize() for i,name in enumerate(tbsim.get_tb(self.sim).graph.states)}
+        state_dict[-1] = 'DEAD OR LEFT' # In no state (see tbsim.state_codes())
         state_dict[-3] = 'NON-TB DEATH'
         state_dict[-2] = 'NEVER INFECTED'
         self.data['state_name'] = self.data['state'].map(state_dict)

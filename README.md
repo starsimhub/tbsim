@@ -1,6 +1,6 @@
 # TBsim
 
-TBsim is an agent-based model for simulating tuberculosis transmission, disease progression, and treatment outcomes in populations. Built on the Starsim agent-based modeling platform, it enables researchers to evaluate intervention strategies, explore disease dynamics under different conditions, and inform TB control policy decisions.
+TBsim is a model of tuberculosis transmission, disease progression, and treatment outcomes in populations. Built on Starsim, its model of TB is declared as states and transitions, so the same model runs as an ODE, as a stochastic compartmental model, or as agents on contact networks. It enables researchers to evaluate intervention strategies, explore disease dynamics under different conditions, and inform TB control policy decisions.
 
 **Note:** TBsim is still under active development; results may change without warning.
 
@@ -8,9 +8,9 @@ TBsim is an agent-based model for simulating tuberculosis transmission, disease 
 
 Tuberculosis is a major global health problem, and understanding its dynamics can help in developing better strategies for control and treatment. This project uses the Starsim package to simulate TB spread in a population, considering factors like transmission rates, treatment efficacy, and social dynamics.
 
-TBsim uses an agent-based implementation of the LSHTM "spectrum of TB disease" natural history (susceptible → infection/cleared → non-infectious → asymptomatic → symptomatic → treatment/treated/death), designed to support evaluating active case-finding / population-wide screening algorithms (e.g., CXR and NAAT workflows) as in Schwalb et al. 2025 ([PLOS Glob Public Health](https://journals.plos.org/globalpublichealth/article?id=10.1371/journal.pgph.0005050)).
+TBsim implements the LSHTM "spectrum of TB disease" natural history (susceptible → infection/cleared → non-infectious → asymptomatic → symptomatic → treatment/treated/death), designed to support evaluating active case-finding / population-wide screening algorithms (e.g., CXR and NAAT workflows) as in Schwalb et al. 2025 ([PLOS Glob Public Health](https://journals.plos.org/globalpublichealth/article?id=10.1371/journal.pgph.0005050)).
 
-TBsim also includes a **multi-strain / drug-resistance extension** (`tbsim.resistance`) for modeling `2ⁿ` strains over `n` drugs — with fitness costs, superinfection, de-novo and acquired resistance, drug-susceptibility testing, and strain-aware treatment/preventive therapy. See the [`tbsim.resistance` README](tbsim/resistance/README.md) and the resistance tutorial in the docs.
+TBsim also models **drug resistance**: `tbsim.TB(drugs=['RIF', 'INH'])` has a strain for each set of drugs it is resistant to, with fitness costs, people carrying several strains at once, resistance acquired on progression and during treatment, and tests for resistance. See the drug resistance user guide and tutorial in the docs.
 
 ## Getting started
 

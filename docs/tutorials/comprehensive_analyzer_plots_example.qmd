@@ -1,95 +1,85 @@
 ---
-title: Comprehensive Analyzer Plots Example
+title: Dwell-time analyzer plots
 jupyter: python3
 ---
 
-This notebook demonstrates all available plotting methods in the `DwtAnalyzer` class from the `tbsim` package. It is adapted from the original Python script for interactive exploration.
-
+This notebook shows every plot of the `tbsim.DwellTime` analyzer, which records how long each agent spends in each TB state, and which state they go to next.
 
 ```{python}
 import tbsim
 import starsim as ss
-import matplotlib.pyplot as plt
 ```
 
-## Build a TB simulation with dwell time analyzer
+## Build a TB simulation with the dwell-time analyzer
+
+The analyzer follows individual agents, so the simulation runs with agents (here on a random contact network, where `beta` is the transmission rate per contact per year). A quarter of the agents start with a latent infection, so that there are many transitions to record.
 
 ```{python}
-def build_tbsim(sim_pars=None):
-    sim_params = dict(
-        start = ss.date('2013-01-01'),
-        stop = ss.date('2016-12-31'),
-        rand_seed=123,
-        dt=ss.days(7),
+def build_sim():
+    """ Create an agent-based TB simulation with the dwell-time analyzer """
+    sim = tbsim.Sim(
+        tb = tbsim.TB(beta=3, init=dict(infection=0.25)),
+        networks = ss.RandomNet(n_contacts=5, dur=0),
+        analyzers = tbsim.DwellTime(scenario_name='Dwell-time example'),
+        n_agents = 1000,
+        start = '2013-01-01',
+        stop = '2016-12-31',
+        dt = ss.weeks(1),
+        rand_seed = 123,
+        verbose = 0,
     )
-    if sim_pars is not None:
-        sim_params.update(sim_pars)
-    pop = ss.People(n_agents=1000)
-    tb_params = dict(
-        beta=ss.peryear(0.025),
-        init_prev=ss.bernoulli(p=0.25),
-    )
-    tb = tbsim.TB(tb_params)
-    net = ss.RandomNet(dict(n_contacts=ss.poisson(lam=5), dur=0))
-    dwell_analyzer = tbsim.DwtAnalyzer(scenario_name='comprehensive_plots_example')
-    sim = ss.Sim(
-        people=pop,
-        networks=net,
-        diseases=tb,
-        pars=sim_params,
-        analyzers=dwell_analyzer,
-    )
-    sim.pars.verbose = 0
     return sim
 ```
 
-## Run the simulation and extract the analyzer
+## Run the simulation and get the analyzer
 
 ```{python}
-print("Building and running TB simulation...")
-sim_tb = build_tbsim()
-sim_tb.run()
-analyzer = sim_tb.analyzers[0]
+sim = build_sim()
+sim.run()
+analyzer = sim.analyzers[0]
+analyzer.data.head()
 ```
 
-## 1. Network Graph
-Directed graph of state transitions.
+## 1. Network graph
+
+A directed graph of the transitions between states, labeled with their mean dwell times and counts.
 
 ```{python}
 analyzer.plot('network')
 ```
 
 ## 2. Histograms
-Histograms with KDE of dwell time distributions per state.
+
+Histograms of the dwell times in each state, by the state that comes next.
 
 ```{python}
 analyzer.plot('histogram')
 ```
 
-## 3. Survival Analysis
-Kaplan-Meier survival curves for dwell times.
+## 3. Survival analysis
+
+Kaplan-Meier survival curves of the dwell times.
 
 ```{python}
 analyzer.plot('kaplan_meier')
 ```
 
 ## 4. Validation
-Observed dwell-time histograms for validation.
+
+Histograms of the observed dwell times in each state, to compare with the distributions the model expects.
 
 ```{python}
 analyzer.plot('validation')
 ```
 
-## 5. Loading from file
-You can save the collected dwell-time data to a CSV file and later create a `DwellTime` instance from it.
+## 5. Loading from a file
+
+You can save the dwell-time data to a CSV file, and later create a `tbsim.DwellTime` from it to plot it.
 
 ```{python}
-from tbsim.analyzers import DwellTime
-
 file_path = analyzer.save('dwelltime.csv')
 print(f'Saved data file: {file_path}')
 
-plotter = DwellTime(file_path=file_path)
+plotter = tbsim.DwellTime(file_path=file_path)
 plotter.plot('histogram')
 ```
-

@@ -84,14 +84,12 @@ def make_intervention(pars = None):
 
 def make_hiv(pars = None):
     """
-    Set up the HIV intervention with default parameters.
+    Set up the HIV model with default parameters.
     """
     # Define HIV parameters
-    if pars is None: 
-        pars = dict(
-            # Add any default parameters here
-        )
-    return ss.HIV(pars=pars)  # Placeholder for the actual HIV class
+    if pars is None:
+        pars = dict(incidence=0.01, art_start=0.2)
+    return tbsim.HIV(pars=pars)
 
 def make_cnn(pars = None):
     """

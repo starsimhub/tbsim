@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TBsim is an agent-based tuberculosis (TB) model built on the [Starsim](https://github.com/starsimhub/starsim) framework. It simulates TB transmission, disease progression, and treatment outcomes in populations. Currently in alpha (v0.10.0). Python >=3.11.
+TBsim is a tuberculosis (TB) model built on [Starsim](https://github.com/starsimhub/starsim) v4. It simulates TB transmission, disease progression, and treatment outcomes in populations. The model is declared as states and transitions, so it runs as an ODE, as a stochastic compartmental model, or as agents. Version 1.0.0 (in development, on the `v1.0.0` branch) is the move to Starsim v4. Python >=3.11.
 
 ## Build & Development Commands
 
@@ -38,34 +38,32 @@ cd docs && ./render    # build static site to docs/_site
 
 The TB natural history model lives in `tbsim/`:
 
-- **TB** ([tb.py](tbsim/tb.py)) — LSHTM "spectrum of disease" approach with states: SUSCEPTIBLE → INFECTION → NON_INFECTIOUS → ASYMPTOMATIC → SYMPTOMATIC → TREATMENT (or CLEARED/DEAD). State enum is `TBS`.
+- **TB** ([tb.py](tbsim/tb.py)) — the LSHTM "spectrum of disease" model as an `ss.Disease` declared from `ss.State`s and `ss.Transition`s: `susceptible` → `infection` → `non_infectious` ↔ `asymptomatic` ↔ `symptomatic` → `treatment` → `treated`, with `cleared` and `recovered`. Parameters (`tb_pars()`) are `ss.par`s, rates per year; optional parts (front-loading, relapse, waning protection, migration) add states and transitions only when used. `tbsim.state_codes(tb)` gives each agent's state as a number.
 
-Extends `ss.Disease` from Starsim.
+### Drug resistance
 
-### Multi-strain / drug-resistance extension
-
-[tbsim/resistance/](tbsim/resistance/) adds a multi-strain, drug-resistance overlay. `TBResistant` (in [tb_resistant.py](tbsim/resistance/tb_resistant.py)) is a drop-in `TB` subclass that encodes `2ⁿ` strains over `n` named drugs as a per-agent bitmask (`strain_mask`) plus a per-strain multiplicity counter, with per-strain fitness costs, superinfection, and de-novo resistance. It ships strain-aware product/delivery interventions — `TxR`/`TxDeliveryR` (treatment), `DST`/`DSTDelivery` (diagnostics), `TPTRx` (preventive therapy) — the `ResistanceStats`/`StrainResults` analyzers, and a two-strain reference ODE (`tbsim.compartmental.TwoStrainODE`) for ABM↔ODE validation. All public entry points are re-exported on `tbsim`. CI coverage lives in [tests/test_resistance.py](tests/test_resistance.py) and the ABM↔ODE validation in [tests/test_compartmental.py](tests/test_compartmental.py). The implementation reference is [tbsim/resistance/README.md](tbsim/resistance/README.md); the usage tutorial is `docs/tutorials/resistance_tutorial.qmd`.
+[tbsim/resistance.py](tbsim/resistance.py) adds drug resistance as a strain dimension of `tbsim.TB` (`drugs=`): its levels are the sets of strains people carry (e.g. `DS+RIF`), up to `max_strains`, and `add_resistance()` adds superinfection, the progression bottleneck, de novo resistance, and treatment outcomes by strain. [models.py](tbsim/models.py) has `tbsim.LSHTMResistant`, the structure of the reference two-strain ODE (`tbsim.compartmental.TwoStrainODE`), which it matches to 1e-4. Tests are in [tests/test_resistance.py](tests/test_resistance.py), [tests/test_models.py](tests/test_models.py), and (agents against the ODE) [tests/test_compartmental.py](tests/test_compartmental.py).
 
 ### Sim Wrapper
 
-[tbsim/sim.py](tbsim/sim.py) provides `tbsim.Sim`, a convenience wrapper around `ss.Sim` that auto-routes flat parameters to the sim or TB module, and provides sensible defaults (demographics, random network, TB disease). A pre-built TB module may be passed via either `tb_model=` or `diseases=` (both are respected — no default TB is added on top). Pass `demographics=[]` (or `networks=[]`) to suppress the default demographics/network for that slot.
+[tbsim/sim.py](tbsim/sim.py) provides `tbsim.Sim`, an `ss.Sim` with a TB model: TB parameters can be given directly (`tbsim.Sim(beta=12)`), or a TB model with `tb=`. It has no default network or demographics, so it runs as an ODE unless given a network or `solver='abm'`.
 
 ### Two conventions to follow
 
-- **Getting the TB module:** on a `tbsim.Sim`, call `sim.get_tb()` — do *not* use `tbsim.get_tb(sim)`, and don't pass `which=` (it auto-finds the TB module, including `TBResistant`). The module-level `tbsim.get_tb(sim, ...)` is only for library internals that must accept an arbitrary `ss.Sim`. In tests/docs/examples, build the sim as `tbsim.Sim(...)` so `sim.get_tb()` is available.
-- **Passing TB parameters:** pass TB/`TBResistant` parameters directly as keyword arguments (e.g. `tbsim.TBResistant(beta=ss.permonth(0.35), init_prev=ss.bernoulli(0.1))`) rather than wrapping them in `pars=dict(...)`. Only build a standalone `pars` dict when the *same* dict is reused across multiple module instances.
+- **Getting the TB module:** on a `tbsim.Sim`, call `sim.get_tb()` — do *not* use `tbsim.get_tb(sim)`, and don't pass `which=` (it auto-finds the TB module, including `LSHTMResistant`). The module-level `tbsim.get_tb(sim, ...)` is only for library internals that must accept an arbitrary `ss.Sim`. In tests/docs/examples, build the sim as `tbsim.Sim(...)` so `sim.get_tb()` is available.
+- **Passing TB parameters:** pass TB parameters directly as keyword arguments (e.g. `tbsim.TB(beta=12, init=dict(infection=0.1))`) rather than wrapping them in `pars=dict(...)`. Only build a standalone `pars` dict when the *same* dict is reused across multiple module instances.
 
 ### Intervention Architecture (Product/Delivery Pattern)
 
-Interventions in [tbsim/interventions/](tbsim/interventions/) follow a product/delivery separation:
+Interventions in [tbsim/interventions/](tbsim/interventions/) are Starsim v4 products and deliveries, so they run under every solver:
 
-- **Products** define *what* (test sensitivity, drug efficacy): `Dx` (diagnostics), `Tx` (treatments)
-- **Delivery** classes define *how* (eligibility, coverage, timing): `DxDelivery`, `TxDelivery`
-- Other interventions: `HealthSeekingBehavior`, `BCG`, `TPT`, `BetaModifier`
+- **Products** define *what*: tests (`tbsim.Xpert()`, `OralSwab()`, `FujiLAM()`, `CAD()`, `tbsim.test()`), `tbsim.BCG()`, and `tbsim.TPT()`
+- **Deliveries** define *how* (eligibility, coverage, timing): `ss.screen()`, `ss.vaccinate()`, `ss.treat()`, and `tbsim.care(tb)` (the care cascade: seeking care, testing, and starting treatment)
+- `tbsim.regimen('dots')` gives the model's treatment parameters for a regimen; `ss.change()` changes a parameter at given times
 
 ### Comorbidities
 
-[tbsim/comorbidities/](tbsim/comorbidities/) contains modules for HIV and malnutrition co-infection that modify TB disease parameters.
+[tbsim/comorbidities/](tbsim/comorbidities/) contains `tbsim.HIV` and `tbsim.Malnutrition`, which act on TB through modifiers (`tbsim.hiv_effects(tb, hiv)`, `tbsim.nutrition_effects(tb)`), passed to the sim as `connectors`.
 
 ### Analyzers
 
@@ -89,6 +87,6 @@ Repo-specific Claude Code skills live in `.claude/skills/` (also exposed at the 
 
 ## Key Dependencies
 
-- **starsim** (>=3.5.1) — ABM framework; use `ss.library.HouseholdNet`
+- **starsim** (v4, the `v4` branch) — the modeling framework; use `ss.library.HouseholdNet` for households
 - **sciris** (>=3.1.0) — Utility library used throughout (`sc.objdict`, `sc.mergedicts`, etc.)
-- **pandas** (>=2.0.0) — Used heavily in diagnostic product definitions (DataFrame-based)
+- **pandas** (>=2.0.0) — Used in the analyzers and malnutrition data

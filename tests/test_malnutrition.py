@@ -111,17 +111,49 @@ class TestTBNutritionConnector:
 
 
 class TestHIV:
-    """Test the effect of HIV on TB (tbsim.hiv_effects)"""
+    """Test HIV, and its effect on TB (tbsim.hiv_effects)"""
+
+    @staticmethod
+    def make(solver='ode', mult=2.0, drugs=None, **kwargs):
+        tb = tbsim.TB(init=dict(infection=0.3), drugs=drugs, strains=dict(DS=0.9, RIF=0.1) if drugs else None)
+        hiv = tbsim.HIV(incidence=0.01, init_prev=0.1, art_start=0.2, **kwargs)
+        return ss.Sim(tb, diseases=hiv, connectors=tbsim.hiv_effects(tb, hiv, acute=mult, latent=mult, aids=mult), solver=solver,
+                      n_agents=5000, total_pop=5000, start=2000, stop=2010, dt=ss.weeks(1), verbose=0, rand_seed=1)
 
     def test_hiv_speeds_progression(self):
-        """With HIV, more latent infections progress to active TB"""
-        progressions = []
-        for mult in [1, 5]:
-            tb = tbsim.TB(init=dict(infection=0.3))
-            sim = ss.Sim(tb, diseases=tbsim.HIV(), connectors=tbsim.hiv_effects(tb, acute=mult, latent=mult, aids=mult), interventions=tbsim.HivInterventions(),
-                         solver='abm', n_agents=5000, start=2000, stop=2010, verbose=0, rand_seed=1).run()
-            progressions.append((sim.results.tb.latent_asy + sim.results.tb.latent_non).sum())
-        assert progressions[1] > 1.3*progressions[0]
+        """With HIV, more latent infections progress to active TB, as an ODE and as agents"""
+        for solver in ['ode', 'abm']:
+            progressions = []
+            for mult in [1, 5]:
+                res = self.make(solver, mult).run().results
+                progressions.append((res.tb.latent_asy + res.tb.latent_non).sum())
+            assert progressions[1] > 1.3*progressions[0]
+
+    def test_tb_hiv_jointly(self):
+        """As compartments, TB (with resistance) and HIV are tracked jointly: they have the same people, and agree with agents"""
+        ode = self.make('ode', drugs=['RIF']).run()
+        abm = self.make('abm', drugs=['RIF']).run()
+        res = ode.results
+        n_tb = sum(res.tb[f'n_{s.name}'] for s in ode.diseases.tb.graph.people_states)
+        n_hiv = sum(res.hiv[f'n_{s.name}'] for s in ode.diseases.hiv.graph.people_states)
+        assert np.allclose(n_tb, n_hiv)
+        assert np.isclose(res.hiv.infected[-1], abm.results.hiv.infected[-1], rtol=0.1)
+        assert np.isclose(res.tb.active[-1], abm.results.tb.active[-1], rtol=0.25)
+        assert res.hiv.infected.by('art').values[-1][1] > 0 # Some on ART
+
+    def test_art_delivery(self):
+        """ART started by a delivery, with no ART otherwise"""
+        tb = tbsim.TB()
+        hiv = tbsim.HIV(incidence=0.01, init_prev=0.1)
+        arts = ss.transfer(art=True, coverage=0.5, years=[2005], eligible=hiv.acute | hiv.latent | hiv.aids)
+        sim = ss.Sim(tb, diseases=hiv, connectors=tbsim.hiv_effects(tb, hiv), interventions=arts, start=2000, stop=2010, verbose=0).run()
+        on_art = sim.results.hiv.infected.by('art').values[:, 1]
+        assert on_art[5] == 0 and on_art[6] > 0 # Nobody on ART until the round in 2005, which is between the numbers at 2005 and 2006
+
+    def test_art_slows_progression(self):
+        """ART slows progression to AIDS"""
+        aids = [self.make(art_progression=f).run().results.hiv.n_aids[-1] for f in [1.0, 0.1]]
+        assert aids[1] < aids[0]
 
 
 class TestMalnutritionIntegration:

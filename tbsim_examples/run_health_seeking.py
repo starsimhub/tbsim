@@ -1,11 +1,16 @@
 """
-Health-seeking behaviour with the LSHTM TB model.
+Health-seeking behavior with the LSHTM TB model.
 
-Three scenarios are run over 20 years and compared:
+People with symptomatic TB seek care, are tested with Xpert, and start treatment if
+they test positive: the care cascade, tbsim.care(). Three scenarios are run over 20 years
+and compared:
 
-  Baseline                  – no intervention
-  Low rate (10 %/day)       – HealthSeekingBehavior at 10 % daily seek probability
-  High rate (40 %/day)      – 40 % daily, with a retry window (~1 month)
+  Baseline              – no care seeking
+  Low rate (1/year)     – people with symptomatic TB seek care once a year on average
+  High rate (4/year)    – four times a year on average
+
+Seeking care is a rate, so people who have not sought care yet can seek it later, and
+people whose test is falsely negative can seek care again.
 """
 
 import matplotlib.pyplot as plt
@@ -13,63 +18,34 @@ import starsim as ss
 import tbsim
 
 
-N_AGENTS  = 3_000
-RAND_SEED = 42
-
-common_pars = dict(
-    n_agents  = N_AGENTS,
-    start     = ss.date("1990-01-01"),
-    stop      = ss.date("2010-12-31"),
-    dt        = ss.days(7),
-    rand_seed = RAND_SEED,
-    verbose   = 0,
-    init_prev   = ss.bernoulli(0.05),
-    beta        = ss.peryear(0.20),
-    trans_asymp = 0.82,
-    rr_reinfection_rec   = 0.21,
-    rr_reinfection_treat = 3.15,
-    demographics = [ss.Births(pars=dict(birth_rate=20)), ss.Deaths(pars=dict(death_rate=10))],
-)
-
-
-def build_sim(hsb=None):
-    kwargs = dict(**common_pars)
-    if hsb is not None:
-        kwargs["interventions"] = hsb
-    return tbsim.Sim(**kwargs)
+def build_sim(label, seeking=None):
+    """ A TB simulation with DOTS treatment and, if a rate of seeking care is given, the care cascade """
+    tb = tbsim.TB(beta=9, **tbsim.regimen('dots')).stratify(age=[0, 15]) # Xpert's sensitivity differs for children and adults
+    care = tbsim.care(tb, seeking=seeking) if seeking is not None else None
+    return tbsim.Sim(tb=tb, interventions=care, start=1990, stop=2010, label=label, verbose=0)
 
 
 scenarios = {
-    "Baseline": build_sim(),
-
-    "Low rate (10 %/day)": build_sim(
-        tbsim.HealthSeekingBehavior(pars=dict(
-            initial_care_seeking_rate=ss.perday(0.10),
-        ))
-    ),
-
-    "High rate (40 %/day) + retry": build_sim(
-        tbsim.HealthSeekingBehavior(pars=dict(
-            initial_care_seeking_rate=ss.perday(0.40),
-            care_retry_steps=4,
-        ))
-    ),
+    'Baseline': None,
+    'Low rate (1/year)': ss.peryear(1),
+    'High rate (4/year)': ss.peryear(4),
 }
 
 
-if __name__ == "__main__":
-    msim = ss.MultiSim(sims=list(scenarios.values()))
-    msim.run(parallel=True, reseed=False)
+if __name__ == '__main__':
+    sims = [build_sim(label, seeking) for label,seeking in scenarios.items()]
+    msim = ss.MultiSim(sims)
+    msim.run(parallel=False)
 
-    results = {
-        label: {str(k): v for k, v in sim.results.flatten().items()}
-        for label, sim in zip(scenarios.keys(), msim.sims)
-    }
+    for sim in msim.sims:
+        res = sim.results
+        diagnosed = res.care.diagnosed.sum() if 'care' in res else 0
+        print(f'{sim.label:20s}: {diagnosed:6.0f} diagnosed, {res.tb.cum_tb_death[-1]:5.0f} TB deaths, prevalence of infectious TB {res.tb.prevalence_active[-1]*1e5:.0f} per 100,000')
 
     tbsim.plot(
-        results,
-        select=dict(like=["symptomatic", "sought_care", "notifications", "prevalence", "incidence", "eligible"]),
-        title="Health-seeking behaviour – LSHTM TB model",
-        n_cols=3,
+        msim,
+        select = ['n_symptomatic', 'prevalence_active', 'new_infections', 'tb_death', 'diagnosis', 'n_treatment'],
+        title = 'Health-seeking behavior – LSHTM TB model',
+        n_cols = 3,
     )
     plt.show()

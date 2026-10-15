@@ -1,54 +1,45 @@
 """
-Illustrate malnutrition, and TB-malnutrition with connector.
+TB and malnutrition: TB with and without the effects of nutrition
+
+The malnutrition model tracks each agent's weight and height (as percentiles of growth
+curves) and micronutrient status. Nutrition acts on TB through modifiers
+(`tbsim.nutrition_effects()`): here, a low BMI speeds progression to active TB
+(`tbsim.lonnroth_bmi_rr`), and poor micronutrient status doubles susceptibility.
+Malnutrition is agent-based, so the sim runs as agents.
 """
 
 import starsim as ss
 import tbsim
-import matplotlib.pyplot as plt
 
 
-def make_malnutrition():
-    """Standalone malnutrition simulation."""
-    nut = tbsim.Malnutrition()
+def make_sim(nutrition=True, label=None):
+    """ A TB-malnutrition sim, with or without the effects of nutrition on TB """
+    tb = tbsim.TB(init=dict(infection=0.25))
+    effects = tbsim.nutrition_effects(tb, rr_activation=tbsim.lonnroth_bmi_rr) if nutrition else None
     sim = tbsim.Sim(
-        n_agents=200,
-        start='1990',
-        stop='2020',
-        diseases=[nut],
-        demographics=[ss.Births(pars=dict(birth_rate=5)), ss.Deaths(pars=dict(death_rate=5))],
+        tb = tb,
+        diseases = tbsim.Malnutrition(),
+        connectors = effects,
+        solver = 'abm',
+        use_aging = True, # Agents age, so that their height and weight follow the growth curves
+        n_agents = 2000,
+        start = '1980-01-01',
+        stop = '2000-01-01',
+        rand_seed = 1,
+        verbose = 0,
+        label = label,
     )
-    return sim
-
-
-def make_tb_nut():
-    """TB + malnutrition simulation with connector."""
-    nut = tbsim.Malnutrition()
-    connector = tbsim.TB_Nutrition_Connector()
-
-    sim = tbsim.Sim(
-        n_agents=1000,
-        start=1980,
-        stop=1995,
-        dt=ss.days(7),
-        beta=0.01,
-        init_prev=0.25,
-        diseases=[nut],
-        demographics=[ss.Pregnancy(pars=dict(fertility_rate=15)), ss.Deaths(pars=dict(death_rate=10))],
-        connectors=connector,
-    )
-    sim.pars.verbose = sim.pars.dt.years / 5
     return sim
 
 
 if __name__ == '__main__':
-    # Make Malnutrition simulation
-    sim_n = make_malnutrition()
-    sim_n.run()
-    results = {'malnutrition': sim_n.results.flatten()}
-    tbsim.plot(results, n_cols=3)
+    sims = [
+        make_sim(nutrition=False, label='No nutrition effects'),
+        make_sim(nutrition=True, label='With nutrition effects'),
+    ]
+    for sim in sims:
+        print(f'Running: {sim.label}')
+        sim.run()
 
-    # Make TB-malnutrition simulation
-    sim_tbn = make_tb_nut()
-    sim_tbn.run()
-    sim_tbn.get_tb().plot()
-    plt.show()
+    msim = ss.MultiSim(sims)
+    tbsim.plot(msim, select=['prevalence_active', 'active', 'n_infection', 'n_symptomatic'], title='TB and malnutrition', n_cols=2)

@@ -5,144 +5,126 @@ jupyter: python3
 
 This section provides practical examples of TBsim usage across different scenarios and applications.
 
-## Basic TB Simulation
+## Basic TB simulation
 
-The simplest way to run a TB simulation:
+The simplest way to run a TB simulation is with `tbsim.Sim`, an `ss.Sim` that comes with the TB model. With no contact network, it runs as an ODE:
 
 ```{python}
-from tbsim import TB
-import starsim as ss
+import tbsim
 
-# Create and run a basic TB simulation
-sim = ss.Sim(diseases=TB(), verbose=0)
+sim = tbsim.Sim()
 sim.run()
-
-# Plot results
 sim.plot()
 ```
 
-## TB with Interventions
+## TB with interventions
 
-Adding BCG vaccination and treatment interventions:
+Interventions are Starsim deliveries of TB products. Here, BCG vaccination reaches 80% of children as they are born (and before age 5), and TB preventive therapy (TPT) is offered every year to 30% of people with a latent infection. Since BCG depends on age, the TB model is stratified by age, at 5 years:
+
+```{python}
+#| output: false
+import starsim as ss
+import tbsim
+
+ppl = ss.People(1000) # For writing conditions on people, such as their age
+tb = tbsim.TB().stratify(age=[0, 5])
+bcg = ss.vaccinate(tbsim.BCG(), eligible=ppl.age < 5, coverage=0.8, start=1980)
+tpt = ss.treat(tbsim.TPT(), eligible=tb.infection, coverage=0.3, interval=ss.years(1), start=1990)
+
+sim = tbsim.Sim(tb=tb, interventions=[bcg, tpt], start=1975, stop=2030, verbose=0)
+sim.run()
+```
+
+Diagnosis and treatment are the care cascade, `tbsim.care()`: people with symptomatic TB seek care, are tested (by default with Xpert), and start treatment if they test positive.
+
+```{python}
+#| output: false
+tb = tbsim.TB(**tbsim.regimen('dots')).stratify(age=[0, 15]) # Xpert's sensitivity differs for children and adults
+sim = tbsim.Sim(tb=tb, interventions=tbsim.care(tb), verbose=0)
+sim.run()
+```
+
+## TB-HIV comorbidity
+
+Modeling TB and HIV together: people are infected with HIV at a given incidence and start ART at a given rate, and `tbsim.hiv_effects()` makes progression to active TB faster for people with HIV. With no network, the simulation runs as an ODE, with TB and HIV tracked jointly:
 
 ```{python}
 #| output: false
 import tbsim
-from tbsim import TB
-import starsim as ss
 
-# Add TB module and interventions
-tb = TB()
-bcg = tbsim.BCGRoutine(pars=dict(
-    coverage=ss.bernoulli(p=0.8),
-    start=ss.date('1980-01-01'),
-    stop=ss.date('2030-12-31'),
-    age_range=[0, 5],
-))
-tpt = tbsim.TPTSimple(pars=dict(
-    start=ss.date('1990-01-01'),
-    stop=ss.date('2030-12-31'),
-))
-
-sim = ss.Sim(
-    diseases=tb,
-    interventions=[bcg, tpt],
-    pars=dict(start=ss.date('1975-01-01'), stop=ss.date('2030-12-31')),
-    verbose=0,
-)
+tb = tbsim.TB()
+hiv = tbsim.HIV(incidence=0.01, init_prev=0.1, art_start=0.2)
+sim = tbsim.Sim(tb=tb, diseases=hiv, connectors=tbsim.hiv_effects(tb, hiv), verbose=0)
 sim.run()
 ```
 
-## TB-HIV Comorbidity
+## Household networks
 
-Modeling TB and HIV together:
-
-```{python}
-#| output: false
-from tbsim.comorbidities.hiv import HIV
-from tbsim import TB
-import starsim as ss
-
-# Add both modules
-tb = TB()
-hiv = HIV()
-
-sim = ss.Sim(diseases=[tb, hiv], verbose=0)
-sim.run()
-```
-
-## Household Networks
-
-Using household-based social networks:
+Using household-based contact networks, as agents. With a network, `beta` is the transmission rate per contact per year:
 
 ```{python}
 #| output: false
-import starsim as ss
 import sciris as sc
-from tbsim import TB
+import starsim as ss
+import tbsim
 
-# Synthetic DHS-style household data (hh_id + comma-separated ages per household)
+# Synthetic DHS-style household data (household ID, and the ages of its members)
 dhs_data = sc.dataframe(
-    hh_id=[0, 1, 2],
-    ages=['72, 17, 30', '37', '13, 55, 36'],
+    hh_id = [0, 1, 2],
+    ages = ['72, 17, 30', '37', '13, 55, 36'],
 )
 
-# Create household network and TB (static households; no Pregnancy module required)
+# Static households, so no pregnancy module is needed
 households = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
-tb = TB()
-
-sim = ss.Sim(networks=households, diseases=tb, verbose=0)
+sim = tbsim.Sim(networks=households, beta=3, n_agents=1000, verbose=0)
 sim.run()
 ```
 
-## Advanced Analysis
+## Advanced analysis
 
-Using the built-in analyzers:
+Using the built-in analyzers, e.g. the dwell time in each TB state. The analyzer follows individual agents, so the simulation runs with agents:
 
 ```{python}
 #| eval: false
-from tbsim import TB
-from tbsim.analyzers import DwellTime
-import starsim as ss
+import tbsim
 
-# Run simulation with dwell time analyzer
-sim = ss.Sim(diseases=[TB()], analyzers=DwellTime(scenario_name="Baseline"))
+sim = tbsim.Sim(analyzers=tbsim.DwellTime(scenario_name='Baseline'), solver='abm', n_agents=2000)
 sim.run()
 
 # Create plots from the analyzer
-sim.analyzers[0].plot('histogram')
-sim.analyzers[0].plot('kaplan_meier')
-sim.analyzers[0].plot('network')
+dwell = sim.analyzers[0]
+dwell.plot('histogram')
+dwell.plot('kaplan_meier')
+dwell.plot('network')
 ```
 
-## Parameter Sweeps
+## Parameter sweeps
 
-Running multiple parameter combinations:
+Running several values of a parameter, here the transmission rate (contacts per person per year), and comparing the prevalence of infectious TB at the end:
 
 ```{python}
 #| output: false
-from tbsim import TB
-import starsim as ss
 import numpy as np
+import tbsim
 
-# Define parameter ranges
-transmission_rates = np.linspace(0.1, 0.5, 5)
-
-results = []
-for rate in transmission_rates:
-    sim = ss.Sim(diseases=TB(pars={'beta': ss.peryear(rate)}), verbose=0)
+betas = np.linspace(5, 15, 5)
+prevalence = []
+for beta in betas:
+    sim = tbsim.Sim(beta=beta, verbose=0)
     sim.run()
-    results.append(sim.results)
+    prevalence.append(sim.results.tb.prevalence_active[-1])
 ```
 
-## Script Examples
+## Script examples
 
 The `tbsim_examples/` directory contains ready-to-run examples:
 
-- **Basic TB**: `run_tb.py` - Simple TB simulation
+- **Basic TB**: `run_tb.py` - a simple TB simulation
 - **Malnutrition**: `run_malnutrition.py` - TB and malnutrition comorbidity
 - **TB-HIV**: `run_tbhiv.py` - TB-HIV coinfection model
-- **Interventions**: `run_tb_interventions.py` - BCG, TPT, and beta scenarios
-- **Health Seeking**: `run_health_seeking.py` - Health-seeking behaviour with the LSHTM TB model
+- **Interventions**: `run_tb_interventions.py` - BCG, TPT, and changes in transmission
+- **Health seeking**: `run_health_seeking.py` - seeking care, diagnosis, and treatment with the care cascade (`tbsim.care()`)
+- **Migration**: `run_migration.py` - people arriving and leaving, some of them with TB
+- **Front-loaded progression**: `run_time_varying_progression.py` - progression to active TB that is concentrated soon after infection
 
 For more detailed tutorials and step-by-step guides, see the [tutorials](../tutorials/index.md) section.
