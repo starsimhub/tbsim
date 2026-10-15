@@ -7,8 +7,8 @@ strain B (treatment-resistant), with superinfection (``AB``), a transmission bot
 a progression bottleneck, de-novo resistance, and a strain-resolved treatment operator.
 
 Every "question of interest" is a mode switch on this one system; the defaults reproduce
-the intended baseline. Used as the deterministic reference that ``tbsim.TBResistant`` is
-validated against (``tests/test_resistance.py``). Parameter and state names match ``two_strain_ode.R``.
+the intended baseline. Used as the deterministic reference that ``tbsim.LSHTMResistant`` is
+validated against (``tests/test_models.py``). Parameter and state names match ``two_strain_ode.R``.
 """
 
 import numpy as np

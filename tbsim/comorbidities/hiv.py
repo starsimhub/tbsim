@@ -5,7 +5,7 @@ import numpy as np
 import starsim as ss
 import tbsim
 
-__all__ = ['HIVState', 'HIV', 'HivInterventions', 'TB_HIV_Connector']
+__all__ = ['HIVState', 'HIV', 'HivInterventions', 'hiv_effects']
 
 class HIVState(IntEnum):
     """ HIV states: uninfected through advanced disease. """
@@ -291,70 +291,27 @@ class HivInterventions(ss.Intervention):
 
         return
 
-class TB_HIV_Connector(ss.Connector):
+def hiv_effects(tb, acute=1.2202, latent=1.9001, aids=2.5955, hiv='hiv'):
     """
-    Connector between TB and HIV: multiplies TB activation risk by HIV-state-dependent
-    relative risk factors (ACUTE: 1.2202, LATENT: 1.9001, AIDS: 2.5955).
+    The effect of HIV on TB: a multiplier on progression from latent infection to active TB, by HIV state (agents only)
 
-    Example
-    -------
-    ::
+    Returns modifiers, to pass to the sim as `connectors`.
 
-        import starsim as ss
-        import tbsim
-        from tbsim.comorbidities.hiv import HIV, HivInterventions, TB_HIV_Connector
+    Args:
+        tb (`tbsim.TB`): the TB model
+        acute, latent, aids (float): the multiplier for each HIV state (TODO: citation needed)
+        hiv (str): the name of the HIV module
 
-        tb   = tbsim.TB(name='tb')
-        hiv  = HIV(name='hiv')
-        conn = TB_HIV_Connector()
-        intv = HivInterventions()
-        sim  = ss.Sim(diseases=[tb, hiv], connectors=conn, interventions=intv,
-                      pars=dict(start='2000', stop='2020'))
-        sim.run()
+    Example::
+
+        tb = tbsim.TB()
+        sim = ss.Sim(tb, diseases=tbsim.HIV(), connectors=tbsim.hiv_effects(tb), interventions=tbsim.HivInterventions(), solver='abm')
     """
-
-    def __init__(self, pars=None, **kwargs):
-        """Initialize with HIV-state-dependent TB risk multipliers."""
-        super().__init__(label='TB-HIV')
-        self.define_pars(
-            tb_hiv_rr_func       = self.compute_tb_hiv_risk_rr,
-            acute_multiplier     = 1.2202,   # TODO: citation needed
-            latent_multiplier    = 1.9001,   # TODO: citation needed
-            aids_multiplier      = 2.5955,   # TODO: citation needed
-        )
-        self.update_pars(pars=pars, **kwargs)
-        self.state_multipliers = {
-            HIVState.ACUTE: self.pars.acute_multiplier,
-            HIVState.LATENT: self.pars.latent_multiplier,
-            HIVState.AIDS:   self.pars.aids_multiplier,
-
-        }
-
-        return
-
-    @staticmethod
-    def compute_tb_hiv_risk_rr(self, tb, hiv, uids, base_factor=1.0):
-        """ Compute per-agent TB relative risk multiplier based on HIV state. """
-        states = hiv.state[uids]
-
-        # Initialize multipliers with 1.0
-        rr = np.ones_like(uids, dtype=float)
-
-        # Define risk multipliers by HIV state
-        state_multipliers = self.state_multipliers
-
-        # Apply state-specific risk multipliers
-        for state, mult in state_multipliers.items():
+    mults = {HIVState.ACUTE:acute, HIVState.LATENT:latent, HIVState.AIDS:aids}
+    def activation(sim):
+        states = sim.diseases[hiv].state[sim.people.auids]
+        rr = np.ones(len(states))
+        for state,mult in mults.items():
             rr[states == state] = mult
-
-        return rr * base_factor
-
-    def step(self):
-        """ Apply HIV-based risk multipliers to TB activation rates. """
-        tb = tbsim.get_tb(self.sim)
-        hiv = self.sim.diseases['hiv']
-        uids_tb = tb.infected.uids
-        rr = self.pars.tb_hiv_rr_func(self, tb, hiv, uids_tb)
-        tb.rr_activation[uids_tb] *= rr
-
-        return
+        return rr
+    return [ss.modify(tb.latent_asy, multiply=activation, name='hiv_latent_asy'), ss.modify(tb.latent_non, multiply=activation, name='hiv_latent_non')]

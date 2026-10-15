@@ -1,8 +1,9 @@
 """
 Define compartmental TB models.
 
-TB_ODE is a translation of the R model (lshtm_ode.R) into Python, integrated with scipy.odeint.
-TB_SS is a Starsim implementation of the same compartmental model, with Euler integration.
+TB_ODE is a translation of the R model (lshtm_ode.R) into Python, integrated with scipy.odeint. It is
+the reference for ``tbsim.TB``, which is the same model declared as states and transitions, and
+runs as an ODE or as agents.
 
 State and parameter names are aligned with the agent-based ``tbsim.TB`` class. The ODE keeps
 ``CLEARED`` split into three sub-states (CLEARED, RECOVERED, TREATED) so that the appropriate
@@ -14,11 +15,10 @@ when modelling a post-treatment-era period.
 
 import numpy as np
 import sciris as sc
-import starsim as ss
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 
-__all__ = ['default_pars', 'TB_ODE', 'TB_SS']
+__all__ = ['default_pars', 'TB_ODE']
 
 
 # Default parameters. Natural-history rates and reinfection multipliers are aligned with
@@ -175,134 +175,3 @@ class TB_ODE(sc.prettyobj):
                     ax.set_ylim(bottom=0)
             sc.figlayout()
         return fig
-
-
-class TB_SS(ss.Module):
-    """
-    Compartmental Starsim implementation of the LSHTM TB model (Euler integration).
-
-    Self-contained: does not need a network or People (operates on aggregate compartments).
-
-    See ``default_pars`` for parameter definitions.
-
-    **Example**:
-
-        import starsim as ss
-        import tbsim.compartmental as tbc
-        tb = tbc.TB_SS()
-        sim = ss.Sim(modules=tb, start=1920, stop=2020, dt=0.1, n_agents=1)
-        sim.run()
-        sim.plot()
-    """
-    def __init__(self, **kwargs):
-        """Initialize compartmental states and parameters; keyword arguments override defaults."""
-        super().__init__()
-        self.define_pars(**default_pars)
-        self.update_pars(**kwargs)
-
-        # Compartment labels (aligned with tbsim.TB; CLEARED is split into three sub-states)
-        self.c_labels = sc.objdict(
-            SUSCEPTIBLE    = 'Susceptible',
-            INFECTION      = 'Latent infection',
-            CLEARED        = 'Cleared (from latent)',
-            RECOVERED      = 'Recovered (from active)',
-            NON_INFECTIOUS = 'Non-infectious',
-            ASYMPTOMATIC   = 'Asymptomatic',
-            SYMPTOMATIC    = 'Symptomatic',
-            TREATMENT      = 'On treatment',
-            TREATED        = 'Completed treatment',
-        )
-
-        # Compartments (scalars, not per-agent states)
-        self.c = sc.objdict({key: 0 for key in self.c_labels})
-        return
-
-    def init_post(self):
-        """Set initial conditions: 1% start in SYMPTOMATIC active TB."""
-        super().init_post()
-        p = self.pars
-        c = self.c
-        init_sym = 1e3
-        c.SUSCEPTIBLE = p.N - init_sym
-        c.SYMPTOMATIC = init_sym
-        return
-
-    def step(self):
-        """Euler integration of the ODE system."""
-        p = self.pars
-        c = self.c
-        dt = self.dt.years  # rates in pars are per-year, so integrate in years
-
-        foi = (p.beta / p.N) * (p.trans_asymp * c.ASYMPTOMATIC + c.SYMPTOMATIC)
-
-        d = sc.objdict()
-        d.SUSCEPTIBLE    = (p.mu * p.N) + (p.sym_dead * c.SYMPTOMATIC) \
-                           - foi * c.SUSCEPTIBLE - p.mu * c.SUSCEPTIBLE
-        d.INFECTION      = foi * (c.SUSCEPTIBLE
-                                  + p.rr_reinfection_cleared * c.CLEARED
-                                  + p.rr_reinfection_rec     * c.RECOVERED
-                                  + p.rr_reinfection_treat   * c.TREATED) \
-                           - (p.inf_cle + p.inf_non + p.inf_asy + p.mu) * c.INFECTION
-        d.CLEARED        = p.inf_cle * c.INFECTION \
-                           - foi * p.rr_reinfection_cleared * c.CLEARED - p.mu * c.CLEARED
-        d.RECOVERED      = p.non_rec * c.NON_INFECTIOUS \
-                           - foi * p.rr_reinfection_rec * c.RECOVERED - p.mu * c.RECOVERED
-        d.NON_INFECTIOUS = p.inf_non * c.INFECTION + p.asy_non * c.ASYMPTOMATIC \
-                           - (p.non_rec + p.non_asy + p.mu) * c.NON_INFECTIOUS
-        d.ASYMPTOMATIC   = p.inf_asy * c.INFECTION + p.non_asy * c.NON_INFECTIOUS + p.sym_asy * c.SYMPTOMATIC \
-                           - (p.asy_non + p.asy_sym + p.mu) * c.ASYMPTOMATIC
-        d.SYMPTOMATIC    = p.asy_sym * c.ASYMPTOMATIC - p.sym_asy * c.SYMPTOMATIC \
-                           - p.theta * c.SYMPTOMATIC + p.phi * c.TREATMENT \
-                           - p.sym_dead * c.SYMPTOMATIC - p.mu * c.SYMPTOMATIC
-        d.TREATMENT      = p.theta * c.SYMPTOMATIC - p.phi * c.TREATMENT \
-                           - p.delta * c.TREATMENT - p.mu * c.TREATMENT
-        d.TREATED        = p.delta * c.TREATMENT \
-                           - foi * p.rr_reinfection_treat * c.TREATED - p.mu * c.TREATED
-
-        for key in d:
-            c[key] += d[key] * dt
-        return
-
-    def init_results(self):
-        """Initialize results."""
-        super().init_results()
-        self.define_results(
-            *[ss.Result(key, label=value) for key, value in self.c_labels.items()],
-            ss.Result('TBc', label='TB prevalence'),
-            ss.Result('Mor', label='TB mortality'),
-            ss.Result('Dxs', label='TB notifications'),
-            ss.Result('Spr', label='Proportion asymptomatic', scale=False),
-        )
-        return
-
-    def update_results(self):
-        """Store the current state."""
-        super().update_results()
-        ti = self.ti
-        c = self.c
-        p = self.pars
-        for key in c:
-            self.results[key][ti] = c[key]
-
-        tb_prev = c.ASYMPTOMATIC + c.SYMPTOMATIC
-        self.results.TBc[ti] = tb_prev
-        self.results.Mor[ti] = p.sym_dead * c.SYMPTOMATIC
-        self.results.Dxs[ti] = p.theta * c.SYMPTOMATIC
-        self.results.Spr[ti] = c.ASYMPTOMATIC / tb_prev if tb_prev > 0 else 0
-        return
-
-    def plot(self, **kwargs):
-        """Plot all results, each in a separate axes."""
-        results = list(self.results.all_results)
-        kw = sc.mergedicts(dict(lw=2, alpha=0.8), kwargs)
-        with sc.options.with_style('fancy'):
-            fig = plt.figure()
-            nrows, ncols = sc.getrowscols(len(results))
-            for i, res in enumerate(results):
-                ax = plt.subplot(nrows, ncols, i + 1)
-                res.plot(ax=ax, **kw)
-                sc.boxoff(ax)
-                if res.min() >= 0:
-                    ax.set_ylim(bottom=0)
-            sc.figlayout()
-        return ss.return_fig(fig)

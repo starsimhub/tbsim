@@ -7,7 +7,6 @@ import datetime as ddtt
 import numpy as np
 import pandas as pd
 from scipy import stats
-from lifelines import KaplanMeierFitter
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -191,6 +190,7 @@ class DwellTime(ss.Analyzer):
         event_observed = (data[event_observed_col]
                           if event_observed_col else [1] * len(data))
 
+        from lifelines import KaplanMeierFitter # Only needed here
         kmf = KaplanMeierFitter()
         kmf.fit(durations, event_observed=event_observed)
 
@@ -353,7 +353,7 @@ class DwellTime(ss.Analyzer):
     def _update_state_change_data(self):
         """Detect state changes and record dwell times."""
         ti = self.ti
-        tb = tbsim.get_tb(self.sim)
+        codes = tbsim.state_codes(tbsim.get_tb(self.sim))
         uids = self.sim.people.auids.copy()
 
         relevant_rows = self._latest_sts_df[
@@ -361,7 +361,7 @@ class DwellTime(ss.Analyzer):
 
         different_state_mask = (
             relevant_rows['last_state'].values
-            != tb.state[ss.uids(relevant_rows['agent_id'].values)])
+            != codes[ss.uids(relevant_rows['agent_id'].values)])
         uids = ss.uids(
             relevant_rows['agent_id'].values[different_state_mask])
         from_states = relevant_rows['last_state'].values[different_state_mask]
@@ -377,12 +377,12 @@ class DwellTime(ss.Analyzer):
             states=from_states[log_mask],
             entry_times=entry_times[log_mask],
             exit_times=np.full(len(log_uids), ti),
-            going_to_state_ids=tb.state[log_uids].copy(),
+            going_to_state_ids=codes[log_uids].copy(),
             age=self.sim.people.age[log_uids].copy())
 
         self._latest_sts_df.loc[
             self._latest_sts_df['agent_id'].isin(uids),
-            'last_state'] = tb.state[uids]
+            'last_state'] = codes[uids]
         self._latest_sts_df.loc[
             self._latest_sts_df['agent_id'].isin(uids),
             'last_state_time'] = ti
@@ -447,9 +447,7 @@ class DwellTime(ss.Analyzer):
                 age=self.sim.people.age[
                     ss.uids(relevant_rows['agent_id'].values)].copy())
 
-        state_dict = {
-            state.value: state.name.replace('_', ' ').title()
-            for state in tbsim.TBS}
+        state_dict = {i:name.replace('_', ' ').capitalize() for i,name in enumerate(tbsim.get_tb(self.sim).graph.states)}
         state_dict[-3] = 'NON-TB DEATH'
         state_dict[-2] = 'NEVER INFECTED'
         self.data['state_name'] = self.data['state'].map(state_dict)

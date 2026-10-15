@@ -10,10 +10,9 @@ do_plot = False
 
 def make_msim():
     pars = dict(dt=ss.days(14), start=ss.date('2000-01-01'), stop=ss.date('2002-12-31'), verbose=0)
-    tb_pars = dict(init_prev=0.2, beta=ss.peryear(1.0))
     sims = [
         ss.Sim(label=label, n_agents=300,
-               diseases=tbsim.TB(name='tb', pars=tb_pars),
+               diseases=tbsim.TB(beta=1.0, init=dict(infection=0.2)),
                networks=ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=30)),
                pars=pars)
         for label in ('Scenario A', 'Scenario B', 'Scenario C')
@@ -46,7 +45,7 @@ def test_plot_select_and_fill_missing_metric():
     msim = make_msim()
     flat = tbsim.plots._normalize_results(msim)
     patched = {label: d.copy() for label, d in flat.items()}
-    metric = 'n_infectious'
+    metric = 'infectious'
     patched['Scenario B'].pop(metric, None)
     fig = tbsim.plot(patched, select=[metric], n_cols=1, show=do_plot)
     assert fig is not None

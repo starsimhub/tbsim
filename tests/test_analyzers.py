@@ -10,12 +10,13 @@ import pytest
 
 
 def make_sim(n_agents=1000, interventions=None, **kwargs):
-    """Create and return a tbsim.Sim with HSB and optional interventions."""
+    """Create and return a tbsim.Sim with optional interventions."""
     sim = tbsim.Sim(
+        tb=tbsim.TB(init=dict(infection=0.30)),
         n_agents=n_agents,
         interventions=interventions,
-        sim_pars=dict(start='2000-01-01', stop='2005-12-31'),
-        tb_pars=dict(init_prev=0.30),
+        start='2000-01-01',
+        stop='2005-12-31',
         **kwargs
     )
     return sim

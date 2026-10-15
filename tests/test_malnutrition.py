@@ -1,7 +1,7 @@
 """
 Tests for malnutrition comorbidity module
 
-This module tests the Malnutrition disease model and TB_Nutrition_Connector
+This module tests the Malnutrition disease model, its effects on TB, and the effect of HIV on TB
 to ensure they work correctly with Starsim 3.0.
 """
 
@@ -72,112 +72,56 @@ class TestMalnutrition:
 
 
 class TestTBNutritionConnector:
-    """Test the TB_Nutrition_Connector"""
-    
-    def test_connector_creation(self):
-        """Test that TB_Nutrition_Connector can be created"""
-        connector = tbsim.TB_Nutrition_Connector()
-        assert isinstance(connector, tbsim.TB_Nutrition_Connector)
-        assert isinstance(connector, ss.Connector)
-    
-    def test_connector_parameters(self):
-        """Test that connector parameters are set correctly"""
-        connector = tbsim.TB_Nutrition_Connector(pars=dict(
-            rr_activation_func=tbsim.TB_Nutrition_Connector.ones_rr,
-            rr_clearance_func=tbsim.TB_Nutrition_Connector.ones_rr,
-            relsus_func=tbsim.TB_Nutrition_Connector.compute_relsus
-        ))
-        
-        assert connector.pars['rr_activation_func'] == tbsim.TB_Nutrition_Connector.ones_rr
-        assert connector.pars['rr_clearance_func'] == tbsim.TB_Nutrition_Connector.ones_rr
-        assert connector.pars['relsus_func'] == tbsim.TB_Nutrition_Connector.compute_relsus
-    
+    """Test the effects of nutrition on TB (tbsim.nutrition_effects) and the risk-ratio functions"""
+
+    def test_effects_are_modifiers(self):
+        """nutrition_effects returns modifiers of the TB transitions and susceptibility"""
+        tb = tbsim.TB()
+        mods = tbsim.nutrition_effects(tb, rr_activation=tbsim.lonnroth_bmi_rr)
+        assert all(isinstance(m, ss.modify) for m in mods)
+        assert [m.target_name or m.target_kind for m in mods] == ['latent_asy', 'latent_non', 'recovery', 'rel_sus']
+
     def test_ones_rr_function(self):
-        """Test the ones_rr function returns neutral risk ratios"""
-        # Create mock TB and malnutrition objects for testing
-        class MockTB:
-            pass
-        
-        class MockMalnutrition:
-            pass
-        
-        tb = MockTB()
-        nut = MockMalnutrition()
-        uids = np.array([0, 1, 2, 3, 4])
-        
-        rr = tbsim.TB_Nutrition_Connector.ones_rr(tb, nut, uids)
-        assert len(rr) == 5
-        assert all(r == 1.0 for r in rr)
-    
+        """ones_rr returns neutral risk ratios"""
+        rr = tbsim.ones_rr(None, None, np.arange(5))
+        assert len(rr) == 5 and np.all(rr == 1.0)
+
     def test_compute_relsus_function(self):
-        """Test the compute_relsus function"""
-        # Create mock objects
-        class MockTB:
-            pass
-        
+        """compute_relsus doubles susceptibility where micronutrient status is below 0.2"""
         class MockMalnutrition:
-            def __init__(self):
-                self.weight_percentile = np.array([0.3, 0.5, 0.7, 0.2, 0.8])
-                self.height_percentile = np.array([0.4, 0.6, 0.3, 0.5, 0.9])
-                self.micro = np.array([0.1, 0.3, 0.5, 0.2, 0.4])
-        
-        tb = MockTB()
-        nut = MockMalnutrition()
-        uids = np.array([0, 1, 2, 3, 4])
-        
-        rel_sus = tbsim.TB_Nutrition_Connector.compute_relsus(tb, nut, uids)
-        assert len(rel_sus) == 5
-        assert all(r >= 1.0 for r in rel_sus)  # Should be >= 1.0
-    
+            micro = np.array([0.1, 0.3, 0.5, 0.2, 0.4])
+        rel_sus = tbsim.compute_relsus(None, MockMalnutrition(), np.arange(5))
+        assert np.array_equal(rel_sus, [2, 1, 1, 1, 1])
+
     def test_supplementation_rr_function(self):
-        """Test the supplementation_rr function"""
-        # Create mock objects
-        class MockTB:
-            pass
-        
+        """supplementation_rr is the rate ratio for those receiving both supplements, and 1 otherwise"""
         class MockMalnutrition:
-            def __init__(self):
-                self.receiving_macro = np.array([True, False, True, False, True])
-                self.receiving_micro = np.array([True, True, False, False, True])
-        
-        tb = MockTB()
-        nut = MockMalnutrition()
-        uids = np.array([0, 1, 2, 3, 4])
-        
-        rr = tbsim.TB_Nutrition_Connector.supplementation_rr(tb, nut, uids, rate_ratio=0.5)
-        
-        assert len(rr) == 5
-        # The function returns integers due to np.ones_like(uids) creating int64 array
-        # Check that all values are either 1 or 0 (for rate_ratio=0.5, it becomes 0 due to int conversion)
-        assert all(r in [0, 1] for r in rr)
-        # Check that at least one value is 0 (supplemented individuals)
-        assert 0 in rr
-    
+            receiving_macro = np.array([True, False, True, False, True])
+            receiving_micro = np.array([True, True, False, False, True])
+        rr = tbsim.supplementation_rr(None, MockMalnutrition(), np.arange(5), rate_ratio=0.5)
+        assert np.array_equal(rr, [0.5, 1, 1, 1, 0.5])
+
     def test_lonnroth_bmi_rr_function(self):
-        """Test the lonnroth_bmi_rr function"""
-        # Create mock objects
-        class MockTB:
-            pass
-        
+        """lonnroth_bmi_rr is positive and at most the scale"""
         class MockMalnutrition:
-            def __init__(self):
-                self.weight_percentile = np.array([0.3, 0.5, 0.7, 0.2, 0.8])
-                self.height_percentile = np.array([0.4, 0.6, 0.3, 0.5, 0.9])
-            
-            def weight(self, uids):
-                return np.array([20.0, 25.0, 30.0, 18.0, 35.0])
-            
-            def height(self, uids):
-                return np.array([100.0, 110.0, 105.0, 95.0, 120.0])
-        
-        tb = MockTB()
-        nut = MockMalnutrition()
-        uids = np.array([0, 1, 2, 3, 4])
-        
-        rr = tbsim.TB_Nutrition_Connector.lonnroth_bmi_rr(tb, nut, uids, scale=2.0, slope=3.0, bmi50=25.0)
-        assert len(rr) == 5
-        assert all(r > 0 for r in rr)  # Should be positive
-        assert all(r <= 2.0 for r in rr)  # Should not exceed scale
+            def weight(self, uids): return np.array([20.0, 25.0, 30.0, 18.0, 35.0])
+            def height(self, uids): return np.array([100.0, 110.0, 105.0, 95.0, 120.0])
+        rr = tbsim.lonnroth_bmi_rr(None, MockMalnutrition(), np.arange(5), scale=2.0, slope=3.0, bmi50=25.0)
+        assert len(rr) == 5 and np.all(rr > 0) and np.all(rr <= 2.0)
+
+
+class TestHIV:
+    """Test the effect of HIV on TB (tbsim.hiv_effects)"""
+
+    def test_hiv_speeds_progression(self):
+        """With HIV, more latent infections progress to active TB"""
+        progressions = []
+        for mult in [1, 5]:
+            tb = tbsim.TB(init=dict(infection=0.3))
+            sim = ss.Sim(tb, diseases=tbsim.HIV(), connectors=tbsim.hiv_effects(tb, acute=mult, latent=mult, aids=mult), interventions=tbsim.HivInterventions(),
+                         solver='abm', n_agents=5000, start=2000, stop=2010, verbose=0, rand_seed=1).run()
+            progressions.append((sim.results.tb.latent_asy + sim.results.tb.latent_non).sum())
+        assert progressions[1] > 1.3*progressions[0]
 
 
 class TestMalnutritionIntegration:
@@ -194,14 +138,12 @@ class TestMalnutritionIntegration:
         assert isinstance(nut, tbsim.Malnutrition)
         assert nut.pars['init_prev'] == 0.001
     
-    def test_connector_creation_with_malnutrition(self):
-        """Test connector creation with malnutrition"""
-        nut = tbsim.Malnutrition()
-        connector = tbsim.TB_Nutrition_Connector()
-        
-        # Test that both can be created together
-        assert isinstance(nut, tbsim.Malnutrition)
-        assert isinstance(connector, tbsim.TB_Nutrition_Connector)
+    def test_tb_with_malnutrition(self):
+        """TB runs as agents with malnutrition affecting it"""
+        tb = tbsim.TB(init=dict(infection=0.3))
+        sim = ss.Sim(tb, diseases=tbsim.Malnutrition(), connectors=tbsim.nutrition_effects(tb, rr_activation=tbsim.lonnroth_bmi_rr),
+                     solver='abm', n_agents=1000, start=2000, stop=2002, verbose=0).run()
+        assert sim.results.tb.latent_asy.sum() > 0
     
     def test_malnutrition_state_initialization(self):
         """Test that malnutrition states are properly initialized"""

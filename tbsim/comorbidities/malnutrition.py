@@ -10,7 +10,7 @@ from scipy.stats import norm
 import tbsim
 from tbsim import DATADIR
 
-__all__ = ["Malnutrition", "TB_Nutrition_Connector"]
+__all__ = ['Malnutrition', 'nutrition_effects', 'supplementation_rr', 'lonnroth_bmi_rr', 'ones_rr', 'compute_relsus']
 
 
 class Malnutrition(ss.Disease):
@@ -161,71 +161,59 @@ class Malnutrition(ss.Disease):
         return
 
 
-class TB_Nutrition_Connector(ss.Connector):
-    """
-    Connector between TB and Malnutrition disease models.
+def supplementation_rr(tb, mn, uids, rate_ratio=0.5):
+    """ Risk ratio from supplementation: `rate_ratio` for those receiving both macro- and micronutrients, else 1 """
+    rr = np.ones(len(uids))
+    rr[mn.receiving_macro[uids] & mn.receiving_micro[uids]] = rate_ratio
+    return rr
 
-    Modifies TB transition rates based on nutritional status:
-    - Activation risk ratio: how malnutrition affects latent-to-active TB
-    - Clearance risk ratio: how malnutrition affects TB recovery
-    - Relative susceptibility: how malnutrition affects new TB infection risk
+
+def lonnroth_bmi_rr(tb, mn, uids, scale=2, slope=3, bmi50=25):
+    """ Sigmoid BMI-based risk ratio, following the log-linear relationship of Lonnroth et al. """
+    bmi = 10_000 * mn.weight(uids) / mn.height(uids)**2
+    x = -0.05*(bmi-15) + 2
+    x0 = -0.05*(bmi50-15) + 2
+    return scale / (1+10**(-slope * (x-x0)))
+
+
+def ones_rr(tb, mn, uids):
+    """ Neutral risk ratios (no effect) """
+    return np.ones(len(uids))
+
+
+def compute_relsus(tb, mn, uids):
+    """ Relative susceptibility: 2 if micronutrient status is below 0.2, else 1 """
+    rel_sus = np.ones(len(uids))
+    rel_sus[mn.micro[uids] < 0.2] = 2
+    return rel_sus
+
+
+def nutrition_effects(tb, rr_activation=ones_rr, rr_clearance=ones_rr, rel_sus=compute_relsus, malnutrition='malnutrition'):
+    """
+    The effects of nutrition on TB, as modifiers (pass them to the sim as `connectors`; agents only)
+
+    Each effect is a function `(tb, mn, uids) -> one value per agent`, e.g. `lonnroth_bmi_rr` or `supplementation_rr`.
 
     Args:
-        pars (dict, optional): Override functions for 'rr_activation_func',
-            'rr_clearance_func', 'relsus_func'
-        **kwargs: Additional keyword arguments passed to ss.Connector
+        tb (`tbsim.TB`): the TB model
+        rr_activation (func): the multiplier on progression from latent infection to active TB
+        rr_clearance (func): the multiplier on recovery from non-infectious TB
+        rel_sus (func): the multiplier on susceptibility to infection
+        malnutrition (str): the name of the malnutrition module
+
+    Example::
+
+        tb = tbsim.TB()
+        sim = ss.Sim(tb, diseases=tbsim.Malnutrition(), connectors=tbsim.nutrition_effects(tb, rr_activation=tbsim.lonnroth_bmi_rr), solver='abm')
     """
-
-    def __init__(self, pars=None, **kwargs):
-        """Initialize with pluggable risk-ratio and relative-susceptibility functions."""
-        super().__init__(label='TB-Malnutrition')
-        self.define_pars(
-            rr_activation_func = self.ones_rr,
-            rr_clearance_func = self.ones_rr,
-            relsus_func = self.compute_relsus,
-        )
-        self.update_pars(pars, **kwargs)
-
-        return
-
-    @staticmethod
-    def supplementation_rr(tb, mn, uids, rate_ratio=0.5):
-        """Risk ratio based on supplementation: rate_ratio for those receiving both macro+micro, else 1."""
-        rr = np.ones_like(uids)
-        rr[mn.receiving_macro[uids] & mn.receiving_micro[uids]] = rate_ratio
-        return rr
-
-    @staticmethod
-    def lonnroth_bmi_rr(tb, mn, uids, scale=2, slope=3, bmi50=25):
-        """Sigmoid BMI-based risk ratio following Lonnroth et al. log-linear relationship."""
-        bmi = 10_000 * mn.weight(uids) / mn.height(uids)**2
-        x = -0.05*(bmi-15) + 2
-        x0 = -0.05*(bmi50-15) + 2
-        rr = scale / (1+10**(-slope * (x-x0)))
-        return rr
-
-    @staticmethod
-    def ones_rr(tb, mn, uids):
-        """Neutral risk ratios (all ones, no effect)."""
-        return np.ones_like(uids)
-
-    @staticmethod
-    def compute_relsus(tb, mn, uids):
-        """Relative susceptibility: 2x if micronutrient status < 0.2, else 1x."""
-        rel_sus = np.ones_like(uids)
-        rel_sus[mn.micro[uids] < 0.2] = 2
-        return rel_sus
-
-    def step(self):
-        """Apply nutritional effects to TB transition rates each time step."""
-        tb = tbsim.get_tb(self.sim)
-        mn = self.sim.diseases['malnutrition']
-
-        uids = tb.infected.uids
-        tb.rr_activation[uids] *= self.pars.rr_activation_func(tb, mn, uids)
-        tb.rr_clearance[uids] *= self.pars.rr_clearance_func(tb, mn, uids)
-
-        uids = (~tb.infected).uids
-        tb.rel_sus[uids] = self.pars.relsus_func(tb, mn, uids)
-
-        return
+    def per_agent(func):
+        def value(sim):
+            uids = sim.people.auids
+            return func(sim.diseases[tb.name], sim.diseases[malnutrition], uids)
+        return value
+    return [
+        ss.modify(tb.latent_asy, multiply=per_agent(rr_activation), name='nutrition_latent_asy'),
+        ss.modify(tb.latent_non, multiply=per_agent(rr_activation), name='nutrition_latent_non'),
+        ss.modify(tb.recovery, multiply=per_agent(rr_clearance), name='nutrition_recovery'),
+        ss.modify(tb.rel_sus, multiply=per_agent(rel_sus), name='nutrition_rel_sus'),
+    ]

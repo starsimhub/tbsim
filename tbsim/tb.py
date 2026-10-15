@@ -1,719 +1,229 @@
-"""TB natural history model. State definitions and transition diagram are in the API docs (tbsim.tb)."""
-
-from enum import IntEnum
-
+"""
+The TB model, declared as states and transitions (Starsim v4), so that it runs as an ODE, as a stochastic compartmental model, or as agents
+"""
 import numpy as np
+import sciris as sc
 import starsim as ss
-from .plots import plot as _tbsim_plot
+import tbsim
+
+__all__ = ['TB', 'tb_pars', 'make_pars', 'get_tb', 'state_codes']
 
 
-__all__ = ['TB', 'TBS', 'get_tb', 'choice2d']
+def tb_pars():
+    """ The parameters of the TB model: rates are per year (as in the LSHTM model, lshtm_ode.R) """
+    return sc.objdict(
+        beta                   = ss.par(ss.peryear(9.0), bounds=[1, 50], doc='Contacts per person per year (with homogeneous mixing; per contact with a network)'),
+        trans_asymp            = 0.82,             # Infectiousness of asymptomatic TB, relative to symptomatic (kappa)
+        rr_reinfection_cleared = 1.00,             # Relative risk of reinfection after clearing latent infection
+        rr_reinfection_rec     = 0.21,             # ... after recovering from non-infectious TB (pi)
+        rr_reinfection_treat   = 3.15,             # ... after completing treatment (rho)
+        rr_reinfection_inf     = 0.21,             # ... of someone with a remote latent infection, which makes it recent again (sigma_L)
+        dur_reinfection_protection = None,         # How long the protection (or risk) after clearance, recovery, or treatment lasts; None: for life
+        inf_cle                = ss.peryear(1.90), # INFECTION -> CLEARED
+        inf_non                = ss.peryear(0.16), # INFECTION -> NON_INFECTIOUS
+        inf_asy                = ss.peryear(0.06), # INFECTION -> ASYMPTOMATIC
+        k_latent               = ss.peryear(0.0),  # Front-loading: the rate at which a recent latent infection becomes remote (0: no remote stage)
+        inf_non_remote         = None,             # INFECTION_REMOTE -> NON_INFECTIOUS (None: as for a recent infection)
+        inf_asy_remote         = ss.peryear(0.0),  # INFECTION_REMOTE -> ASYMPTOMATIC
+        non_rec                = ss.peryear(0.18), # NON_INFECTIOUS -> RECOVERED
+        non_asy                = ss.peryear(0.25), # NON_INFECTIOUS -> ASYMPTOMATIC
+        asy_non                = ss.peryear(1.66), # ASYMPTOMATIC -> NON_INFECTIOUS
+        asy_sym                = ss.peryear(0.88), # ASYMPTOMATIC -> SYMPTOMATIC
+        sym_asy                = ss.peryear(0.54), # SYMPTOMATIC -> ASYMPTOMATIC
+        sym_dead               = ss.peryear(0.34), # SYMPTOMATIC -> dead (TB mortality)
+        theta                  = ss.peryear(0.0),  # Diagnosis: active TB -> TREATMENT (0 by default: it is driven by a delivery, e.g. tbsim.care())
+        phi                    = ss.peryear(0.0),  # Treatment failure: TREATMENT -> SYMPTOMATIC
+        delta                  = ss.peryear(2.0),  # Treatment completion: TREATMENT -> TREATED (6 months)
+        p_relapse              = 0.0,              # The share of completed treatments that relapse to symptomatic TB
+        dur_relapse            = ss.years(1.5),    # The time from the end of treatment to relapse
+        mu                     = ss.peryear(1/70), # Background mortality, with births replacing every death (0: none, e.g. to use ss.Births and ss.Deaths as agents)
+    )
 
 
-class TBS(IntEnum):
+def make_pars(defaults, kwargs):
+    """ Each parameter as an `ss.par` named after it (so it can be fitted, or set with `ss.Sim(pars=...)`); a bare number for a rate is per year """
+    unknown = set(kwargs) - set(defaults)
+    if unknown:
+        errormsg = f'Unknown parameter(s) {sc.strjoin(unknown)}; the parameters are {sc.strjoin(defaults.keys())}'
+        raise ValueError(errormsg)
+    pars = sc.objdict()
+    for key,default in defaults.items():
+        val = kwargs.get(key)
+        if isinstance(val, ss.par):
+            pars[key] = val
+            continue
+        raw = default.raw if isinstance(default, ss.par) else default
+        if val is None:
+            val = raw
+        elif isinstance(raw, ss.TimePar) and sc.isnumber(val): # A bare number is in the default's unit (per year, or years)
+            val = type(raw)(val)
+        if val is None: # An optional parameter that is not used
+            pars[key] = None
+            continue
+        bounds = default.bounds if isinstance(default, ss.par) else None
+        doc = default.doc if isinstance(default, ss.par) else None
+        pars[key] = ss.par(val, bounds=bounds, doc=doc, name=key)
+    return pars
+
+
+class TB(ss.Disease):
     """
-    TB state labels.
-
-    - Each agent is in exactly one of these states.
-    - Transitions are driven by exponential rates in `TB`.
-    """
-    SUSCEPTIBLE     = 0     # Never infected (agents who clear/recover/treat remain in their last state, not here)
-    INFECTION       = 1     # Latent infection (not yet active TB)
-    CLEARED         = 2     # Post-infection: cleared latent, recovered from non-infectious, or completed treatment
-    NON_INFECTIOUS  = 3     # Non-infectious TB (early/smear-negative)
-    ASYMPTOMATIC    = 4     # Active TB, asymptomatic (infectious)
-    SYMPTOMATIC     = 5     # Active TB, symptomatic (infectious)
-    TREATMENT       = 6     # On TB treatment
-    DEAD            = 7     # Dead (TB-caused via sym_dead; general mortality via step_die also sets this)
-    REMOVED         = 8     # Removed from the active population (e.g. emigration)
-
-
-# State groups for fast membership tests, e.g. ``tb.state.isin(TBS.ACTIVE)``.
-TBS.ACTIVE       = (TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC, TBS.SYMPTOMATIC)  # active TB disease
-TBS.TERMINAL     = (TBS.DEAD, TBS.REMOVED)                                  # no longer in the active population
-TBS.CARE_SEEKING = (TBS.SYMPTOMATIC,)                                       # eligible to seek care (clinical symptoms only)
-
-# Number of bins for one-pass state counting via np.bincount (TBS codes are contiguous from 0).
-_TBS_NBINS = int(max(TBS)) + 1
-
-
-class BaseTB(ss.Infection):
-    """Base class for TB natural history models."""
-    pass
-
-
-class TB(BaseTB):
-    """
-    Agent-based TB natural history adapting the LSHTM compartmental structure [1] (Schwalb et al. 2025).
-    States in `TBS` span the spectrum from susceptibility to active disease and treatment.
-    Infectious states are `TBS.ASYMPTOMATIC` and `TBS.SYMPTOMATIC`; the force
-    of infection depends on `pars.beta` and the prevalence of those states, with
-    `pars.trans_asymp` (kappa) giving the relative infectiousness of asymptomatic vs symptomatic TB.
-    Progression out of latent `INFECTION` uses constant per-year hazards by default, but can optionally
-    be *front-loaded* via `k_asy` (and `k_non`): the `INFECTION -> ASYMPTOMATIC` (and
-    `INFECTION -> NON_INFECTIOUS`) hazard then declines exponentially with time since infection
-    (see `progression_rates`).
-    Reinfectable state (`TBS.CLEARED`) uses per-agent `rr_reinfection`, set on entry from each
-    pathway (`rr_reinfection_cleared`, `rr_reinfection_rec`, `rr_reinfection_treat`). Per-agent modifiers
-    ``rr_activation``, ``rr_clearance``, ``rr_death`` scale selected rates.
-
-    Args (pars):
-        *Transmission and reinfection*
-
-        - ``init_prev``:   Initial seed infections into latent ``INFECTION`` (prevalence).
-        - ``init_prev_active``: Initial seed infections into active ``SYMPTOMATIC`` TB (prevalence). Default 0. Mirrors the ODE model's symptomatic seeding, so that both models can start from identical active-TB prevalence.
-        - ``beta``:        Transmission rate per year.
-        - ``trans_asymp``: Relative transmissibility, asymptomatic vs symptomatic. (kappa)
-        - ``rr_reinfection_rec``:     Relative risk of reinfection after recovering from NON_INFECTIOUS. (pi)
-        - ``rr_reinfection_treat``:   Relative risk of reinfection after completing treatment. (rho)
-        - ``rr_reinfection_cleared``: Relative risk of reinfection after clearing latent infection. Default: 1.0
-        - ``dur_reinfection_protection``: Distribution of duration of reinfection protection. If None, never wanes.
-
-        *From INFECTION (latent)*
-
-        - ``inf_cle``:     Infection -> Cleared (no active TB).
-        - ``inf_non``:     Infection -> Non-infectious TB.
-        - ``inf_asy``:     Infection -> Asymptomatic TB.
-        - ``k_asy``:       Optional exponential decline shape parameter of ``inf_asy`` with time since infection tau: ``inf_asy(tau) = inf_asy * exp(-k_asy * tau)``. Default 0 (constant hazard). Set > 0 to front-load progression to active TB (the recommended one-parameter form).
-        - ``k_non``:       Optional exponential decline shape parameter of ``inf_non`` with time since infection, analogous to ``k_asy``. Default 0 (constant hazard).
-
-        *From NON_INFECTIOUS*
-
-        - ``non_rec``:    Non-infectious -> Recovered.
-        - ``non_asy``:    Non-infectious -> Asymptomatic.
-
-        *From ASYMPTOMATIC*
-
-        - ``asy_non``:    Asymptomatic -> Non-infectious.
-        - ``asy_sym``:    Asymptomatic -> Symptomatic.
-
-        *From SYMPTOMATIC*
-
-        - ``sym_asy``:     Symptomatic -> Asymptomatic.
-        - ``sym_dead``:    Symptomatic -> Dead (TB-specific mortality, mu_TB).
-
-        *Background (general mortality is handled by* ``ss.Deaths`` *demographics, not this module)*
-
-        - ``cxr_asymp_sens``:   CXR sensitivity for screening asymptomatic (0-1).
-
-    Attributes:
-        *Infection flags*
-
-        - ``susceptible``    (BoolState, default=True):   Whether the agent is susceptible to TB.
-        - ``infected``       (BoolState, default=False):  Whether the agent is currently infected.
-        - ``ever_infected``  (BoolState, default=False):  Whether the agent has ever been infected.
-        - ``on_treatment``   (BoolState, default=False):  Whether the agent is on TB treatment.
-
-        *TB state machine*
-
-        - ``state``          (FloatArr, default=TBS.SUSCEPTIBLE):  Current TB state (`TBS` value).
-        - ``ti_infected``    (FloatArr, default=-inf):              Time of infection (never infected = -inf).
-
-        *Transmission modifiers*
-
-        - ``rel_sus``        (FloatArr, default=1.0):  Relative susceptibility to TB.
-        - ``rel_trans``      (FloatArr, default=1.0):  Relative transmissibility of TB.
-
-        *Per-agent risk modifiers*
-
-        - ``rr_activation``         (FloatArr, default=1.0):   Multiplier on INFECTION -> NON_INFECTIOUS / ASYMPTOMATIC.
-        - ``rr_clearance``          (FloatArr, default=1.0):   Multiplier on NON_INFECTIOUS -> CLEARED.
-        - ``rr_death``              (FloatArr, default=1.0):   Multiplier on SYMPTOMATIC -> DEAD.
-        - ``rr_reinfection``        (FloatArr, default=1.0):   Per-agent relative reinfection risk; set on entry to CLEARED.
-        - ``ti_rr_reinfection_wane`` (FloatArr, default=np.inf): Sim time at which ``rr_reinfection`` resets to 1.0.
-
-    Example:
-        ::
-
-            import starsim as ss
-            import tbsim
-
-            sim = ss.Sim(diseases=tbsim.TB(), pars=dict(start='2000', stop='2020'))
-            sim.run()
-            sim.plot()
-
-    References:
-        [1] Schwalb et al. (2025) Potential impact, costs, and benefits of population-wide
-        screening interventions for tuberculosis in Viet Nam. PLOS Glob Public Health.
-        https://doi.org/10.1371/journal.pgph.0005050
-
-    """
-
-    def __init__(self, pars=None, **kwargs):
-        """Initialize with default natural history parameters; override via ``pars``."""
-        super().__init__(name=kwargs.pop('name', None), label=kwargs.pop('label', None))
-
-        # --- Transmission and reinfection ---
-        self.define_pars(
-            init_prev=ss.bernoulli(0.05),       # Initial seed infections into latent INFECTION (prevalence)
-            init_prev_active=ss.bernoulli(0.0), # Initial seed infections into active SYMPTOMATIC TB (prevalence); mirrors the ODE's symptomatic seeding
-            beta=ss.permonth(0.2),              # Transmission rate per month
-            trans_asymp=0.82,                   # κ kappa: rel. transmissibility asymptomatic vs symptomatic
-            rr_reinfection_rec=0.21,            # π pi: RR reinfection after NON_INFECTIOUS → CLEARED
-            rr_reinfection_treat=3.15,          # ρ rho: RR reinfection after TREATMENT → CLEARED
-            rr_reinfection_cleared=1.0,         # RR reinfection after INFECTION → CLEARED (latent cleared); also applies to agents cleared via TPT sterilization
-            rr_reinfection_inf=None,            # σ_L: relative susceptibility of a latent INFECTION agent to reinfection (clock reset). None → rr_reinfection_rec
-            rr_reinfection_non=None,            # σ_N: relative susceptibility of a NON_INFECTIOUS agent to reinfection (clock reset). None → rr_reinfection_inf
-            dur_reinfection_protection=None,    # Distribution of protection duration; None = never wanes
-            # --- From INFECTION (latent) ---
-            inf_cle=ss.peryear(1.90),            # Clear infection (no active TB)
-            inf_non=ss.peryear(0.16),            # Progress to non-infectious TB
-            inf_asy=ss.peryear(0.06),            # Progress to asymptomatic active TB
-            # Optional front-loading of progression: the INFECTION-exit hazards may decline with
-            # time since infection tau (years), rate(tau) = rate * exp(-k * tau). Both default to 0
-            # (constant hazard = unchanged behaviour); set k_asy > 0 for the recommended 1-parameter
-            # front-loaded INFECTION -> ASYMPTOMATIC (see progression_rates).
-            k_asy=0.0,                           # Exponential decay shape parameter for inf_asy; 0 = constant
-            k_non=0.0,                           # Exponential decay shape parameter for inf_non; 0 = constant
-            # --- From NON_INFECTIOUS ---
-            non_rec=ss.peryear(0.18),            # Non-infectious → CLEARED
-            non_asy=ss.peryear(0.25),            # Progress to asymptomatic
-            # --- From ASYMPTOMATIC ---
-            asy_non=ss.peryear(1.66),            # Revert to non-infectious
-            asy_sym=ss.peryear(0.88),            # Progress to symptomatic
-            # --- From SYMPTOMATIC ---
-            sym_asy=ss.peryear(0.54),            # Regress to asymptomatic (still active TB; does not enter CLEARED)
-            sym_dead=ss.peryear(0.34),           # μ_TB: symptomatic → dead (TB mortality)
-            # --- Background ---
-            cxr_asymp_sens=1.0,                 # CXR sensitivity for screening asymptomatic (0–1)
-        )
-        self.update_pars(pars, **kwargs)
-        self._validate_pars()
-
-        # CRN-safe RNG distributions for per-step transition draws (one per source state)
-        self._rng_inf = ss.random(name='tb_rng_inf')   # INFECTION exits
-        self._rng_non = ss.random(name='tb_rng_non')   # NON_INFECTIOUS exits
-        self._rng_asy = ss.random(name='tb_rng_asy')   # ASYMPTOMATIC exits
-        self._rng_sym = ss.random(name='tb_rng_sym')   # SYMPTOMATIC exits
-
-        # Per-agent state: redefine base Infection states and add TB-specific ones
-        self.define_states(
-            ss.BoolState('susceptible', default=True),
-            ss.BoolState('infected'),
-            ss.FloatArr('rel_sus', default=1.0),
-            ss.FloatArr('rel_trans', default=1.0),
-            ss.FloatArr('ti_infected', default=-np.inf),
-            ss.FloatArr('state', default=TBS.SUSCEPTIBLE),
-            ss.FloatArr('ti_asymp', default=np.nan),                # Time of last entry to ASYMPTOMATIC (for new_active tracking)
-            ss.BoolState('on_treatment', default=False),
-            ss.BoolState('ever_infected', default=False),
-            # Risk modifiers
-            ss.FloatArr('rr_activation', default=1.0),
-            ss.FloatArr('rr_clearance', default=1.0),
-            ss.FloatArr('rr_death', default=1.0),
-            # Reinfection protection
-            ss.FloatArr('rr_reinfection', default=1.0),
-            ss.FloatArr('ti_rr_reinfection_wane', default=np.inf),
-            reset=True,
-        )
-
-        return
-
-    def _validate_pars(self):
-        """Validate parameter values that share the same rule across ``TB`` and ``TBResistant``.
-
-        Called after ``update_pars`` in each subclass' ``__init__`` so the checks live in one place
-        (``TBResistant`` applies its own pars after ``super().__init__``, hence the shared re-use).
-        """
-        # Decline parameters are shape terms for exp(-k*tau); require k >= 0.
-        if self.pars.k_asy < 0:
-            raise ValueError(f'k_asy must be >= 0, got {self.pars.k_asy}')
-        if self.pars.k_non < 0:
-            raise ValueError(f'k_non must be >= 0, got {self.pars.k_non}')
-        return
-
-    def _set_reinfection_wane(self, uids):
-        """Schedule reinfection-protection waning for newly cleared ``uids``, if waning is enabled."""
-        if self.pars.dur_reinfection_protection is not None and len(uids):
-            self.ti_rr_reinfection_wane[uids] = self.ti + self.pars.dur_reinfection_protection.rvs(uids)
-        return
-
-    def _enter_cleared(self, uids, rr):
-        """Bookkeeping shared by every pathway that moves agents into ``CLEARED``.
-
-        Sets the pathway-specific per-agent reinfection RR and schedules protection waning. Callers set
-        ``state`` (and any infected/susceptible flags) themselves. ``TBResistant`` extends this to also
-        drop all carried strains and their counts.
-        """
-        if len(uids) == 0:
-            return
-        self.rr_reinfection[uids] = rr
-        self._set_reinfection_wane(uids)
-        return
-
-    @property
-    def infectious(self):
-        """
-        Boolean array: True for agents who can transmit TB.
-
-        In this model only ASYMPTOMATIC and SYMPTOMATIC states are infectious.
-        Used by the base `starsim.Infection` for transmission.
-        """
-        return (self.state == TBS.ASYMPTOMATIC) | (self.state == TBS.SYMPTOMATIC)
-
-    # Read-only boolean views of the categorical `state` (the single source of truth).
-    # These give the boolean idiom at call sites (e.g. ``tb.active_tb.uids``,
-    # ``tb.latent[uids]``) with no extra storage and no risk of desync; to *write*
-    # state, assign ``self.state[uids] = TBS.X`` as before.
-    @property
-    def latent(self):
-        """Latent infection (`TBS.INFECTION`)."""
-        return self.state == TBS.INFECTION
-
-    @property
-    def non_infectious(self):
-        """Non-infectious TB (`TBS.NON_INFECTIOUS`)."""
-        return self.state == TBS.NON_INFECTIOUS
-
-    @property
-    def asymptomatic(self):
-        """Asymptomatic active TB (`TBS.ASYMPTOMATIC`)."""
-        return self.state == TBS.ASYMPTOMATIC
-
-    @property
-    def symptomatic(self):
-        """Symptomatic active TB (`TBS.SYMPTOMATIC`)."""
-        return self.state == TBS.SYMPTOMATIC
-
-    @property
-    def active_tb(self):
-        """Active TB disease (non-infectious, asymptomatic, or symptomatic)."""
-        return self.state.isin(TBS.ACTIVE)
-
-    @property
-    def terminal(self):
-        """No longer participating in transmission or care flows (dead or removed)."""
-        return self.state.isin(TBS.TERMINAL)
-
-    def set_prognoses(self, uids, sources=None):
-        """
-        Set prognoses for newly infected agents (called when transmission occurs).
-
-        The base `starsim.Infection` calls this when a susceptible agent acquires infection. A primary
-        infection (from ``SUSCEPTIBLE`` / ``CLEARED``) enters latent ``INFECTION``; a *reinfection* of an
-        already-infected latent (``INFECTION``) or non-infectious (``NON_INFECTIOUS``) agent only resets
-        the ``ti_infected`` clock — its state is left unchanged (clock reset, no state change). Transitions
-        are evaluated per dt each timestep in `step`.
-        """
-        super().set_prognoses(uids, sources)
-        if len(uids) == 0:
-            return
-
-        # Reinfection resets everyone's infection clock (raising the progression hazard under
-        # front-loading); the state is only (re)set to INFECTION for agents entering from a non-infected
-        # state, so a reinfected NON_INFECTIOUS agent is not wrongly knocked back to latent.
-        was_uninfected = ~self.infected[uids]
-        self.susceptible[uids] = False
-        self.infected[uids] = True
-        self.ever_infected[uids] = True
-        self.ti_infected[uids] = self.ti
-        self.state[uids[was_uninfected]] = TBS.INFECTION
-
-        return
-
-    def init_pre(self, sim):
-        """Resolve the reinfection-RR default coupling once all pars are final (spec §reinfection).
-
-        ``rr_reinfection_inf`` (σ_L) defaults to ``rr_reinfection_rec``; ``rr_reinfection_non`` (σ_N)
-        defaults to ``rr_reinfection_inf``. Done here (not in ``__init__``) so it uses the fully-resolved
-        pars regardless of subclass construction order (``TBResistant`` applies its pars after
-        ``super().__init__``).
-        """
-        super().init_pre(sim)
-        if self.pars.rr_reinfection_inf is None:
-            self.pars.rr_reinfection_inf = float(self.pars.rr_reinfection_rec)
-        if self.pars.rr_reinfection_non is None:
-            self.pars.rr_reinfection_non = float(self.pars.rr_reinfection_inf)
-        return
-
-    def init_post(self):
-        """
-        Seed initial infections, then (optionally) promote a fraction to active TB.
-
-        The base `starsim.Infection.init_post` seeds ``init_prev`` cases into latent
-        ``INFECTION`` (via `set_prognoses`). We additionally seed ``init_prev_active``
-        cases directly into ``SYMPTOMATIC`` active TB, matching the compartmental ODE,
-        which seeds its initial cases as symptomatic rather than latent. Active seeding
-        draws from agents still susceptible after latent seeding, so the two seeds do
-        not overlap.
-        """
-        super().init_post()
-
-        active_cases = self.pars.init_prev_active.filter(self.susceptible.uids)
-        if len(active_cases):
-            self.set_prognoses(active_cases)                # sets infection flags + ti_infected (state → INFECTION)
-            self.state[active_cases] = TBS.SYMPTOMATIC      # override latent → symptomatic active TB
-        return
-
-    def transition(self, uids, to, rng):
-        """
-        Evaluate competing exponential transitions over one dt and apply immediately.
-
-        For each agent in *uids*, computes the probability of transitioning
-        to each destination in *to* during one timestep. Uses a single uniform
-        draw per agent to decide (a) whether the agent transitions and
-        (b) which destination it goes to. State is updated **immediately**.
-
-        """
-        if len(uids) == 0:
-            return
-
-        dt = self.sim.t.dt
-        n = len(uids)
-        states = list(to.keys())
-        n_dest = len(states)
-
-        # Convert each rate to dimensionless "rate per dt" using its own unit
-        rates_per_dt = np.zeros((n_dest, n))
-        for idx, rate_val in enumerate(to.values()):
-            factor = dt / rate_val.unit
-            v = rate_val.value
-            rates_per_dt[idx] = np.broadcast_to(v, n) * factor
-
-        # Total exit rate per agent (dimensionless, per dt)
-        total_rate_dt = rates_per_dt.sum(axis=0)
-
-        # Probability of any transition in one dt
-        p_any = 1 - np.exp(-total_rate_dt)
-
-        # Build CDF bins for destination selection
-        with np.errstate(divide='ignore', invalid='ignore'):
-            fractions = np.where(total_rate_dt > 0, rates_per_dt / total_rate_dt, 0)
-        cum_p = np.cumsum(fractions, axis=0) * p_any
-
-        # Single uniform draw per agent
-        u = rng.rvs(uids)
-
-        # Find agents that transition: u < p_any
-        transitioning = u < p_any
-        if not np.any(transitioning):
-            return
-
-        # For transitioning agents, determine destination from CDF
-        t_idx = transitioning.nonzero()[0]
-        t_uids = uids[t_idx]
-        t_u = u[t_idx]
-        t_cum_p = cum_p[:, t_idx]
-        dest_idx = (t_u[None, :] < t_cum_p).argmax(axis=0)
-        dest_states = np.array(states)[dest_idx]
-
-        # Apply state change immediately
-        self.state[t_uids] = dest_states
-
-        # Record ti_asymp for new-active tracking
-        newly_asymp = t_uids[dest_states == TBS.ASYMPTOMATIC]
-        if len(newly_asymp):
-            self.ti_asymp[newly_asymp] = self.ti
-
-        return
-
-    def step(self):
-        """
-        Advance TB state machine one timestep.
-
-        1. **Transmission** (via ``super().step()``): handles force of infection.
-        2. **Evaluate transitions** (``step_transitions``): competing-risk transitions,
-           applied immediately; agents may cascade through multiple states in one step.
-        3. **Bookkeeping** (``step_bookkeeping``): update flags, modifiers, deaths, and
-           the transmission state (``susceptible``/``rel_sus``/``rel_trans``) for next step.
-
-        The work is split into ``step_transitions`` and ``step_bookkeeping`` so that
-        strain-aware subclasses (see ``tbsim.resistance``) can override the natural
-        history and the transmission set-up independently.
-        """
-        super().step()
-        self.step_transitions()
-        self.step_bookkeeping()
-        return
-
-    def progression_rates(self, uids):
-        """
-        Per-agent INFECTION-exit rates to NON_INFECTIOUS and ASYMPTOMATIC.
-
-        Returns ``(inf_non, inf_asy)`` as rate objects with per-agent values, applying
-        ``rr_activation`` and the optional time-since-infection decline::
-
-            inf_non(tau) = inf_non * rr_activation * exp(-k_non * tau)
-            inf_asy(tau) = inf_asy * rr_activation * exp(-k_asy * tau)
-
-        where ``tau`` is years since each agent entered INFECTION (from ``ti_infected``,
-        so reinfection restarts the clock). With ``k_non = k_asy = 0`` (default) the decline
-        factors are exactly 1 and the rates reduce to the constant ``inf_non``/``inf_asy``
-        scaled only by ``rr_activation``.
-        """
-        rr = self.rr_activation[uids]
-        inf_non = self.pars.inf_non * rr
-        inf_asy = self.pars.inf_asy * rr
-        k_non, k_asy = self.pars.k_non, self.pars.k_asy
-        if k_non or k_asy:  # front-load progression by declining with time since infection
-            tau = (self.ti - self.ti_infected[uids]) * self.t.dt_year
-            if k_non:
-                inf_non = inf_non * np.exp(-k_non * tau)
-            if k_asy:
-                inf_asy = inf_asy * np.exp(-k_asy * tau)
-        return inf_non, inf_asy
-
-    def step_transitions(self):
-        """ Evaluate the natural-history state transitions (each mutates ``self.state`` in place). """
-        # For transitions that lead to CLEARED, we snapshot the pre-transition CLEARED mask
-        # and compare after to identify agents newly entering CLEARED from each source state,
-        # so we can assign the correct pathway-specific rr_reinfection to each new entrant.
-
-        u = self.latent.uids
-        if len(u):
-            inf_non, inf_asy = self.progression_rates(u)  # constant, or front-loaded via k_non/k_asy
-            self.transition(u, to={
-                TBS.CLEARED:        self.pars.inf_cle,
-                TBS.NON_INFECTIOUS: inf_non,
-                TBS.ASYMPTOMATIC:   inf_asy,
-            }, rng=self._rng_inf)
-            newly_cleared = u[self.state[u] == TBS.CLEARED]  # agents cleared from INFECTION this step
-            self._enter_cleared(newly_cleared, self.pars.rr_reinfection_cleared)
-
-        u = self.non_infectious.uids
-        if len(u):
-            self.transition(u, to={
-                TBS.CLEARED:      self.pars.non_rec * self.rr_clearance[u],
-                TBS.ASYMPTOMATIC: self.pars.non_asy,
-            }, rng=self._rng_non)
-            newly_cleared = u[self.state[u] == TBS.CLEARED]  # agents cleared from NON_INFECTIOUS this step
-            self._enter_cleared(newly_cleared, self.pars.rr_reinfection_rec)
-
-        u = self.asymptomatic.uids
-        if len(u):
-            self.transition(u, to={
-                TBS.NON_INFECTIOUS: self.pars.asy_non,
-                TBS.SYMPTOMATIC:    self.pars.asy_sym,
-            }, rng=self._rng_asy)
-
-        u = self.symptomatic.uids
-        if len(u):
-            self.transition(u, to={
-                TBS.ASYMPTOMATIC: self.pars.sym_asy,
-                TBS.DEAD:         self.pars.sym_dead * self.rr_death[u],
-            }, rng=self._rng_sym)
-
-        # NOTE: TREATMENT outcomes (success → CLEARED, failure → SYMPTOMATIC) are
-        # handled by TxDelivery, not the natural history. Agents in TREATMENT state
-        # without a TxDelivery intervention will remain in TREATMENT indefinitely.
-        return
-
-    def step_bookkeeping(self):
-        """ Update infection flags, request TB deaths, reset risk modifiers, and set the
-        transmission state (``susceptible``/``rel_sus``/``rel_trans``) used next step. """
-        # --- Bookkeep from current state ---
-        # Derive the transmission flags from the categorical state (identical values to,
-        # but faster than, the previous np.isin re-derivation).
-        st = self.state
-        # Reinfection-eligible states: never-infected/cleared, plus latent and non-infectious agents
-        # (a re-exposure resets their infection clock; see set_prognoses and rr_reinfection_inf/non).
-        self.susceptible[:] = st.isin((TBS.SUSCEPTIBLE, TBS.CLEARED, TBS.INFECTION, TBS.NON_INFECTIOUS))
-        self.infected[:] = st.isin((TBS.INFECTION, TBS.NON_INFECTIOUS, TBS.ASYMPTOMATIC, TBS.SYMPTOMATIC, TBS.TREATMENT))
-        self.on_treatment[:] = (st == TBS.TREATMENT)
-
-        # TB deaths
-        dead = ss.uids((st == TBS.DEAD) & self.sim.people.alive)
-        self.sim.people.request_death(dead)
-        self.results['new_deaths'][self.ti] = len(dead)
-        self.results['new_deaths_15+'][self.ti] = np.count_nonzero(self.sim.people.age[dead] >= 15)
-
-        # Reset rr_* (interventions set fresh values next step)
-        self.rr_activation[:] = 1
-        self.rr_clearance[:] = 1
-        self.rr_death[:] = 1
-
-        # rel_sus / rel_trans. rel_sus is per-state: 1 for fully-susceptible, the (waning) per-agent
-        # rr_reinfection for CLEARED, and the σ_L / σ_N reinfection factors for latent / non-infectious.
-        self.rel_sus[:] = 1
-        cleared = ss.uids(self.state == TBS.CLEARED)
-        if self.pars.dur_reinfection_protection is not None and len(cleared):
-            # Waning: agents whose protection period has elapsed revert to full susceptibility
-            waned = cleared[self.ti >= self.ti_rr_reinfection_wane[cleared]]
-            self.rr_reinfection[waned] = 1.0
-            self.ti_rr_reinfection_wane[waned] = np.inf
-        self.rel_sus[cleared] *= self.rr_reinfection[cleared]
-        self.rel_sus[st == TBS.INFECTION] = self.pars.rr_reinfection_inf
-        self.rel_sus[st == TBS.NON_INFECTIOUS] = self.pars.rr_reinfection_non
-        self.rel_trans[:] = 1
-        self.rel_trans[self.asymptomatic] = self.pars.trans_asymp
-
-        return
-
-    def step_die(self, uids):
-        """
-        Apply death for the given agents and update TB state.
-
-        Called by the framework when agents die (e.g. background mortality).
-        Sets state to DEAD, clears flags, and stops transmission.
-        """
-        if len(uids) == 0:
-            return
-
-        removed = self.state[uids] == TBS.REMOVED
-        super().step_die(uids)
-        self.susceptible[uids] = False
-        self.infected[uids] = False
-        self.on_treatment[uids] = False
-        self.rel_sus[uids] = 0
-        self.rel_trans[uids] = 0
-        if np.any(~removed):
-            self.state[uids[~removed]] = TBS.DEAD
-        if np.any(removed):
-            self.state[uids[removed]] = TBS.REMOVED
-        return
-
-    def init_results(self):
-        """Define result time series."""
-        super().init_results()
-
-        results = []
-        for state in TBS:
-            results.append(ss.Result(f'n_{state.name}', dtype=int, label=state.name))
-            results.append(ss.Result(f'n_{state.name}_15+', dtype=int, label=f'{state.name} (15+)'))
-
-        self.define_results(*results)
-        self.define_results(
-            ss.Result('n_infectious',      dtype=int, label='Number Infectious'),
-            ss.Result('n_infectious_15+',  dtype=int, label='Number Infectious, 15+'),
-            ss.Result('new_active',        dtype=int, label='New Active'),
-            ss.Result('new_active_15+',    dtype=int, label='New Active, 15+'),
-            ss.Result('cum_active',        dtype=int, label='Cumulative Active'),
-            ss.Result('cum_active_15+',    dtype=int, label='Cumulative Active, 15+'),
-            ss.Result('new_deaths',        dtype=int, label='New Deaths'),
-            ss.Result('new_deaths_15+',    dtype=int, label='New Deaths, 15+'),
-            ss.Result('cum_deaths',        dtype=int, label='Cumulative Deaths'),
-            ss.Result('cum_deaths_15+',    dtype=int, label='Cumulative Deaths, 15+'),
-            ss.Result('prevalence_active', dtype=float, scale=False, label='Prevalence (Active)'),
-            ss.Result('incidence_kpy',     dtype=float, scale=False, label='Incidence per 1,000 person-years'),
-            ss.Result('deaths_ppy',        dtype=float, label='Death per person-year'),
-            ss.Result('new_notifications_15+', dtype=int, label='New TB notifications, 15+'),
-            ss.Result('n_detectable_15+', dtype=float, scale=False, label='Symptomatic plus cxr_asymp_sens * Asymptomatic (15+)'),
-        )
-        return
-
-    def update_results(self):
-        """Record current time-step values for all result series."""
-        super().update_results()
-        res = self.results
-        ti = self.ti
-        dty = self.sim.t.dt_year
-
-        # Cache commonly reused arrays
-        age15 = self.sim.people.age >= 15
-        n_alive = self.sim.people.alive.count()
-        new_asymp = self.ti_asymp == ti
-
-        # Count every state in a single pass with np.bincount (TBS codes index bins directly),
-        # once over all agents and once restricted to 15+. The per-state, infectious, and
-        # detectable series are then plain lookups -- no per-state ==/& passes.
-        codes = self.state.values.astype(np.intp)
-        adult = age15.values
-        n_all = np.bincount(codes, minlength=_TBS_NBINS)
-        n_15  = np.bincount(codes[adult], minlength=_TBS_NBINS)
-        for state in TBS:
-            res[f'n_{state.name}'][ti] = n_all[state]
-            res[f'n_{state.name}_15+'][ti] = n_15[state]
-
-        asy = int(TBS.ASYMPTOMATIC)
-        sym = int(TBS.SYMPTOMATIC)
-        res.n_infectious[ti] = n_all[asy] + n_all[sym]                       # infectious == asymptomatic | symptomatic
-        res['n_infectious_15+'][ti] = n_15[asy] + n_15[sym]
-        res.prevalence_active[ti] = res.n_infectious[ti] / n_alive if n_alive else 0
-        res.incidence_kpy[ti] = 1_000 * (self.ti_infected == ti).count() / (n_alive * dty) if n_alive else 0
-        res.deaths_ppy[ti] = res.new_deaths[ti] / (n_alive * dty) if n_alive else 0
-
-        # New active: agents whose ti_asymp == this step
-        res['new_active'][ti] = new_asymp.count()
-        res['new_active_15+'][ti] = (new_asymp & age15).count()
-        res['n_detectable_15+'][ti] = n_15[sym] + self.pars.cxr_asymp_sens * n_15[asy]
-        return
-
-    def finalize_results(self):
-        """Compute cumulative series from new-event series after the run."""
-        super().finalize_results()
-        res = self.results
-        res['cum_deaths'] = np.cumsum(res['new_deaths'])
-        res['cum_deaths_15+'] = np.cumsum(res['new_deaths_15+'])
-        res['cum_active'] = np.cumsum(res['new_active'])
-        res['cum_active_15+'] = np.cumsum(res['new_active_15+'])
-        return
-
-    def plot(self, **kwargs):
-        """Plot TB result time series using tbsim.plot().
-
-        Args:
-            **kwargs: Forwarded to :func:`tbsim.plots.plot`. Common options
-                include ``select``, ``title``, ``n_cols``, ``row_height``,
-                ``style``, ``filename``, and ``show``.
-
-        Returns:
-            matplotlib.figure.Figure
-        """
-        return _tbsim_plot(self.sim, **kwargs)
-
-
-def get_tb(sim, which=None):
-    """ Helper to get the TB infection module from a sim
+    The LSHTM spectrum-of-disease TB model (Schwalb et al. 2025), declared as states and transitions
+
+    It runs as an ODE (where it is `compartmental/lshtm_ode.R`), as a stochastic compartmental
+    model, or as agents (with networks, if any), from the same object: see `ss.Sim(solver=...)`.
+
+    States: `susceptible`, `infection` (latent), `non_infectious`, `asymptomatic` and
+    `symptomatic` (both infectious), `treatment`, and three states for people who are no
+    longer infected, which differ in their risk of reinfection: `cleared` (from latent
+    infection), `recovered` (from non-infectious TB), and `treated` (after treatment).
+    Optionally, `infection_remote` (with `k_latent > 0`: latent infections become remote,
+    after which progression is slower, so it is front-loaded) and `relapsing` (with
+    `p_relapse > 0`: treated people who will relapse).
+
+    The transitions are named so that interventions and other conditions can act on them
+    (e.g. `ss.modify(tb.latent_asy, mult=0.5, where=...)`): `transmission` and `reinfect_*`;
+    `clearance`, `latent_non`, and `latent_asy` (from latent infection); `recovery` and
+    `worsening` (from non-infectious TB); `improvement` and `symptoms` (from asymptomatic TB);
+    `remission` and `tb_death` (from symptomatic TB); `diagnosis` (into
+    treatment: driven by a delivery, see `tbsim.care()`), `failure`, and `completion`.
+
+    Results, besides those of every state and transition: `infectious` (asymptomatic and
+    symptomatic), `active` (also non-infectious), and `prevalence_active` (infectious, as
+    a share of everyone).
+
+    With `drugs`, there are strains resistant to them, which people can carry several of
+    at once: the model is stratified by `resistance`, whose levels are the sets of strains
+    people carry (see `tbsim.add_resistance()`), and results can be read by strain, e.g.
+    `sim.results.tb.n_symptomatic.by('resistance')`. Treatment then ends at the rate
+    `delta + phi`, in success for people with every strain cured.
 
     Args:
-        sim (Sim): the simulation to search for the TB module
-        which (type, optional): the class of TB module to get (e.g. TB); if None, returns the first BaseTB subclass found
+        init (dict): the number (or share) of people starting in each state (default: 5% with a latent infection)
+        drugs (list): the drugs that strains can be resistant to (default: none, so one strain)
+        max_strains (int): with drugs, the most strains anyone can carry at once
+        strains (dict): with drugs, the share of each set of strains among people infected at the start (default: all drug-susceptible), e.g. `dict(DS=0.99, RIF=0.01)`
+        kwargs (dict): parameters, by name (see `tb_pars()`, and `tbsim.resistance_pars()` with drugs): numbers (rates per year), or `ss.par` objects
+
+    Examples::
+
+        tb = tbsim.TB(beta=12)
+        sim = ss.Sim(tb, start=1950, stop=2020, total_pop=1e5)
+        sim.run().plot()
+
+        tb = tbsim.TB(drugs=['RIF', 'INH'], fitness=dict(RIF=0.6, INH=0.9), theta=0.5)
     """
-    if which is None:
-        which = BaseTB
+    def __init__(self, init=None, drugs=None, max_strains=2, strains=None, name='tb', **kwargs):
+        res_kw = {key:kwargs.pop(key) for key in list(kwargs) if key in tbsim.resistance_pars()}
+        if res_kw and not drugs:
+            errormsg = f'The parameters {sc.strjoin(res_kw.keys())} are for drug resistance: give drugs= as well'
+            raise ValueError(errormsg)
+        p = make_pars(tb_pars(), kwargs)
+        S = sc.objdict() # The states, by name
+        add_state = lambda name_, label, **kw: S.setdefault(name_, ss.State(name=name_, label=label, **kw))
+        add_state('susceptible', 'Susceptible')
+        add_state('infection', 'Latent infection')
+        add_state('cleared', 'Cleared (from latent)')
+        add_state('recovered', 'Recovered (from non-infectious)')
+        add_state('non_infectious', 'Non-infectious TB')
+        add_state('asymptomatic', 'Asymptomatic TB', infectious=True)
+        add_state('symptomatic', 'Symptomatic TB', infectious=True)
+        add_state('treatment', 'On treatment')
+        add_state('treated', 'Completed treatment')
+        front = p.k_latent.raw.value > 0
+        relapse = p.p_relapse.raw > 0
+        if front:
+            add_state('infection_remote', 'Remote latent infection')
+        if relapse:
+            add_state('relapsing', 'Treated, will relapse')
+
+        T = sc.objdict() # The transitions, by name
+        def add(name_, src, dst, rate, **kw):
+            T[name_] = ss.Transition(S[src], S[dst] if isinstance(dst, str) else [S[d] for d in dst], rate=rate, name=name_, **kw)
+
+        foi = p.beta*(p.trans_asymp*S.asymptomatic + S.symptomatic) # Exposure to asymptomatic and symptomatic TB (through networks, as agents)
+        add('transmission', 'susceptible', 'infection', foi)
+        add('reinfect_cle', 'cleared', 'infection', p.rr_reinfection_cleared*foi)
+        add('reinfect_rec', 'recovered', 'infection', p.rr_reinfection_rec*foi)
+        add('reinfect_trd', 'treated', 'infection', p.rr_reinfection_treat*foi)
+        add('clearance', 'infection', 'cleared', p.inf_cle)
+        add('latent_non', 'infection', 'non_infectious', p.inf_non)
+        add('latent_asy', 'infection', 'asymptomatic', p.inf_asy)
+        if front: # The hazard of progression falls with time since infection: recent, then remote
+            add('remote', 'infection', 'infection_remote', p.k_latent)
+            add('reinfect_remote', 'infection_remote', 'infection', p.rr_reinfection_inf*foi)
+            add('clearance_remote', 'infection_remote', 'cleared', p.inf_cle)
+            add('remote_non', 'infection_remote', 'non_infectious', p.inf_non_remote if p.inf_non_remote is not None else p.inf_non)
+            add('remote_asy', 'infection_remote', 'asymptomatic', p.inf_asy_remote)
+        add('recovery', 'non_infectious', 'recovered', p.non_rec)
+        add('worsening', 'non_infectious', 'asymptomatic', p.non_asy)
+        add('improvement', 'asymptomatic', 'non_infectious', p.asy_non)
+        add('symptoms', 'asymptomatic', 'symptomatic', p.asy_sym)
+        add('remission', 'symptomatic', 'asymptomatic', p.sym_asy)
+        T.tb_death = ss.death('symptomatic ->', rate=p.sym_dead, name='tb_death')
+        T.diagnosis = ss.Transition([S.non_infectious, S.asymptomatic, S.symptomatic], S.treatment, rate=p.theta, name='diagnosis')
+        end, fail = (p.delta + p.phi, p.delta + p.phi) if drugs else (p.delta, p.phi) # With drugs, treatment ends at one rate, and its outcome depends on the strains: see tbsim.resistance()
+        add('failure', 'treatment', 'symptomatic', fail)
+        if relapse:
+            add('completion', 'treatment', ['treated', 'relapsing'], end, p=[None, p.p_relapse])
+            T.relapse = ss.Transition(S.relapsing, S.symptomatic, dur=p.dur_relapse, name='relapse')
+        else:
+            add('completion', 'treatment', 'treated', end)
+        if p.dur_reinfection_protection is not None: # Protection (or risk) after clearance wanes
+            for src in ['cleared', 'recovered', 'treated']:
+                T[f'waning_{src}'] = ss.Transition(S[src], S.susceptible, dur=p.dur_reinfection_protection, name=f'waning_{src}')
+
+        # Demography: births replace every death
+        T.births  = ss.birth('-> susceptible', rate=p.mu, name='births')
+        T.replace = ss.null >> S.susceptible @ (p.sym_dead*S.symptomatic.n) # Births that replace TB deaths
+        T.deaths  = ss.death(rate=p.mu, name='deaths')
+
+        if drugs: # Strains resistant to them, as a dimension
+            remote = ['remote_asy'] if front else []
+            delta, phi = p.delta.raw.value, p.phi.raw.value
+            strat = tbsim.add_resistance(S, T, p, foi, drugs=drugs, max_strains=max_strains, split=strains,
+                superinfect = dict(infection='rr_superinfection_latent', non_infectious='rr_superinfection_non', asymptomatic='rr_superinfection_asy', symptomatic='rr_superinfection_sym'),
+                bottleneck  = ['latent_asy', 'worsening'] + remote,
+                symptoms    = ['symptoms'],
+                clear       = ['clearance', 'recovery'] + (['clearance_remote'] if front else []),
+                denovo      = ['latent_non', 'latent_asy'] + (['remote_non'] + remote if front else []),
+                treatment   = [('completion', 'failure')],
+                cure        = delta/(delta + phi) if delta + phi > 0 else 1.0,
+                **res_kw)
+
+        everyone = S.susceptible
+        for st in S.values()[1:]:
+            everyone = everyone | st
+        super().__init__(
+            *S.values(),
+            **T,
+            infectious        = S.asymptomatic + S.symptomatic,
+            active            = S.non_infectious + S.asymptomatic + S.symptomatic,
+            prevalence_active = (S.asymptomatic + S.symptomatic)/everyone,
+            init              = sc.ifelse(init, dict(infection=0.05)),
+            name              = name,
+        )
+        if drugs:
+            self.stratify(**strat)
+        return
+
+
+def get_tb(sim):
+    """ The TB module of a sim: the first disease that is a `tbsim.TB` (or has a `tb_death` transition, as the resistant models do) """
     for disease in sim.diseases.values():
-        if isinstance(disease, which):
+        if isinstance(disease, TB) or 'tb_death' in getattr(getattr(disease, 'graph', None), 'transitions', {}):
             return disease
-    raise ValueError("No TB module found in sim.diseases")
+    errormsg = 'No TB module found in sim.diseases'
+    raise ValueError(errormsg)
 
-class choice2d(ss.choice):
-    """ 
-    Version of ss.choice() allowing different per-agent probabilities.
 
-    Temporary location; to be ported to Starsim and potentially merged
-    with ss.choice().
-
-    Args:
-        a (1D array): the values to choose from (default: np.arange(p.shape[1]))
-        p (2D array): the probability of each choice for each agent
-
-    **Example**:
-        # Choose between specified options each with a specified probability (must sum to 1)
-        p = np.array([ # Per-agent array of outcome probabilities across 3 options
-            [0.1, 0.5, 0.4],
-            [0.2, 0.3, 0.5],
-            [0.3, 0.4, 0.3],
-            [0.4, 0.2, 0.4],
-            [0.5, 0.3, 0.2],
-            [0.8, 0.1, 0.1],
-        ])
-        n = len(p)
-        choices = tbsim.choice2d(p=p, strict=False)(n)
+def state_codes(tb):
     """
-    valid_pars = ['a', 'p', 'replace', 'dtype']
-    scaling = ss.distributions.scale_types.false
+    As agents: the state of each agent as a number, its position in `tb.graph.states` (-1 for none, e.g. the dead)
 
-    def __init__(self, a=None, p=None, replace=True, **kwargs):
-        if p is None and a is not None:
-            if np.ndim(a) == 2:
-                p = a # Swap, to allow calling choice2d(p) directly
-                a = np.arange(p.shape[1])
-            else:
-                errormsg = f'Must supply p as a 2D array of probabilities (n_agents x n_choices); got a={a} (shape {np.shape(a)})'
-                raise ValueError(errormsg)
-        if a is None:
-            if p is None or np.ndim(p) != 2:
-                errormsg = f'Must supply p as a 2D array of probabilities'
-                raise ValueError(errormsg)
-            a = np.arange(p.shape[1])
-        ss.Dist.__init__(self, distname='choice2d', a=a, p=p, replace=replace, **kwargs)
-        self._use_ppf = True # Always use array parameters
-        return
-
-    def ppf(self, rands):
-        """ Always use ppf to allow per-agent probabilities """
-        pars = self._pars
-        pcum = np.cumsum(pars.p, axis=1) # Sum probabilities to equal one
-        inds = (rands[:, np.newaxis] >= pcum).sum(axis=1) # 2D equivalent of np.searchsorted
-        rvs = pars.a[inds] # Map to outcomes
-        return rvs
+    Returns an array indexed by UID, e.g. `state_codes(tb)[uids]`; `list(tb.graph.states)` gives the names.
+    """
+    out = np.full(len(tb.sim.people.uid.raw), -1.0)
+    for i,name in enumerate(tb.graph.states):
+        out[tb[name].raw] = i
+    return out
