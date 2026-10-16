@@ -52,6 +52,8 @@ def make_pars(defaults, kwargs):
     for key,default in defaults.items():
         val = kwargs.get(key)
         if isinstance(val, ss.par):
+            if val.name is None: # Named after its key, as the defaults are
+                val.name = key
             pars[key] = val
             continue
         raw = default.raw if isinstance(default, ss.par) else default
@@ -100,12 +102,21 @@ class TB(ss.Disease):
     `sim.results.tb.n_symptomatic.by('resistance')`. Treatment then ends at the rate
     `delta + phi`, in success for people with every strain cured.
 
+    With `second_line`, there is a second regimen, for people found to carry a resistant
+    strain: the state `second_line`, entered by `diagnosis_second_line` (driven by a
+    delivery, see `tbsim.care(dst=...)`) and left by `completion_second_line` and
+    `failure_second_line`.
+
     Args:
         pars (dict): parameters, by name (as `kwargs`)
         init (dict): the number (or share) of people starting in each state (default: 5% with a latent infection)
         drugs (list): the drugs that strains can be resistant to (default: none, so one strain)
         max_strains (int): with drugs, the most strains anyone can carry at once
         strains (dict): with drugs, the share of each set of strains among people infected at the start (default: all drug-susceptible), e.g. `dict(DS=0.99, RIF=0.01)`
+        second_line (bool/dict): with drugs, a second-line regimen: True for `tbsim.regimen('second_line_combo')`, or a dict
+            of `delta`, `phi`, and `p_relapse` (as `tbsim.regimen()` gives); and optionally `rr_cure` (the chance that it cures
+            a strain resistant to each drug, relative to a drug-susceptible strain; default 1, for drugs it does not use) and
+            `q_treat` (the chance that a strain it does not cure becomes resistant to each drug; default 0)
         immigrants (dict): with `immigration`, the share of people arriving in each state (default: all susceptible), e.g. `dict(susceptible=0.7, infection=0.3)`
         kwargs (dict): parameters, by name (see `tb_pars()`, and `tbsim.resistance_pars()` with drugs): numbers (rates per year), or `ss.par` objects
 
@@ -116,14 +127,19 @@ class TB(ss.Disease):
         sim.run().plot()
 
         tb = tbsim.TB(drugs=['RIF', 'INH'], fitness=dict(RIF=0.6, INH=0.9), theta=0.5)
+        tb = tbsim.TB(drugs=['RIF'], second_line=True) # With tbsim.care(tb, dst=tbsim.DST(tb))
     """
-    def __init__(self, pars=None, init=None, drugs=None, max_strains=2, strains=None, immigrants=None, name='tb', **kwargs):
+    def __init__(self, pars=None, init=None, drugs=None, max_strains=2, strains=None, immigrants=None, second_line=None, name='tb', **kwargs):
         kwargs = sc.mergedicts(pars, kwargs)
         res_kw = {key:kwargs.pop(key) for key in list(kwargs) if key in tbsim.resistance_pars()}
         if res_kw and not drugs:
             errormsg = f'The parameters {sc.strjoin(res_kw.keys())} are for drug resistance: give drugs= as well'
             raise ValueError(errormsg)
+        if second_line and not drugs:
+            errormsg = 'second_line= is a regimen for people with a resistant strain: give drugs= as well'
+            raise ValueError(errormsg)
         p = make_pars(tb_pars(), kwargs)
+        second = second_line_pars(second_line) if second_line else None
         S = sc.objdict() # The states, by name
         add_state = lambda name_, label, **kw: S.setdefault(name_, ss.State(name=name_, label=label, **kw))
         add_state('susceptible', 'Susceptible')
@@ -136,9 +152,11 @@ class TB(ss.Disease):
         add_state('treatment', 'On treatment')
         add_state('treated', 'Completed treatment')
         front = p.k_latent.raw.value > 0
-        relapse = p.p_relapse.raw > 0
+        relapse = p.p_relapse.raw > 0 or (second is not None and second.p_relapse > 0)
         if front:
             add_state('infection_remote', 'Remote latent infection')
+        if second:
+            add_state('second_line', 'On second-line treatment')
         if relapse:
             add_state('relapsing', 'Treated, will relapse')
 
@@ -169,11 +187,19 @@ class TB(ss.Disease):
         T.diagnosis = ss.Transition([S.non_infectious, S.asymptomatic, S.symptomatic], S.treatment, rate=p.theta, name='diagnosis')
         end, fail = (p.delta + p.phi, p.delta + p.phi) if drugs else (p.delta, p.phi) # With drugs, treatment ends at one rate, and its outcome depends on the strains: see tbsim.resistance()
         add('failure', 'treatment', 'symptomatic', fail)
+        def add_completion(name_, src, rate, p_relapse):
+            if relapse:
+                add(name_, src, ['treated', 'relapsing'], rate, p=[None, p_relapse])
+            else:
+                add(name_, src, 'treated', rate)
+        add_completion('completion', 'treatment', end, p.p_relapse)
+        if second: # As treatment, at its own rates
+            T.diagnosis_second_line = ss.Transition([S.non_infectious, S.asymptomatic, S.symptomatic], S.second_line, rate=ss.peryear(0.0), name='diagnosis_second_line')
+            end_2 = second.delta + second.phi
+            add('failure_second_line', 'second_line', 'symptomatic', end_2)
+            add_completion('completion_second_line', 'second_line', end_2, second.p_relapse)
         if relapse:
-            add('completion', 'treatment', ['treated', 'relapsing'], end, p=[None, p.p_relapse])
             T.relapse = ss.Transition(S.relapsing, S.symptomatic, dur=p.dur_relapse, name='relapse')
-        else:
-            add('completion', 'treatment', 'treated', end)
         if p.dur_reinfection_protection is not None: # Protection (or risk) after clearance wanes
             for src in ['cleared', 'recovered', 'treated']:
                 T[f'waning_{src}'] = ss.Transition(S[src], S.susceptible, dur=p.dur_reinfection_protection, name=f'waning_{src}')
@@ -197,13 +223,17 @@ class TB(ss.Disease):
         if drugs: # Strains resistant to them, as a dimension
             remote = ['remote_asy'] if front else []
             delta, phi = p.delta.raw.value, p.phi.raw.value
+            treatment = [('completion', 'failure')]
+            if second:
+                d2, f2 = second.delta.raw.value, second.phi.raw.value
+                treatment.append(('completion_second_line', 'failure_second_line', dict(cure=d2/(d2 + f2) if d2 + f2 > 0 else 1.0, rr_cure=second.rr_cure, q_treat=second.q_treat)))
             strat = tbsim.add_resistance(S, T, p, foi, drugs=drugs, max_strains=max_strains, split=strains,
                 superinfect = dict(infection='rr_superinfection_latent', non_infectious='rr_superinfection_non', asymptomatic='rr_superinfection_asy', symptomatic='rr_superinfection_sym'),
                 bottleneck  = ['latent_asy', 'worsening'] + remote,
                 symptoms    = ['symptoms'],
                 clear       = ['clearance', 'recovery'] + (['clearance_remote'] if front else []),
                 denovo      = ['latent_non', 'latent_asy'] + (['remote_non'] + remote if front else []),
-                treatment   = [('completion', 'failure')],
+                treatment   = treatment,
                 cure        = delta/(delta + phi) if delta + phi > 0 else 1.0,
                 **res_kw)
 
@@ -222,6 +252,25 @@ class TB(ss.Disease):
         if drugs:
             self.stratify(**strat)
         return
+
+
+def second_line_pars(second_line):
+    """ The parameters of a second-line regimen (see `tbsim.TB`), with its rates as `ss.par` objects """
+    from .interventions.care import regimen # Not at the top, since the interventions import this module
+    pars = sc.mergedicts(regimen('second_line_combo') if second_line is True else {}, second_line if isinstance(second_line, dict) else {})
+    unknown = set(pars) - {'delta', 'phi', 'p_relapse', 'rr_cure', 'q_treat'}
+    if unknown or not {'delta', 'phi'} <= set(pars):
+        errormsg = f'second_line= takes True, or a dict of delta, phi, and optionally p_relapse, rr_cure, and q_treat; not {second_line}'
+        raise ValueError(errormsg)
+    out = sc.objdict(p_relapse=pars.get('p_relapse', 0.0), rr_cure=pars.get('rr_cure', 1.0), q_treat=pars.get('q_treat', 0.0))
+    for key in ['delta', 'phi']:
+        val = pars[key]
+        if not isinstance(val, ss.par):
+            val = ss.par(val if isinstance(val, ss.TimePar) else ss.peryear(val))
+        if val.name is None:
+            val.name = f'{key}_second_line'
+        out[key] = val
+    return out
 
 
 def get_tb(sim):

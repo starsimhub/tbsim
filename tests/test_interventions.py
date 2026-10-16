@@ -1,6 +1,7 @@
 """
 Test the TB interventions: the care cascade (tests and treatment), TPT, BCG, and changes to transmission
 """
+import pytest
 import numpy as np
 import sciris as sc
 import starsim as ss
@@ -73,8 +74,29 @@ def test_change_beta():
     return res
 
 
+@sc.timer()
+def test_contact_tracing():
+    """ The household contacts of people starting treatment are tested, and treated or given TPT (as agents) """
+    def make(tracing):
+        tb = tbsim.TB(beta=3, init=dict(infection=0.3))
+        household = ss.library.HouseholdNet(dhs_data='default', dynamic=False)
+        intvs = [tbsim.care(tb, seeking=ss.peryear(1.0))] + [tbsim.contact_tracing(tb)]*tracing
+        return ss.Sim(tb, networks=household, interventions=intvs, solver='abm', n_agents=20_000, rand_seed=1, **sc.mergedicts(kw, dict(total_pop=None))).run()
+    sim = make(True)
+    res = sim.results
+    print(f'{res.tb.diagnosis.sum():.0f} started treatment; {res.tracing.delivered.sum():.0f} contacts tested, {res.tracing.diagnosed.sum():.0f} positive, {res.tracing_prevention.delivered.sum():.0f} given TPT')
+    assert res.tracing.delivered.sum() > res.tb.diagnosis.sum() # More than one contact each
+    assert res.tracing.diagnosed.sum() > 0 and res.tracing_prevention.delivered.sum() > 0
+    assert np.isclose(res.tracing_positive.delivered.sum(), res.tracing.diagnosed.sum())
+    tb = tbsim.TB()
+    with pytest.raises(ss.CodedError, match='E804'): # Only agents have contacts
+        ss.Sim(tb, interventions=tbsim.contact_tracing(tb), solver='ode', verbose=0).init()
+    return sim
+
+
 if __name__ == '__main__':
     test_tests()
     test_care()
     test_prevention()
     test_change_beta()
+    test_contact_tracing()

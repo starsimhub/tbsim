@@ -132,6 +132,44 @@ def test_interventions():
     return sim
 
 
+@sc.timer()
+def test_second_line():
+    sc.heading('A test for resistance sends people to a second-line regimen, which cures the resistant strain; as agents too')
+    def make(solver, second_line):
+        tb = tbsim.TB(drugs=['RIF'], strains=dict(DS=0.7, RIF=0.3), init=dict(infection=0.3), rr_cure=dict(RIF=0.1), second_line=second_line, **tbsim.regimen('dots'))
+        care = tbsim.care(tb, seeking=ss.peryear(1.0), dst=tbsim.DST(tb) if second_line else None)
+        agents = dict(n_agents=50_000) if solver == 'abm' else {}
+        return tbsim.Sim(tb=tb, interventions=care, solver=solver, **sc.mergedicts(pars, dict(stop=2020, dt=ss.weeks(1)), agents)).run()
+    first = make('ode', None)
+    sims = sc.objdict(ode=make('ode', True), abm=make('abm', True))
+    shares = {key:tbsim.resistant_share(sim)[-1] for key,sim in dict(first_line=first, **sims).items()}
+    print(f'Share of active TB resistant to RIF: {sc.strjoin(f"{k} {v:0.3f}" for k,v in shares.items())}')
+    assert shares['ode'] < 0.6*shares['first_line']
+    res = sims.ode.results
+    assert np.isclose(res.care_dst_positive.delivered.sum(), res.tb.diagnosis_second_line.sum())
+    assert res.tb.n_second_line.values.max() > 0
+    ratio = sims.abm.results.tb.n_second_line.values.mean()/res.tb.n_second_line.values.mean()
+    print(f'On second-line treatment as agents: {ratio:0.2f} times the ODE')
+    assert 0.8 < ratio < 1.25
+    return sims
+
+
+@sc.timer()
+def test_tpt_strains():
+    sc.heading('TPT protects only against the strains its drugs act on')
+    def progression(drugs):
+        tb = tbsim.TB(beta=0, drugs=['RIF', 'INH'], init=dict(infection=0.5), strains={'DS':0.5, 'INH':0.25, 'DS+INH':0.25})
+        tpt = ss.treat(tbsim.TPT(efficacy=1.0, activation=0.0, dur=None, tb=tb, drugs=drugs), eligible=tb.infection, years=[2000], name='tpt_delivery')
+        sim = tbsim.Sim(tb=tb, interventions=tpt, **sc.mergedicts(pars, dict(stop=2003, dt=ss.weeks(1)))).run()
+        return {key:round(val) for key,val in by_strain(sim, 'non_infectious').items() if key in ['DS', 'INH', 'DS+INH']}
+    none = progression(['RIF'])
+    inh = progression(['INH'])
+    print(f'Non-infectious TB with RIF-based TPT: {none}\n... with INH-based TPT: {inh}')
+    assert none['DS'] == none['INH'] == none['DS+INH'] == 0
+    assert inh['DS'] == 0 and inh['INH'] > 0 and 0 < inh['DS+INH'] < inh['INH']
+    return none, inh
+
+
 if __name__ == '__main__':
     test_strains()
     test_single_strain()
@@ -141,3 +179,5 @@ if __name__ == '__main__':
     test_denovo()
     test_two_drugs()
     test_interventions()
+    test_second_line()
+    test_tpt_strains()

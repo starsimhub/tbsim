@@ -132,7 +132,8 @@ def add_resistance(S, T, p, foi, drugs=('RIF',), max_strains=2, split=None, supe
         symptoms (list): the transitions from asymptomatic to symptomatic TB (faster with several strains, by `rr_prog_super`)
         clear (list): the transitions of clearance and recovery (faster with several strains, by `rr_clear_super`)
         denovo (list): the transitions of progression from a latent infection, on which resistance can be acquired
-        treatment (list): pairs of the transitions that end treatment, (completion, failure): both have the rate at which treatment ends, and are split here by its outcome
+        treatment (list): pairs of the transitions that end treatment, (completion, failure): both have the rate at which treatment ends, and are split here by its outcome;
+            a third entry, a dict, gives that regimen's own `cure`, `rr_cure`, or `q_treat`
         cure (float): the chance that treatment cures a drug-susceptible strain
         kwargs (dict): the parameters of resistance (see `resistance_pars()`)
 
@@ -204,22 +205,25 @@ def add_resistance(S, T, p, foi, drugs=('RIF',), max_strains=2, split=None, supe
                     add_move(name, l, m, prob)
 
         # The outcome of treatment: each strain is cured independently; those not cured can acquire resistance
-        if treatment:
-            c = {s:min(1.0, cure*np.prod([rr_cure[d] for d in s])) for s in carried}
+        for completion,failure,*opts in treatment or []:
+            opts = opts[0] if opts else {}
+            p_cure = opts.get('cure', cure)
+            rr = st.per_drug(opts['rr_cure'], 'rr_cure') if 'rr_cure' in opts else rr_cure
+            q = st.per_drug(opts['q_treat'], 'q_treat') if 'q_treat' in opts else q_treat
+            c = {s:min(1.0, p_cure*np.prod([rr[d] for d in s])) for s in carried}
             outcomes = {}
             for k in range(1, len(carried) + 1):
                 for left in itertools.combinations(sorted(carried, key=st.strains.index), k):
                     p_left = np.prod([1 - c[s] if s in left else c[s] for s in carried])
-                    for combo in itertools.product(*[acquire(s, st.drugs, q_treat).items() for s in left]):
+                    for combo in itertools.product(*[acquire(s, st.drugs, q).items() for s in left]):
                         target = frozenset(new for new,_ in combo)
-                        prob = p_left*np.prod([q for _,q in combo])
+                        prob = p_left*np.prod([q_ for _,q_ in combo])
                         m = st.index.get(target, l)
                         outcomes[m] = outcomes.get(m, 0) + prob
-            for completion,failure in treatment:
-                mult(completion, l, np.prod(list(c.values())))
-                mult(failure, l, outcomes.get(l, 0))
-                for m,prob in outcomes.items():
-                    add_move(failure, l, m, prob)
+            mult(completion, l, np.prod(list(c.values())))
+            mult(failure, l, outcomes.get(l, 0))
+            for m,prob in outcomes.items():
+                add_move(failure, l, m, prob)
 
     split = sc.ifelse(split, {'DS': 1.0})
     shares = np.zeros(n)

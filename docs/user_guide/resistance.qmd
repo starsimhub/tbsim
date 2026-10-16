@@ -225,7 +225,30 @@ print(f'Tested for resistance: {sim.results.screen.delivered.sum():,.0f}')
 print(f'Found resistant: {sim.results.screen.diagnosed.sum():,.0f}')
 ```
 
-A test for resistance to one drug detects the sets of strains that include it, e.g. `detects=tb.resistance.isin([label for label in tbsim.Strains(['RIF', 'INH']).labels if 'RIF' in label])`. The test's results are counted, but treatment does not yet depend on them: everyone who starts treatment gets the same regimen (see [known limitations](#known-limitations)).
+`tbsim.DST(tb, drugs='RIF')` is the same test for resistance to some of the drugs only: it detects the sets of strains that include one resistant to any of them.
+
+## Second-line treatment
+
+With `second_line=`, the model has a second regimen, for people found resistant: the state `second_line`, entered by `diagnosis_second_line` and left by `completion_second_line` and `failure_second_line`. `tbsim.care(tb, dst=...)` tests everyone who tests positive for resistance as well: those found resistant start the second-line regimen, and the others first-line treatment.
+
+```{python}
+tb = tbsim.TB(drugs=['RIF'], strains=dict(DS=0.8, RIF=0.2), init=init, rr_cure=0.25, second_line=True, **tbsim.regimen('dots'))
+care = tbsim.care(tb, test=tbsim.Xpert(by_age=False), dst=tbsim.DST(tb, sensitivity=0.95))
+sim = tbsim.Sim(tb=tb, interventions=care, start=2000, stop=2020, verbose=0).run()
+print(f'Started second-line treatment: {sim.results.tb.diagnosis_second_line.sum():,.0f}; first-line: {sim.results.tb.diagnosis.sum():,.0f}')
+```
+
+`second_line=True` is `tbsim.regimen('second_line_combo')`. A dict gives the regimen's `delta`, `phi`, and `p_relapse` (as `tbsim.regimen()` does), and optionally its own `rr_cure` (by default 1: the drugs of the model are not in it, so it cures resistant strains as well as drug-susceptible ones) and `q_treat` (by default 0).
+
+## Strain-aware preventive therapy
+
+`tbsim.TPT(tb=tb, drugs=['INH'])` protects only against the strains that are susceptible to all of its drugs: someone who carries several strains is protected in proportion to the share of them it covers, and someone with only resistant strains not at all.
+
+```{python}
+tb = tbsim.TB(drugs=['RIF', 'INH'], init=init, strains={'DS':0.8, 'INH':0.2})
+tpt = ss.treat(tbsim.TPT(tb=tb, drugs=['INH']), eligible=tb.infection, coverage=0.5, interval=ss.years(1), name='tpt_delivery')
+sim = tbsim.Sim(tb=tb, interventions=tpt, start=2000, stop=2020, verbose=0).run()
+```
 
 ## Analyzing where resistance comes from
 
@@ -301,13 +324,14 @@ print(f'Share resistant after 20 years: {tbsim.resistant_share(sim)[-1]:.3f}')
 |-----------|-------|
 | `theta` | The rate at which people with active TB start treatment (0 by default: use a care cascade such as `tbsim.care()`) |
 | `delta`, `phi` | Treatment ends at the rate `delta + phi`, and cures a drug-susceptible strain with chance `delta/(delta + phi)`; `tbsim.regimen('dots')` gives the values for a regimen |
+| `second_line` | A second-line regimen for people found resistant (see [second-line treatment](#second-line-treatment)) |
 
 ## Known limitations
 
 | Topic | Current behavior |
 |-------|------------------|
-| Treatment after a test for resistance | Not modeled: treatment does not depend on the result of a test, so there are no second-line regimens for people found resistant, no retreatment regimens, and no switching regimen during a course; `rr_cure` applies to everyone treated |
-| Preventive therapy | `tbsim.TPT()` slows progression the same for every strain; it does not clear drug-susceptible strains only |
+| Treatment after a test for resistance | A test for resistance at diagnosis sends people to the second-line regimen; there is no switching regimen during a course, and no separate retreatment regimen |
+| Preventive therapy | `tbsim.TPT(tb=tb, drugs=...)` slows progression only for the strains its drugs act on; it does not clear strains, or select for resistance |
 | Identical strains | Being infected again with a strain someone already carries does not change the strains they carry |
 | Loss to follow-up | Not a separate outcome of treatment |
 
@@ -317,4 +341,4 @@ print(f'Share resistant after 20 years: {tbsim.resistant_share(sim)[-1]:.3f}')
 - The module docstring of `tbsim/resistance.py`: how resistance is built into the model, and the mapping to the reference two-strain ODE.
 - Validation is in `tests/test_resistance.py`, `tests/test_models.py` (against the reference ODE), and `tests/test_compartmental.py` (agents against the ODE).
 
-Public API: `tbsim.TB(drugs=...)`, `tbsim.Strains`, `tbsim.resistance_pars`, `tbsim.add_resistance`, `tbsim.resistant_share`, and `tbsim.LSHTMResistant`.
+Public API: `tbsim.TB(drugs=..., second_line=...)`, `tbsim.Strains`, `tbsim.resistance_pars`, `tbsim.add_resistance`, `tbsim.resistant_share`, `tbsim.DST`, `tbsim.TPT(drugs=...)`, and `tbsim.LSHTMResistant`.

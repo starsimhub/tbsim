@@ -168,7 +168,22 @@ print(f'Found resistant:       {res.diagnosed.sum():,.0f} ({res.diagnosed.sum()/
 print(f'Started treatment:     {sim.results.tb.diagnosis.sum():,.0f}')
 ```
 
-The test counts who would be found resistant, but treatment does not yet depend on its result: everyone who starts treatment gets the same regimen, so second-line regimens for people found resistant, retreatment, and switching regimen during a course are not modeled. What a regimen that works against resistant strains would do can be bounded by comparing values of `rr_cure`, which apply to everyone treated:
+Here the test only counts who would be found resistant. For treatment to depend on its result, give the model a second-line regimen (`second_line=True` for `tbsim.regimen('second_line_combo')`, or a regimen of your own), and the care cascade a test for resistance (`tbsim.DST()`): people found resistant then start the second-line regimen, which cures resistant strains as well as drug-susceptible ones, and the others first-line treatment:
+
+```{python}
+fig, ax = plt.subplots(figsize=(8, 4))
+for second_line in [None, True]:
+    tb = tbsim.TB(drugs=['RIF'], strains=dict(DS=0.8, RIF=0.2), init=init, rr_cure=0.25, second_line=second_line, **tbsim.regimen('dots'))
+    care = tbsim.care(tb, test=tbsim.Xpert(by_age=False), dst=tbsim.DST(tb) if second_line else None)
+    sim = tbsim.Sim(tb=tb, interventions=care, start=2000, stop=2040, dt=ss.weeks(1), verbose=0).run()
+    ax.plot(sim.timevec, tbsim.resistant_share(sim), label='Second line after a test for resistance' if second_line else 'First line only')
+ax.set(title='Share of active TB that is resistant', ylabel='Share')
+ax.legend()
+plt.show()
+print(f'Started second-line treatment: {sim.results.tb.diagnosis_second_line.sum():,.0f}')
+```
+
+How well first-line treatment cures resistant strains matters too. Comparing values of `rr_cure`, which apply to everyone on first-line treatment:
 
 ```{python}
 fig, ax = plt.subplots(figsize=(8, 4))
@@ -228,7 +243,7 @@ You have now used every part of drug resistance in TBsim:
 - `tbsim.TB(drugs=..., strains=..., fitness=...)`: multi-strain natural history, with the transmission bottleneck, superinfection, and competition.
 - `q_prog` and `prog_resist_mix`: resistance acquired on progression, added to the strain or replacing it.
 - `theta`, `rr_cure`, and `q_treat`: treatment that cures resistant strains less well, and resistance acquired on treatment failure.
-- `ss.Test(detects=tb.resistance != 'DS')`: a test for resistance.
+- `ss.Test(detects=tb.resistance != 'DS')`, or `tbsim.DST(tb)`: a test for resistance; with `tbsim.care(tb, dst=...)` and `tbsim.TB(second_line=...)`, people found resistant start a second-line regimen.
 - `tbsim.resistant_share()` and `.by('resistance')`: results by strain, and the transitions that show where resistance comes from.
 
-Preventive therapy (`tbsim.TPT()`) acts the same on every strain, and treatment does not yet depend on the result of a test for resistance. For a recipe-style companion, including a parameter reference and the reference two-strain model (`tbsim.LSHTMResistant`), see the [drug resistance user guide](../user_guide/resistance.qmd).
+Preventive therapy is strain-aware with `tbsim.TPT(tb=tb, drugs=['INH'])`: it protects only against the strains its drugs act on. For a recipe-style companion, including a parameter reference and the reference two-strain model (`tbsim.LSHTMResistant`), see the [drug resistance user guide](../user_guide/resistance.qmd).

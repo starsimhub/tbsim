@@ -282,6 +282,24 @@ print(f'Treated:   {r.start_tx.delivered.sum():,.0f}')
 print(f'Completed: {r.tb.completion.sum():,.0f}, failed: {r.tb.failure.sum():,.0f}')
 ```
 
+## Household contact tracing
+
+When someone starts treatment, the people they live with can be traced: `tbsim.contact_tracing(tb)` tests the household contacts of everyone who starts treatment, starts treatment for those who test positive, and gives TPT to those with a latent infection who test negative. It needs to know who each person's contacts are, so it runs as agents, with a household network:
+
+```{python}
+tb = tbsim.TB(**tb_pars)
+household = ss.library.HouseholdNet(dhs_data='default', dynamic=False)
+interventions = [tbsim.care(tb, seeking=ss.peryear(1.0)), tbsim.contact_tracing(tb)]
+tracing_sim = ss.Sim(tb, networks=household, interventions=interventions, solver='abm', n_agents=10_000, start=2000, stop=2010, dt=ss.weeks(1), verbose=0).run()
+
+r = tracing_sim.results
+print(f'Started treatment:  {r.tb.diagnosis.sum():,.0f}')
+print(f'Contacts tested:    {r.tracing.delivered.sum():,.0f}, of whom {r.tracing.diagnosed.sum():,.0f} tested positive')
+print(f'Contacts given TPT: {r.tracing_prevention.delivered.sum():,.0f}')
+```
+
+Contact tracing is `ss.screen(..., on=tb.diagnosis, trace='householdnet')`: `trace=` delivers to the contacts, in a network, of the people `on=` selects, so any network can be traced, and any product delivered to the contacts.
+
 ## Summary and key takeaways
 
 In this tutorial, we've learned how to:
@@ -292,6 +310,7 @@ In this tutorial, we've learned how to:
    - **TPT** (`tbsim.TPT()` with `ss.treat()`): slows progression from latent infection to active TB while it protects
    - **Changes in transmission** (`ss.change()`): multiply the transmission rate from given years on
    - **The care cascade** (`tbsim.care()`, or tests chained with `ss.screen()`): finds and treats people with TB
+   - **Household contact tracing** (`tbsim.contact_tracing()`): tests the contacts of people starting treatment, and treats them or gives them TPT
 3. **Run multiple scenarios** with `ss.MultiSim` and compare their impacts
 4. **Analyze intervention effectiveness** through prevalence, deaths, and new infections
 5. **Create custom scenarios** that combine interventions
