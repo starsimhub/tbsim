@@ -133,7 +133,8 @@ def add_resistance(S, T, p, foi, drugs=('RIF',), max_strains=2, split=None, supe
         clear (list): the transitions of clearance and recovery (faster with several strains, by `rr_clear_super`)
         denovo (list): the transitions of progression from a latent infection, on which resistance can be acquired
         treatment (list): pairs of the transitions that end treatment, (completion, failure): both have the rate at which treatment ends, and are split here by its outcome;
-            a third entry, a dict, gives that regimen's own `cure`, `rr_cure`, or `q_treat`
+            a third entry, a dict, gives that regimen's own `cure`, `rr_cure`, or `q_treat`. The completion can be None, for an event that
+            only cures strains or makes them resistant; a failure from a state to itself does nothing to people whose strains it leaves as they were
         cure (float): the chance that treatment cures a drug-susceptible strain
         kwargs (dict): the parameters of resistance (see `resistance_pars()`)
 
@@ -165,7 +166,7 @@ def add_resistance(S, T, p, foi, drugs=('RIF',), max_strains=2, split=None, supe
             return
         tr = T[base]
         name = f'{base}_{st.safe(st.sets[l])}_to_{st.safe(st.sets[m])}'
-        T[name] = ss.Transition(tr.src, tr.dst, rate=tr.rate*value, name=name, move=dict(resistance=f'{st.labels[l]} -> {st.labels[m]}'))
+        T[name] = ss.Transition(tr.src, tr.dst, rate=tr.rate*value, name=name, where=tr.where, move=dict(resistance=f'{st.labels[l]} -> {st.labels[m]}'))
         return
 
     # Transmission: someone with several strains is as infectious as the fittest (or all of them), and passes each on in proportion to its fitness
@@ -220,8 +221,10 @@ def add_resistance(S, T, p, foi, drugs=('RIF',), max_strains=2, split=None, supe
                         prob = p_left*np.prod([q_ for _,q_ in combo])
                         m = st.index.get(target, l)
                         outcomes[m] = outcomes.get(m, 0) + prob
-            mult(completion, l, np.prod(list(c.values())))
-            mult(failure, l, outcomes.get(l, 0))
+            if completion is not None:
+                mult(completion, l, np.prod(list(c.values())))
+            stays = T[failure].src == T[failure].dst # Nothing happens to people whose strains are as they were
+            mult(failure, l, 0.0 if stays else outcomes.get(l, 0))
             for m,prob in outcomes.items():
                 add_move(failure, l, m, prob)
 

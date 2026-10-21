@@ -5,6 +5,7 @@ The model is checked against the reference ODE (two_strain_ode.R) in test_models
 against the ODE in test_compartmental.py; these tests check its behavior.
 """
 
+import pytest
 import numpy as np
 import sciris as sc
 import starsim as ss
@@ -170,6 +171,64 @@ def test_tpt_strains():
     return none, inh
 
 
+@sc.timer()
+def test_monitoring():
+    sc.heading('People on first-line treatment found resistant switch to second line; as agents too')
+    def make(solver, monitor):
+        tb = tbsim.TB(drugs=['RIF'], strains=dict(DS=0.7, RIF=0.3), init=dict(infection=0.3), rr_cure=dict(RIF=0.1), second_line=True, **tbsim.regimen('dots'))
+        intvs = [tbsim.care(tb, seeking=ss.peryear(1.0))] + [tbsim.monitoring(tb)]*monitor
+        agents = dict(n_agents=50_000) if solver == 'abm' else {}
+        return tbsim.Sim(tb=tb, interventions=intvs, solver=solver, **sc.mergedicts(pars, dict(stop=2020, dt=ss.weeks(1)), agents)).run()
+    base = make('ode', False)
+    sims = sc.objdict(ode=make('ode', True), abm=make('abm', True))
+    switched = {key:sim.results.tb.switch_second_line.sum() for key,sim in sims.items()}
+    print(f'Switched to second line: {switched}; resistant share {tbsim.resistant_share(base)[-1]:0.3f} without monitoring, {tbsim.resistant_share(sims.ode)[-1]:0.3f} with')
+    assert tbsim.resistant_share(sims.ode)[-1] < 0.6*tbsim.resistant_share(base)[-1]
+    assert np.isclose(switched['abm'], switched['ode'], rtol=0.2)
+    return sims
+
+
+@sc.timer()
+def test_tpt_infection():
+    sc.heading('TPT clears the strains it acts on, and others can become resistant under it; as agents too')
+    out = sc.objdict()
+    for solver in ['ode', 'abm']:
+        tb = tbsim.TB(beta=0, drugs=['RIF', 'INH'], init=dict(infection=0.4, symptomatic=0.05), strains={'DS':0.5, 'INH':0.25, 'DS+INH':0.25}, tpt=dict(drugs=['INH'], clearance=4.0, acquisition=0.5))
+        tpt = ss.treat(tbsim.TPT(tb=tb, dur=ss.years(100)), eligible=tb.infection | tb.symptomatic, years=[2000], name='tpt_delivery') # Held for the whole run
+        agents = dict(n_agents=40_000) if solver == 'abm' else {}
+        sim = tbsim.Sim(tb=tb, interventions=tpt, solver=solver, **sc.mergedicts(pars, dict(stop=2002, dt=ss.weeks(1)), agents)).run()
+        res = sim.results.tb
+        latent = by_strain(sim, 'infection')
+        out[solver] = sc.objdict(DS=latent['DS'], INH=latent['INH'], mixed=latent['DS+INH'], partial=res.tpt_partial_DS_and_INH_to_INH.sum(),
+                                 acquired=sum(res[key].sum() for key in res.keys() if key.startswith('tpt_acquisition_') and '_to_' in key))
+        print(f'{solver}: {sc.strjoin(f"{k} {v:.0f}" for k,v in out[solver].items())}')
+        assert latent['DS'] < 0.05*latent['INH'] and latent['DS+INH'] < 0.05*latent['INH'] # Cleared, or left with the strain it does not act on
+        assert out[solver].partial > 0 and out[solver].acquired > 0
+    assert np.isclose(out.abm.acquired, out.ode.acquired, rtol=0.2)
+
+    # Without TPT, none of this happens
+    tb = tbsim.TB(drugs=['RIF', 'INH'], init=init, tpt=dict(drugs=['INH'], clearance=4.0, acquisition=0.5))
+    res = tbsim.Sim(tb=tb, **pars).run().results.tb
+    assert res.tpt_clearance.sum() == 0
+    return out
+
+
+@sc.timer()
+def test_retreatment():
+    sc.heading('Only people treated before are tested for resistance (as agents)')
+    tb = tbsim.TB(drugs=['RIF'], strains=dict(DS=0.7, RIF=0.3), init=dict(infection=0.3), rr_cure=dict(RIF=0.1), second_line=True, **tbsim.regimen('dots'))
+    care = tbsim.care(tb, seeking=ss.peryear(1.0), dst=tbsim.DST(tb), retreatment=ss.years(2))
+    sim = tbsim.Sim(tb=tb, interventions=care, solver='abm', n_agents=20_000, **sc.mergedicts(pars, dict(stop=2015, dt=ss.weeks(1)))).run()
+    res = sim.results
+    print(f'{res.care_history.delivered.sum():.0f} tested positive; {res.care_history.diagnosed.sum():.0f} had been treated within 2 years, and were tested for resistance')
+    assert 0 < res.care_dst.delivered.sum() == res.care_history.diagnosed.sum() < res.care_history.delivered.sum()
+    assert np.isclose(res.tb.diagnosis.sum() + res.tb.diagnosis_second_line.sum(), res.care_history.delivered.sum())
+    tb = tbsim.TB(drugs=['RIF'], second_line=True)
+    with pytest.raises(ss.CodedError, match='E804'): # Only agents keep when people were treated
+        tbsim.Sim(tb=tb, interventions=tbsim.care(tb, dst=tbsim.DST(tb), retreatment=ss.years(2)), solver='ode', verbose=0).init()
+    return sim
+
+
 if __name__ == '__main__':
     test_strains()
     test_single_strain()
@@ -181,3 +240,6 @@ if __name__ == '__main__':
     test_interventions()
     test_second_line()
     test_tpt_strains()
+    test_monitoring()
+    test_tpt_infection()
+    test_retreatment()

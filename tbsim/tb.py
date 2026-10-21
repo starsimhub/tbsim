@@ -6,7 +6,7 @@ import sciris as sc
 import starsim as ss
 import tbsim
 
-__all__ = ['TB', 'tb_pars', 'make_pars', 'get_tb', 'state_codes']
+__all__ = ['TB', 'tb_pars', 'tpt_pars', 'make_pars', 'get_tb', 'state_codes']
 
 
 def tb_pars():
@@ -39,6 +39,16 @@ def tb_pars():
         mu                     = ss.peryear(1/70), # Background mortality, with births replacing every death (0: none, e.g. to use ss.Births and ss.Deaths as agents)
         immigration            = ss.peryear(0.0),  # People arriving per year (a number, not per person), into the states given by immigrants=
         emigration             = ss.peryear(0.0),  # People leaving, per person per year
+    )
+
+
+def tpt_pars():
+    """ The effects of TB preventive therapy on the infection itself (see `tbsim.TB(tpt=...)`); its protection is the product's (see `tbsim.TPT()`) """
+    return sc.objdict(
+        drugs          = None,             # The drugs of the regimen, with a model with drugs (default: all of them)
+        clearance      = ss.peryear(0.0),  # The rate at which it clears the strains it acts on, while held
+        acquisition    = 0.0,              # With drugs: the rate per year at which a strain it does not clear becomes resistant to each of its drugs, while held (a number, or a dict by drug)
+        rr_acquisition = dict(infection=0.05, non_infectious=0.5, asymptomatic=1.0, symptomatic=1.0), # The acquisition, relative to the above, by state
     )
 
 
@@ -105,7 +115,15 @@ class TB(ss.Disease):
     With `second_line`, there is a second regimen, for people found to carry a resistant
     strain: the state `second_line`, entered by `diagnosis_second_line` (driven by a
     delivery, see `tbsim.care(dst=...)`) and left by `completion_second_line` and
-    `failure_second_line`.
+    `failure_second_line`; `switch_second_line` moves people from first-line treatment to it
+    (driven by a delivery, see `tbsim.monitoring()`).
+
+    With `tpt`, TB preventive therapy acts on the infection of people who hold it (a product
+    from `tbsim.TPT()`), as well as protecting them: it clears the strains it acts on
+    (`tpt_clearance`, to `cleared`; with drugs, `tpt_partial` for someone who also carries a
+    strain it does not act on, who keeps that one), and with drugs, strains it does not clear
+    can become resistant to its drugs (`tpt_acquisition_<state>`), mostly in people who have
+    active TB that was not found.
 
     Args:
         pars (dict): parameters, by name (as `kwargs`)
@@ -113,6 +131,7 @@ class TB(ss.Disease):
         drugs (list): the drugs that strains can be resistant to (default: none, so one strain)
         max_strains (int): with drugs, the most strains anyone can carry at once
         strains (dict): with drugs, the share of each set of strains among people infected at the start (default: all drug-susceptible), e.g. `dict(DS=0.99, RIF=0.01)`
+        tpt (dict): the effects of TB preventive therapy on the infection (see `tbsim.tpt_pars()`), e.g. `dict(clearance=2.0)`, or with drugs, `dict(drugs=['INH'], clearance=2.0, acquisition=0.05)`
         second_line (bool/dict): with drugs, a second-line regimen: True for `tbsim.regimen('second_line_combo')`, or a dict
             of `delta`, `phi`, and `p_relapse` (as `tbsim.regimen()` gives); and optionally `rr_cure` (the chance that it cures
             a strain resistant to each drug, relative to a drug-susceptible strain; default 1, for drugs it does not use) and
@@ -129,7 +148,7 @@ class TB(ss.Disease):
         tb = tbsim.TB(drugs=['RIF', 'INH'], fitness=dict(RIF=0.6, INH=0.9), theta=0.5)
         tb = tbsim.TB(drugs=['RIF'], second_line=True) # With tbsim.care(tb, dst=tbsim.DST(tb))
     """
-    def __init__(self, pars=None, init=None, drugs=None, max_strains=2, strains=None, immigrants=None, second_line=None, name='tb', **kwargs):
+    def __init__(self, pars=None, init=None, drugs=None, max_strains=2, strains=None, immigrants=None, second_line=None, tpt=None, name='tb', **kwargs):
         kwargs = sc.mergedicts(pars, kwargs)
         res_kw = {key:kwargs.pop(key) for key in list(kwargs) if key in tbsim.resistance_pars()}
         if res_kw and not drugs:
@@ -140,6 +159,7 @@ class TB(ss.Disease):
             raise ValueError(errormsg)
         p = make_pars(tb_pars(), kwargs)
         second = second_line_pars(second_line) if second_line else None
+        tpt = check_tpt(tpt, drugs)
         S = sc.objdict() # The states, by name
         add_state = lambda name_, label, **kw: S.setdefault(name_, ss.State(name=name_, label=label, **kw))
         add_state('susceptible', 'Susceptible')
@@ -198,6 +218,19 @@ class TB(ss.Disease):
             end_2 = second.delta + second.phi
             add('failure_second_line', 'second_line', 'symptomatic', end_2)
             add_completion('completion_second_line', 'second_line', end_2, second.p_relapse)
+            T.switch_second_line = ss.Transition(S.treatment, S.second_line, rate=ss.peryear(0.0), name='switch_second_line')
+        latent = ['infection'] + ['infection_remote']*front
+        suffix = lambda src: '' if src == 'infection' else '_remote'
+        if tpt: # Only for the people who hold TPT
+            on_tpt = holds_tpt(name)
+            for src in latent:
+                add(f'tpt_clearance{suffix(src)}', src, 'cleared', tpt.clearance, where=on_tpt)
+                if drugs:
+                    add(f'tpt_partial{suffix(src)}', src, src, tpt.clearance, where=on_tpt)
+            if drugs:
+                for state,rr in tpt.rr_acquisition.items():
+                    for src in (latent if state == 'infection' else [state]):
+                        add(f'tpt_acquisition_{src}', src, src, ss.peryear(rr), where=on_tpt) # Each strain not cleared becomes resistant to each drug at the acquisition rate, below
         if relapse:
             T.relapse = ss.Transition(S.relapsing, S.symptomatic, dur=p.dur_relapse, name='relapse')
         if p.dur_reinfection_protection is not None: # Protection (or risk) after clearance wanes
@@ -227,6 +260,14 @@ class TB(ss.Disease):
             if second:
                 d2, f2 = second.delta.raw.value, second.phi.raw.value
                 treatment.append(('completion_second_line', 'failure_second_line', dict(cure=d2/(d2 + f2) if d2 + f2 > 0 else 1.0, rr_cure=second.rr_cure, q_treat=second.q_treat)))
+            if tpt: # TPT clears the strains it acts on, and strains it does not can become resistant
+                tpt_drugs = tpt.drugs or list(drugs)
+                for src in latent:
+                    treatment.append((f'tpt_clearance{suffix(src)}', f'tpt_partial{suffix(src)}', dict(cure=1.0, rr_cure={d:0.0 for d in tpt_drugs}, q_treat=0.0)))
+                acq = tpt.acquisition if isinstance(tpt.acquisition, dict) else {d:tpt.acquisition for d in tpt_drugs}
+                for name_ in T:
+                    if name_.startswith('tpt_acquisition_'):
+                        treatment.append((None, name_, dict(cure=0.0, q_treat=acq)))
             strat = tbsim.add_resistance(S, T, p, foi, drugs=drugs, max_strains=max_strains, split=strains,
                 superinfect = dict(infection='rr_superinfection_latent', non_infectious='rr_superinfection_non', asymptomatic='rr_superinfection_asy', symptomatic='rr_superinfection_sym'),
                 bottleneck  = ['latent_asy', 'worsening'] + remote,
@@ -249,9 +290,50 @@ class TB(ss.Disease):
             init              = sc.ifelse(init, dict(infection=0.05)),
             name              = name,
         )
+        self.tpt = tpt
         if drugs:
             self.stratify(**strat)
         return
+
+
+def check_tpt(tpt, drugs):
+    """ The effects of TPT on the infection (see `tpt_pars()`), with its rate as an `ss.par`; None if there are none """
+    if not tpt:
+        return None
+    unknown = set(tpt) - set(tpt_pars())
+    if unknown:
+        errormsg = f'tpt= has {sc.strjoin(unknown)}, which are not among {sc.strjoin(tpt_pars().keys())}'
+        raise ValueError(errormsg)
+    out = sc.mergedicts(tpt_pars(), tpt)
+    if not drugs and (out.drugs or out.acquisition):
+        errormsg = 'The drugs of TPT, and resistance acquired under it, are for a model with drug resistance: give drugs= as well'
+        raise ValueError(errormsg)
+    unknown = set(sc.tolist(out.drugs)) - set(drugs or [])
+    if unknown:
+        errormsg = f'The drugs of TPT, {sc.strjoin(unknown)}, are not among those of the model ({sc.strjoin(drugs)})'
+        raise ValueError(errormsg)
+    out.drugs = sc.tolist(out.drugs) if out.drugs is not None else None
+    out.rr_acquisition = sc.mergedicts(tpt_pars().rr_acquisition, tpt.get('rr_acquisition'))
+    clearance = out.clearance
+    if not isinstance(clearance, ss.par):
+        clearance = ss.par(clearance if isinstance(clearance, ss.TimePar) else ss.peryear(clearance))
+    if clearance.name is None:
+        clearance.name = 'tpt_clearance_rate'
+    out.clearance = clearance
+    return out
+
+
+def holds_tpt(name):
+    """ Who holds a TPT product (from `tbsim.TPT()`) for the TB model with this name: a function of the sim, for the `where=` of its transitions """
+    def on_tpt(sim):
+        selector = sim.diseases[name].engine.selector
+        out = selector.nobody() > 0
+        for intv in sim.interventions():
+            product = getattr(intv, 'product', None)
+            if getattr(product, 'is_tpt', False) and getattr(intv, 'disease', None) == name:
+                out = out | (selector.dim(product.dim) > 0) # At any level, since one that fades has a level for each stage of time since delivery
+        return out
+    return on_tpt
 
 
 def second_line_pars(second_line):

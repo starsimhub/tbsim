@@ -238,6 +238,10 @@ sim = tbsim.Sim(tb=tb, interventions=care, start=2000, stop=2020, verbose=0).run
 print(f'Started second-line treatment: {sim.results.tb.diagnosis_second_line.sum():,.0f}; first-line: {sim.results.tb.diagnosis.sum():,.0f}')
 ```
 
+As agents, the test for resistance can be kept for people treated before, as where it is only done for retreatment: with `tbsim.care(tb, dst=tbsim.DST(tb), retreatment=ss.years(2))`, only people who started treatment within the last two years are tested for resistance (agents keep when each person was last treated; a compartmental model does not), and everyone else starts first-line treatment.
+
+People already on first-line treatment can be tested again, and switched to the second-line regimen if found resistant (`switch_second_line`): `tbsim.monitoring(tb, every=ss.months(2))` tests everyone on first-line treatment for resistance at that interval.
+
 `second_line=True` is `tbsim.regimen('second_line_combo')`. A dict gives the regimen's `delta`, `phi`, and `p_relapse` (as `tbsim.regimen()` does), and optionally its own `rr_cure` (by default 1: the drugs of the model are not in it, so it cures resistant strains as well as drug-susceptible ones) and `q_treat` (by default 0).
 
 ## Strain-aware preventive therapy
@@ -248,6 +252,15 @@ print(f'Started second-line treatment: {sim.results.tb.diagnosis_second_line.sum
 tb = tbsim.TB(drugs=['RIF', 'INH'], init=init, strains={'DS':0.8, 'INH':0.2})
 tpt = ss.treat(tbsim.TPT(tb=tb, drugs=['INH']), eligible=tb.infection, coverage=0.5, interval=ss.years(1), name='tpt_delivery')
 sim = tbsim.Sim(tb=tb, interventions=tpt, start=2000, stop=2020, verbose=0).run()
+```
+
+TPT can also act on the infection itself, which the model declares with `tpt=` (see `tbsim.tpt_pars()`). While people hold TPT, it clears the strains it acts on at the rate `clearance` (to `cleared`; someone who also carries a strain it does not act on keeps that one), and each strain it does not clear becomes resistant to each of its drugs at the rate `acquisition`, times `rr_acquisition` for the person's state: mostly in people given TPT who have active TB that was not found.
+
+```{python}
+tb = tbsim.TB(drugs=['RIF', 'INH'], init=init, strains={'DS':0.8, 'INH':0.2}, tpt=dict(drugs=['INH'], clearance=2.0, acquisition=0.05))
+tpt = ss.treat(tbsim.TPT(tb=tb), eligible=tb.infection | tb.asymptomatic, coverage=0.5, interval=ss.years(1), name='tpt_delivery')
+sim = tbsim.Sim(tb=tb, interventions=tpt, start=2000, stop=2020, verbose=0).run()
+print(f'Cleared by TPT: {sim.results.tb.tpt_clearance.sum():,.0f}')
 ```
 
 ## Analyzing where resistance comes from
@@ -330,8 +343,8 @@ print(f'Share resistant after 20 years: {tbsim.resistant_share(sim)[-1]:.3f}')
 
 | Topic | Current behavior |
 |-------|------------------|
-| Treatment after a test for resistance | A test for resistance at diagnosis sends people to the second-line regimen; there is no switching regimen during a course, and no separate retreatment regimen |
-| Preventive therapy | `tbsim.TPT(tb=tb, drugs=...)` slows progression only for the strains its drugs act on; it does not clear strains, or select for resistance |
+| Treatment after a test for resistance | A test for resistance at diagnosis, or during first-line treatment, sends people to the second-line regimen; testing only people treated before (`retreatment=`) needs agents, and there is no separate retreatment regimen |
+| Preventive therapy | Its clearance of strains and the resistance acquired under it are rates while it is held (`tbsim.TB(tpt=...)`), not outcomes at the end of a course |
 | Identical strains | Being infected again with a strain someone already carries does not change the strains they carry |
 | Loss to follow-up | Not a separate outcome of treatment |
 
@@ -341,4 +354,4 @@ print(f'Share resistant after 20 years: {tbsim.resistant_share(sim)[-1]:.3f}')
 - The module docstring of `tbsim/resistance.py`: how resistance is built into the model, and the mapping to the reference two-strain ODE.
 - Validation is in `tests/test_resistance.py`, `tests/test_models.py` (against the reference ODE), and `tests/test_compartmental.py` (agents against the ODE).
 
-Public API: `tbsim.TB(drugs=..., second_line=...)`, `tbsim.Strains`, `tbsim.resistance_pars`, `tbsim.add_resistance`, `tbsim.resistant_share`, `tbsim.DST`, `tbsim.TPT(drugs=...)`, and `tbsim.LSHTMResistant`.
+Public API: `tbsim.TB(drugs=..., second_line=..., tpt=...)`, `tbsim.tpt_pars`, `tbsim.monitoring`, `tbsim.treated_within`, `tbsim.Strains`, `tbsim.resistance_pars`, `tbsim.add_resistance`, `tbsim.resistant_share`, `tbsim.DST`, `tbsim.TPT(drugs=...)`, and `tbsim.LSHTMResistant`.

@@ -47,14 +47,15 @@ def TPT(efficacy=0.6, activation=0.4, dur=ss.years(2), tb=None, drugs=None, **kw
     `latent_non`. With `drugs` as well, it is strain-aware: it protects only against the strains
     that are susceptible to all of its drugs, so someone who carries several strains is
     protected in proportion to the share of them it covers, and someone with only resistant
-    strains not at all.
+    strains not at all. (A model with `tpt=` gives its drugs, and the other effects of TPT on
+    the infection of the people who hold it: see `tbsim.TB`.)
 
     Args:
         efficacy (float): the share of those treated whom it protects
         activation (float): the multiplier on progression to active TB for those it protects
         dur (dur): the mean time protection lasts (exponential)
         tb (`tbsim.TB`): the TB model
-        drugs (list): the drugs of the regimen (e.g. `['INH']` for isoniazid, `['INH', 'RIF']` for 3HP), with a model with drugs
+        drugs (list): the drugs of the regimen (e.g. `['INH']` for isoniazid, `['INH', 'RIF']` for 3HP), with a model with drugs (default: the model's `tpt=` drugs, if any)
         kwargs (dict): passed to `ss.Treatment`, e.g. `cost=`
 
     Example::
@@ -66,6 +67,8 @@ def TPT(efficacy=0.6, activation=0.4, dur=ss.years(2), tb=None, drugs=None, **kw
     if drugs is not None and tb is None:
         errormsg = 'TPT(drugs=...) needs the TB model too, for its strains: TPT(tb=tb, drugs=...)'
         raise ValueError(errormsg)
+    if drugs is None and getattr(tb, 'tpt', None) and tb.tpt.drugs:
+        drugs = tb.tpt.drugs
     if tb is None:
         keys = ['latent_asy', 'latent_non']
     else:
@@ -80,4 +83,6 @@ def TPT(efficacy=0.6, activation=0.4, dur=ss.years(2), tb=None, drugs=None, **kw
         covered = [np.mean([not any(d in strain.split('/') for d in drugs) for strain in label.split('+')]) for label in labels]
         eff = ss.by(resistance=[eff*cov for cov in covered])
     kwargs.setdefault('name', 'tpt')
-    return ss.Treatment(efficacy={key:eff for key in keys}, waning=dur, **kwargs)
+    product = ss.Treatment(efficacy={key:eff for key in keys}, waning=dur, **kwargs)
+    product.is_tpt = True # So the model's effects of TPT on the infection (tbsim.TB(tpt=...)) apply to the people who hold it
+    return product

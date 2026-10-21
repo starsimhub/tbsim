@@ -243,7 +243,7 @@ You have now used every part of drug resistance in TBsim:
 - `tbsim.TB(drugs=..., strains=..., fitness=...)`: multi-strain natural history, with the transmission bottleneck, superinfection, and competition.
 - `q_prog` and `prog_resist_mix`: resistance acquired on progression, added to the strain or replacing it.
 - `theta`, `rr_cure`, and `q_treat`: treatment that cures resistant strains less well, and resistance acquired on treatment failure.
-- `ss.Test(detects=tb.resistance != 'DS')`, or `tbsim.DST(tb)`: a test for resistance; with `tbsim.care(tb, dst=...)` and `tbsim.TB(second_line=...)`, people found resistant start a second-line regimen.
+- `ss.Test(detects=tb.resistance != 'DS')`, or `tbsim.DST(tb)`: a test for resistance; with `tbsim.care(tb, dst=...)` and `tbsim.TB(second_line=...)`, people found resistant start a second-line regimen, and with `tbsim.monitoring(tb)`, people on first-line treatment found resistant switch to it.
 - `tbsim.resistant_share()` and `.by('resistance')`: results by strain, and the transitions that show where resistance comes from.
 
-Preventive therapy is strain-aware with `tbsim.TPT(tb=tb, drugs=['INH'])`: it protects only against the strains its drugs act on. For a recipe-style companion, including a parameter reference and the reference two-strain model (`tbsim.LSHTMResistant`), see the [drug resistance user guide](../user_guide/resistance.qmd).
+Preventive therapy is strain-aware with `tbsim.TPT(tb=tb, drugs=['INH'])`: it protects only against the strains its drugs act on; with `tbsim.TB(tpt=...)`, it also clears them, and strains it does not clear can become resistant to it. For a recipe-style companion, including a parameter reference and the reference two-strain model (`tbsim.LSHTMResistant`), see the [drug resistance user guide](../user_guide/resistance.qmd).
