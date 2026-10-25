@@ -21,9 +21,9 @@ def test_ode(do_plot=False):
         tbr.plot()
 
     # Run the declared model
-    sim = ss.Sim(tbsim.TB(init=dict(symptomatic=1000)), start=start_time, stop=end_time, unit='year', total_pop=1e5, verbose=0)
+    sim = ss.Sim(tbsim.TB(init_n=dict(symptomatic=1000)), start=start_time, stop=end_time, unit='year', total_pop=1e5, verbose=0)
     sim.run()
-    assert np.allclose(sim.results.tb.n_symptomatic.values, tbr.results.SYMPTOMATIC, rtol=1e-4) # Both at the start of each year
+    assert np.allclose(sim.results.tb.symptomatic.values, tbr.results.SYMPTOMATIC, rtol=1e-4) # Both at the start of each year
     if do_plot:
         sim.plot()
 

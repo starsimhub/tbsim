@@ -90,7 +90,8 @@ class Malnutrition(ss.Disease):
 
     def height(self, uids=None):
         """Calculate height (cm) from height percentiles using LMS method."""
-        return self.lms(self.height_percentile, uids, 'Height')
+        height = self.lms(self.height_percentile, uids, 'Height')
+        return np.where(np.isnan(height), self.lms(self.height_percentile, uids, 'Length'), height) # Height starts at 24 months; Length covers younger ages
 
     def lms(self, percentile, uids=None, metric='Weight'):
         """

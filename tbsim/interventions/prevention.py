@@ -6,18 +6,19 @@ A product acts on the transitions of `tbsim.TB` for the people who hold it (see
 `ss.vaccinate()` and `ss.treat()`, e.g.::
 
     tb = tbsim.TB()
-    bcg = ss.vaccinate(tbsim.BCG(), eligible=ppl.age < 1, coverage=0.9)
-    tpt = ss.treat(tbsim.TPT(), eligible=tb.infection, coverage=0.3, interval=ss.years(1))
+    bcg = ss.vaccinate(tbsim.BCG(), where=ppl.age < 1, coverage=0.9)
+    tpt = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.3, interval=ss.years(1))
 
 With drug resistance, TPT protects only against the strains its drugs act on: see `TPT(drugs=...)`.
 """
 import numpy as np
 import starsim as ss
+from ..resistance import resistant, drugs_of
 
 __all__ = ['BCG', 'TPT']
 
 
-def BCG(take=0.8, activation=0.575, clearance=1.4, death=0.1, dur=ss.years(10), **kwargs):
+class BCG(ss.Vaccine):
     """
     The BCG vaccine: an `ss.Vaccine` that slows progression to active TB, speeds recovery, and lowers TB mortality
 
@@ -32,13 +33,13 @@ def BCG(take=0.8, activation=0.575, clearance=1.4, death=0.1, dur=ss.years(10), 
         dur (dur): the mean time protection lasts (exponential)
         kwargs (dict): passed to `ss.Vaccine`, e.g. `cost=`
     """
-    eff = lambda mult: take*(1 - mult) # The efficacy is 1 minus the multiplier, averaged over responders and others
-    efficacy = dict(latent_asy=eff(activation), latent_non=eff(activation), recovery=eff(clearance), tb_death=eff(death))
-    kwargs.setdefault('name', 'bcg')
-    return ss.Vaccine(efficacy=efficacy, waning=dur, **kwargs)
+    def __init__(self, take=0.8, activation=0.575, clearance=1.4, death=0.1, dur=ss.years(10), **kwargs):
+        eff = lambda mult: take*(1 - mult) # The efficacy is 1 minus the multiplier, averaged over responders and others
+        efficacy = dict(latent_asy=eff(activation), latent_non=eff(activation), recovery=eff(clearance), tb_death=eff(death))
+        super().__init__(efficacy=efficacy, waning=dur, **kwargs)
 
 
-def TPT(efficacy=0.6, activation=0.4, dur=ss.years(2), tb=None, drugs=None, **kwargs):
+class TPT(ss.Treatment):
     """
     TB preventive therapy: an `ss.Treatment` that slows progression from latent infection to active TB while it protects
 
@@ -61,28 +62,24 @@ def TPT(efficacy=0.6, activation=0.4, dur=ss.years(2), tb=None, drugs=None, **kw
     Example::
 
         tb = tbsim.TB(drugs=['RIF', 'INH'])
-        tpt = ss.treat(tbsim.TPT(tb=tb, drugs=['INH']), eligible=tb.infection, coverage=0.3, interval=ss.years(1))
+        tpt = ss.treat(tbsim.TPT(tb=tb, drugs=['INH']), where=tb.infection, coverage=0.3, interval=ss.years(1))
     """
-    eff = efficacy*(1 - activation)
-    if drugs is not None and tb is None:
-        errormsg = 'TPT(drugs=...) needs the TB model too, for its strains: TPT(tb=tb, drugs=...)'
-        raise ValueError(errormsg)
-    if drugs is None and getattr(tb, 'tpt', None) and tb.tpt.drugs:
-        drugs = tb.tpt.drugs
-    if tb is None:
-        keys = ['latent_asy', 'latent_non']
-    else:
-        latent = {'infection', 'infection_remote'}
-        active = {'non_infectious', 'asymptomatic', 'symptomatic'}
-        keys = [name for name,tr in tb.graph.transitions.items() if set(s.name for s in tr.src) <= latent and any(s.name in active for s in tr.dst)]
-    if drugs is not None: # The share of the strains people carry that the regimen covers, at each level of resistance
-        from .care import resistant_levels
-        resistant_levels(tb, drugs) # Checks that the model has these drugs
-        drugs = [drugs] if isinstance(drugs, str) else list(drugs)
-        labels = [strat for strat in tb.graph.strats if strat.name == 'resistance'][0].labels
-        covered = [np.mean([not any(d in strain.split('/') for d in drugs) for strain in label.split('+')]) for label in labels]
-        eff = ss.by(resistance=[eff*cov for cov in covered])
-    kwargs.setdefault('name', 'tpt')
-    product = ss.Treatment(efficacy={key:eff for key in keys}, waning=dur, **kwargs)
-    product.is_tpt = True # So the model's effects of TPT on the infection (tbsim.TB(tpt=...)) apply to the people who hold it
-    return product
+    def __init__(self, efficacy=0.6, activation=0.4, dur=ss.years(2), tb=None, drugs=None, **kwargs):
+        eff = efficacy*(1 - activation)
+        if drugs is not None and tb is None:
+            errormsg = 'TPT(drugs=...) needs the TB model too, for its strains: TPT(tb=tb, drugs=...)'
+            raise ValueError(errormsg)
+        if drugs is None and getattr(tb, 'tpt', None) and tb.tpt.drugs:
+            drugs = tb.tpt.drugs
+        if tb is None:
+            keys = ['latent_asy', 'latent_non']
+        else:
+            latent = {'infection', 'infection_remote'}
+            active = {'non_infectious', 'asymptomatic', 'symptomatic'}
+            keys = [name for name,tr in tb.graph.transitions.items() if set(s.name for s in tr.src) <= latent and any(s.name in active for s in tr.dst)]
+        if drugs is not None: # The share of the strains people carry that the regimen covers, at each level of resistance
+            resistant(tb, drugs) # Checks that the model has these drugs
+            drugs = {drugs} if isinstance(drugs, str) else set(drugs)
+            covered = [np.mean([not (drugs_of(tb.strains[j]) & drugs) for j in s]) for s in tb.strains.sets]
+            eff = ss.by(resistance=[eff*cov for cov in covered])
+        super().__init__(efficacy={key:eff for key in keys}, waning=dur, **kwargs)

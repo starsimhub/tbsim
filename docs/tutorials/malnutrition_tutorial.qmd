@@ -92,7 +92,7 @@ msim = ss.MultiSim(sims)
 With the effects of nutrition, more people have a latent infection (through the higher susceptibility of those with poor micronutrient status), and more progress to active TB:
 
 ```{python}
-tbsim.plot(msim, select=['prevalence_active', 'active', 'n_infection', 'n_symptomatic'], n_cols=2, row_height=2.5)
+tbsim.plot(msim, select=['prevalence_active', 'active', 'infection', 'symptomatic'], n_cols=2, row_height=2.5)
 ```
 
 The risk ratio for progression depends on each agent's BMI, which comes from their weight and height:

@@ -28,7 +28,7 @@ With no network, people mix homogeneously and the sim runs as an ODE; `solver='a
 
 ## Diagnosis and treatment
 
-- **Tests**: `tbsim.Xpert()`, `tbsim.OralSwab()`, `tbsim.FujiLAM()`, and `tbsim.CAD()` are `ss.Test` products whose sensitivity depends on the TB state and on age; `tbsim.test()` makes one from a table of your own.
+- **Tests**: `tbsim.Xpert()`, `tbsim.OralSwab()`, `tbsim.FujiLAM()`, and `tbsim.CAD()` are `ss.Diagnostic` products whose sensitivity depends on the TB state and on age; `tbsim.test()` makes one from a table of your own.
 - **The care cascade**: `tbsim.care(tb)` has people with symptomatic TB seek care, be tested, and start treatment if they test positive.
 - **Regimens**: `tbsim.regimen('dots')` gives the model's treatment parameters (completion, failure, and relapse) for a regimen.
 
@@ -39,12 +39,12 @@ With no network, people mix homogeneously and the sim runs as an ODE; `solver='a
 
 ## Comorbidities
 
-- **HIV**: `tbsim.HIV()`, with HIV infection at a given (possibly time-varying) incidence and ART started at a rate or by `ss.transfer()`, and `tbsim.hiv_effects(tb, hiv)`, modifiers that raise progression to active TB by HIV state (as an ODE or as agents).
+- **HIV**: `tbsim.HIV()`, with HIV infection at a given (possibly time-varying) incidence and ART started at a rate or by a delivery (`ss.Delivery(move=dict(art=True), ...)`), and `tbsim.hiv_effects(tb, hiv)`, modifiers that raise progression to active TB by HIV state (as an ODE or as agents).
 - **Malnutrition**: `tbsim.Malnutrition()` with `tbsim.nutrition_effects(tb)`, modifiers on susceptibility, progression, and clearance, and `tbsim.supplementation_rr()` for nutritional supplements.
 
 ## Drug resistance
 
-`tbsim.TB(drugs=['RIF', 'INH'])` has a strain for each set of drugs it is resistant to, and people can carry several strains at once. Resistant strains can be less fit, are acquired on progression and during treatment, and are cured less often; results are read by strain (`sim.results.tb.n_symptomatic.by('resistance')`, `tbsim.resistant_share(sim)`). `tbsim.LSHTMResistant` is the reference two-strain model. See the [drug resistance user guide](resistance.qmd) and the [drug resistance tutorial](../tutorials/resistance_tutorial.qmd).
+`tbsim.TB(drugs=['RIF', 'INH'])` has a strain for each set of drugs it is resistant to, and people can carry several strains at once. Resistant strains can be less fit, are acquired on progression and during treatment, and are cured less often; results are read by strain (`sim.results.tb.symptomatic.by('resistance')`, `tbsim.resistant_share(sim)`). `tbsim.LSHTMResistant` is the reference two-strain model. See the [drug resistance user guide](resistance.qmd) and the [drug resistance tutorial](../tutorials/resistance_tutorial.qmd).
 
 ## Analysis
 

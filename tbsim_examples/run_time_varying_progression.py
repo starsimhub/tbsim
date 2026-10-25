@@ -63,7 +63,7 @@ def run_curve(drugs=None, years=10, **pars):
     sim = tbsim.Sim(tb=tb, start=2000, stop=2000+years, verbose=0)
     sim.run()
     res = sim.results.tb
-    curve = res.n_asymptomatic/res.n_infection[0]
+    curve = res.asymptomatic/res.infection[0]
     t = np.arange(len(curve))*sim.t.dt.years
     year1 = curve[np.searchsorted(t, 1.0)]/curve[-1] # The share of 10-year progression that happens in the first year
     return t, curve, year1, curve[-1]

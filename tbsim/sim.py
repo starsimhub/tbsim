@@ -50,7 +50,7 @@ class Sim(ss.Sim):
         """ Plot the results: by default, a selection of the TB results """
         if key is None:
             name = self.get_tb().name
-            keys = [f'{name}_{k}' for k in ['infectious', 'prevalence_active', 'new_infections', 'tb_death', 'n_treatment']]
+            keys = [f'{name}_{k}' for k in ['infectious', 'prevalence_active', 'transmission', 'tb_death', 'treatment']]
             key = [k for k in keys if k in self.results.flatten()] or None
         return super().plot(key=key, **kwargs)
 

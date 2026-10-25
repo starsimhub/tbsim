@@ -1,35 +1,37 @@
 """
-Drug resistance: strains of TB that are resistant to some drugs, as a strain dimension of the TB model
+Drug resistance: strains of TB that are resistant to some drugs, as the strains of the TB model (`ss.Strains`)
 
-A strain is the set of drugs it is resistant to (`DS` for none, `RIF`, `RIF/INH`, ...).
-People can carry several strains at once, up to `max_strains`: the levels of the dimension
-are the sets of strains people can carry (`DS`, `RIF`, `DS+RIF`, ...). The TB model's states
-of infection and disease are split by these levels; everything else about the model is unchanged,
-so it runs as an ODE, as a stochastic compartmental model, or as agents, and every intervention
-for `tbsim.TB` works with it.
+A strain is the set of drugs it is resistant to (`DS` for none, `RIF`, `RIF/INH`, ...). People can
+carry several strains at once, up to `max_strains`; the sets they carry (`DS`, `RIF`, `DS+RIF`, ...)
+are made by `ss.Strains`, and are the levels of the model's `resistance` dimension. Everything else
+about the model is unchanged, so it runs as an ODE, as a stochastic compartmental model, or as
+agents, and every intervention for `tbsim.TB` works with it.
 
 The model is `two_strain_ode.R` (in `tbsim/compartmental`), generalized to any number of drugs:
 
 - Transmission: each strain has its own force of infection. Someone who carries several strains
-  is as infectious as the most infectious of them (or as all of them together, with
-  `transmission_independent=True`), and passes each on in proportion to its fitness.
+  is as infectious as the most infectious of them, and passes on one, in proportion to fitness
+  (`transmit='one'`); or each at its own fitness (`transmission_independent=True`, `transmit='each'`).
 - Superinfection: people with a latent infection or TB who are infected with a strain they do not
   carry carry it as well (at a rate relative to the force of infection, by state).
 - Progression: of someone who carries several strains, all progress to asymptomatic TB with
-  probability `p_multi`, and otherwise one of them; resistance can be acquired on progression
-  from a latent infection with one strain (`q_prog`), added to the strain (`prog_resist_mix=True`)
-  or replacing it.
-- Treatment: each strain carried is cured independently, with the chance of curing a drug-susceptible
-  strain times `rr_cure` for each drug it is resistant to; people with every strain cured complete
-  treatment, and the others fail, with the strains not cured, each of which can acquire resistance to
-  each drug (`q_treat`).
+  probability `p_multi`, and otherwise one of them (`alone=True`); resistance can be acquired on
+  progression from a latent infection with one strain (`q_prog`), added to the strain
+  (`prog_resist_mix=True`) or replacing it.
+- Treatment: each strain carried is cured independently (`per='strain'`), with the chance of
+  curing a drug-susceptible strain times `rr_cure` for each drug it is resistant to; people with
+  every strain cured complete treatment, and the others fail, with the strains not cured, which
+  can acquire resistance to each drug (`q_treat`; for people with several strains left, all of
+  them acquire it together).
 """
 import itertools
+import functools
+import operator
 import numpy as np
 import sciris as sc
 import starsim as ss
 
-__all__ = ['resistance_pars', 'Strains', 'add_resistance', 'resistant_share']
+__all__ = ['resistance_pars', 'add_resistance', 'resistant', 'resistant_share']
 
 
 def resistance_pars():
@@ -46,131 +48,107 @@ def resistance_pars():
         p_multi                   = 1.0,   # The chance that every strain carried progresses to asymptomatic TB together (otherwise one does)
         rr_prog_super             = 1.0,   # Progression to asymptomatic and symptomatic TB with several strains, relative to one (psi)
         rr_clear_super            = 1.0,   # Clearance and recovery with several strains, relative to one (omega)
-        transmission_independent  = False, # Whether someone with several strains transmits each at its own fitness (otherwise at the highest, split between them)
+        transmission_independent  = False, # Whether someone with several strains transmits each at its own fitness (otherwise one, at the highest)
         prog_resist_mix           = True,  # Whether resistance acquired on progression is added to the strain (giving two) or replaces it
         prog_select_fitness       = False, # Whether the strain that progresses alone is chosen by fitness (otherwise equally)
     )
 
 
-class Strains(sc.prettyobj):
-    """
-    The strains for a set of drugs, and the sets of them that people can carry
+def drugs_of(strain):
+    """ The drugs a strain is resistant to, from its name ('DS', 'RIF', 'RIF/INH') """
+    return frozenset(getattr(strain, 'name', strain).split('/')) - {'DS'}
 
-    Args:
-        drugs (list): the drugs, e.g. `['RIF', 'INH']`
-        max_strains (int): the most strains anyone can carry at once
 
-    Attributes:
-        strains (list): each strain, as the set of drugs it is resistant to (the first is drug-susceptible)
-        sets (list): each set of strains that people can carry: the levels of the dimension, in order
-        labels (list): the label of each set, e.g. 'DS', 'RIF', 'DS+RIF'
-    """
-    def __init__(self, drugs=('RIF',), max_strains=2):
-        self.drugs = [drugs] if isinstance(drugs, str) else list(drugs)
-        if not self.drugs or len(set(self.drugs)) != len(self.drugs):
-            errormsg = f'drugs must be a list of different drugs, not {drugs}'
+def per_drug(drugs, value, key):
+    """ A value for each drug, from a number or a dict by drug """
+    if isinstance(value, dict):
+        unknown = set(value) - set(drugs)
+        if unknown:
+            errormsg = f'{key} has values for {sc.strjoin(unknown)}, which are not among the drugs ({sc.strjoin(drugs)})'
             raise ValueError(errormsg)
-        self.max_strains = max_strains
-        self.strains = [frozenset(c) for k in range(len(self.drugs) + 1) for c in itertools.combinations(self.drugs, k)]
-        self.sets = [frozenset(c) for k in range(1, max_strains + 1) for c in itertools.combinations(self.strains, k)]
-        self.labels = [self.label(s) for s in self.sets]
-        self.index = {s:i for i,s in enumerate(self.sets)}
-        return
-
-    def name(self, strain):
-        """ The name of a strain: the drugs it is resistant to, or DS (drug-susceptible) """
-        return '/'.join(d for d in self.drugs if d in strain) or 'DS'
-
-    def label(self, carried):
-        """ The label of a set of strains, e.g. 'DS+RIF' """
-        return '+'.join(self.name(s) for s in self.strains if s in carried)
-
-    def per_drug(self, value, key):
-        """ A value for each drug, from a number or a dict by drug """
-        if isinstance(value, dict):
-            unknown = set(value) - set(self.drugs)
-            if unknown:
-                errormsg = f'{key} has values for {sc.strjoin(unknown)}, which are not among the drugs ({sc.strjoin(self.drugs)})'
-                raise ValueError(errormsg)
-            return {d:value.get(d, 1.0 if key in ['fitness', 'rr_cure'] else 0.0) for d in self.drugs}
-        return {d:value for d in self.drugs}
-
-    def safe(self, carried):
-        """ A label usable in the name of a transition, e.g. DS_and_RIF """
-        return self.label(carried).replace('+', '_and_').replace('/', '_')
+        return {d:value.get(d, 1.0 if key in ['fitness', 'rr_cure'] else 0.0) for d in drugs}
+    return {d:value for d in drugs}
 
 
-def acquire(strain, drugs, q):
-    """ The strains that a strain can become by acquiring resistance to each of some drugs independently, with their probabilities: {strain: p} """
+def gains(have, drugs, q):
+    """ The resistance a strain resistant to `have` gains, by each drug independently with chance q[d]: {drugs gained: probability}, including none """
+    free = [d for d in drugs if d not in have]
     out = {}
-    free = [d for d in drugs if d not in strain]
     for k in range(len(free) + 1):
         for gained in itertools.combinations(free, k):
-            p = np.prod([q[d] if d in gained else 1 - q[d] for d in free])
-            new = strain | frozenset(gained)
-            out[new] = out.get(new, 0) + p
+            out[frozenset(gained)] = np.prod([q[d] if d in gained else 1 - q[d] for d in free])
     return out
 
 
-def add_resistance(S, T, p, foi, drugs=('RIF',), max_strains=2, split=None, superinfect=None, bottleneck=None, symptoms=None, clear=None, denovo=None, treatment=None, cure=None, **kwargs):
+def add_resistance(S, T, p, foi, drugs=('RIF',), max_strains=2, split=None, superinfect=None, bottleneck=None, symptoms=None, clear=None, denovo=None, regimens=None, tpt=None, **kwargs):
     """
-    Add drug resistance to a TB model that is being built: the transitions it needs, and the stratification to apply once it is built
+    Add drug resistance to a TB model that is being built: its strains, and the transitions they need
 
-    The roles of the model's transitions are given by name, so this works for any model with
-    the structure of the LSHTM model (`tbsim.TB`, and the reference structure of `tbsim.LSHTMResistant`).
+    The roles of the model's transitions are given by name, so this works for any model with the
+    structure of the LSHTM model (`tbsim.TB`, and the reference structure of `tbsim.LSHTMResistant`).
 
     Args:
         S (dict): the states, by name
-        T (dict): the transitions, by name (new ones are added)
+        T (dict): the transitions, by name (changed and added to here)
         p (dict): the parameters of the model (as `ss.par`)
         foi (Expr): the force of infection
         drugs (list): the drugs
         max_strains (int): the most strains anyone can carry at once
-        split (dict): the share of each set of strains among people infected at the start, by label (default: all drug-susceptible)
+        split (dict): the share of each strain, or set of strains carried together, among people infected at the start, e.g. `dict(DS=0.9, RIF=0.1)` (default: all `DS`)
         superinfect (dict): the states whose people can be superinfected, and the parameter of each (e.g. dict(infection='rr_superinfection_latent'))
         bottleneck (list): the transitions to asymptomatic TB, through which several strains progress together or one alone
         symptoms (list): the transitions from asymptomatic to symptomatic TB (faster with several strains, by `rr_prog_super`)
         clear (list): the transitions of clearance and recovery (faster with several strains, by `rr_clear_super`)
         denovo (list): the transitions of progression from a latent infection, on which resistance can be acquired
-        treatment (list): pairs of the transitions that end treatment, (completion, failure): both have the rate at which treatment ends, and are split here by its outcome;
-            a third entry, a dict, gives that regimen's own `cure`, `rr_cure`, or `q_treat`. The completion can be None, for an event that
-            only cures strains or makes them resistant; a failure from a state to itself does nothing to people whose strains it leaves as they were
-        cure (float): the chance that treatment cures a drug-susceptible strain
+        regimens (list): the treatments, each a dict: `name` (of its transitions), `src` (the state on treatment), `cured` (where
+            people with every strain cured go), `failed` (where the others go), `rate` (at which treatment ends), `cure` (the chance
+            that it cures a drug-susceptible strain), and optionally `rr_cure`, `q_treat` (as the parameters), and `relapse` (a pair: the
+            state, and the share of those cured who go there instead)
+        tpt (dict): the effects of TPT on the infection (see `tbsim.tpt_pars()`), with `on` (who holds it) and `latent` (the states of latent infection)
         kwargs (dict): the parameters of resistance (see `resistance_pars()`)
 
     Returns:
-        A dict of keywords for `stratify()`
+        The strains (an `ss.Strains`), for `ss.Disease(strains=...)`
     """
-    pars = sc.mergedicts(resistance_pars(), kwargs)
     unknown = set(kwargs) - set(resistance_pars())
     if unknown:
         errormsg = f'Unknown parameter(s) of resistance: {sc.strjoin(unknown)}; they are {sc.strjoin(resistance_pars().keys())}'
         raise ValueError(errormsg)
-    st = Strains(drugs, max_strains)
-    fit = st.per_drug(pars.fitness, 'fitness')
-    rr_cure = st.per_drug(pars.rr_cure, 'rr_cure')
-    q_treat = st.per_drug(pars.q_treat, 'q_treat')
-    q_prog = st.per_drug(pars.q_prog, 'q_prog')
-    fitness = {s:np.prod([fit[d] for d in s]) for s in st.strains}
-    n = len(st.sets)
-    adjust = sc.objdict()
+    pars = sc.mergedicts(resistance_pars(), kwargs)
+    drugs = [drugs] if isinstance(drugs, str) else list(drugs)
+    if not drugs or len(set(drugs)) != len(drugs):
+        errormsg = f'drugs must be a list of different drugs, not {drugs}'
+        raise ValueError(errormsg)
+    have = [frozenset(c) for k in range(len(drugs) + 1) for c in itertools.combinations(drugs, k)] # Each strain, as the drugs it resists
+    names = ['/'.join(d for d in drugs if d in h) or 'DS' for h in have]
+    index = {h:i for i,h in enumerate(have)}
+    fit = per_drug(drugs, pars.fitness, 'fitness')
+    fitness = np.array([np.prod([fit[d] for d in h]) for h in have])
+    q_prog = per_drug(drugs, pars.q_prog, 'q_prog')
 
-    def mult(name, level, value):
-        adjust.setdefault(name, np.ones(n))
-        adjust[name][level] *= value
-        return
+    # The values of the strains: transmissibility, each regimen's chance of cure, and the weights of the strain that progresses alone
+    values = dict(rel_trans=fitness)
+    for reg in regimens or []:
+        rr = per_drug(drugs, reg.get('rr_cure', pars.rr_cure), 'rr_cure')
+        values[f'cure_{reg["name"]}'] = [min(1.0, reg['cure']*np.prod([rr[d] for d in h])) for h in have]
+    if tpt: # TPT clears the strains susceptible to all of its drugs
+        values['tpt_cure'] = [float(not (h & set(tpt.drugs or drugs))) for h in have]
+    alone = [name for name in bottleneck or []] if pars.p_multi < 1 else []
+    for name in alone:
+        values[f'{name}_one'] = fitness if pars.prog_select_fitness else np.ones(len(have))
+    split = sc.ifelse(split, {'DS': 1.0})
+    split = {label:share/sum(split.values()) for label,share in split.items()}
+    strains = ss.Strains(names, max_strains=max_strains, transmit='each' if pars.transmission_independent else 'one', split=split, name='resistance', **values)
+    sets = [frozenset(s) for s in strains.sets] # The strains each level carries
+    several = lambda s: len(s) > 1
+    def by(func):
+        """ A value for each level of resistance, from the strains it carries """
+        return ss.by(resistance=[func(s) for s in sets])
+    def scale(name, func): # A transition, with its rate times a value by level
+        tr = T[name]
+        T[name] = ss.Transition(tr.src, tr.dst, rate=tr.rate*by(func), name=name, where=tr.where)
 
-    def add_move(base, l, m, value):
-        """ A transition like another, from people carrying one set of strains, who carry another after it """
-        if value <= 0 or l == m:
-            return
-        tr = T[base]
-        name = f'{base}_{st.safe(st.sets[l])}_to_{st.safe(st.sets[m])}'
-        T[name] = ss.Transition(tr.src, tr.dst, rate=tr.rate*value, name=name, where=tr.where, move=dict(resistance=f'{st.labels[l]} -> {st.labels[m]}'))
-        return
-
-    # Transmission: someone with several strains is as infectious as the fittest (or all of them), and passes each on in proportion to its fitness
-    rel_trans = np.array([sum(fitness[s] for s in c) if pars.transmission_independent else max(fitness[s] for s in c) for c in st.sets])
+    base = dict(T) # The transitions as given, before their rates are changed by level
 
     # Superinfection: infected with a strain they do not carry, people carry it as well
     for state,key in (superinfect or {}).items():
@@ -180,64 +158,100 @@ def add_resistance(S, T, p, foi, drugs=('RIF',), max_strains=2, split=None, supe
             rr = ss.par(default.raw if rr is None else rr, doc=default.doc, name=key)
         T[f'superinfection_{state}'] = ss.Transition(S[state], S[state], rate=rr*foi, name=f'superinfection_{state}')
 
-    for l,carried in enumerate(st.sets):
-        several = len(carried) > 1
-        if several: # Progression with several strains: together, or one alone
-            for name in bottleneck or []:
-                mult(name, l, pars.rr_prog_super*pars.p_multi)
-                total = sum(fitness[s] for s in carried)
-                for s in carried:
-                    h = fitness[s]/total if pars.prog_select_fitness else 1/len(carried)
-                    add_move(name, l, st.index[frozenset([s])], pars.rr_prog_super*(1 - pars.p_multi)*h)
-            for name in symptoms or []:
-                mult(name, l, pars.rr_prog_super)
-            for name in clear or []:
-                mult(name, l, pars.rr_clear_super)
-        else: # Resistance acquired on progression from a latent infection with one strain
-            [s] = carried
-            for new,prob in acquire(s, st.drugs, q_prog).items():
-                if new == s:
-                    for name in denovo or []:
-                        mult(name, l, prob)
-                    continue
-                target = frozenset([s, new]) if pars.prog_resist_mix else frozenset([new])
-                m = st.index.get(target, st.index[frozenset([new])]) # Replaced, if there is no level for carrying both
-                for name in denovo or []:
-                    add_move(name, l, m, prob)
+    # Progression with several strains: faster or slower, and together or one alone
+    ps, om = pars.rr_prog_super, pars.rr_clear_super
+    for name in bottleneck or []:
+        scale(name, lambda s: ps*pars.p_multi if several(s) else 1)
+    for name in alone: # One strain progresses alone: the rate of the set is the sum of its strains' weights, so divided by it
+        w = values[f'{name}_one']
+        tr = base[name]
+        T[f'{name}_one'] = ss.Transition(tr.src, tr.dst, rate=tr.rate*ps*(1 - pars.p_multi)*by(lambda s: 1/sum(w[j] for j in s) if several(s) else 0), per='strain', alone=True, name=f'{name}_one')
+    for name in symptoms or []:
+        scale(name, lambda s: ps if several(s) else 1)
+    for name in clear or []:
+        scale(name, lambda s: om if several(s) else 1)
 
-        # The outcome of treatment: each strain is cured independently; those not cured can acquire resistance
-        for completion,failure,*opts in treatment or []:
-            opts = opts[0] if opts else {}
-            p_cure = opts.get('cure', cure)
-            rr = st.per_drug(opts['rr_cure'], 'rr_cure') if 'rr_cure' in opts else rr_cure
-            q = st.per_drug(opts['q_treat'], 'q_treat') if 'q_treat' in opts else q_treat
-            c = {s:min(1.0, p_cure*np.prod([rr[d] for d in s])) for s in carried}
-            outcomes = {}
-            for k in range(1, len(carried) + 1):
-                for left in itertools.combinations(sorted(carried, key=st.strains.index), k):
-                    p_left = np.prod([1 - c[s] if s in left else c[s] for s in carried])
-                    for combo in itertools.product(*[acquire(s, st.drugs, q).items() for s in left]):
-                        target = frozenset(new for new,_ in combo)
-                        prob = p_left*np.prod([q_ for _,q_ in combo])
-                        m = st.index.get(target, l)
-                        outcomes[m] = outcomes.get(m, 0) + prob
-            if completion is not None:
-                mult(completion, l, np.prod(list(c.values())))
-            stays = T[failure].src == T[failure].dst # Nothing happens to people whose strains are as they were
-            mult(failure, l, 0.0 if stays else outcomes.get(l, 0))
-            for m,prob in outcomes.items():
-                add_move(failure, l, m, prob)
+    # Resistance acquired on progression from a latent infection with one strain: added to it, or replacing it
+    for name in denovo or []:
+        tr = base[name]
+        scale(name, lambda s: gains(have[min(s)], drugs, q_prog)[frozenset()] if not several(s) else 1)
+        for j,h in enumerate(have):
+            for gained,prob in gains(h, drugs, q_prog).items():
+                new = strains[index[h | gained]]
+                if gained and prob > 0:
+                    move = strains[j] >> ((strains[j], new) if pars.prog_resist_mix and max_strains > 1 else new)
+                    T[f'{name}_{names[j]}_to_{new.name}'] = ss.Transition(tr.src, tr.dst, rate=tr.rate*prob*by(lambda s: float(s == {j})), move=move, name=f'{name}_{names[j]}_to_{new.name}')
 
-    split = sc.ifelse(split, {'DS': 1.0})
-    shares = np.zeros(n)
-    for label,share in split.items():
-        if label not in st.labels:
-            errormsg = f'The split of strains has "{label}", which is not one of {sc.strjoin(st.labels)}'
-            raise ValueError(errormsg)
-        shares[st.labels.index(label)] = share
-    adjust['rel_trans'] = rel_trans
-    strained = [name for name in S if name not in ['susceptible', 'cleared', 'recovered', 'treated']]
-    return dict(resistance=st.labels, split=shares, adjust=dict(adjust), states=strained)
+    # The outcome of treatment: each strain is cured independently; those not cured can acquire resistance
+    for reg in regimens or []:
+        add_regimen(S, T, reg, strains, have, names, sets, by, drugs, pars)
+
+    # TPT clears the strains it acts on (leaving the others), and the others can become resistant to its drugs
+    if tpt:
+        for src in tpt.latent:
+            name = 'tpt_clearance' + ('' if src == 'infection' else '_remote')
+            T[name] = ss.Transition(S[src], [S.cleared, S[src]], rate=tpt.clearance, p='tpt_cure', per='strain', where=tpt.on, name=name)
+        tpt_drugs = tpt.drugs or drugs
+        acq = per_drug(drugs, tpt.acquisition if isinstance(tpt.acquisition, dict) else {d:tpt.acquisition for d in tpt_drugs}, 'acquisition')
+        for state,rr in tpt.rr_acquisition.items():
+            for src in (tpt.latent if state == 'infection' else [state]):
+                for j,h in enumerate(have):
+                    for gained,prob in gains(h, drugs, acq).items():
+                        if gained and prob > 0:
+                            name = f'tpt_acquisition_{src}_{names[j]}_to_{names[index[h | gained]]}'
+                            T[name] = ss.Transition(S[src], S[src], rate=ss.peryear(rr*prob), move=strains[j] >> strains[index[h | gained]], where=tpt.on, name=name)
+    return strains
+
+
+def add_regimen(S, T, reg, strains, have, names, sets, by, drugs, pars):
+    """ The transitions that end a treatment: see `add_resistance()` """
+    name, rate, cure = reg['name'], reg['rate'], f'cure_{reg["name"]}'
+    src, cured, failed = S[reg['src']], S[reg['cured']], S[reg['failed']]
+    relapse, p_relapse = reg.get('relapse') or (None, 0.0)
+    q = per_drug(drugs, reg.get('q_treat', pars.q_treat), 'q_treat')
+    c = np.array(strains.values[cure])
+    none = np.prod([1 - q[d] for d in drugs]) # The chance that no strain acquires resistance
+
+    # No resistance acquired: each strain is cured or not, by itself
+    if none > 0:
+        T[name] = ss.Transition(src, [cured, failed], rate=rate*none*(1 - p_relapse), p=cure, per='strain', name=name)
+        if p_relapse:
+            T[f'{name}_relapse'] = ss.Transition(src, [S[relapse], failed], rate=rate*none*p_relapse, p=cure, per='strain', name=f'{name}_relapse')
+    if none == 1:
+        return
+
+    # Resistance acquired to some drugs by every strain not cured: as a change from each set carried to each set after
+    T[f'{name}_acquired_cured'] = ss.Transition(src, [cured, S[relapse]] if p_relapse else cured, rate=rate*(1 - none)*by(lambda s: np.prod(c[list(s)])), p=[None, p_relapse] if p_relapse else None, name=f'{name}_acquired_cured')
+    outcomes = {} # {(set before, set after): chance}
+    for gained,pg in gains(frozenset(), drugs, q).items():
+        if not gained:
+            continue
+        for s in set(sets):
+            for k in range(1, len(s) + 1):
+                for left in itertools.combinations(sorted(s), k):
+                    after = frozenset(have.index(have[j] | gained) for j in left)
+                    p_left = np.prod([1 - c[j] if j in left else c[j] for j in s])
+                    outcomes[(s, after)] = outcomes.get((s, after), 0) + pg/(1 - none)*p_left
+    T[f'{name}_acquired'] = ss.Transition(src, failed, rate=rate*(1 - none)*by(lambda s: outcomes.get((s, s), 0)), name=f'{name}_acquired') # Nothing to acquire
+    for (before,after),prob in outcomes.items():
+        if before != after and prob > 0:
+            key = f'{name}_acquired_{"+".join(names[j] for j in sorted(before))}_to_{"+".join(names[j] for j in sorted(after))}'
+            move = strains.move(tuple(strains[j] for j in sorted(before)), tuple(strains[j] for j in sorted(after)))
+            T[key] = ss.Transition(src, failed, rate=rate*(1 - none)*prob*by(lambda s: float(s == before)), move=move, name=key)
+    return
+
+
+def resistant(tb, drugs=None):
+    """ The people who carry a strain resistant to any of some drugs (default: any), as a condition, e.g. `where=tbsim.resistant(tb, 'RIF')` """
+    if getattr(tb, 'strains', None) is None:
+        errormsg = f'The TB model "{tb.name}" has no drug resistance: give it drugs='
+        raise ValueError(errormsg)
+    known = set().union(*[drugs_of(s) for s in tb.strains])
+    drugs = known if drugs is None else {drugs} if isinstance(drugs, str) else set(drugs)
+    if drugs - known:
+        errormsg = f'The drugs {sc.strjoin(drugs - known)} are not among those of "{tb.name}" ({sc.strjoin(sorted(known))})'
+        raise ValueError(errormsg)
+    return functools.reduce(operator.or_, [s.cond for s in tb.strains if drugs_of(s) & drugs])
 
 
 def resistant_share(sim, drug=None, states=('non_infectious', 'asymptomatic', 'symptomatic'), disease='tb'):
@@ -256,13 +270,8 @@ def resistant_share(sim, drug=None, states=('non_infectious', 'asymptomatic', 's
         plt.plot(sim.timevec, tbsim.resistant_share(sim))
     """
     res = sim.results[disease]
-    strat = [s for s in sim.diseases[disease].graph.strats if s.name == 'resistance'][0]
-    def resists(label): # Whether a set of strains, e.g. 'DS+RIF/INH', includes one resistant to the drug
-        strains = label.split('+')
-        if drug is None:
-            return any(strain != 'DS' for strain in strains)
-        return any(drug in strain.split('/') for strain in strains)
-    resistant = np.array([resists(label) for label in strat.labels])
-    counts = sum(res[f'n_{state}'].by('resistance').values for state in states)
-    total = counts.sum(axis=1)
-    return np.divide(counts[:, resistant].sum(axis=1), total, out=np.zeros(len(total)), where=total>0)
+    st = sim.diseases[disease].strains
+    labels = [label for label,s in zip(st.labels, st.sets) if any(drugs_of(st[j]) & ({drug} if drug else drugs_of(st[j])) for j in s)]
+    counts = sum(np.asarray(res[state].select(resistance=labels)) for state in states)
+    total = sum(res[state].values for state in states)
+    return np.divide(counts, total, out=np.zeros(len(total)), where=total>0)

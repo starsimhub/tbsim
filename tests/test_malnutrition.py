@@ -114,11 +114,11 @@ class TestHIV:
     """Test HIV, and its effect on TB (tbsim.hiv_effects)"""
 
     @staticmethod
-    def make(solver='ode', mult=2.0, drugs=None, **kwargs):
+    def make(solver='ode', mult=2.0, drugs=None, n_agents=5000, **kwargs):
         tb = tbsim.TB(init=dict(infection=0.3), drugs=drugs, strains=dict(DS=0.9, RIF=0.1) if drugs else None)
         hiv = tbsim.HIV(incidence=0.01, init_prev=0.1, art_start=0.2, **kwargs)
         return ss.Sim(tb, diseases=hiv, connectors=tbsim.hiv_effects(tb, hiv, acute=mult, latent=mult, aids=mult), solver=solver,
-                      n_agents=5000, total_pop=5000, start=2000, stop=2010, dt=ss.weeks(1), verbose=0, rand_seed=1)
+                      n_agents=n_agents, total_pop=5000, start=2000, stop=2010, dt=ss.weeks(1), verbose=0, rand_seed=1)
 
     def test_hiv_speeds_progression(self):
         """With HIV, more latent infections progress to active TB, as an ODE and as agents"""
@@ -132,10 +132,10 @@ class TestHIV:
     def test_tb_hiv_jointly(self):
         """As compartments, TB (with resistance) and HIV are tracked jointly: they have the same people, and agree with agents"""
         ode = self.make('ode', drugs=['RIF']).run()
-        abm = self.make('abm', drugs=['RIF']).run()
+        abm = self.make('abm', drugs=['RIF'], n_agents=20e3).run() # At 5,000 agents, active TB varies too much between seeds
         res = ode.results
-        n_tb = sum(res.tb[f'n_{s.name}'] for s in ode.diseases.tb.graph.people_states)
-        n_hiv = sum(res.hiv[f'n_{s.name}'] for s in ode.diseases.hiv.graph.people_states)
+        n_tb = sum(res.tb[s.name] for s in ode.diseases.tb.graph.people_states)
+        n_hiv = sum(res.hiv[s.name] for s in ode.diseases.hiv.graph.people_states)
         assert np.allclose(n_tb, n_hiv)
         assert np.isclose(res.hiv.infected[-1], abm.results.hiv.infected[-1], rtol=0.1)
         assert np.isclose(res.tb.active[-1], abm.results.tb.active[-1], rtol=0.25)
@@ -145,14 +145,14 @@ class TestHIV:
         """ART started by a delivery, with no ART otherwise"""
         tb = tbsim.TB()
         hiv = tbsim.HIV(incidence=0.01, init_prev=0.1)
-        arts = ss.transfer(art=True, coverage=0.5, years=[2005], eligible=hiv.acute | hiv.latent | hiv.aids)
+        arts = ss.Delivery(move=dict(art=True), coverage=0.5, at=[2005], where=hiv.acute | hiv.latent | hiv.aids)
         sim = ss.Sim(tb, diseases=hiv, connectors=tbsim.hiv_effects(tb, hiv), interventions=arts, start=2000, stop=2010, verbose=0).run()
         on_art = sim.results.hiv.infected.by('art').values[:, 1]
         assert on_art[5] == 0 and on_art[6] > 0 # Nobody on ART until the round in 2005, which is between the numbers at 2005 and 2006
 
     def test_art_slows_progression(self):
         """ART slows progression to AIDS"""
-        aids = [self.make(art_progression=f).run().results.hiv.n_aids[-1] for f in [1.0, 0.1]]
+        aids = [self.make(art_progression=f).run().results.hiv.aids[-1] for f in [1.0, 0.1]]
         assert aids[1] < aids[0]
 
 

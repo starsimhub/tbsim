@@ -22,23 +22,27 @@ def run(solver='ode', **kwargs):
 
 
 def by_strain(sim, state='symptomatic'):
-    """ The number in a state for each set of strains at the end, by label """
-    labels = sim.diseases.tb.graph.strats[0].labels
-    return dict(zip(labels, sim.results.tb[f'n_{state}'].by('resistance').values[-1]))
+    """ The number in a state for each set of strains at the end, by label (in the order of the strains; the same set acquired in another order is counted with it) """
+    st = sim.diseases.tb.strains
+    out = {}
+    for label,s in zip(st.labels, st.sets):
+        key = '+'.join(st.names[j] for j in sorted(s))
+        out[key] = out.get(key, 0) + sim.results.tb[state].select(resistance=label)[-1]
+    return out
 
 
 @sc.timer()
 def test_strains():
     sc.heading('The strains and the sets of them that people can carry')
-    st = tbsim.Strains(['RIF'])
+    st = tbsim.TB(drugs=['RIF']).strains
     assert st.labels == ['DS', 'RIF', 'DS+RIF']
-    st = tbsim.Strains(['RIF', 'INH'])
-    assert len(st.strains) == 4 and len(st.labels) == 4 + 6 # Every strain, and every pair
-    assert 'RIF/INH' in st.labels and 'DS+RIF/INH' in st.labels
-    assert len(tbsim.Strains(['RIF', 'INH'], max_strains=1).labels) == 4
     tb = tbsim.TB(drugs=['RIF', 'INH'])
-    assert tb.graph.strats[0].labels == st.labels
-    assert 'susceptible' not in tb.graph.strats[0].states # Only infection and TB have strains
+    st = tb.strains
+    assert len(st.names) == 4 and len(st.labels) == 4 + 12 # Every strain, and every pair, in the order acquired (ss.Strains orders the sets when a full one can take another)
+    assert 'RIF/INH' in st.labels and 'DS+RIF/INH' in st.labels
+    assert len(tbsim.TB(drugs=['RIF', 'INH'], max_strains=1).strains.labels) == 4
+    strat = tb.strats.resistance
+    assert 'susceptible' not in strat.states and 'cleared' not in strat.states # Only infection and TB have strains
     return st
 
 
@@ -120,13 +124,13 @@ def test_interventions():
     make = lambda: tbsim.TB(drugs=['RIF'], strains=dict(DS=0.8, RIF=0.2), init=init)
     weekly = sc.mergedicts(pars, dict(dt=ss.weeks(1)))
     tb = make()
-    dst = ss.Test(detects=tb.resistance != 'DS', name='dst')
-    screen = ss.screen(dst, eligible=tb.symptomatic, coverage=0.5, interval=ss.years(1), name='screen')
+    dst = ss.Diagnostic(detects=tb.resistance != 'DS', name='dst')
+    screen = ss.screen(dst, where=tb.symptomatic, coverage=0.5, interval=ss.years(1), name='screen')
     sim = tbsim.Sim(tb=tb, interventions=[tbsim.care(tb, test=tbsim.Xpert(by_age=False)), screen], **weekly).run()
     base = tbsim.Sim(tb=make(), **weekly).run()
     assert sim.results.tb.active[-1] < 0.8*base.results.tb.active[-1]
     res = sim.results.screen
-    share = res.diagnosed.values.sum()/res.delivered.values.sum()
+    share = res.positive.values.sum()/res.delivered.values.sum()
     resistant = tbsim.resistant_share(sim, states=['symptomatic'])
     print(f'The test for resistance found {share:0.3f} of those tested resistant; {resistant.mean():0.3f} of people with symptomatic TB were')
     assert 0.5*resistant.mean() < share < 2*resistant.mean()
@@ -148,8 +152,8 @@ def test_second_line():
     assert shares['ode'] < 0.6*shares['first_line']
     res = sims.ode.results
     assert np.isclose(res.care_dst_positive.delivered.sum(), res.tb.diagnosis_second_line.sum())
-    assert res.tb.n_second_line.values.max() > 0
-    ratio = sims.abm.results.tb.n_second_line.values.mean()/res.tb.n_second_line.values.mean()
+    assert res.tb.second_line.values.max() > 0
+    ratio = sims.abm.results.tb.second_line.values.mean()/res.tb.second_line.values.mean()
     print(f'On second-line treatment as agents: {ratio:0.2f} times the ODE')
     assert 0.8 < ratio < 1.25
     return sims
@@ -160,7 +164,7 @@ def test_tpt_strains():
     sc.heading('TPT protects only against the strains its drugs act on')
     def progression(drugs):
         tb = tbsim.TB(beta=0, drugs=['RIF', 'INH'], init=dict(infection=0.5), strains={'DS':0.5, 'INH':0.25, 'DS+INH':0.25})
-        tpt = ss.treat(tbsim.TPT(efficacy=1.0, activation=0.0, dur=None, tb=tb, drugs=drugs), eligible=tb.infection, years=[2000], name='tpt_delivery')
+        tpt = ss.treat(tbsim.TPT(efficacy=1.0, activation=0.0, dur=None, tb=tb, drugs=drugs), where=tb.infection, at=[2000], name='tpt_delivery')
         sim = tbsim.Sim(tb=tb, interventions=tpt, **sc.mergedicts(pars, dict(stop=2003, dt=ss.weeks(1)))).run()
         return {key:round(val) for key,val in by_strain(sim, 'non_infectious').items() if key in ['DS', 'INH', 'DS+INH']}
     none = progression(['RIF'])
@@ -194,12 +198,12 @@ def test_tpt_infection():
     out = sc.objdict()
     for solver in ['ode', 'abm']:
         tb = tbsim.TB(beta=0, drugs=['RIF', 'INH'], init=dict(infection=0.4, symptomatic=0.05), strains={'DS':0.5, 'INH':0.25, 'DS+INH':0.25}, tpt=dict(drugs=['INH'], clearance=4.0, acquisition=0.5))
-        tpt = ss.treat(tbsim.TPT(tb=tb, dur=ss.years(100)), eligible=tb.infection | tb.symptomatic, years=[2000], name='tpt_delivery') # Held for the whole run
+        tpt = ss.treat(tbsim.TPT(tb=tb, dur=ss.years(100)), where=tb.infection | tb.symptomatic, at=[2000], name='tpt_delivery') # Held for the whole run
         agents = dict(n_agents=40_000) if solver == 'abm' else {}
         sim = tbsim.Sim(tb=tb, interventions=tpt, solver=solver, **sc.mergedicts(pars, dict(stop=2002, dt=ss.weeks(1)), agents)).run()
         res = sim.results.tb
         latent = by_strain(sim, 'infection')
-        out[solver] = sc.objdict(DS=latent['DS'], INH=latent['INH'], mixed=latent['DS+INH'], partial=res.tpt_partial_DS_and_INH_to_INH.sum(),
+        out[solver] = sc.objdict(DS=latent['DS'], INH=latent['INH'], mixed=latent['DS+INH'], partial=res.tpt_clearance.select(resistance='DS+INH').sum() - res['tpt_clearance.cleared'].select(resistance='DS+INH').sum(),
                                  acquired=sum(res[key].sum() for key in res.keys() if key.startswith('tpt_acquisition_') and '_to_' in key))
         print(f'{solver}: {sc.strjoin(f"{k} {v:.0f}" for k,v in out[solver].items())}')
         assert latent['DS'] < 0.05*latent['INH'] and latent['DS+INH'] < 0.05*latent['INH'] # Cleared, or left with the strain it does not act on
@@ -220,11 +224,11 @@ def test_retreatment():
     care = tbsim.care(tb, seeking=ss.peryear(1.0), dst=tbsim.DST(tb), retreatment=ss.years(2))
     sim = tbsim.Sim(tb=tb, interventions=care, solver='abm', n_agents=20_000, **sc.mergedicts(pars, dict(stop=2015, dt=ss.weeks(1)))).run()
     res = sim.results
-    print(f'{res.care_history.delivered.sum():.0f} tested positive; {res.care_history.diagnosed.sum():.0f} had been treated within 2 years, and were tested for resistance')
-    assert 0 < res.care_dst.delivered.sum() == res.care_history.diagnosed.sum() < res.care_history.delivered.sum()
+    print(f'{res.care_history.delivered.sum():.0f} tested positive; {res.care_history.positive.sum():.0f} had been treated within 2 years, and were tested for resistance')
+    assert 0 < res.care_dst.delivered.sum() == res.care_history.positive.sum() < res.care_history.delivered.sum()
     assert np.isclose(res.tb.diagnosis.sum() + res.tb.diagnosis_second_line.sum(), res.care_history.delivered.sum())
     tb = tbsim.TB(drugs=['RIF'], second_line=True)
-    with pytest.raises(ss.CodedError, match='E804'): # Only agents keep when people were treated
+    with pytest.raises(ss.CapabilityError): # Only agents keep when people were treated
         tbsim.Sim(tb=tb, interventions=tbsim.care(tb, dst=tbsim.DST(tb), retreatment=ss.years(2)), solver='ode', verbose=0).init()
     return sim
 

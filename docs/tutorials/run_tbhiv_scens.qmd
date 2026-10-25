@@ -10,7 +10,7 @@ A TB-HIV sim needs two things besides the TB model (see the HIV comorbidity tuto
 - `tbsim.HIV()` in the diseases: the HIV model, in which people are infected at a given `incidence` (which can vary in time), and start ART at the rate `art_start`.
 - `tbsim.hiv_effects(tb, hiv)` in the connectors: the modifiers through which HIV speeds progression from latent infection to active TB. Their multipliers by HIV state can be changed, e.g. `tbsim.hiv_effects(tb, hiv, aids=3.0)`.
 
-ART can also be delivered at given times, with `ss.transfer()` in the interventions.
+ART can also be delivered at given times, with `ss.Delivery(move=dict(art=True), ...)` in the interventions.
 
 ```{python}
 import starsim as ss
@@ -28,7 +28,7 @@ def make_sim(label=None, incidence=0, art_start=0, campaign=None):
     hiv = tbsim.HIV(incidence=incidence, art_start=art_start)
     art = None
     if campaign:
-        art = ss.transfer(art=True, coverage=0.75, years=[campaign], eligible=hiv.acute | hiv.latent | hiv.aids)
+        art = ss.Delivery(move=dict(art=True), coverage=0.75, at=[campaign], where=hiv.acute | hiv.latent | hiv.aids)
     sim = tbsim.Sim(
         tb = tb,
         diseases = hiv,
@@ -77,7 +77,7 @@ msim = ss.MultiSim(sims)
 `tbsim.plot()` plots the same results for every scenario; `select` picks which ones.
 
 ```{python}
-tbsim.plot(msim, select=['prevalence_active', 'active', 'n_symptomatic', 'infected', 'hiv_prevalence', 'n_aids'], n_cols=2, row_height=2.5)
+tbsim.plot(msim, select=['prevalence_active', 'active', 'symptomatic', 'infected', 'hiv_prevalence', 'aids'], n_cols=2, row_height=2.5)
 ```
 
 More HIV means more active TB. ART does not act on TB directly, but by slowing progression to AIDS, where the TB risk is highest, so the effect of ART grows over time. The number of people on ART is `infected` split by the dimension `art`:

@@ -1,18 +1,17 @@
 """
 The TB model, declared as states and transitions (Starsim v4), so that it runs as an ODE, as a stochastic compartmental model, or as agents
 """
-import numpy as np
 import sciris as sc
 import starsim as ss
 import tbsim
 
-__all__ = ['TB', 'tb_pars', 'tpt_pars', 'make_pars', 'get_tb', 'state_codes']
+__all__ = ['TB', 'tb_pars', 'tpt_pars', 'get_tb']
 
 
 def tb_pars():
     """ The parameters of the TB model: rates are per year (as in the LSHTM model, lshtm_ode.R) """
     return sc.objdict(
-        beta                   = ss.par(ss.peryear(9.0), bounds=[1, 50], doc='Contacts per person per year (with homogeneous mixing; per contact with a network)'),
+        beta                   = ss.par(ss.peryear(9.0), bounds=[0, 50], doc='Contacts per person per year (with homogeneous mixing; per contact with a network)'),
         trans_asymp            = 0.82,             # Infectiousness of asymptomatic TB, relative to symptomatic (kappa)
         rr_reinfection_cleared = 1.00,             # Relative risk of reinfection after clearing latent infection
         rr_reinfection_rec     = 0.21,             # ... after recovering from non-infectious TB (pi)
@@ -52,32 +51,6 @@ def tpt_pars():
     )
 
 
-def make_pars(defaults, kwargs):
-    """ Each parameter as an `ss.par` named after it (so it can be fitted, or set with `ss.Sim(pars=...)`); a bare number for a rate is per year """
-    unknown = set(kwargs) - set(defaults)
-    if unknown:
-        errormsg = f'Unknown parameter(s) {sc.strjoin(unknown)}; the parameters are {sc.strjoin(defaults.keys())}'
-        raise ValueError(errormsg)
-    pars = sc.objdict()
-    for key,default in defaults.items():
-        val = kwargs.get(key)
-        if isinstance(val, ss.par):
-            if val.name is None: # Named after its key, as the defaults are
-                val.name = key
-            pars[key] = val
-            continue
-        raw = default.raw if isinstance(default, ss.par) else default
-        if val is None:
-            val = raw
-        elif isinstance(raw, ss.TimePar) and sc.isnumber(val): # A bare number is in the default's unit (per year, or years)
-            val = type(raw)(val)
-        if val is None: # An optional parameter that is not used
-            pars[key] = None
-            continue
-        bounds = default.bounds if isinstance(default, ss.par) else None
-        doc = default.doc if isinstance(default, ss.par) else None
-        pars[key] = ss.par(val, bounds=bounds, doc=doc, name=key)
-    return pars
 
 
 class TB(ss.Disease):
@@ -107,22 +80,22 @@ class TB(ss.Disease):
     a share of everyone).
 
     With `drugs`, there are strains resistant to them, which people can carry several of
-    at once: the model is stratified by `resistance`, whose levels are the sets of strains
-    people carry (see `tbsim.add_resistance()`), and results can be read by strain, e.g.
-    `sim.results.tb.n_symptomatic.by('resistance')`. Treatment then ends at the rate
-    `delta + phi`, in success for people with every strain cured.
+    at once: the model has strains (`tb.strains`, an `ss.Strains` called `resistance`; see
+    `tbsim.add_resistance()`), and results can be read by set of strains, e.g.
+    `sim.results.tb.symptomatic.select(resistance='DS+RIF')`. Treatment then ends at the
+    rate `delta + phi` (`completion`), in success for people with every strain cured.
 
     With `second_line`, there is a second regimen, for people found to carry a resistant
     strain: the state `second_line`, entered by `diagnosis_second_line` (driven by a
-    delivery, see `tbsim.care(dst=...)`) and left by `completion_second_line` and
-    `failure_second_line`; `switch_second_line` moves people from first-line treatment to it
+    delivery, see `tbsim.care(dst=...)`) and left by `completion_second_line`;
+    `switch_second_line` moves people from first-line treatment to it
     (driven by a delivery, see `tbsim.monitoring()`).
 
     With `tpt`, TB preventive therapy acts on the infection of people who hold it (a product
     from `tbsim.TPT()`), as well as protecting them: it clears the strains it acts on
-    (`tpt_clearance`, to `cleared`; with drugs, `tpt_partial` for someone who also carries a
-    strain it does not act on, who keeps that one), and with drugs, strains it does not clear
-    can become resistant to its drugs (`tpt_acquisition_<state>`), mostly in people who have
+    (`tpt_clearance`, to `cleared`; with drugs, someone who also carries a strain it does
+    not act on keeps that one), and with drugs, strains it does not clear can become
+    resistant to its drugs (`tpt_acquisition_<state>_<strain>_to_<strain>`), mostly in people who have
     active TB that was not found.
 
     Args:
@@ -148,7 +121,7 @@ class TB(ss.Disease):
         tb = tbsim.TB(drugs=['RIF', 'INH'], fitness=dict(RIF=0.6, INH=0.9), theta=0.5)
         tb = tbsim.TB(drugs=['RIF'], second_line=True) # With tbsim.care(tb, dst=tbsim.DST(tb))
     """
-    def __init__(self, pars=None, init=None, drugs=None, max_strains=2, strains=None, immigrants=None, second_line=None, tpt=None, name='tb', **kwargs):
+    def __init__(self, pars=None, init=None, init_n=None, drugs=None, max_strains=2, strains=None, immigrants=None, second_line=None, tpt=None, name='tb', **kwargs):
         kwargs = sc.mergedicts(pars, kwargs)
         res_kw = {key:kwargs.pop(key) for key in list(kwargs) if key in tbsim.resistance_pars()}
         if res_kw and not drugs:
@@ -157,7 +130,7 @@ class TB(ss.Disease):
         if second_line and not drugs:
             errormsg = 'second_line= is a regimen for people with a resistant strain: give drugs= as well'
             raise ValueError(errormsg)
-        p = make_pars(tb_pars(), kwargs)
+        p = ss.pars(tb_pars(), **kwargs)
         second = second_line_pars(second_line) if second_line else None
         tpt = check_tpt(tpt, drugs)
         S = sc.objdict() # The states, by name
@@ -167,8 +140,8 @@ class TB(ss.Disease):
         add_state('cleared', 'Cleared (from latent)')
         add_state('recovered', 'Recovered (from non-infectious)')
         add_state('non_infectious', 'Non-infectious TB')
-        add_state('asymptomatic', 'Asymptomatic TB', infectious=True)
-        add_state('symptomatic', 'Symptomatic TB', infectious=True)
+        add_state('asymptomatic', 'Asymptomatic TB')
+        add_state('symptomatic', 'Symptomatic TB')
         add_state('treatment', 'On treatment')
         add_state('treated', 'Completed treatment')
         front = p.k_latent.raw.value > 0
@@ -203,96 +176,72 @@ class TB(ss.Disease):
         add('improvement', 'asymptomatic', 'non_infectious', p.asy_non)
         add('symptoms', 'asymptomatic', 'symptomatic', p.asy_sym)
         add('remission', 'symptomatic', 'asymptomatic', p.sym_asy)
-        T.tb_death = ss.death('symptomatic ->', rate=p.sym_dead, name='tb_death')
+        T.tb_death = ss.death(S.symptomatic, rate=p.sym_dead, name='tb_death')
         T.diagnosis = ss.Transition([S.non_infectious, S.asymptomatic, S.symptomatic], S.treatment, rate=p.theta, name='diagnosis')
-        end, fail = (p.delta + p.phi, p.delta + p.phi) if drugs else (p.delta, p.phi) # With drugs, treatment ends at one rate, and its outcome depends on the strains: see tbsim.resistance()
-        add('failure', 'treatment', 'symptomatic', fail)
-        def add_completion(name_, src, rate, p_relapse):
-            if relapse:
-                add(name_, src, ['treated', 'relapsing'], rate, p=[None, p_relapse])
-            else:
-                add(name_, src, 'treated', rate)
-        add_completion('completion', 'treatment', end, p.p_relapse)
-        if second: # As treatment, at its own rates
+        if not drugs: # With drugs, the outcome of treatment depends on the strains: see tbsim.add_resistance()
+            add('failure', 'treatment', 'symptomatic', p.phi)
+            add('completion', 'treatment', ['treated', 'relapsing'] if relapse else 'treated', p.delta, **(dict(p=[None, p.p_relapse]) if relapse else {}))
+        if second: # As treatment, at its own rates (people found to carry a resistant strain)
             T.diagnosis_second_line = ss.Transition([S.non_infectious, S.asymptomatic, S.symptomatic], S.second_line, rate=ss.peryear(0.0), name='diagnosis_second_line')
-            end_2 = second.delta + second.phi
-            add('failure_second_line', 'second_line', 'symptomatic', end_2)
-            add_completion('completion_second_line', 'second_line', end_2, second.p_relapse)
             T.switch_second_line = ss.Transition(S.treatment, S.second_line, rate=ss.peryear(0.0), name='switch_second_line')
         latent = ['infection'] + ['infection_remote']*front
-        suffix = lambda src: '' if src == 'infection' else '_remote'
-        if tpt: # Only for the people who hold TPT
-            on_tpt = holds_tpt(name)
+        on_tpt = tbsim.TPT.held if tpt else None # Only for the people who hold TPT
+        if tpt and not drugs:
             for src in latent:
-                add(f'tpt_clearance{suffix(src)}', src, 'cleared', tpt.clearance, where=on_tpt)
-                if drugs:
-                    add(f'tpt_partial{suffix(src)}', src, src, tpt.clearance, where=on_tpt)
-            if drugs:
-                for state,rr in tpt.rr_acquisition.items():
-                    for src in (latent if state == 'infection' else [state]):
-                        add(f'tpt_acquisition_{src}', src, src, ss.peryear(rr), where=on_tpt) # Each strain not cleared becomes resistant to each drug at the acquisition rate, below
+                add('tpt_clearance' + ('' if src == 'infection' else '_remote'), src, 'cleared', tpt.clearance, where=on_tpt)
         if relapse:
             T.relapse = ss.Transition(S.relapsing, S.symptomatic, dur=p.dur_relapse, name='relapse')
         if p.dur_reinfection_protection is not None: # Protection (or risk) after clearance wanes
             for src in ['cleared', 'recovered', 'treated']:
                 T[f'waning_{src}'] = ss.Transition(S[src], S.susceptible, dur=p.dur_reinfection_protection, name=f'waning_{src}')
 
-        # Demography: births replace every death
-        T.births  = ss.birth('-> susceptible', rate=p.mu, name='births')
-        T.replace = ss.null >> S.susceptible @ (p.sym_dead*S.symptomatic.n) # Births that replace TB deaths
-        T.deaths  = ss.death(rate=p.mu, name='deaths')
-        migrates = lambda key: isinstance(kwargs.get(key), ss.par) or p[key].raw.value > 0 # Given to be fitted, or not zero
-        if migrates('immigration'): # People arriving from elsewhere, at ages like the population's
+        used = lambda key: isinstance(kwargs.get(key), ss.par) or p[key].raw.value > 0 # Given to be fitted, or not zero
+        if used('mu'): # Demography: births replace every death (with mu=0, none, so ss.Births and ss.Deaths, or demographics=True, can be used instead)
+            T.births  = ss.birth(S.susceptible, rate=p.mu, name='births')
+            T.replace = ss.null >> S.susceptible @ (p.sym_dead*S.symptomatic.n) # Births that replace TB deaths
+            T.deaths  = ss.death(rate=p.mu, name='deaths')
+        if used('immigration'): # People arriving from elsewhere, at ages like the population's
             immigrants = sc.ifelse(immigrants, dict(susceptible=1.0))
             total = sum(immigrants.values())
             for key,share in immigrants.items():
-                T[f'immigrants_{key}'] = ss.immigration(f'-> {key}', rate=p.immigration*(share/total), name=f'immigrants_{key}')
+                T[f'immigrants_{key}'] = ss.immigration(S[key], rate=p.immigration*(share/total), name=f'immigrants_{key}')
         elif immigrants is not None:
             errormsg = 'immigrants= gives the states that people arrive in: give immigration= as well'
             raise ValueError(errormsg)
-        if migrates('emigration'):
+        if used('emigration'):
             T.emigrants = ss.emigration(rate=p.emigration, name='emigrants')
 
-        if drugs: # Strains resistant to them, as a dimension
+        st = None
+        if drugs: # Strains resistant to them
             remote = ['remote_asy'] if front else []
-            delta, phi = p.delta.raw.value, p.phi.raw.value
-            treatment = [('completion', 'failure')]
+            cure = lambda d, f: d/(d + f) if d + f > 0 else 1.0 # The chance that treatment cures a drug-susceptible strain
+            regimens = [dict(name='completion', src='treatment', cured='treated', failed='symptomatic', rate=p.delta + p.phi, cure=cure(p.delta.raw.value, p.phi.raw.value), relapse=('relapsing', p.p_relapse.raw) if relapse else None)]
             if second:
-                d2, f2 = second.delta.raw.value, second.phi.raw.value
-                treatment.append(('completion_second_line', 'failure_second_line', dict(cure=d2/(d2 + f2) if d2 + f2 > 0 else 1.0, rr_cure=second.rr_cure, q_treat=second.q_treat)))
-            if tpt: # TPT clears the strains it acts on, and strains it does not can become resistant
-                tpt_drugs = tpt.drugs or list(drugs)
-                for src in latent:
-                    treatment.append((f'tpt_clearance{suffix(src)}', f'tpt_partial{suffix(src)}', dict(cure=1.0, rr_cure={d:0.0 for d in tpt_drugs}, q_treat=0.0)))
-                acq = tpt.acquisition if isinstance(tpt.acquisition, dict) else {d:tpt.acquisition for d in tpt_drugs}
-                for name_ in T:
-                    if name_.startswith('tpt_acquisition_'):
-                        treatment.append((None, name_, dict(cure=0.0, q_treat=acq)))
-            strat = tbsim.add_resistance(S, T, p, foi, drugs=drugs, max_strains=max_strains, split=strains,
+                regimens.append(dict(name='completion_second_line', src='second_line', cured='treated', failed='symptomatic', rate=second.delta + second.phi, cure=cure(second.delta.raw.value, second.phi.raw.value),
+                                     rr_cure=second.rr_cure, q_treat=second.q_treat, relapse=('relapsing', second.p_relapse) if relapse else None))
+            st = tbsim.add_resistance(S, T, p, foi, drugs=drugs, max_strains=max_strains, split=strains,
                 superinfect = dict(infection='rr_superinfection_latent', non_infectious='rr_superinfection_non', asymptomatic='rr_superinfection_asy', symptomatic='rr_superinfection_sym'),
                 bottleneck  = ['latent_asy', 'worsening'] + remote,
                 symptoms    = ['symptoms'],
                 clear       = ['clearance', 'recovery'] + (['clearance_remote'] if front else []),
                 denovo      = ['latent_non', 'latent_asy'] + (['remote_non'] + remote if front else []),
-                treatment   = treatment,
-                cure        = delta/(delta + phi) if delta + phi > 0 else 1.0,
+                regimens    = regimens,
+                tpt         = sc.objdict(sc.mergedicts(tpt, dict(on=on_tpt, latent=latent))) if tpt else None,
                 **res_kw)
 
-        everyone = S.susceptible
-        for st in S.values()[1:]:
-            everyone = everyone | st
+        everyone = sum(S.values()[1:], S.susceptible)
         super().__init__(
             *S.values(),
             **T,
             infectious        = S.asymptomatic + S.symptomatic,
             active            = S.non_infectious + S.asymptomatic + S.symptomatic,
             prevalence_active = (S.asymptomatic + S.symptomatic)/everyone,
-            init              = sc.ifelse(init, dict(infection=0.05)),
+            init              = None if init_n else sc.ifelse(init, dict(infection=0.05)),
+            init_n            = init_n,
             name              = name,
+            strains           = st,
         )
         self.tpt = tpt
-        if drugs:
-            self.stratify(**strat)
         return
 
 
@@ -323,19 +272,6 @@ def check_tpt(tpt, drugs):
     return out
 
 
-def holds_tpt(name):
-    """ Who holds a TPT product (from `tbsim.TPT()`) for the TB model with this name: a function of the sim, for the `where=` of its transitions """
-    def on_tpt(sim):
-        selector = sim.diseases[name].engine.selector
-        out = selector.nobody() > 0
-        for intv in sim.interventions():
-            product = getattr(intv, 'product', None)
-            if getattr(product, 'is_tpt', False) and getattr(intv, 'disease', None) == name:
-                out = out | (selector.dim(product.dim) > 0) # At any level, since one that fades has a level for each stage of time since delivery
-        return out
-    return on_tpt
-
-
 def second_line_pars(second_line):
     """ The parameters of a second-line regimen (see `tbsim.TB`), with its rates as `ss.par` objects """
     from .interventions.care import regimen # Not at the top, since the interventions import this module
@@ -362,15 +298,3 @@ def get_tb(sim):
             return disease
     errormsg = 'No TB module found in sim.diseases'
     raise ValueError(errormsg)
-
-
-def state_codes(tb):
-    """
-    As agents: the state of each agent as a number, its position in `tb.graph.states` (-1 for none, e.g. the dead)
-
-    Returns an array indexed by UID, e.g. `state_codes(tb)[uids]`; `list(tb.graph.states)` gives the names.
-    """
-    out = np.full(len(tb.sim.people.uid.raw), -1.0)
-    for i,name in enumerate(tb.graph.states):
-        out[tb[name].raw] = i
-    return out

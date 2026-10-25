@@ -67,13 +67,15 @@ Only the states of infection and disease (`infection`, `non_infectious`, `asympt
 
 ### Defining strains
 
-`tbsim.Strains` lists the strains for a set of drugs, and the sets of them that people can carry:
+The TB model makes the strains for its drugs: `tb.strains` is an `ss.Strains` called `resistance`, with the strains and the sets of them that people can carry:
 
 ```{python}
-strains = tbsim.Strains(['RIF', 'INH'])
-print('Strains:', [strains.name(s) for s in strains.strains])
+strains = tbsim.TB(drugs=['RIF', 'INH']).strains
+print('Strains:', strains.names)
 print('Sets people can carry:', strains.labels)
 ```
+
+When a full set can take another strain (more strains than `max_strains`), the sets are ordered by when each strain was acquired, oldest first, so `DS+RIF` and `RIF+DS` are different levels.
 
 With two drugs and fitness `dict(RIF=0.5, INH=0.8)`:
 
@@ -84,7 +86,7 @@ With two drugs and fitness `dict(RIF=0.5, INH=0.8)`:
 | `INH` | INH | 0.80 |
 | `RIF/INH` | RIF and INH | 0.40 |
 
-Adding a third drug (e.g. `'FQ'`) only requires adding it to `drugs`, giving 8 strains. You usually do not construct `Strains` yourself: the TB model builds it, and its levels are `tb.graph.strats[0].labels`.
+Adding a third drug (e.g. `'FQ'`) only requires adding it to `drugs`, giving 8 strains.
 
 ### Creating the TB model with drugs
 
@@ -121,13 +123,13 @@ Alongside the usual TB results:
 | Result | Meaning |
 |--------|---------|
 | `tbsim.resistant_share(sim, drug)` | The share of people with active TB who carry a strain resistant to the drug (any drug, if none is given); `states=` counts other states |
-| `sim.results.tb.<result>.by('resistance')` | Any result of a state or transition, with one column per set of strains, e.g. `n_symptomatic` |
+| `sim.results.tb.<result>.by('resistance')` | Any result of a state or transition, with one column per set of strains, e.g. `symptomatic` |
 | `superinfection_<state>` | Superinfections of people in each state |
-| `<transition>_<from>_to_<to>` | The people who moved between sets of strains: e.g. `latent_asy_DS_to_DS_and_RIF` (resistance acquired on progression) and `failure_DS_to_RIF` (resistance acquired on treatment failure) |
+| `<transition>_<from>_to_<to>` | The people who moved between sets of strains: e.g. `latent_asy_DS_to_RIF` (resistance acquired on progression: the strain `DS` gives rise to `RIF`) and `completion_acquired_DS_to_RIF` (resistance acquired by the strains not cured when treatment ends) |
 
 ```{python}
 sim = run(drugs=['RIF', 'INH'], strains=dict(DS=0.85, RIF=0.12, INH=0.03), beta=15, theta=0.5)
-by_strain = sim.results.tb.n_symptomatic.by('resistance')
+by_strain = sim.results.tb.symptomatic.by('resistance')
 print(dict(zip(by_strain.columns, by_strain.values[-1].round())))
 print(f'Mean share resistant to RIF over the last 5 years: {tbsim.resistant_share(sim, "RIF")[-60:].mean():.3f}')
 ```
@@ -185,7 +187,7 @@ Resistance can arise when a latent infection progresses to TB (to non-infectious
 ```{python}
 sim = run(fitness=0.9, q_prog=0.02, stop=2050, rr_superinfection_latent=0, rr_superinfection_non=0)
 res = sim.results.tb
-print(f'Resistance acquired on progression: {(res.latent_non_DS_to_DS_and_RIF + res.latent_asy_DS_to_DS_and_RIF).sum():,.0f} people')
+print(f'Resistance acquired on progression: {(res.latent_non_DS_to_RIF + res.latent_asy_DS_to_RIF).sum():,.0f} people')
 print(f'Final share resistant: {tbsim.resistant_share(sim)[-1]:.3f}')
 ```
 
@@ -205,7 +207,7 @@ A run in which treatment selects for resistance (the drug-susceptible strain is 
 sim = run(beta=15, theta=0.5, fitness=0.6, strains=dict(DS=0.95, RIF=0.05), rr_cure=0.25, q_treat=0.04, **tbsim.regimen('dots'))
 res = sim.results.tb
 print(f'Treatments started: {res.diagnosis.sum():,.0f}')
-print(f'Resistance acquired on treatment failure: {res.failure_DS_to_RIF.sum():,.0f}')
+print(f'Resistance acquired on treatment failure: {res.completion_acquired_DS_to_RIF.sum():,.0f}')
 print(f'Final share resistant: {tbsim.resistant_share(sim)[-1]:.3f}')
 ```
 
@@ -213,16 +215,16 @@ print(f'Final share resistant: {tbsim.resistant_share(sim)[-1]:.3f}')
 
 ## Testing for resistance
 
-A test for resistance is an `ss.Test` that detects carrying a resistant strain, delivered with `ss.screen()`. Here, alongside the care cascade, half of the people with symptomatic TB are tested for resistance once a year:
+A test for resistance is an `ss.Diagnostic` that detects carrying a resistant strain, delivered with `ss.screen()`. Here, alongside the care cascade, half of the people with symptomatic TB are tested for resistance once a year:
 
 ```{python}
 tb = tbsim.TB(drugs=['RIF'], strains=dict(DS=0.8, RIF=0.2), init=init, **tbsim.regimen('dots'))
 care = tbsim.care(tb, test=tbsim.Xpert(by_age=False))
-dst = ss.Test(detects=tb.resistance != 'DS', sensitivity=0.95, specificity=0.98, name='dst')
-screen = ss.screen(dst, eligible=tb.symptomatic, coverage=0.5, interval=ss.years(1), name='screen')
+dst = ss.Diagnostic(detects=tb.resistance != 'DS', sensitivity=0.95, specificity=0.98, name='dst')
+screen = ss.screen(dst, where=tb.symptomatic, coverage=0.5, interval=ss.years(1), name='screen')
 sim = tbsim.Sim(tb=tb, interventions=[care, screen], start=2000, stop=2020, verbose=0).run()
 print(f'Tested for resistance: {sim.results.screen.delivered.sum():,.0f}')
-print(f'Found resistant: {sim.results.screen.diagnosed.sum():,.0f}')
+print(f'Found resistant: {sim.results.screen.positive.sum():,.0f}')
 ```
 
 `tbsim.DST(tb, drugs='RIF')` is the same test for resistance to some of the drugs only: it detects the sets of strains that include one resistant to any of them.
@@ -250,7 +252,7 @@ People already on first-line treatment can be tested again, and switched to the 
 
 ```{python}
 tb = tbsim.TB(drugs=['RIF', 'INH'], init=init, strains={'DS':0.8, 'INH':0.2})
-tpt = ss.treat(tbsim.TPT(tb=tb, drugs=['INH']), eligible=tb.infection, coverage=0.5, interval=ss.years(1), name='tpt_delivery')
+tpt = ss.treat(tbsim.TPT(tb=tb, drugs=['INH']), where=tb.infection, coverage=0.5, interval=ss.years(1), name='tpt_delivery')
 sim = tbsim.Sim(tb=tb, interventions=tpt, start=2000, stop=2020, verbose=0).run()
 ```
 
@@ -258,7 +260,7 @@ TPT can also act on the infection itself, which the model declares with `tpt=` (
 
 ```{python}
 tb = tbsim.TB(drugs=['RIF', 'INH'], init=init, strains={'DS':0.8, 'INH':0.2}, tpt=dict(drugs=['INH'], clearance=2.0, acquisition=0.05))
-tpt = ss.treat(tbsim.TPT(tb=tb), eligible=tb.infection | tb.asymptomatic, coverage=0.5, interval=ss.years(1), name='tpt_delivery')
+tpt = ss.treat(tbsim.TPT(tb=tb), where=tb.infection | tb.asymptomatic, coverage=0.5, interval=ss.years(1), name='tpt_delivery')
 sim = tbsim.Sim(tb=tb, interventions=tpt, start=2000, stop=2020, verbose=0).run()
 print(f'Cleared by TPT: {sim.results.tb.tpt_clearance.sum():,.0f}')
 ```
@@ -267,8 +269,8 @@ print(f'Cleared by TPT: {sim.results.tb.tpt_clearance.sum():,.0f}')
 
 Each way that people move between sets of strains is a transition with its own result, so resistance can be split by where it comes from:
 
-- **Acquired on progression:** the transitions `latent_non_*_to_*` and `latent_asy_*_to_*`, e.g. `latent_asy_DS_to_DS_and_RIF`.
-- **Acquired on treatment failure:** `failure_*_to_*` where the strains after have resistance the strains before did not, e.g. `failure_DS_to_RIF`.
+- **Acquired on progression:** the transitions `latent_non_*_to_*` and `latent_asy_*_to_*`, e.g. `latent_asy_DS_to_RIF`.
+- **Acquired on treatment failure:** `completion_acquired_*_to_*` where the strains after have resistance the strains before did not, e.g. `completion_acquired_DS_to_RIF`.
 - **Transmitted:** new infections and reinfections with a resistant strain: `transmission` and `reinfect_*`, by `resistance`.
 
 ```{python}
@@ -276,8 +278,8 @@ sim = run(beta=15, theta=0.5, fitness=0.6, strains=dict(DS=0.95, RIF=0.05), rr_c
 res = sim.results.tb
 infections = sum(res[key].by('resistance') for key in ['transmission', 'reinfect_cle', 'reinfect_rec', 'reinfect_trd'])
 origins = {
-    'De novo':            round((res.latent_non_DS_to_DS_and_RIF + res.latent_asy_DS_to_DS_and_RIF).sum()),
-    'Treatment-acquired': round(res.failure_DS_to_RIF.sum()),
+    'De novo':            round((res.latent_non_DS_to_RIF + res.latent_asy_DS_to_RIF).sum()),
+    'Treatment-acquired': round(res.completion_acquired_DS_to_RIF.sum()),
     'Transmitted':        round(infections.values[:, infections.columns.index('RIF')].sum()),
 }
 print(origins)
@@ -287,11 +289,11 @@ Once resistance is established, transmission usually dominates; resistance acqui
 
 ## Running as agents, or stochastically
 
-The model runs under every solver. With no network, `tbsim.Sim` runs it as an ODE; `solver='abm'` (or a network, such as `ss.RandomNet()`) runs it as agents, and `solver='stochastic'` as a stochastic compartmental model. The stochastic runs vary from run to run around the ODE:
+The model runs under every solver. With no network, `tbsim.Sim` runs it as an ODE; `solver='abm'` (or a network, such as `ss.RandomNet()`) runs it as agents, and `solver='binomial'` as a stochastic compartmental model (a chain binomial). The stochastic runs vary from run to run around the ODE:
 
 ```{python}
 kw = dict(drugs=['RIF'], strains=dict(DS=0.9, RIF=0.1), beta=15, theta=0.3, rr_cure=0.25, init=init)
-for solver in ['ode', 'stochastic', 'abm']:
+for solver in ['ode', 'binomial', 'abm']:
     sim = tbsim.Sim(tb=tbsim.TB(**kw), solver=solver, n_agents=50_000, start=2000, stop=2020, dt=ss.months(1), verbose=0).run()
     print(f'{solver:10s}: in the last year, {sim.results.tb.active[-12:].mean():.0f} people with active TB, {tbsim.resistant_share(sim)[-12:].mean():.0%} resistant')
 ```
@@ -354,4 +356,4 @@ print(f'Share resistant after 20 years: {tbsim.resistant_share(sim)[-1]:.3f}')
 - The module docstring of `tbsim/resistance.py`: how resistance is built into the model, and the mapping to the reference two-strain ODE.
 - Validation is in `tests/test_resistance.py`, `tests/test_models.py` (against the reference ODE), and `tests/test_compartmental.py` (agents against the ODE).
 
-Public API: `tbsim.TB(drugs=..., second_line=..., tpt=...)`, `tbsim.tpt_pars`, `tbsim.monitoring`, `tbsim.treated_within`, `tbsim.Strains`, `tbsim.resistance_pars`, `tbsim.add_resistance`, `tbsim.resistant_share`, `tbsim.DST`, `tbsim.TPT(drugs=...)`, and `tbsim.LSHTMResistant`.
+Public API: `tbsim.TB(drugs=..., second_line=..., tpt=...)`, `tbsim.tpt_pars`, `tbsim.monitoring`, `tbsim.treated_within`, `tbsim.resistance_pars`, `tbsim.add_resistance`, `tbsim.resistant_share`, `tbsim.DST`, `tbsim.TPT(drugs=...)`, and `tbsim.LSHTMResistant`.

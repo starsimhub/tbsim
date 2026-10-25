@@ -12,9 +12,9 @@ def hiv_pars():
     """ The parameters of the HIV model """
     return sc.objdict(
         incidence       = ss.par(ss.peryear(0.0), bounds=[0, 0.2], doc='New HIV infections per person at risk per year'),
-        acute_to_latent = ss.perday(1/(7*12)),  # ACUTE -> LATENT (12 weeks)
-        latent_to_aids  = ss.perday(1/(365*8)), # LATENT -> AIDS (8 years)
-        art_start       = ss.peryear(0.0),      # The rate at which people with HIV start ART (0: none, or by a delivery, e.g. ss.transfer(art=True, coverage=0.8, years=[2010]))
+        acute_to_latent = ss.peryear(52/12),     # ACUTE -> LATENT (12 weeks)
+        latent_to_aids  = ss.peryear(1/8),      # LATENT -> AIDS (8 years)
+        art_start       = ss.peryear(0.0),      # The rate at which people with HIV start ART (0: none, or by a delivery, e.g. ss.Delivery(move=dict(art=True), coverage=0.8, at=[2010]))
         art_progression = 0.1,                  # The multiplier on progression for people on ART
     )
 
@@ -27,7 +27,7 @@ class HIV(ss.Disease):
     to chronic infection (`latent`) and advanced disease (`aids`). People with HIV are
     stratified by `art`, whether they are on ART, which slows progression; new infections
     start off ART. People start ART at the rate `art_start`, or by a delivery,
-    e.g. `ss.transfer(art=True, coverage=0.8, years=[2010])`.
+    e.g. `ss.Delivery(move=dict(art=True), coverage=0.8, at=[2010])`.
 
     Results, besides those of every state and transition: `infected` (people with HIV)
     and `hiv_prevalence` (as a share of everyone). The number on ART is
@@ -48,7 +48,7 @@ class HIV(ss.Disease):
     """
     def __init__(self, pars=None, init_prev=0.0, init_onart=0.0, name='hiv', **kwargs):
         kwargs = sc.mergedicts(pars, kwargs)
-        p = tbsim.make_pars(hiv_pars(), kwargs)
+        p = ss.pars(hiv_pars(), **kwargs)
         atrisk = ss.State('atrisk', label='At risk')
         acute  = ss.State('acute', label='Acute HIV')
         latent = ss.State('latent', label='Chronic HIV')
@@ -62,8 +62,9 @@ class HIV(ss.Disease):
             to_latent      = to_latent,
             to_aids        = to_aids,
             infected       = acute + latent + aids,
-            hiv_prevalence = (acute + latent + aids)/(atrisk | acute | latent | aids),
+            hiv_prevalence = (acute + latent + aids)/(atrisk + acute + latent + aids),
             init           = dict(acute=init_prev),
+            first          = 'atrisk',
             name           = name,
         )
         starts = isinstance(kwargs.get('art_start'), ss.par) or p.art_start.raw.value > 0 # Given to be fitted, or not zero

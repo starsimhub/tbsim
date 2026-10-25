@@ -15,10 +15,10 @@ kw = dict(unit='year', total_pop=1e5, verbose=0)
 def test_lshtm_ode():
     """ As an ODE, the declared model is the reference ODE (lshtm_ode.R, as ported to Python) """
     ref = tbc.TB_ODE().run(start_time=1920, end_time=2020)
-    sim = ss.Sim(tbsim.TB(init=dict(symptomatic=1000)), start=1920, stop=2020, **kw).run()
+    sim = ss.Sim(tbsim.TB(init_n=dict(symptomatic=1000)), start=1920, stop=2020, **kw).run()
     res = sim.results.tb
     for key in ['SUSCEPTIBLE', 'INFECTION', 'CLEARED', 'RECOVERED', 'NON_INFECTIOUS', 'ASYMPTOMATIC', 'SYMPTOMATIC']:
-        model = res[f'n_{key.lower()}'].values # Both at the start of each year
+        model = res[f'{key.lower()}'].values # Both at the start of each year
         diff = np.abs(model - ref[key]).max()/ref[key].max()
         print(f'{key:15s} differs from the reference by {diff:0.1e}')
         assert diff < 1e-4
@@ -29,7 +29,7 @@ def test_lshtm_ode():
 def test_resistant_ode():
     """ As an ODE, the model with resistance is the reference ODE (two_strain_ode.R, as ported to Python), in every compartment and for each strain """
     names = dict(SUS='susceptible', CLE='cleared', REC='recovered', TRD='treated', L='infection', N='non_infectious', AS='asymptomatic', SY='symptomatic', TA='treat_asy', TY='treat_sym')
-    level = dict(A=0, B=1, AB=2) # The levels of the resistance dimension: DS, R, DS+R
+    level = dict(A='DS', B='R', AB='DS+R') # The sets of strains carried
     flags = dict(transmission_independent=True, prog_resist_mix=False, prog_select_fitness=True, p_multi=0.5)
     for refpars,pars in [(dict(), dict()), (dict(rr_reinfection_asy=0.5, **flags), dict(rr_superinfection_asy=0.5, **flags))]:
         ref = tbc.TwoStrainODE(**refpars).run(start_time=1920, end_time=2020)
@@ -38,8 +38,8 @@ def test_resistant_ode():
         diffs = []
         for key in tbc.two_strain_ode.STATES[:-1]: # Not the deaths, which are an accumulator
             prefix, _, strain = key.partition('_')
-            result = res[f'n_{names[prefix]}']
-            model = result.by('resistance').values[:, level[strain]] if strain else result.values
+            result = res[f'{names[prefix]}']
+            model = np.asarray(result.select(resistance=level[strain])) if strain else result.values
             diffs.append(np.abs(model - ref[key].values).max()/max(ref[key].max(), 1)) # Both at the start of each year
         print(f'{pars}: largest difference from the reference {max(diffs):0.1e}')
         assert max(diffs) < 1e-3

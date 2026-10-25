@@ -18,7 +18,7 @@ def run(solver='ode', **kwargs):
 def n_people(sim):
     """ The number of people at the end, from the TB states """
     tb = sim.diseases.tb
-    return sum(tb.results[f'n_{s.name}'][-1] for s in tb.graph.people_states)
+    return sum(tb.results[s.name][-1] for s in tb.graph.people_states)
 
 
 @sc.timer()

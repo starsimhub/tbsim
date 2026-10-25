@@ -27,6 +27,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sciris as sc
 import starsim as ss
+import starsim.library as ssl
 import tbsim
 ```
 
@@ -64,19 +65,19 @@ for key, value in tb_pars.items():
 Each intervention needs the TB model it acts on (e.g. to be eligible for TPT, people must have a latent infection, `tb.infection`) and the people (e.g. BCG is for children, `ppl.age < 5`), so we write a small function for each that makes it from those:
 
 ```{python}
-def bcg(tb, ppl, coverage=0.8, start=1980, stop=2020, max_age=5):
+def bcg(tb, ppl, coverage=0.8, start='1980', stop='2020', max_age=5):
     """ BCG vaccination: each child under max_age is offered it once """
-    return ss.vaccinate(tbsim.BCG(), eligible=ppl.age < max_age, coverage=coverage, start=start, stop=stop, name='bcg_vx')
+    return ss.vaccinate(tbsim.BCG(), where=ppl.age < max_age, coverage=coverage, start=start, stop=stop, name='bcg_vx')
 
-def tpt(tb, ppl, coverage=0.7, start=1990, stop=2025, min_age=15):
+def tpt(tb, ppl, coverage=0.7, start='1990', stop='2025', min_age=15):
     """ TB preventive therapy: yearly rounds for adults with a latent infection """
-    return ss.treat(tbsim.TPT(), eligible=tb.infection & (ppl.age >= min_age), coverage=coverage, interval=ss.years(1), start=start, stop=stop, name='tpt_tx')
+    return ss.treat(tbsim.TPT(), where=tb.infection & (ppl.age >= min_age), coverage=coverage, interval=ss.years(1), start=start, stop=stop, name='tpt_tx')
 
-def beta_change(tb, ppl, years=(1990, 2000), by=(0.5, 1.4)):
+def beta_change(tb, ppl, years=('1990', '2000'), by=(0.5, 1.4)):
     """ Transmission multiplied by each value from each year on """
     return ss.change(tb.pars.beta, at=list(years), by=list(by), name='beta_change')
 
-def care(tb, ppl, seeking=ss.peryear(1), start=1990):
+def care(tb, ppl, seeking=ss.peryear(1), start='1990'):
     """ The care cascade: people with symptomatic TB seek care, are tested with Xpert, and start treatment """
     return tbsim.care(tb, seeking=seeking, every=ss.months(1), start=start)
 
@@ -117,19 +118,19 @@ def get_scenarios():
         ),
         'Single BCG': dict(
             name = 'BCG vaccination',
-            bcg  = dict(coverage=0.8, start=1980, stop=2020, max_age=5),
+            bcg  = dict(coverage=0.8, start='1980', stop='2020', max_age=5),
         ),
         'TPT': dict(
             name = 'TB preventive therapy',
-            tpt  = dict(coverage=0.7, start=1990, stop=2025),
+            tpt  = dict(coverage=0.7, start='1990', stop='2025'),
         ),
         'Beta change': dict(
             name       = 'Change in transmission',
-            betabyyear = dict(years=[1990, 2000], by=[0.5, 1.4]),
+            betabyyear = dict(years=['1990', '2000'], by=[0.5, 1.4]),
         ),
         'Care cascade': dict(
             name = 'Care cascade',
-            care = dict(seeking=ss.peryear(1), start=1990),
+            care = dict(seeking=ss.peryear(1), start='1990'),
         ),
     }
 
@@ -153,7 +154,7 @@ baseline_sim.run()
 
 ## Exploring baseline results
 
-The results of the TB model are in `sim.results.tb`: the number in each state (`n_infection`, `n_symptomatic`, ...), the number of people making each transition (`transmission`, `tb_death`, `diagnosis`, ...) and its cumulative total (`cum_tb_death`, ...), and summaries such as `infectious`, `active`, and `prevalence_active`:
+The results of the TB model are in `sim.results.tb`: the number in each state (`infection`, `symptomatic`, ...), the number of people making each transition (`transmission`, `tb_death`, `diagnosis`, ...) and its running total (`tb_death.cum`, ...), and summaries such as `infectious`, `active`, and `prevalence_active`:
 
 ```{python}
 res = baseline_sim.results.tb
@@ -161,8 +162,10 @@ print('TB results:')
 print(sc.strjoin(res.keys()))
 
 print('\nKey TB results at the end:')
-for key in ['n_infection', 'active', 'infectious', 'prevalence_active', 'cum_tb_death', 'cum_infections']:
+for key in ['infection', 'active', 'infectious', 'prevalence_active']:
     print(f'  {key}: {res[key][-1]:,.4g}')
+print(f'  TB deaths in all: {res.tb_death.cum[-1]:,.0f}')
+print(f'  Infections in all: {res.transmission.cum[-1]:,.0f}')
 ```
 
 ## Plotting baseline results
@@ -187,7 +190,7 @@ def run_scenarios(scenario_names=None, plot=True):
     msim = ss.MultiSim(sims)
     msim.run(parallel=False)
     if plot:
-        msim.plot(key=['tb_infectious', 'tb_prevalence_active', 'tb_new_infections', 'tb_cum_tb_death'])
+        msim.plot(key=['tb_infectious', 'tb_prevalence_active', 'tb_transmission', 'tb_tb_death'])
         plt.show()
     return msim
 ```
@@ -228,11 +231,11 @@ def analyze_intervention_impact(msim):
         print(f'  Final active TB prevalence: {after:.4f} (vs {before:.4f}), {(after - before)/before:+.0%}')
 
         # Cumulative TB deaths
-        before, after = base.cum_tb_death[-1], res.cum_tb_death[-1]
+        before, after = base.tb_death.cum[-1], res.tb_death.cum[-1]
         print(f'  Total TB deaths: {after:,.0f} (vs {before:,.0f}), {(after - before)/before:+.0%}')
 
         # Mean new infections per month
-        before, after = np.mean(base.new_infections), np.mean(res.new_infections)
+        before, after = np.mean(base.transmission), np.mean(res.transmission)
         print(f'  Mean new infections per month: {after:,.0f} (vs {before:,.0f}), {(after - before)/before:+.0%}')
     return
 
@@ -247,9 +250,9 @@ Let's create a custom scenario that combines several interventions, with lower t
 custom_scenario = dict(
     name       = 'Combined',
     tbpars     = dict(beta=7), # Lower baseline transmission
-    bcg        = dict(coverage=0.85, start=1980, stop=2020),
-    tpt        = dict(coverage=0.7, start=1990, stop=2025),
-    betabyyear = dict(years=[1990, 2000, 2010], by=[0.8, 0.6, 0.4]), # A gradual fall in transmission
+    bcg        = dict(coverage=0.85, start='1980', stop='2020'),
+    tpt        = dict(coverage=0.7, start='1990', stop='2025'),
+    betabyyear = dict(years=['1990', '2000', '2010'], by=[0.8, 0.6, 0.4]), # A gradual fall in transmission
 )
 
 print('Custom scenario:')
@@ -260,24 +263,24 @@ custom_sim = build_sim(custom_scenario)
 custom_sim.run()
 
 msim = ss.MultiSim([baseline_sim, custom_sim])
-msim.plot(key=['tb_infectious', 'tb_prevalence_active', 'tb_new_infections', 'tb_cum_tb_death'])
+msim.plot(key=['tb_infectious', 'tb_prevalence_active', 'tb_transmission', 'tb_tb_death'])
 plt.show()
 ```
 
 ## The care cascade, step by step
 
-`tbsim.care()` is one test followed by treatment. A cascade with more steps is built from the same pieces: here people with symptomatic TB who seek care are screened with computer-aided detection of chest X-rays (CAD), those who screen positive are confirmed with Xpert, and 90% of those confirmed start treatment (the TB model's `diagnosis` transition):
+`tbsim.care()` is one test followed by treatment. A cascade with more steps is built from the same pieces: here people with symptomatic TB who seek care are screened with computer-aided detection of chest X-rays (CAD), those who screen positive are confirmed with Xpert, and 90% of those confirmed start treatment (the TB model's `diagnosis` transition). Each step after the first is given the people an earlier step found (`who=screen.positive`), and every step goes in the interventions:
 
 ```{python}
 tb = tbsim.TB(**tb_pars).stratify(age=[0, 15])
-start_tx = ss.treat(ss.Treatment(efficacy=1.0, transition='diagnosis'), coverage=0.9, name='start_tx')
-confirm = ss.screen(tbsim.Xpert(), coverage=0.8, on_positive=start_tx, name='confirm')
-screen = ss.screen(tbsim.CAD(), eligible=tb.symptomatic, coverage=0.1, interval=ss.months(1), start=1990, on_positive=confirm, name='screen')
-cascade_sim = tbsim.Sim(tb=tb, interventions=screen, **sim_pars).run()
+screen = ss.screen(tbsim.CAD(), where=tb.symptomatic, coverage=0.1, interval=ss.months(1), start='1990', name='screen')
+confirm = ss.screen(tbsim.Xpert(), who=screen.positive, coverage=0.8, name='confirm')
+start_tx = ss.treat(ss.Treatment(moves='diagnosis'), who=confirm.positive, coverage=0.9, name='start_tx')
+cascade_sim = tbsim.Sim(tb=tb, interventions=[screen, confirm, start_tx], **sim_pars).run()
 
 r = cascade_sim.results
 print(f'Screened:  {r.screen.delivered.sum():,.0f}')
-print(f'Confirmed: {r.confirm.diagnosed.sum():,.0f} of {r.confirm.delivered.sum():,.0f} tested')
+print(f'Confirmed: {r.confirm.positive.sum():,.0f} of {r.confirm.delivered.sum():,.0f} tested')
 print(f'Treated:   {r.start_tx.delivered.sum():,.0f}')
 print(f'Completed: {r.tb.completion.sum():,.0f}, failed: {r.tb.failure.sum():,.0f}')
 ```
@@ -288,13 +291,13 @@ When someone starts treatment, the people they live with can be traced: `tbsim.c
 
 ```{python}
 tb = tbsim.TB(**tb_pars)
-household = ss.library.HouseholdNet(dhs_data='default', dynamic=False)
+household = ssl.HouseholdNet(dhs_data='default', dynamic=False)
 interventions = [tbsim.care(tb, seeking=ss.peryear(1.0)), tbsim.contact_tracing(tb)]
 tracing_sim = ss.Sim(tb, networks=household, interventions=interventions, solver='abm', n_agents=10_000, start=2000, stop=2010, dt=ss.weeks(1), verbose=0).run()
 
 r = tracing_sim.results
 print(f'Started treatment:  {r.tb.diagnosis.sum():,.0f}')
-print(f'Contacts tested:    {r.tracing.delivered.sum():,.0f}, of whom {r.tracing.diagnosed.sum():,.0f} tested positive')
+print(f'Contacts tested:    {r.tracing.delivered.sum():,.0f}, of whom {r.tracing.positive.sum():,.0f} tested positive')
 print(f'Contacts given TPT: {r.tracing_prevention.delivered.sum():,.0f}')
 ```
 

@@ -150,7 +150,7 @@ def run_abm():
         dt           = DT,
         n_agents     = N_AGENTS,
         rand_seed    = 1,
-        verbose      = 0.02,
+        verbose      = 1,
     )
     msim = ss.MultiSim(base_sim=sim, n_runs=N_RUNS)
     msim.run()
@@ -176,15 +176,15 @@ def ode_fractions(ode):
 def abm_fractions(sim):
     """Return ABM state-group fractions for a single sim (counts / living population each step)."""
     r = sim.results.tb
-    nalive = sim.results.n_alive.astype(float)
+    nalive = sim.results.alive.astype(float)
     nalive[nalive == 0] = np.nan
     return sc.objdict(
         time        = np.asarray(sim.results.timevec, dtype=float),
-        susceptible = r['n_SUSCEPTIBLE'] / nalive,
-        latent      = r['n_INFECTION'] / nalive,
-        cleared     = r['n_CLEARED'] / nalive,
-        active      = (r['n_NON_INFECTIOUS'] + r['n_ASYMPTOMATIC'] + r['n_SYMPTOMATIC']) / nalive,
-        infectious  = r['n_infectious'] / nalive,
+        susceptible = r['susceptible'] / nalive,
+        latent      = r['infection'] / nalive,
+        cleared     = r['cleared'] / nalive,
+        active      = (r['non_infectious'] + r['asymptomatic'] + r['symptomatic']) / nalive,
+        infectious  = r['infectious'] / nalive,
     )
 
 

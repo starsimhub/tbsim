@@ -42,4 +42,4 @@ if __name__ == '__main__':
         sim.run()
 
     msim = ss.MultiSim(sims)
-    tbsim.plot(msim, select=['prevalence_active', 'active', 'n_infection', 'n_symptomatic'], title='TB and malnutrition', n_cols=2)
+    tbsim.plot(msim, select=['prevalence_active', 'active', 'infection', 'symptomatic'], title='TB and malnutrition', n_cols=2)

@@ -14,6 +14,7 @@ import networkx as nx
 
 import sciris as sc
 import starsim as ss
+import starsim.library as ssl
 import tbsim
 
 __all__ = ['DwellTime', 'DwtAnalyzer', 'DwtPlotter', 'DwtPostProcessor', 'HouseholdStats']
@@ -58,6 +59,7 @@ class DwellTime(ss.Analyzer):
             sim.run()
             sim.analyzers[0].plot('validation')
     """
+    compartmental = False # It follows each agent through its states
 
     def __init__(self, data=None, file_path=None, directory=None, prefix='',
                  scenario_name='', debug=False):
@@ -357,7 +359,7 @@ class DwellTime(ss.Analyzer):
     def _update_state_change_data(self):
         """Detect state changes and record dwell times."""
         ti = self.ti
-        codes = tbsim.state_codes(tbsim.get_tb(self.sim))
+        codes = tbsim.get_tb(self.sim).current_state()
         uids = self.sim.people.auids.copy()
 
         relevant_rows = self._latest_sts_df[
@@ -451,8 +453,8 @@ class DwellTime(ss.Analyzer):
                 age=self.sim.people.age[
                     ss.uids(relevant_rows['agent_id'].values)].copy())
 
-        state_dict = {i:name.replace('_', ' ').capitalize() for i,name in enumerate(tbsim.get_tb(self.sim).graph.states)}
-        state_dict[-1] = 'DEAD OR LEFT' # In no state (see tbsim.state_codes())
+        state_dict = {i:name.replace('_', ' ').capitalize() for i,name in enumerate(tbsim.get_tb(self.sim).current_state().labels)}
+        state_dict[-1] = 'DEAD OR LEFT' # In no state (see ss.Disease.current_state())
         state_dict[-3] = 'NON-TB DEATH'
         state_dict[-2] = 'NEVER INFECTED'
         self.data['state_name'] = self.data['state'].map(state_dict)
@@ -566,7 +568,7 @@ class HouseholdStats(ss.Analyzer):
     Track household size, age, and contact-mixing statistics over time.
 
     Works with any network that exposes a ``household_ids`` state (e.g.
-    ``ss.library.HouseholdNet``).  At each timestep the
+    ``ssl.HouseholdNet``).  At each timestep the
     analyzer counts alive agents per household and records summary statistics.
 
     Args:
@@ -596,7 +598,7 @@ class HouseholdStats(ss.Analyzer):
         import tbsim
 
         dhs_data = ...  # pandas DataFrame with hh_id and ages columns
-        net = ss.library.HouseholdNet(dhs_data=dhs_data)
+        net = ssl.HouseholdNet(dhs_data=dhs_data)
         analyzer = tbsim.HouseholdStats(network_name='householdnet')
         sim = ss.Sim(
             diseases='sis', networks=net,
@@ -606,6 +608,7 @@ class HouseholdStats(ss.Analyzer):
         sim.run()
         analyzer.plot()
     """
+    compartmental = False # It reads households, which only agents have
 
     def __init__(self, network_name='householdnet', age_bins=(0, 5, 15, 50, 100), save_at=None, **kwargs):
         super().__init__(**kwargs)

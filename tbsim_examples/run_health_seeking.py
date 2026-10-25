@@ -39,12 +39,12 @@ if __name__ == '__main__':
 
     for sim in msim.sims:
         res = sim.results
-        diagnosed = res.care.diagnosed.sum() if 'care' in res else 0
-        print(f'{sim.label:20s}: {diagnosed:6.0f} diagnosed, {res.tb.cum_tb_death[-1]:5.0f} TB deaths, prevalence of infectious TB {res.tb.prevalence_active[-1]*1e5:.0f} per 100,000')
+        diagnosed = res.care.positive.sum() if 'care' in res else 0
+        print(f'{sim.label:20s}: {diagnosed:6.0f} diagnosed, {res.tb.tb_death.cum[-1]:5.0f} TB deaths, prevalence of infectious TB {res.tb.prevalence_active[-1]*1e5:.0f} per 100,000')
 
     tbsim.plot(
         msim,
-        select = ['n_symptomatic', 'prevalence_active', 'new_infections', 'tb_death', 'diagnosis', 'n_treatment'],
+        select = ['symptomatic', 'prevalence_active', 'transmission', 'tb_death', 'diagnosis', 'treatment'],
         title = 'Health-seeking behavior – LSHTM TB model',
         n_cols = 3,
     )

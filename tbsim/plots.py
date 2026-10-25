@@ -39,9 +39,9 @@ def plot(results, select=None, title='', filename=None, n_cols=None, row_height=
     Examples::
 
         tbsim.plot(msim)                                           # all metrics
-        tbsim.plot(msim, select=['n_infectious', 'prevalence'])    # exact names
+        tbsim.plot(msim, select=['infectious', 'prevalence'])      # exact names
         tbsim.plot(msim, select=dict(like='prevalence'))           # substring match
-        tbsim.plot(msim, select=dict(regex=r'^n_'))                # regex match
+        tbsim.plot(msim, select=dict(regex=r'death$'))              # regex match
         tbsim.plot(msim, select=['~15+', '~None'])                 # exclude patterns
         tbsim.plot(msim, style='starsim', n_cols=3)                # appearance
         tbsim.plot(msim, filename='abc.png')                       # save to disk
@@ -213,10 +213,10 @@ def _normalize_results(results):
     """
     if isinstance(results, ss.MultiSim):
         sims = results.sims
-        return {sim.label: _rename_results(ss.utils.match_result_keys(sim.results, key=None)) for sim in sims}
+        return {sim.label: _rename_results(sim.results.flatten()) for sim in sims}
     elif isinstance(results, ss.Sim):
         sim = results
-        return {sim.label: _rename_results(ss.utils.match_result_keys(sim.results, key=None))} # TODO: can probably just be sim.results.flatten()?
+        return {sim.label: _rename_results(sim.results.flatten())} # TODO: can probably just be sim.results.flatten()?
     elif isinstance(results, dict):
         return results
     else:

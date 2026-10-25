@@ -20,10 +20,10 @@ def test_natural_history():
     """ People stay in the model (births replace deaths), the results add up, and transmission keeps TB going """
     for solver in ['ode', 'abm']:
         res = run(tbsim.TB(init=dict(infection=0.05, symptomatic=0.002)), solver=solver)
-        total = sum(res[f'n_{s}'].values for s in states)
+        total = sum(res[s].values for s in states)
         assert np.allclose(total, 1e5, rtol=0.02 if solver == 'abm' else 1e-9), f'The population should stay the same size with {solver}'
-        assert np.allclose(res.infectious, res.n_asymptomatic + res.n_symptomatic)
-        assert np.allclose(res.active, res.infectious + res.n_non_infectious)
+        assert np.allclose(res.infectious, res.asymptomatic + res.symptomatic)
+        assert np.allclose(res.active, res.infectious + res.non_infectious)
         assert np.allclose(res.prevalence_active, res.infectious/total, rtol=0.02)
         assert res.transmission.sum() > 0 and res.reinfect_rec.sum() > 0
         assert res.infectious[-1] > 50, f'TB should persist with {solver}'
@@ -51,7 +51,7 @@ def test_front_loading():
     front = cohort(k_latent=1.0, inf_asy_remote=0.0, inf_non_remote=0.0, inf_asy=0.12, inf_non=0.32)
     early = lambda r: (r.latent_asy + r.latent_non)[:52].sum()/(r.latent_asy + r.latent_non).sum()
     assert early(front) > early(flat), 'Progression should happen earlier with front-loading'
-    assert 'remote' in front.keys() and 'n_infection_remote' in front.keys()
+    assert 'remote' in front.keys() and 'infection_remote' in front.keys()
     return flat, front
 
 

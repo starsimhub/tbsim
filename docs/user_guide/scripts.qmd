@@ -13,7 +13,7 @@ Basic TB simulation with default parameters. The simplest starting point for und
 TB-Malnutrition comorbidity model demonstrating how to add a co-disease to a simulation.
 
 **run_tbhiv.py**  
-TB-HIV coinfection model: TB with and without HIV, with HIV incidence from 2000 and ART delivered with `ss.transfer()`.
+TB-HIV coinfection model: TB with and without HIV, with HIV incidence from 2000 and ART delivered with `ss.Delivery(move=...)`.
 
 **run_tb_interventions.py**
 Intervention framework demonstrating BCG vaccination, TPT, and time-varying beta scenarios.

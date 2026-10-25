@@ -28,8 +28,8 @@ import tbsim
 
 ppl = ss.People(1000) # For writing conditions on people, such as their age
 tb = tbsim.TB().stratify(age=[0, 5])
-bcg = ss.vaccinate(tbsim.BCG(), eligible=ppl.age < 5, coverage=0.8, start=1980)
-tpt = ss.treat(tbsim.TPT(), eligible=tb.infection, coverage=0.3, interval=ss.years(1), start=1990)
+bcg = ss.vaccinate(tbsim.BCG(), where=ppl.age < 5, coverage=0.8, start='1980')
+tpt = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.3, interval=ss.years(1), start='1990')
 
 sim = tbsim.Sim(tb=tb, interventions=[bcg, tpt], start=1975, stop=2030, verbose=0)
 sim.run()
@@ -66,6 +66,7 @@ Using household-based contact networks, as agents. With a network, `beta` is the
 #| output: false
 import sciris as sc
 import starsim as ss
+import starsim.library as ssl
 import tbsim
 
 # Synthetic DHS-style household data (household ID, and the ages of its members)
@@ -75,7 +76,7 @@ dhs_data = sc.dataframe(
 )
 
 # Static households, so no pregnancy module is needed
-households = ss.library.HouseholdNet(dhs_data=dhs_data, dynamic=False)
+households = ssl.HouseholdNet(dhs_data=dhs_data, dynamic=False)
 sim = tbsim.Sim(networks=households, beta=3, n_agents=1000, verbose=0)
 sim.run()
 ```

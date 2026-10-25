@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import starsim as ss
+import starsim.library as ssl
 import tbsim
 
 
@@ -26,7 +27,7 @@ sim_pars = dict(
 
 
 def make_households(n_agents, rand_seed):
-    """ Create a synthetic DHS household table for ``ss.library.HouseholdNet`` """
+    """ Create a synthetic DHS household table for ``ssl.HouseholdNet`` """
     rng = np.random.default_rng(rand_seed)
     hh_id = []
     ages = []
@@ -42,8 +43,8 @@ def make_households(n_agents, rand_seed):
 def build_sim(name, migration=None, tpt=False):
     """ Build a tbsim.Sim for a migration scenario """
     tb = tbsim.TB(beta=3, init=dict(infection=0.2, symptomatic=0.005), **sc.mergedicts(migration))
-    households = ss.library.HouseholdNet(dhs_data=make_households(sim_pars['n_agents'], sim_pars['rand_seed']), dynamic=False)
-    interventions = ss.treat(tbsim.TPT(), eligible=tb.infection, coverage=0.5, interval=ss.years(1), name='tpt_rounds') if tpt else None
+    households = ssl.HouseholdNet(dhs_data=make_households(sim_pars['n_agents'], sim_pars['rand_seed']), dynamic=False)
+    interventions = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.5, interval=ss.years(1), name='tpt_rounds') if tpt else None
     return tbsim.Sim(tb=tb, networks=households, interventions=interventions, label=name, **sim_pars)
 
 
@@ -56,10 +57,10 @@ def summarize(sim):
     emigrants = res.emigrants.sum() if 'emigrants' in res else 0
     return dict(
         scenario = sim.label,
-        final_population = sim.results.n_alive[-1],
+        final_population = sim.results.alive[-1],
         n_households = len(counts),
         mean_household_size = counts.mean(),
-        tb_deaths = res.cum_tb_death[-1],
+        tb_deaths = res.tb_death.cum[-1],
         immigrants = immigrants,
         emigrants = emigrants,
         net_migration = immigrants - emigrants,
@@ -91,7 +92,7 @@ def run_scenarios(do_plot=False, savefig=False, fig_path='results/migration_mult
         tbsim.plot(
             msim,
             title = 'Migration scenarios (TBsim)',
-            select = ['n_alive', 'n_susceptible', 'n_infection', 'infectious', 'tb_death', 'emigrants'],
+            select = ['alive', 'susceptible', 'infection', 'infectious', 'tb_death', 'emigrants'],
             filename = fig_path if savefig else None,
             show = do_plot,
         )

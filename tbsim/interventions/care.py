@@ -10,7 +10,9 @@ With drug resistance, a test for it (`DST()`) can start a second-line regimen in
 import numpy as np
 import sciris as sc
 import starsim as ss
+import starsim.library as ssl
 from .prevention import TPT
+from ..resistance import resistant
 
 __all__ = ['tests', 'test', 'Xpert', 'OralSwab', 'FujiLAM', 'CAD', 'DST', 'regimens', 'regimen', 'treated_within', 'start_treatment', 'care', 'monitoring', 'contact_tracing']
 
@@ -26,19 +28,19 @@ tests = sc.objdict(
 
 def test(kind='xpert', by_age=True, specificity=1.0, **kwargs):
     """
-    A TB test: an `ss.Test` whose sensitivity depends on the TB state, and on age (children under 15, and adults)
+    A TB test: an `ss.Diagnostic` whose sensitivity depends on the TB state, and on age (children under 15, and adults)
 
     Args:
         kind (str/dict): one of `tbsim.tests` ('xpert', 'oralswab', 'fujilam', 'cad'), or a dict of the
             probability of a positive result for each state, as [children, adults]
         by_age (bool): whether the sensitivity differs by age; needs the TB model to be stratified by age at 15 (`tb.stratify(age=[0, 15])`). If False, the adult values are used
         specificity (float): the probability that someone without active TB tests negative
-        kwargs (dict): passed to `ss.Test`, e.g. `cost=` or `delay=`
+        kwargs (dict): passed to `ss.Diagnostic`, e.g. `cost=` or `delay=`
     """
     table = tests[kind.lower()] if isinstance(kind, str) else kind
     sensitivity = {state:(ss.by(age=vals) if by_age else vals[-1]) for state,vals in table.items()}
     kwargs.setdefault('name', kind.lower() if isinstance(kind, str) else None)
-    return ss.Test(sensitivity=sensitivity, specificity=specificity, **kwargs)
+    return ss.Diagnostic(sensitivity=sensitivity, specificity=specificity, **kwargs)
 
 
 def Xpert(**kwargs):    return test('xpert', **kwargs)
@@ -47,25 +49,9 @@ def FujiLAM(**kwargs):  return test('fujilam', **kwargs)
 def CAD(**kwargs):      return test('cad', **kwargs)
 
 
-def resistant_levels(tb, drugs=None):
-    """ The levels of the resistance of a TB model (the sets of strains people carry, e.g. 'DS+RIF') with a strain resistant to any of some drugs (default: any) """
-    strats = [strat for strat in tb.graph.strats if strat.name == 'resistance']
-    if not strats:
-        errormsg = f'The TB model "{tb.name}" has no drug resistance: give it drugs='
-        raise ValueError(errormsg)
-    labels = strats[0].labels
-    known = {drug for label in labels for strain in label.split('+') for drug in strain.split('/')} - {'DS'}
-    drugs = sorted(known) if drugs is None else [drugs] if isinstance(drugs, str) else list(drugs)
-    unknown = set(drugs) - known
-    if unknown:
-        errormsg = f'The drugs {sc.strjoin(unknown)} are not among those of "{tb.name}" ({sc.strjoin(sorted(known))})'
-        raise ValueError(errormsg)
-    return [label for label in labels if any(drug in strain.split('/') for strain in label.split('+') for drug in drugs)]
-
-
 def DST(tb, drugs=None, sensitivity=1.0, specificity=1.0, **kwargs):
     """
-    A drug-susceptibility test: an `ss.Test` that is positive for people who carry a strain resistant to any of some drugs
+    A drug-susceptibility test: an `ss.Diagnostic` that is positive for people who carry a strain resistant to any of some drugs
 
     Use it in the care cascade, so that people found resistant start the second-line regimen
     (`tbsim.care(tb, dst=tbsim.DST(tb))`), or with `ss.screen()`.
@@ -75,11 +61,11 @@ def DST(tb, drugs=None, sensitivity=1.0, specificity=1.0, **kwargs):
         drugs (list): the drugs the test detects resistance to (default: all of the model's), e.g. 'RIF' for Xpert MTB/RIF
         sensitivity (float): the probability that someone with a resistant strain tests positive
         specificity (float): the probability that someone without one tests negative
-        kwargs (dict): passed to `ss.Test`, e.g. `cost=` or `delay=`
+        kwargs (dict): passed to `ss.Diagnostic`, e.g. `cost=` or `delay=`
     """
-    detects = tb.resistance.isin(resistant_levels(tb, drugs))
+    detects = resistant(tb, drugs)
     kwargs.setdefault('name', 'dst')
-    return ss.Test(sensitivity=sensitivity, specificity=specificity, detects=detects, **kwargs)
+    return ss.Diagnostic(sensitivity=sensitivity, specificity=specificity, detects=detects, **kwargs)
 
 
 # Treatment regimens: the chance of cure among those who adhere, the chance of adhering, the length of the course, and the chance of relapse after a cure
@@ -126,12 +112,12 @@ def care(tb, test=None, seeking=ss.perday(0.1), eligible=None, every=ss.weeks(1)
 
     Args:
         tb (`tbsim.TB`): the TB model
-        test (`ss.Test`): the test (default: `tbsim.Xpert()`, by age if the model is stratified by age at 15)
+        test (`ss.Diagnostic`): the test (default: `tbsim.Xpert()`, by age if the model is stratified by age at 15)
         seeking (rate): the rate at which eligible people seek care
         eligible (Cond): who seeks care (default: people with symptomatic TB)
         every (dur): how often the rounds are; shorter is closer to seeking care at any time
         treat (float): the share of those who test positive who start treatment
-        dst (`ss.Test`): a test for resistance (see `tbsim.DST()`), for a model with a second-line regimen
+        dst (`ss.Diagnostic`): a test for resistance (see `tbsim.DST()`), for a model with a second-line regimen
         retreatment (dur): with `dst`, test only people who started treatment within this time before (agents only), e.g. `ss.years(2)`
         start, stop: the period of the cascade
         name (str): the name of the delivery (its follow-up is `<name>_positive`)
@@ -140,34 +126,29 @@ def care(tb, test=None, seeking=ss.perday(0.1), eligible=None, every=ss.weeks(1)
         An `ss.screen` delivery
     """
     if test is None:
-        ages = [strat.edges for strat in tb.graph.strats if strat.kind == 'age']
-        by_age = len(ages) == 1 and ages[0] is not None and list(ages[0]) == [0, 15]
+        by_age = 'age' in tb.strats and list(tb.strats.age.edges) == [0, 15]
         test = Xpert(by_age=by_age)
     eligible = sc.ifelse(eligible, tb.symptomatic)
     p_seek = float(seeking.to_prob(every)) if isinstance(seeking, ss.TimePar) else float(seeking) # The chance of seeking care in each round
-    return ss.screen(test, eligible=eligible, coverage=p_seek, interval=every, start=start, stop=stop, on_positive=start_treatment(tb, treat, dst, retreatment, name=name), name=name)
+    screen = ss.screen(test, where=eligible, coverage=p_seek, interval=every, start=start, stop=stop, name=name)
+    return [screen, *start_treatment(tb, screen.positive, treat, dst, retreatment, name=name)]
 
 
 def treated_within(tb, within):
     """
-    Whether people started treatment (first- or second-line) within some time before: a function of the sim and UIDs, for `eligible=` or `detects=` (agents only)
+    Whether people started treatment (first- or second-line) within some time before: a condition, for `where=` or `detects=` (agents only)
 
     Args:
         tb (`tbsim.TB`): the TB model
         within (dur): the time, e.g. `ss.years(2)`
     """
-    name = tb.name
-    def recent(sim, uids):
-        dis = sim.diseases[name]
-        last = dis.ti_treatment[uids]
-        if 'second_line' in dis.graph.states:
-            last = np.fmax(last, dis.ti_second_line[uids])
-        steps = within/sim.t.dt
-        return uids[np.isfinite(last) & (sim.ti - last <= steps)]
+    recent = tb.diagnosis.since <= within
+    if 'diagnosis_second_line' in tb.graph.transitions:
+        recent = recent | (tb.diagnosis_second_line.since <= within)
     return recent
 
 
-def start_treatment(tb, treat=1.0, dst=None, retreatment=None, name='care'):
+def start_treatment(tb, who, treat=1.0, dst=None, retreatment=None, name='care'):
     """
     The follow-up of a positive test for TB: a share `treat` start treatment (the model's `diagnosis`)
 
@@ -180,28 +161,31 @@ def start_treatment(tb, treat=1.0, dst=None, retreatment=None, name='care'):
     Args:
         tb (`tbsim.TB`): the TB model
         treat (float): the share who start treatment
-        dst (`ss.Test`): a test for resistance (see `tbsim.DST()`)
+        dst (`ss.Diagnostic`): a test for resistance (see `tbsim.DST()`)
         retreatment (dur): with `dst`, test only people who started treatment within this time before (agents only), e.g. `ss.years(2)`
         name (str): the start of the names of the products (`<name>_tx` and `<name>_tx_second_line`) and of the test for resistance (`<name>_dst`, whose follow-ups are `<name>_dst_positive` and `<name>_dst_negative`)
 
     Returns:
         An `ss.treat` delivery, or with `dst`, an `ss.screen` one
     """
-    first_line = ss.treat(ss.Treatment(efficacy=1.0, transition='diagnosis', name=f'{name}_tx'), coverage=treat)
+    first_line = lambda who: ss.treat(ss.Treatment(moves='diagnosis', name=f'{name}_tx'), who=who, coverage=treat, name=f'{name}_positive')
     if dst is None:
         if retreatment is not None:
             errormsg = 'retreatment= says who is tested for resistance: give dst= as well'
             raise ValueError(errormsg)
-        return first_line
+        return [first_line(who)]
     if 'diagnosis_second_line' not in tb.graph.transitions:
         errormsg = f'dst= sends people found resistant to the second-line regimen, which "{tb.name}" does not have: give it second_line='
         raise ValueError(errormsg)
-    second_line = ss.treat(ss.Treatment(efficacy=1.0, transition='diagnosis_second_line', name=f'{name}_tx_second_line'), coverage=treat)
-    resistance = ss.screen(dst, on_positive=second_line, on_negative=first_line, name=f'{name}_dst')
+    def resistance(who):
+        screen = ss.screen(dst, who=who, name=f'{name}_dst')
+        second_line = ss.treat(ss.Treatment(moves='diagnosis_second_line', name=f'{name}_tx_second_line'), who=screen.positive, coverage=treat, name=f'{name}_dst_positive')
+        first = ss.treat(ss.Treatment(moves='diagnosis', name=f'{name}_tx_dst_negative'), who=screen.negative, coverage=treat, name=f'{name}_dst_negative')
+        return [screen, second_line, first]
     if retreatment is None:
-        return resistance
-    history = ss.Test(detects=treated_within(tb, retreatment), name=f'{name}_records')
-    return ss.screen(history, on_positive=resistance, on_negative=first_line, name=f'{name}_history')
+        return resistance(who)
+    history = ss.screen(ss.Diagnostic(detects=treated_within(tb, retreatment), name=f'{name}_records'), who=who, name=f'{name}_history')
+    return [history, *resistance(history.positive), first_line(history.negative)]
 
 
 def monitoring(tb, dst=None, every=ss.months(2), coverage=1.0, switch=1.0, start=None, stop=None, name='monitoring'):
@@ -212,7 +196,7 @@ def monitoring(tb, dst=None, every=ss.months(2), coverage=1.0, switch=1.0, start
 
     Args:
         tb (`tbsim.TB`): the TB model, with a second-line regimen
-        dst (`ss.Test`): the test for resistance (default: `tbsim.DST(tb)`)
+        dst (`ss.Diagnostic`): the test for resistance (default: `tbsim.DST(tb)`)
         every (dur): how often people on treatment are tested
         coverage (float): the share of people on treatment tested in each round
         switch (float): the share of those found resistant who switch
@@ -228,8 +212,9 @@ def monitoring(tb, dst=None, every=ss.months(2), coverage=1.0, switch=1.0, start
         errormsg = f'Monitoring switches people found resistant to the second-line regimen, which "{tb.name}" does not have: give it second_line='
         raise ValueError(errormsg)
     dst = sc.ifelse(dst, DST(tb, name=f'{name}_dst'))
-    switching = ss.treat(ss.Treatment(efficacy=1.0, transition='switch_second_line', name=f'{name}_tx'), coverage=switch)
-    return ss.screen(dst, eligible=tb.treatment, coverage=coverage, interval=every, start=start, stop=stop, on_positive=switching, name=name)
+    screen = ss.screen(dst, where=tb.treatment, coverage=coverage, interval=every, start=start, stop=stop, name=name)
+    switching = ss.treat(ss.Treatment(moves='switch_second_line', name=f'{name}_tx'), who=screen.positive, coverage=switch, name=f'{name}_positive')
+    return [screen, switching]
 
 
 def contact_tracing(tb, network='householdnet', test=None, tpt=None, coverage=1.0, treat=1.0, dst=None, on=None, name='tracing'):
@@ -241,19 +226,19 @@ def contact_tracing(tb, network='householdnet', test=None, tpt=None, coverage=1.
 
     Args:
         tb (`tbsim.TB`): the TB model
-        network (str/Network): the network whose contacts are traced (default: `ss.library.HouseholdNet`'s)
-        test (`ss.Test`): the test of contacts (default: `tbsim.Xpert(by_age=False)`)
+        network (str/Network): the network whose contacts are traced (default: `ssl.HouseholdNet`'s)
+        test (`ss.Diagnostic`): the test of contacts (default: `tbsim.Xpert(by_age=False)`)
         tpt (`ss.Treatment`): the preventive therapy for contacts with a latent infection who test negative, delivered by `<name>_prevention` (default: `tbsim.TPT(tb=tb)`); False for none
         coverage (float): the share of contacts who are traced and tested
         treat (float): the share of those who test positive who start treatment
-        dst (`ss.Test`): a test for resistance for those who test positive, as for `tbsim.care()`
+        dst (`ss.Diagnostic`): a test for resistance for those who test positive, as for `tbsim.care()`
         on (Transition/Cond): whose contacts are traced (default: people starting treatment)
         name (str): the name of the delivery
 
     Example::
 
         tb = tbsim.TB()
-        household = ss.library.HouseholdNet(dhs_data='default', dynamic=False)
+        household = ssl.HouseholdNet(dhs_data='default', dynamic=False)
         interventions = [tbsim.care(tb), tbsim.contact_tracing(tb)]
         sim = ss.Sim(tb, networks=household, interventions=interventions, solver='abm')
     """
@@ -267,5 +252,6 @@ def contact_tracing(tb, network='householdnet', test=None, tpt=None, coverage=1.
     treating = [name_ for name_ in ['treatment', 'second_line'] if name_ in tb.graph.states]
     on_treatment = getattr(tb, treating[0]) if len(treating) == 1 else getattr(tb, treating[0]) | getattr(tb, treating[1])
     latent = tb.infection | tb.infection_remote if 'infection_remote' in tb.graph.states else tb.infection
-    prevent = ss.treat(tpt, eligible=latent, name=f'{name}_prevention') if tpt else None
-    return ss.screen(test, on=on, trace=network, coverage=coverage, eligible=~on_treatment, on_positive=start_treatment(tb, treat, dst, name=name), on_negative=prevent, name=name)
+    screen = ss.screen(test, on=on, trace=network, coverage=coverage, where=~on_treatment, name=name)
+    prevent = [ss.treat(tpt, who=screen.negative, where=latent, name=f'{name}_prevention')] if tpt else []
+    return [screen, *start_treatment(tb, screen.positive, treat, dst, name=name), *prevent]

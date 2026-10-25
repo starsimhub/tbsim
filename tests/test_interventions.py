@@ -5,6 +5,7 @@ import pytest
 import numpy as np
 import sciris as sc
 import starsim as ss
+import starsim.library as ssl
 import tbsim
 
 kw = dict(start=2000, stop=2015, dt=ss.weeks(1), unit='year', total_pop=1e5, verbose=0)
@@ -43,10 +44,10 @@ def test_care():
     res = sims.ode.results
     assert res.tb.infectious[-1] < 0.5*base.infectious[-1], 'Care should lower TB'
     assert res.tb.diagnosis.sum() > 0 and np.isclose(res.tb.diagnosis.sum(), res.care_positive.delivered.sum())
-    found = res.care.diagnosed.sum()
+    found = res.care.positive.sum()
     for solver,sim in sims.items():
-        print(f'{solver}: {sim.results.care.diagnosed.sum():.0f} diagnosed, {sim.results.tb.completion.sum():.0f} treated')
-    assert np.isclose(sims.abm.results.care.diagnosed.sum(), found, rtol=0.15)
+        print(f'{solver}: {sim.results.care.positive.sum():.0f} diagnosed, {sim.results.tb.completion.sum():.0f} treated')
+    assert np.isclose(sims.abm.results.care.positive.sum(), found, rtol=0.15)
     return sims
 
 
@@ -58,8 +59,8 @@ def test_prevention():
         res = run(tb, intv).results.tb
         return (res.latent_asy + res.latent_non).sum()
     base = latent_progression(None)
-    tpt = latent_progression(ss.treat(tbsim.TPT(efficacy=1.0, activation=0.0), coverage=1.0, eligible=None, years=[2000]))
-    bcg = latent_progression(ss.vaccinate(tbsim.BCG(take=1.0, activation=0.5), coverage=1.0, years=[2000]))
+    tpt = latent_progression(ss.treat(tbsim.TPT(efficacy=1.0, activation=0.0), coverage=1.0, where=None, at=[2000]))
+    bcg = latent_progression(ss.vaccinate(tbsim.BCG(take=1.0, activation=0.5), coverage=1.0, at=[2000]))
     print(f'Progression from latent infection: {base:.0f} without, {tpt:.0f} with TPT, {bcg:.0f} with BCG')
     assert tpt < 0.7*base and bcg < 0.9*base
     return base, tpt, bcg
@@ -79,17 +80,17 @@ def test_contact_tracing():
     """ The household contacts of people starting treatment are tested, and treated or given TPT (as agents) """
     def make(tracing):
         tb = tbsim.TB(beta=3, init=dict(infection=0.3))
-        household = ss.library.HouseholdNet(dhs_data='default', dynamic=False)
+        household = ssl.HouseholdNet(dhs_data='default', dynamic=False)
         intvs = [tbsim.care(tb, seeking=ss.peryear(1.0))] + [tbsim.contact_tracing(tb)]*tracing
         return ss.Sim(tb, networks=household, interventions=intvs, solver='abm', n_agents=20_000, rand_seed=1, **sc.mergedicts(kw, dict(total_pop=None))).run()
     sim = make(True)
     res = sim.results
-    print(f'{res.tb.diagnosis.sum():.0f} started treatment; {res.tracing.delivered.sum():.0f} contacts tested, {res.tracing.diagnosed.sum():.0f} positive, {res.tracing_prevention.delivered.sum():.0f} given TPT')
+    print(f'{res.tb.diagnosis.sum():.0f} started treatment; {res.tracing.delivered.sum():.0f} contacts tested, {res.tracing.positive.sum():.0f} positive, {res.tracing_prevention.delivered.sum():.0f} given TPT')
     assert res.tracing.delivered.sum() > res.tb.diagnosis.sum() # More than one contact each
-    assert res.tracing.diagnosed.sum() > 0 and res.tracing_prevention.delivered.sum() > 0
-    assert np.isclose(res.tracing_positive.delivered.sum(), res.tracing.diagnosed.sum())
+    assert res.tracing.positive.sum() > 0 and res.tracing_prevention.delivered.sum() > 0
+    assert np.isclose(res.tracing_positive.delivered.sum(), res.tracing.positive.sum())
     tb = tbsim.TB()
-    with pytest.raises(ss.CodedError, match='E804'): # Only agents have contacts
+    with pytest.raises(ss.CapabilityError): # Only agents have contacts
         ss.Sim(tb, interventions=tbsim.contact_tracing(tb), solver='ode', verbose=0).init()
     return sim
 

@@ -102,7 +102,7 @@ As the model grows, it may be convenient to give `make_tb()` arguments (e.g. for
 
 ## Analyzing the results
 
-The results of the TB model are in `sim.results.tb`. For every state there is the number of people in it (e.g. `n_symptomatic`), and for every transition the number of people taking it in each time step (e.g. `latent_asy`, or `tb_death` for TB deaths), with its cumulative sum (e.g. `cum_tb_death`). There are also summary results: `new_infections`, `infectious` (asymptomatic and symptomatic TB), `active` (also non-infectious TB), and `prevalence_active` (infectious TB, as a share of everyone). For more information about results, see the [Starsim results API](https://docs.starsim.org/api/results.html).
+The results of the TB model are in `sim.results.tb`. For every state there is the number of people in it (e.g. `symptomatic`), and for every transition the number of people taking it in each time step (e.g. `latent_asy`, `transmission` for new infections, or `tb_death` for TB deaths), with its running total (e.g. `tb_death.cum`). There are also summary results: `infectious` (asymptomatic and symptomatic TB), `active` (also non-infectious TB), and `prevalence_active` (infectious TB, as a share of everyone). For more information about results, see the [Starsim results API](https://docs.starsim.org/api/results.html).
 
 ```{python}
 res = sim.results.tb
@@ -128,7 +128,7 @@ Once you are familiar with the results, you can plot them in several ways.
 
 ```{python}
 sim.plot()
-sim.plot(['tb_n_infection', 'tb_n_non_infectious', 'tb_n_asymptomatic', 'tb_n_symptomatic'])
+sim.plot(['tb_infection', 'tb_non_infectious', 'tb_asymptomatic', 'tb_symptomatic'])
 ```
 
 ### Using TBsim
@@ -136,7 +136,7 @@ sim.plot(['tb_n_infection', 'tb_n_non_infectious', 'tb_n_asymptomatic', 'tb_n_sy
 `tbsim.plot()` plots many results at once, for one or more simulations, each in its own color. Here we compare the ODE with the agent-based simulation. They differ, since with a network `beta` means something else, and the agents' population grows. `select` chooses which results to plot (see the `tbsim.plot()` documentation for other ways to select them):
 
 ```{python}
-tbsim.plot(ss.MultiSim([ode, sim]), select=['infectious', 'prevalence_active', 'new_infections', 'tb_death', 'n_infection', 'n_treatment'], n_cols=3, row_height=2)
+tbsim.plot(ss.MultiSim([ode, sim]), select=['infectious', 'prevalence_active', 'transmission', 'tb_death', 'infection', 'treatment'], n_cols=3, row_height=2)
 ```
 
 ### Using your own function
@@ -146,7 +146,7 @@ The results are arrays, so you can also plot them however you like:
 ```{python}
 plt.figure()
 for state in ['infection', 'non_infectious', 'asymptomatic', 'symptomatic']:
-    result = res[f'n_{state}']
+    result = res[state]
     plt.plot(res.timevec, result, label=result.label)
 plt.legend()
 plt.title('People in each TB state')
