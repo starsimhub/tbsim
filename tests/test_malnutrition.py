@@ -2,7 +2,6 @@
 Tests for malnutrition comorbidity module
 
 This module tests the Malnutrition disease model, its effects on TB, and the effect of HIV on TB
-to ensure they work correctly with Starsim 3.0.
 """
 
 import pytest
@@ -20,15 +19,6 @@ class TestMalnutrition:
         nut = tbsim.Malnutrition()
         assert isinstance(nut, tbsim.Malnutrition)
         assert isinstance(nut, ss.Disease)
-    
-    def test_malnutrition_parameters(self):
-        """Test that Malnutrition parameters are set correctly"""
-        nut = tbsim.Malnutrition(pars=dict(
-            beta=2.0,
-            init_prev=0.05
-        ))
-        assert nut.pars['beta'] == 2.0
-        assert nut.pars['init_prev'] == 0.05
     
     def test_malnutrition_states(self):
         """Test that Malnutrition states are defined correctly"""
@@ -50,25 +40,24 @@ class TestMalnutrition:
         assert 'Male' in nut.LMS_data.index
     
     def test_malnutrition_dweight_scale(self):
-        """Test the dweight scale function"""
-        nut = tbsim.Malnutrition()
-
-        uids = np.array([0, 1, 2, 3, 4])
-        std = nut.dweight_scale(nut, None, uids)
-        assert len(std) == 5
-        assert all(s >= 0 for s in std)  # Should be non-negative
+        """The weight random walk takes steps of the same size throughout the run, scaled by the square root of the step"""
+        sim = ss.Sim(diseases=tbsim.Malnutrition(weight_sd=0.05), n_agents=100, start=2000, stop=2010, dt=ss.month, verbose=0).init()
+        mn = sim.diseases.malnutrition
+        uids = sim.people.auids
+        expected = 0.05*np.sqrt(1/12)
+        assert np.isclose(mn.dweight_scale(mn, sim, uids), expected, rtol=0.01)
+        sim.run()
+        assert np.isclose(mn.dweight_scale(mn, sim, uids), expected, rtol=0.01)
     
-    def test_malnutrition_lms_method(self):
-        """Test the LMS method for weight/height calculations"""
-        # Skip this test as it requires simulation context
-        # The LMS method needs self.sim.people which is not available in test context
-        pass
-    
-    def test_malnutrition_lms_method_skip(self):
-        """Test that LMS method exists but skip execution due to simulation context requirement"""
-        nut = tbsim.Malnutrition()
-        assert hasattr(nut, 'lms')
-        assert callable(nut.lms)
+    def test_malnutrition_lms(self):
+        """Weight and height from the LMS method are plausible, including for children under 2 (who have a length, not a height)"""
+        sim = ss.Sim(diseases=tbsim.Malnutrition(), n_agents=1000, start=2000, stop=2001, verbose=0).init()
+        mn = sim.diseases.malnutrition
+        uids = sim.people.auids
+        weight, height = mn.weight(uids), mn.height(uids)
+        assert np.all(np.isfinite(weight)) and np.all(np.isfinite(height))
+        adults = sim.people.age[uids] >= 20
+        assert 40 < np.median(weight[adults]) < 100 and 140 < np.median(height[adults]) < 190
 
 
 class TestTBNutritionConnector:
@@ -159,17 +148,6 @@ class TestHIV:
 class TestMalnutritionIntegration:
     """Test integration between TB and Malnutrition"""
     
-    def test_malnutrition_standalone_creation(self):
-        """Test malnutrition as a standalone disease creation"""
-        people = ss.People(n_agents=200)
-        nut = tbsim.Malnutrition(pars=dict(
-            init_prev=0.001
-        ))
-        
-        # Test that malnutrition can be created with people
-        assert isinstance(nut, tbsim.Malnutrition)
-        assert nut.pars['init_prev'] == 0.001
-    
     def test_tb_with_malnutrition(self):
         """TB runs as agents with malnutrition affecting it"""
         tb = tbsim.TB(init=dict(infection=0.3))
@@ -177,21 +155,5 @@ class TestMalnutritionIntegration:
                      solver='abm', n_agents=1000, start=2000, stop=2002, verbose=0).run()
         assert sim.results.tb.latent_asy.sum() > 0
     
-    def test_malnutrition_state_initialization(self):
-        """Test that malnutrition states are properly initialized"""
-        nut = tbsim.Malnutrition()
-        
-        # Test that state arrays exist and have correct types
-        assert hasattr(nut, 'receiving_macro')
-        assert hasattr(nut, 'receiving_micro')
-        assert hasattr(nut, 'height_percentile')
-        assert hasattr(nut, 'weight_percentile')
-        assert hasattr(nut, 'micro')
-        
-        # Test that dweight distribution is created
-        assert hasattr(nut, 'dweight')
-        assert isinstance(nut.dweight, ss.normal)
-
-
 if __name__ == "__main__":
     pytest.main([__file__])

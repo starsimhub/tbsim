@@ -26,9 +26,8 @@ Interventions are Starsim deliveries of TB products. Here, BCG vaccination reach
 import starsim as ss
 import tbsim
 
-ppl = ss.People(1000) # For writing conditions on people, such as their age
 tb = tbsim.TB().stratify(age=[0, 5])
-bcg = ss.vaccinate(tbsim.BCG(), where=ppl.age < 5, coverage=0.8, start='1980')
+bcg = ss.vaccinate(tbsim.BCG(), where=ss.ppl.age < 5, coverage=0.8, start='1980')
 tpt = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.3, interval=ss.years(1), start='1990')
 
 sim = tbsim.Sim(tb=tb, interventions=[bcg, tpt], start=1975, stop=2030, verbose=0)

@@ -97,7 +97,7 @@ def regimen(kind='dots', **kwargs):
     return dict(delta=success/years, phi=(1 - success)/years, p_relapse=r['relapse'])
 
 
-def care(tb, test=None, seeking=ss.perday(0.1), eligible=None, every=ss.weeks(1), treat=1.0, dst=None, retreatment=None, start=None, stop=None, name='care'):
+def care(tb, test=None, seeking=ss.perday(0.1), where=None, every=ss.weeks(1), treat=1.0, dst=None, retreatment=None, start=None, stop=None, name='care'):
     """
     The care cascade: people with symptomatic TB seek care, are tested, and those who test positive start treatment
 
@@ -113,8 +113,8 @@ def care(tb, test=None, seeking=ss.perday(0.1), eligible=None, every=ss.weeks(1)
     Args:
         tb (`tbsim.TB`): the TB model
         test (`ss.Diagnostic`): the test (default: `tbsim.Xpert()`, by age if the model is stratified by age at 15)
-        seeking (rate): the rate at which eligible people seek care
-        eligible (Cond): who seeks care (default: people with symptomatic TB)
+        seeking (rate): the rate at which eligible people seek care (or a number: the chance of seeking care in each round)
+        where (Cond): who seeks care (default: people with symptomatic TB)
         every (dur): how often the rounds are; shorter is closer to seeking care at any time
         treat (float): the share of those who test positive who start treatment
         dst (`ss.Diagnostic`): a test for resistance (see `tbsim.DST()`), for a model with a second-line regimen
@@ -123,14 +123,12 @@ def care(tb, test=None, seeking=ss.perday(0.1), eligible=None, every=ss.weeks(1)
         name (str): the name of the delivery (its follow-up is `<name>_positive`)
 
     Returns:
-        An `ss.screen` delivery
+        A list of deliveries: the `ss.screen`, and its follow-ups (see `start_treatment()`)
     """
     if test is None:
         by_age = 'age' in tb.strats and list(tb.strats.age.edges) == [0, 15]
         test = Xpert(by_age=by_age)
-    eligible = sc.ifelse(eligible, tb.symptomatic)
-    p_seek = float(seeking.to_prob(every)) if isinstance(seeking, ss.TimePar) else float(seeking) # The chance of seeking care in each round
-    screen = ss.screen(test, where=eligible, coverage=p_seek, interval=every, start=start, stop=stop, name=name)
+    screen = ss.screen(test, where=sc.ifelse(where, tb.symptomatic), coverage=seeking, interval=every, start=start, stop=stop, name=name) # A rate of seeking care is a chance in each round
     return [screen, *start_treatment(tb, screen.positive, treat, dst, retreatment, name=name)]
 
 
@@ -143,7 +141,7 @@ def treated_within(tb, within):
         within (dur): the time, e.g. `ss.years(2)`
     """
     recent = tb.diagnosis.since <= within
-    if 'diagnosis_second_line' in tb.graph.transitions:
+    if 'diagnosis_second_line' in tb.transitions:
         recent = recent | (tb.diagnosis_second_line.since <= within)
     return recent
 
@@ -166,7 +164,7 @@ def start_treatment(tb, who, treat=1.0, dst=None, retreatment=None, name='care')
         name (str): the start of the names of the products (`<name>_tx` and `<name>_tx_second_line`) and of the test for resistance (`<name>_dst`, whose follow-ups are `<name>_dst_positive` and `<name>_dst_negative`)
 
     Returns:
-        An `ss.treat` delivery, or with `dst`, an `ss.screen` one
+        A list of deliveries: an `ss.treat`, or with `dst`, an `ss.screen` and the treatments that follow it
     """
     first_line = lambda who: ss.treat(ss.Treatment(moves='diagnosis', name=f'{name}_tx'), who=who, coverage=treat, name=f'{name}_positive')
     if dst is None:
@@ -174,7 +172,7 @@ def start_treatment(tb, who, treat=1.0, dst=None, retreatment=None, name='care')
             errormsg = 'retreatment= says who is tested for resistance: give dst= as well'
             raise ValueError(errormsg)
         return [first_line(who)]
-    if 'diagnosis_second_line' not in tb.graph.transitions:
+    if 'diagnosis_second_line' not in tb.transitions:
         errormsg = f'dst= sends people found resistant to the second-line regimen, which "{tb.name}" does not have: give it second_line='
         raise ValueError(errormsg)
     def resistance(who):
@@ -208,7 +206,7 @@ def monitoring(tb, dst=None, every=ss.months(2), coverage=1.0, switch=1.0, start
         tb = tbsim.TB(drugs=['RIF'], second_line=True)
         interventions = [tbsim.care(tb), tbsim.monitoring(tb)]
     """
-    if 'switch_second_line' not in tb.graph.transitions:
+    if 'switch_second_line' not in tb.transitions:
         errormsg = f'Monitoring switches people found resistant to the second-line regimen, which "{tb.name}" does not have: give it second_line='
         raise ValueError(errormsg)
     dst = sc.ifelse(dst, DST(tb, name=f'{name}_dst'))
@@ -242,16 +240,13 @@ def contact_tracing(tb, network='householdnet', test=None, tpt=None, coverage=1.
         interventions = [tbsim.care(tb), tbsim.contact_tracing(tb)]
         sim = ss.Sim(tb, networks=household, interventions=interventions, solver='abm')
     """
-    T = tb.graph.transitions
+    second = 'second_line' in tb.states
     if on is None:
-        on = ss.conditions.as_cond(tb.diagnosis)
-        if 'diagnosis_second_line' in T:
-            on = on | ss.conditions.as_cond(tb.diagnosis_second_line)
+        on = tb.diagnosis | tb.diagnosis_second_line if second else tb.diagnosis
     test = sc.ifelse(test, Xpert(by_age=False, name=f'{name}_xpert'))
     tpt = TPT(tb=tb, name=f'{name}_tpt') if tpt is None else tpt
-    treating = [name_ for name_ in ['treatment', 'second_line'] if name_ in tb.graph.states]
-    on_treatment = getattr(tb, treating[0]) if len(treating) == 1 else getattr(tb, treating[0]) | getattr(tb, treating[1])
-    latent = tb.infection | tb.infection_remote if 'infection_remote' in tb.graph.states else tb.infection
+    on_treatment = tb.treatment | tb.second_line if second else tb.treatment
+    latent = tb.infection | tb.infection_remote if 'infection_remote' in tb.states else tb.infection
     screen = ss.screen(test, on=on, trace=network, coverage=coverage, where=~on_treatment, name=name)
     prevent = [ss.treat(tpt, who=screen.negative, where=latent, name=f'{name}_prevention')] if tpt else []
     return [screen, *start_treatment(tb, screen.positive, treat, dst, name=name), *prevent]

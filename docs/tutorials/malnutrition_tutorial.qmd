@@ -21,7 +21,7 @@ The model tracks, for each agent:
 | State | Description |
 |-------|-------------|
 | `height_percentile` | Height, as a percentile of the reference growth curve for the agent's age and sex (constant) |
-| `weight_percentile` | Weight, as a percentile; it follows a random walk, kept between 2.5% and 97.5% |
+| `weight_percentile` | Weight, as a percentile; it follows a random walk (SD `weight_sd`, 0.035 a year), kept between 2.5% and 97.5% |
 | `micro` | Micronutrient status, between 0 and 1 |
 | `receiving_macro`, `receiving_micro` | Whether the agent receives macronutrient or micronutrient supplements |
 

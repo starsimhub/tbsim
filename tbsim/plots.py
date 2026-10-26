@@ -207,16 +207,15 @@ def _rename_results(flat):
 def _normalize_results(results):
     """Convert MultiSim, Sim, or dict into ``{label: flat_result_dict}``.
 
-    Uses ``ss.utils.match_result_keys(key=None)`` to flatten each sim's
-    results, then re-keys by result name so metrics align across sims that
-    use different module class names.
+    Flattens each sim's results, then re-keys them by result name, so metrics
+    align across sims whose modules have different names.
     """
     if isinstance(results, ss.MultiSim):
         sims = results.sims
         return {sim.label: _rename_results(sim.results.flatten()) for sim in sims}
     elif isinstance(results, ss.Sim):
         sim = results
-        return {sim.label: _rename_results(sim.results.flatten())} # TODO: can probably just be sim.results.flatten()?
+        return {sim.label: _rename_results(sim.results.flatten())}
     elif isinstance(results, dict):
         return results
     else:
@@ -271,6 +270,12 @@ def _select_metrics(all_metrics, select_spec, flat_results):
 
     exclude_patterns = []
     resolved = set()
+
+    named = [select_spec] if isinstance(select_spec, str) else [x for x in select_spec if isinstance(x, str) and not x.startswith('~')] if isinstance(select_spec, (list, tuple, set)) else []
+    named += sc.tolist(select_spec.get('items', [])) if isinstance(select_spec, dict) else []
+    missing = [m for m in named if m not in available]
+    if missing:
+        ss.warn(f'No results named {sc.strjoin(missing)} to plot; the results are {sc.strjoin(sorted(available))}')
 
     if isinstance(select_spec, str):
         resolved = {select_spec} if select_spec in available else set()

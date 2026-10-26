@@ -37,7 +37,7 @@ class HIV(ss.Disease):
         pars (dict): parameters, by name (as `kwargs`)
         init_prev (float): the share of people with (acute) HIV at the start
         init_onart (float): the share of them on ART at the start
-        kwargs (dict): parameters, by name (see `hiv_pars()`): numbers (rates per day for the progression, per year for the others), or `ss.par` objects;
+        kwargs (dict): parameters, by name (see `hiv_pars()`): numbers (rates per year), or `ss.par` objects;
             `incidence` can vary in time, e.g. `ss.timeseries({2000: ss.peryear(0.01), 2020: ss.peryear(0.002)})`
 
     Examples::
@@ -69,8 +69,8 @@ class HIV(ss.Disease):
         )
         starts = isinstance(kwargs.get('art_start'), ss.par) or p.art_start.raw.value > 0 # Given to be fitted, or not zero
         slow = [1.0, p.art_progression.raw]
-        move = dict(move=ss.transfer(art=True, rate=p.art_start)) if starts else {}
-        self.stratify(art=[False, True], states=['acute', 'latent', 'aids'], split=[1 - init_onart, init_onart], adjust=dict(to_latent=slow, to_aids=slow), **move)
+        start_art = dict(start_art=ss.transfer(art=True, rate=p.art_start)) if starts else {}
+        self.stratify(art=[False, True], states=['acute', 'latent', 'aids'], split=[1 - init_onart, init_onart], adjust=dict(to_latent=slow, to_aids=slow), **start_art)
         return
 
 

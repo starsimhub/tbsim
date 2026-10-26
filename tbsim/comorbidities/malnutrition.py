@@ -15,18 +15,16 @@ __all__ = ['Malnutrition', 'nutrition_effects', 'supplementation_rr', 'lonnroth_
 
 class Malnutrition(ss.Disease):
     """
-    Malnutrition disease model for tuberculosis simulation studies.
+    Malnutrition: each person's weight and height, and their micronutrient status (written as code, so agents only)
 
-    Tracks anthropometric measurements (weight, height) using the LMS
-    (Lambda-Mu-Sigma) method and simulates effects of nutritional interventions
-    on growth and development.
-
-    Uses Cole's LMS method for growth reference curves and implements random
-    walk processes for weight percentile evolution.
+    Tracks anthropometric measurements (weight, height) using Cole's LMS
+    (Lambda-Mu-Sigma) method for growth reference curves, with a random walk
+    in each person's weight percentile. Its effects on TB are modifiers: see
+    `tbsim.nutrition_effects()`.
 
     Args:
-        pars (dict, optional): Parameter overrides ('beta', 'init_prev')
-        **kwargs: Additional keyword arguments passed to ss.Disease
+        weight_sd (float): SD of the yearly change in weight percentile (the random walk's step is `weight_sd*sqrt(dt)`, with `dt` in years)
+        kwargs (dict): passed to `ss.Disease`, e.g. `name=`
 
     States:
         receiving_macro (bool): Whether individual receives macronutrient supplementation
@@ -35,19 +33,11 @@ class Malnutrition(ss.Disease):
         weight_percentile (float): Weight percentile (0-1), evolves over time
         micro (float): Micronutrient status z-score, evolves over time
 
-    Example
-    -------
-    ::
+    Example::
 
-        import starsim as ss
-        import tbsim
-        from tbsim.comorbidities.malnutrition import Malnutrition, TB_Nutrition_Connector
-
-        tb   = tbsim.TB(name='tb')
-        mn   = Malnutrition(name='malnutrition')
-        conn = TB_Nutrition_Connector()
-        sim  = ss.Sim(diseases=[tb, mn], connectors=conn,
-                      pars=dict(start='2000', stop='2020'))
+        tb = tbsim.TB()
+        effects = tbsim.nutrition_effects(tb, rr_activation=tbsim.lonnroth_bmi_rr)
+        sim = ss.Sim(tb, diseases=tbsim.Malnutrition(), connectors=effects, solver='abm')
         sim.run()
 
     **References:**
@@ -56,14 +46,11 @@ class Malnutrition(ss.Disease):
     """
 
     def __init__(self, pars=None, **kwargs):
-        """Initialize with default malnutrition parameters; override via ``pars``."""
-        super().__init__(**kwargs)
+        super().__init__()
         self.define_pars(
-            beta = 1.0,         # Transmission rate  - TODO: Check if there is one
-            init_prev = 0.001,  # Initial prevalence
+            weight_sd = 0.035, # SD of the yearly change in weight percentile (about 0.01 a month)
         )
         self.update_pars(pars, **kwargs)
-
         anthro_path = os.path.join(DATADIR, 'anthropometry.csv')
         self.LMS_data = pd.read_csv(anthro_path).set_index('Sex')
 
@@ -75,14 +62,12 @@ class Malnutrition(ss.Disease):
             ss.FloatArr('micro', default=ss.uniform(0.0, 1.0)),
         )
         self.dweight = ss.normal(loc=0, scale=self.dweight_scale)
-
         return
 
     @staticmethod
     def dweight_scale(self, sim, uids):
-        """Scale parameter for weight change distribution: 0.01 * time_index."""
-        std = np.full(len(uids), fill_value=0.01*self.ti)
-        return std
+        """Scale parameter for weight change distribution: a random walk, so the SD grows with the square root of the step"""
+        return self.pars.weight_sd * np.sqrt(self.t.dt_year)
 
     def weight(self, uids=None):
         """Calculate weight (kg) from weight percentiles using LMS method."""
@@ -132,32 +117,11 @@ class Malnutrition(ss.Disease):
 
         return ret
 
-    def set_initial_states(self, sim):
-        """Set initial state values (placeholder for future correlated weight/height)."""
-        return
-
     def step(self):
         """Update weight percentiles via random walk each time step."""
         uids = self.sim.people.auids
         self.weight_percentile[uids] += self.dweight(uids)
         self.weight_percentile[uids] = np.clip(self.weight_percentile[uids], 0.025, 0.975)
-
-        return
-
-    def init_results(self):
-        """Initialize results tracking."""
-        super().init_results()
-        self.define_results(
-            ss.Result(name='people_alive', dtype=float, scale=False, label='People alive'),
-        )
-
-    def update_results(self):
-        """Record proportion of individuals alive at this time step."""
-        super().update_results()
-        ti = self.sim.ti
-        alive = self.sim.people.alive
-        n_agents = self.sim.pars['n_agents']
-        self.results.people_alive[ti] = np.count_nonzero(alive)/n_agents
 
         return
 

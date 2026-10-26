@@ -38,7 +38,7 @@ cd docs && ./render    # build static site to docs/_site
 
 The TB natural history model lives in `tbsim/`:
 
-- **TB** ([tb.py](tbsim/tb.py)) — the LSHTM "spectrum of disease" model as an `ss.Disease` declared from `ss.State`s and `ss.Transition`s: `susceptible` → `infection` → `non_infectious` ↔ `asymptomatic` ↔ `symptomatic` → `treatment` → `treated`, with `cleared` and `recovered`. Parameters (`tb_pars()`) are `ss.par`s, rates per year; optional parts (front-loading, relapse, waning protection, migration) add states and transitions only when used. `tbsim.state_codes(tb)` gives each agent's state as a number.
+- **TB** ([tb.py](tbsim/tb.py)) — the LSHTM "spectrum of disease" model as an `ss.Disease` declared from `ss.State`s and `ss.Transition`s: `susceptible` → `infection` → `non_infectious` ↔ `asymptomatic` ↔ `symptomatic` → `treatment` → `treated`, with `cleared` and `recovered`. Parameters (`tb_pars()`) are `ss.par`s, rates per year; optional parts (front-loading, relapse, waning protection, migration) add states and transitions only when used. `tb.current_state()` (Starsim's) gives each agent's state as a number.
 
 ### Drug resistance
 

@@ -20,14 +20,13 @@ def make_sim(scenario='Baseline'):
     Args:
         scenario (str): 'Baseline', 'BCG', 'TPT', 'Beta change', or 'Care cascade'
     """
-    ppl = ss.People(n_agents=sim_pars['n_agents'])
     tb = tbsim.TB(**tb_pars).stratify(age=[0, 15]) # By age, for the tests' sensitivity in children and adults
     if scenario == 'Baseline':
         intv = None
     elif scenario == 'BCG': # Each child under 5 is offered BCG once
-        intv = ss.vaccinate(tbsim.BCG(), where=ppl.age < 5, coverage=0.8, start='1980', stop='2020', name='bcg_vx')
+        intv = ss.vaccinate(tbsim.BCG(), where=ss.ppl.age < 5, coverage=0.8, start='1980', stop='2020', name='bcg_vx')
     elif scenario == 'TPT': # Yearly rounds of TPT for adults with a latent infection
-        intv = ss.treat(tbsim.TPT(), where=tb.infection & (ppl.age >= 15), coverage=0.7, interval=ss.years(1), start='1990', stop='2025', name='tpt_tx')
+        intv = ss.treat(tbsim.TPT(), where=tb.infection & (ss.ppl.age >= 15), coverage=0.7, interval=ss.years(1), start='1990', stop='2025', name='tpt_tx')
     elif scenario == 'Beta change': # Transmission halves in 1990, then is 1.4 times the original from 2000
         intv = ss.change(tb.pars.beta, at=['1990', '2000'], by=[0.5, 1.4], name='beta_change')
     elif scenario == 'Care cascade': # People with symptomatic TB seek care, are tested with Xpert, and start treatment
@@ -35,7 +34,7 @@ def make_sim(scenario='Baseline'):
     else:
         errormsg = f'Unknown scenario "{scenario}"'
         raise ValueError(errormsg)
-    return tbsim.Sim(people=ppl, tb=tb, interventions=intv, label=scenario, **sim_pars)
+    return tbsim.Sim(tb=tb, interventions=intv, label=scenario, **sim_pars)
 
 
 def run_scenarios(scenarios=('Baseline', 'BCG', 'TPT', 'Beta change', 'Care cascade'), plot=True):

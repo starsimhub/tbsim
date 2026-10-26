@@ -134,7 +134,7 @@ print(dict(zip(by_strain.columns, by_strain.values[-1].round())))
 print(f'Mean share resistant to RIF over the last 5 years: {tbsim.resistant_share(sim, "RIF")[-60:].mean():.3f}')
 ```
 
-For where resistance comes from, see [analyzing where resistance comes from](#analyzing-where-resistance-comes-from) below.
+Here nearly everyone with active TB carries a resistant strain by the end: by default treatment cures every drug-susceptible strain (`delta=2`, `phi=0`) and only a third as many resistant ones (`rr_cure=1/3`), while the fitness costs are small. Without treatment (`theta=0`), the resistant strains are out-competed instead (2% of active TB by 2040), and with `rr_cure=1`, treatment eliminates TB. For where resistance comes from, see [analyzing where resistance comes from](#analyzing-where-resistance-comes-from) below.
 
 ## Transmission and fitness
 
@@ -289,7 +289,7 @@ Once resistance is established, transmission usually dominates; resistance acqui
 
 ## Running as agents, or stochastically
 
-The model runs under every solver. With no network, `tbsim.Sim` runs it as an ODE; `solver='abm'` (or a network, such as `ss.RandomNet()`) runs it as agents, and `solver='binomial'` as a stochastic compartmental model (a chain binomial). The stochastic runs vary from run to run around the ODE:
+The model runs under every solver. With no network, `tbsim.Sim` runs it as an ODE; `solver='abm'` (or a network, such as `ss.RandomNet()`) runs it as agents, and `solver='binomial'` as a stochastic compartmental model (a chain binomial). The stochastic runs vary from run to run around the ODE, and since this epidemic is close to its threshold, they vary a lot: over 24 seeds, people with active TB in the last year have a standard deviation of about 25% (agents ranged from 126 to 469, against 299 as an ODE), so compare means over several runs (`sim.run(n_runs=...)`) rather than one. The chain binomial is also biased by its step: at this monthly step it runs about 10% high (334 with noise removed), and 3% high with `substeps=12`:
 
 ```{python}
 kw = dict(drugs=['RIF'], strains=dict(DS=0.9, RIF=0.1), beta=15, theta=0.3, rr_cure=0.25, init=init)

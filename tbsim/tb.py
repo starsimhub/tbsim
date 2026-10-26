@@ -292,9 +292,9 @@ def second_line_pars(second_line):
 
 
 def get_tb(sim):
-    """ The TB module of a sim: the first disease that is a `tbsim.TB` (or has a `tb_death` transition, as the resistant models do) """
+    """ The TB module of a sim: the first disease that is a `tbsim.TB` or a `tbsim.LSHTMResistant` """
     for disease in sim.diseases.values():
-        if isinstance(disease, TB) or 'tb_death' in getattr(getattr(disease, 'graph', None), 'transitions', {}):
+        if isinstance(disease, (TB, tbsim.LSHTMResistant)):
             return disease
     errormsg = 'No TB module found in sim.diseases'
     raise ValueError(errormsg)

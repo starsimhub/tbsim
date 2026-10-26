@@ -62,22 +62,22 @@ for key, value in tb_pars.items():
 
 ## Building the simulation function
 
-Each intervention needs the TB model it acts on (e.g. to be eligible for TPT, people must have a latent infection, `tb.infection`) and the people (e.g. BCG is for children, `ppl.age < 5`), so we write a small function for each that makes it from those:
+Each intervention needs the TB model it acts on (e.g. to be eligible for TPT, people must have a latent infection, `tb.infection`) and conditions on people are written with `ss.ppl` (e.g. BCG is for children, `ss.ppl.age < 5`), so we write a small function for each that makes it from the model:
 
 ```{python}
-def bcg(tb, ppl, coverage=0.8, start='1980', stop='2020', max_age=5):
+def bcg(tb, coverage=0.8, start='1980', stop='2020', max_age=5):
     """ BCG vaccination: each child under max_age is offered it once """
-    return ss.vaccinate(tbsim.BCG(), where=ppl.age < max_age, coverage=coverage, start=start, stop=stop, name='bcg_vx')
+    return ss.vaccinate(tbsim.BCG(), where=ss.ppl.age < max_age, coverage=coverage, start=start, stop=stop, name='bcg_vx')
 
-def tpt(tb, ppl, coverage=0.7, start='1990', stop='2025', min_age=15):
+def tpt(tb, coverage=0.7, start='1990', stop='2025', min_age=15):
     """ TB preventive therapy: yearly rounds for adults with a latent infection """
-    return ss.treat(tbsim.TPT(), where=tb.infection & (ppl.age >= min_age), coverage=coverage, interval=ss.years(1), start=start, stop=stop, name='tpt_tx')
+    return ss.treat(tbsim.TPT(), where=tb.infection & (ss.ppl.age >= min_age), coverage=coverage, interval=ss.years(1), start=start, stop=stop, name='tpt_tx')
 
-def beta_change(tb, ppl, years=('1990', '2000'), by=(0.5, 1.4)):
+def beta_change(tb, years=('1990', '2000'), by=(0.5, 1.4)):
     """ Transmission multiplied by each value from each year on """
     return ss.change(tb.pars.beta, at=list(years), by=list(by), name='beta_change')
 
-def care(tb, ppl, seeking=ss.peryear(1), start='1990'):
+def care(tb, seeking=ss.peryear(1), start='1990'):
     """ The care cascade: people with symptomatic TB seek care, are tested with Xpert, and start treatment """
     return tbsim.care(tb, seeking=seeking, every=ss.months(1), start=start)
 
@@ -98,11 +98,10 @@ def build_sim(scenario=None):
         tbsim.Sim: the simulation, ready to run
     """
     scenario = sc.mergedicts(scenario)
-    ppl = ss.People(n_agents=sim_pars['n_agents'])
     tb = tbsim.TB(**sc.mergedicts(tb_pars, scenario.get('tbpars')))
     tb.stratify(age=[0, 15]) # By age, for the sensitivity of the tests in children and adults
-    interventions = [make(tb, ppl, **scenario[key]) for key,make in intervention_makers.items() if key in scenario]
-    return tbsim.Sim(people=ppl, tb=tb, interventions=interventions, label=scenario.get('name'), **sim_pars)
+    interventions = [make(tb, **scenario[key]) for key,make in intervention_makers.items() if key in scenario]
+    return tbsim.Sim(tb=tb, interventions=interventions, label=scenario.get('name'), **sim_pars)
 ```
 
 ## Defining intervention scenarios

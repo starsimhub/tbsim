@@ -58,6 +58,5 @@ if __name__ == '__main__':
     sc.options(interactive=do_plot)
     T = sc.timer()
     test_plot_accepts_all_input_types()
-    test_plot_handles_mixed_tb_modules()
     test_plot_select_and_fill_missing_metric()
     T.toc()

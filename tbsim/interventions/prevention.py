@@ -6,7 +6,7 @@ A product acts on the transitions of `tbsim.TB` for the people who hold it (see
 `ss.vaccinate()` and `ss.treat()`, e.g.::
 
     tb = tbsim.TB()
-    bcg = ss.vaccinate(tbsim.BCG(), where=ppl.age < 1, coverage=0.9)
+    bcg = ss.vaccinate(tbsim.BCG(), where=ss.ppl.age < 1, coverage=0.9)
     tpt = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.3, interval=ss.years(1))
 
 With drug resistance, TPT protects only against the strains its drugs act on: see `TPT(drugs=...)`.
