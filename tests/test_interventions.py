@@ -68,9 +68,9 @@ def test_prevention():
 
 @sc.timer()
 def test_change_beta():
-    """ Transmission can change over time with ss.change (what BetaByYear did) """
+    """ Transmission can change over time with ss.modify (what BetaByYear did) """
     tb = make_tb()
-    res = run(tb, ss.change(tb.pars.beta, at=[2005], by=[0.0])).results.tb
+    res = run(tb, ss.modify(tb.pars.beta, set=0.0, start=2005)).results.tb
     assert res.transmission[-10:].sum() == 0 and res.transmission[:100].sum() > 0
     return res
 

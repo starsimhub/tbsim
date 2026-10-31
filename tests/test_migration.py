@@ -35,7 +35,7 @@ def test_population():
     abm = run('abm', immigration=500, emigration=0.01)
     assert np.isclose(n_people(abm), grow, rtol=0.03)
     res = abm.results
-    assert res.new_emigrants.sum() == res.tb.emigrants.sum() > 0 # Emigrants leave, rather than die
+    assert res.emigrated.sum() == res.tb.emigrants.sum() > 0 # Emigrants leave, rather than die
     return abm
 
 

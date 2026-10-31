@@ -247,6 +247,6 @@ def contact_tracing(tb, network='householdnet', test=None, tpt=None, coverage=1.
     tpt = TPT(tb=tb, name=f'{name}_tpt') if tpt is None else tpt
     on_treatment = tb.treatment | tb.second_line if second else tb.treatment
     latent = tb.infection | tb.infection_remote if 'infection_remote' in tb.states else tb.infection
-    screen = ss.screen(test, on=on, trace=network, coverage=coverage, where=~on_treatment, name=name)
+    screen = ss.screen(test, who=on, trace=network, coverage=coverage, where=~on_treatment, name=name)
     prevent = [ss.treat(tpt, who=screen.negative, where=latent, name=f'{name}_prevention')] if tpt else []
     return [screen, *start_treatment(tb, screen.positive, treat, dst, name=name), *prevent]

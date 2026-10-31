@@ -5,7 +5,7 @@ import sciris as sc
 import starsim as ss
 import tbsim
 
-__all__ = ['TB', 'tb_pars', 'tpt_pars', 'get_tb']
+__all__ = ['TB', 'tb_pars', 'tpt_pars', 'treatment', 'get_tb']
 
 
 def tb_pars():
@@ -133,116 +133,176 @@ class TB(ss.Disease):
         p = ss.pars(tb_pars(), **kwargs)
         second = second_line_pars(second_line) if second_line else None
         tpt = check_tpt(tpt, drugs)
-        S = sc.objdict() # The states, by name
-        add_state = lambda name_, label, **kw: S.setdefault(name_, ss.State(name=name_, label=label, **kw))
-        add_state('susceptible', 'Susceptible')
-        add_state('infection', 'Latent infection')
-        add_state('cleared', 'Cleared (from latent)')
-        add_state('recovered', 'Recovered (from non-infectious)')
-        add_state('non_infectious', 'Non-infectious TB')
-        add_state('asymptomatic', 'Asymptomatic TB')
-        add_state('symptomatic', 'Symptomatic TB')
-        add_state('treatment', 'On treatment')
-        add_state('treated', 'Completed treatment')
-        front = p.k_latent.raw.value > 0
-        relapse = p.p_relapse.raw > 0 or (second is not None and second.p_relapse > 0)
-        if front:
-            add_state('infection_remote', 'Remote latent infection')
-        if second:
-            add_state('second_line', 'On second-line treatment')
-        if relapse:
-            add_state('relapsing', 'Treated, will relapse')
-
-        T = sc.objdict() # The transitions, by name
-        def add(name_, src, dst, rate, **kw):
-            T[name_] = ss.Transition(S[src], S[dst] if isinstance(dst, str) else [S[d] for d in dst], rate=rate, name=name_, **kw)
-
-        foi = p.beta*(p.trans_asymp*S.asymptomatic + S.symptomatic) # Exposure to asymptomatic and symptomatic TB (through networks, as agents)
-        add('transmission', 'susceptible', 'infection', foi)
-        add('reinfect_cle', 'cleared', 'infection', p.rr_reinfection_cleared*foi)
-        add('reinfect_rec', 'recovered', 'infection', p.rr_reinfection_rec*foi)
-        add('reinfect_trd', 'treated', 'infection', p.rr_reinfection_treat*foi)
-        add('clearance', 'infection', 'cleared', p.inf_cle)
-        add('latent_non', 'infection', 'non_infectious', p.inf_non)
-        add('latent_asy', 'infection', 'asymptomatic', p.inf_asy)
-        if front: # The hazard of progression falls with time since infection: recent, then remote
-            add('remote', 'infection', 'infection_remote', p.k_latent)
-            add('reinfect_remote', 'infection_remote', 'infection', p.rr_reinfection_inf*foi)
-            add('clearance_remote', 'infection_remote', 'cleared', p.inf_cle)
-            add('remote_non', 'infection_remote', 'non_infectious', p.inf_non_remote if p.inf_non_remote is not None else p.inf_non)
-            add('remote_asy', 'infection_remote', 'asymptomatic', p.inf_asy_remote)
-        add('recovery', 'non_infectious', 'recovered', p.non_rec)
-        add('worsening', 'non_infectious', 'asymptomatic', p.non_asy)
-        add('improvement', 'asymptomatic', 'non_infectious', p.asy_non)
-        add('symptoms', 'asymptomatic', 'symptomatic', p.asy_sym)
-        add('remission', 'symptomatic', 'asymptomatic', p.sym_asy)
-        T.tb_death = ss.death(S.symptomatic, rate=p.sym_dead, name='tb_death')
-        T.diagnosis = ss.Transition([S.non_infectious, S.asymptomatic, S.symptomatic], S.treatment, rate=p.theta, name='diagnosis')
-        if not drugs: # With drugs, the outcome of treatment depends on the strains: see tbsim.add_resistance()
-            add('failure', 'treatment', 'symptomatic', p.phi)
-            add('completion', 'treatment', ['treated', 'relapsing'] if relapse else 'treated', p.delta, **(dict(p=[None, p.p_relapse]) if relapse else {}))
-        if second: # As treatment, at its own rates (people found to carry a resistant strain)
-            T.diagnosis_second_line = ss.Transition([S.non_infectious, S.asymptomatic, S.symptomatic], S.second_line, rate=ss.peryear(0.0), name='diagnosis_second_line')
-            T.switch_second_line = ss.Transition(S.treatment, S.second_line, rate=ss.peryear(0.0), name='switch_second_line')
-        latent = ['infection'] + ['infection_remote']*front
+        front = p.k_latent.raw.value > 0 # Latent infections become remote, after which progression is slower
+        relapse = p.p_relapse.raw > 0 or (second is not None and second.p_relapse > 0) # Some treated people relapse
+        latent = ['infection', 'infection_remote'] if front else ['infection'] # The states of latent infection
         on_tpt = tbsim.TPT.held if tpt else None # Only for the people who hold TPT
+
+        # With drugs, strains resistant to them, whose transitions are added below; the outcome of treatment depends on the strains
+        regimens = []
+        resistance = None
+        if drugs:
+            regimens.append(treatment('completion', 'treatment', p.delta, p.phi, p.p_relapse.raw))
+            if second: # People found to carry a resistant strain
+                regimens.append(treatment('completion_second_line', 'second_line', second.delta, second.phi, second.p_relapse, rr_cure=second.rr_cure, q_treat=second.q_treat))
+            bottleneck = ['latent_asy', 'worsening'] + (['remote_asy'] if front else []) # The transitions to asymptomatic TB
+            tpt_strains = sc.mergedicts(tpt, dict(on=on_tpt, latent=latent)) if tpt else None
+            resistance = tbsim.make_strains(drugs, max_strains=max_strains, split=strains, regimens=regimens, tpt=tpt_strains, alone=bottleneck, **res_kw)
+
+        super().__init__(
+            init    = None if init_n else sc.ifelse(init, dict(infection=0.05)),
+            init_n  = init_n,
+            strains = resistance,
+            name    = name,
+        )
+
+        # The states
+        self.define_states(
+            ss.State('susceptible',    label='Susceptible'),
+            ss.State('infection',      label='Latent infection'),
+            ss.State('cleared',        label='Cleared (from latent)'),
+            ss.State('recovered',      label='Recovered (from non-infectious)'),
+            ss.State('non_infectious', label='Non-infectious TB'),
+            ss.State('asymptomatic',   label='Asymptomatic TB'),
+            ss.State('symptomatic',    label='Symptomatic TB'),
+            ss.State('treatment',      label='On treatment'),
+            ss.State('treated',        label='Completed treatment'),
+        )
+        if front:
+            self.define_states(ss.State('infection_remote', label='Remote latent infection'))
+        if second:
+            self.define_states(ss.State('second_line', label='On second-line treatment'))
+        if relapse:
+            self.define_states(ss.State('relapsing', label='Treated, will relapse'))
+
+        # Infection, and reinfection of those no longer infected, at a relative risk that depends on how they stopped being infected
+        foi = p.beta*(p.trans_asymp*self.asymptomatic + self.symptomatic) # Exposure to asymptomatic and symptomatic TB (through networks, as agents)
+        self.define_transitions(
+            transmission = self.susceptible >> self.infection @ foi,
+            reinfect_cle = self.cleared     >> self.infection @ p.rr_reinfection_cleared*foi,
+            reinfect_rec = self.recovered   >> self.infection @ p.rr_reinfection_rec*foi,
+            reinfect_trd = self.treated     >> self.infection @ p.rr_reinfection_treat*foi,
+        )
+
+        # Latent infection: cleared, or progressing to TB
+        self.define_transitions(
+            clearance  = self.infection >> self.cleared        @ p.inf_cle,
+            latent_non = self.infection >> self.non_infectious @ p.inf_non,
+            latent_asy = self.infection >> self.asymptomatic   @ p.inf_asy,
+        )
+        if front: # The hazard of progression falls with time since infection: recent, then remote
+            inf_non_remote = p.inf_non_remote if p.inf_non_remote is not None else p.inf_non
+            self.define_transitions(
+                remote           = self.infection        >> self.infection_remote @ p.k_latent,
+                reinfect_remote  = self.infection_remote >> self.infection        @ p.rr_reinfection_inf*foi,
+                clearance_remote = self.infection_remote >> self.cleared          @ p.inf_cle,
+                remote_non       = self.infection_remote >> self.non_infectious   @ inf_non_remote,
+                remote_asy       = self.infection_remote >> self.asymptomatic     @ p.inf_asy_remote,
+            )
+
+        # The spectrum of TB disease, and death from it
+        self.define_transitions(
+            recovery    = self.non_infectious >> self.recovered      @ p.non_rec,
+            worsening   = self.non_infectious >> self.asymptomatic   @ p.non_asy,
+            improvement = self.asymptomatic   >> self.non_infectious @ p.asy_non,
+            symptoms    = self.asymptomatic   >> self.symptomatic    @ p.asy_sym,
+            remission   = self.symptomatic    >> self.asymptomatic   @ p.sym_asy,
+            tb_death    = ss.death(self.symptomatic, rate=p.sym_dead),
+        )
+
+        # Treatment: started by diagnosis (driven by a delivery, e.g. tbsim.care()); with drugs, it ends by the strains (below)
+        active = [self.non_infectious, self.asymptomatic, self.symptomatic]
+        self.define_transitions(diagnosis=ss.Transition(active, self.treatment, rate=p.theta))
+        if not drugs:
+            completed = [self.treated, self.relapsing] if relapse else self.treated
+            self.define_transitions(
+                failure    = self.treatment >> self.symptomatic @ p.phi,
+                completion = ss.Transition(self.treatment, completed, rate=p.delta, p=[None, p.p_relapse] if relapse else None),
+            )
+        if second: # As treatment, at its own rates; both are driven by deliveries (tbsim.care(dst=...), tbsim.monitoring())
+            self.define_transitions(
+                diagnosis_second_line = ss.Transition(active, self.second_line, rate=ss.peryear(0.0)),
+                switch_second_line    = ss.Transition(self.treatment, self.second_line, rate=ss.peryear(0.0)),
+            )
+
+        # TPT clears a latent infection, for those who hold it (with drugs, by strain: below)
         if tpt and not drugs:
             for src in latent:
-                add('tpt_clearance' + ('' if src == 'infection' else '_remote'), src, 'cleared', tpt.clearance, where=on_tpt)
-        if relapse:
-            T.relapse = ss.Transition(S.relapsing, S.symptomatic, dur=p.dur_relapse, name='relapse')
-        if p.dur_reinfection_protection is not None: # Protection (or risk) after clearance wanes
-            for src in ['cleared', 'recovered', 'treated']:
-                T[f'waning_{src}'] = ss.Transition(S[src], S.susceptible, dur=p.dur_reinfection_protection, name=f'waning_{src}')
+                name_ = 'tpt_clearance' + ('' if src == 'infection' else '_remote')
+                self.define_transitions(ss.Transition(getattr(self, src), self.cleared, rate=tpt.clearance, where=on_tpt, name=name_))
 
+        # Relapse after treatment
+        if relapse:
+            self.define_transitions(relapse=ss.Transition(self.relapsing, self.symptomatic, dur=p.dur_relapse))
+
+        # Protection (or risk) after clearance, recovery, or treatment wanes
+        if p.dur_reinfection_protection is not None:
+            for src in ['cleared', 'recovered', 'treated']:
+                self.define_transitions(ss.Transition(getattr(self, src), self.susceptible, dur=p.dur_reinfection_protection, name=f'waning_{src}'))
+
+        # Demography: births replace every death (with mu=0, none, so ss.Births and ss.Deaths, or demographics=True, can be used instead)
         used = lambda key: isinstance(kwargs.get(key), ss.par) or p[key].raw.value > 0 # Given to be fitted, or not zero
-        if used('mu'): # Demography: births replace every death (with mu=0, none, so ss.Births and ss.Deaths, or demographics=True, can be used instead)
-            T.births  = ss.birth(S.susceptible, rate=p.mu, name='births')
-            T.replace = ss.null >> S.susceptible @ (p.sym_dead*S.symptomatic.n) # Births that replace TB deaths
-            T.deaths  = ss.death(rate=p.mu, name='deaths')
-        if used('immigration'): # People arriving from elsewhere, at ages like the population's
+        if used('mu'):
+            self.define_transitions(
+                births  = ss.birth(self.susceptible, rate=p.mu),
+                replace = ss.null >> self.susceptible @ p.sym_dead*self.symptomatic.n, # Births that replace TB deaths
+                deaths  = ss.death(rate=p.mu),
+            )
+
+        # Migration: people arriving from elsewhere, at ages like the population's, into the states given by immigrants=
+        if used('immigration'):
             immigrants = sc.ifelse(immigrants, dict(susceptible=1.0))
             total = sum(immigrants.values())
             for key,share in immigrants.items():
-                T[f'immigrants_{key}'] = ss.immigration(S[key], rate=p.immigration*(share/total), name=f'immigrants_{key}')
+                self.define_transitions(ss.immigration(getattr(self, key), rate=p.immigration*(share/total), name=f'immigrants_{key}'))
         elif immigrants is not None:
             errormsg = 'immigrants= gives the states that people arrive in: give immigration= as well'
             raise ValueError(errormsg)
         if used('emigration'):
-            T.emigrants = ss.emigration(rate=p.emigration, name='emigrants')
+            self.define_transitions(emigrants=ss.emigration(rate=p.emigration))
 
-        st = None
-        if drugs: # Strains resistant to them
-            remote = ['remote_asy'] if front else []
-            cure = lambda d, f: d/(d + f) if d + f > 0 else 1.0 # The chance that treatment cures a drug-susceptible strain
-            regimens = [dict(name='completion', src='treatment', cured='treated', failed='symptomatic', rate=p.delta + p.phi, cure=cure(p.delta.raw.value, p.phi.raw.value), relapse=('relapsing', p.p_relapse.raw) if relapse else None)]
-            if second:
-                regimens.append(dict(name='completion_second_line', src='second_line', cured='treated', failed='symptomatic', rate=second.delta + second.phi, cure=cure(second.delta.raw.value, second.phi.raw.value),
-                                     rr_cure=second.rr_cure, q_treat=second.q_treat, relapse=('relapsing', second.p_relapse) if relapse else None))
-            st = tbsim.add_resistance(S, T, p, foi, drugs=drugs, max_strains=max_strains, split=strains,
+        # Drug resistance: superinfection, progression and treatment by strain, and resistance acquired
+        if drugs:
+            tbsim.add_resistance(self, resistance, foi,
                 superinfect = dict(infection='rr_superinfection_latent', non_infectious='rr_superinfection_non', asymptomatic='rr_superinfection_asy', symptomatic='rr_superinfection_sym'),
-                bottleneck  = ['latent_asy', 'worsening'] + remote,
+                bottleneck  = bottleneck,
                 symptoms    = ['symptoms'],
                 clear       = ['clearance', 'recovery'] + (['clearance_remote'] if front else []),
-                denovo      = ['latent_non', 'latent_asy'] + (['remote_non'] + remote if front else []),
+                denovo      = ['latent_non', 'latent_asy'] + (['remote_non', 'remote_asy'] if front else []),
                 regimens    = regimens,
-                tpt         = sc.objdict(sc.mergedicts(tpt, dict(on=on_tpt, latent=latent))) if tpt else None,
-                **res_kw)
+                tpt         = tpt_strains,
+                **res_kw,
+            )
 
-        everyone = sum(S.values()[1:], S.susceptible)
-        super().__init__(
-            *S.values(),
-            **T,
-            infectious        = S.asymptomatic + S.symptomatic,
-            active            = S.non_infectious + S.asymptomatic + S.symptomatic,
-            prevalence_active = (S.asymptomatic + S.symptomatic)/everyone,
-            init              = None if init_n else sc.ifelse(init, dict(infection=0.05)),
-            init_n            = init_n,
-            name              = name,
-            strains           = st,
+        # Results, besides those of every state and transition
+        infectious = self.asymptomatic + self.symptomatic
+        self.define_results(
+            infectious        = infectious,
+            active            = self.non_infectious + infectious,
+            prevalence_active = infectious.frac, # As a share of everyone
         )
         self.tpt = tpt
         return
+
+
+def treatment(name, src, delta, phi, p_relapse=0.0, **kwargs):
+    """
+    A regimen of treatment, for a model with drug resistance (see `tbsim.add_resistance()`)
+
+    Treatment ends at the rate of completion plus that of failure; people with every strain cured
+    go to `treated` (or a share `p_relapse` of them to `relapsing`), and the others to `symptomatic`.
+
+    Args:
+        name (str): the name of its transitions
+        src (str): the state of being on it
+        delta (ss.par): the rate of completion
+        phi (ss.par): the rate of failure
+        p_relapse (float): the share of those cured who will relapse
+        kwargs (dict): `rr_cure` and `q_treat`, if not the model's (see `tbsim.resistance_pars()`)
+    """
+    d, f = delta.raw.value, phi.raw.value
+    cure = d/(d + f) if d + f > 0 else 1.0 # The chance that it cures a drug-susceptible strain
+    return dict(name=name, src=src, cured='treated', failed='symptomatic', rate=delta + phi, cure=cure, p_relapse=p_relapse, **kwargs)
 
 
 def check_tpt(tpt, drugs):
