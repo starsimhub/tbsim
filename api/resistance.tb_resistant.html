@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.20">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -80,14 +80,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-5a1953863e1f72ef3b996ef827f01ca7.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-29e00c98bbba659d91ab3844292f79dc.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-86fc916b84669629367aabb2a24c5117.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-29e00c98bbba659d91ab3844292f79dc.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f0ffb6172689ed7439ef1c664ffff6bb.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-d074071b0ab3afe5023f3c0d05f1b529.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../site_libs/bootstrap/bootstrap-f0ffb6172689ed7439ef1c664ffff6bb.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-86718710186c2f4e1576d5ac509fd8f3.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-8056550ce4ceaee692419e17cc70b6b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-86718710186c2f4e1576d5ac509fd8f3.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -638,25 +638,25 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td>pars</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
+<td><a href="https://docs.python.org/3/builtins/stdtypes.html#dict">dict</a></td>
 <td>TB and resistance parameter overrides.</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a></td>
 </tr>
 <tr class="even">
 <td>drugs</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#list">list</a></td>
+<td><a href="https://docs.python.org/3/builtins/stdtypes.html#list">list</a></td>
 <td>ordered drug/class names defining the strain space (default <code>['TX']</code> = the two-strain A/B reference).</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a></td>
 </tr>
 <tr class="odd">
 <td>rel_fitness</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
+<td><a href="https://docs.python.org/3/builtins/stdtypes.html#dict">dict</a></td>
 <td>per-drug transmission fitness cost <code>r_i</code> (default none).</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a></td>
 </tr>
 </tbody>
 </table>
-<p>Resistance parameters (<code>pars</code>): - <code>rr_reinfection_inf</code> (σ_L): susceptibility of an <code>INFECTION</code> agent to a 2nd strain. Default <a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a> → <code>rr_reinfection_rec</code> (the spec’s coupling; set to 1.0 for the ODE null). - <code>rr_reinfection_non</code> (σ_N): of a <code>NON_INFECTIOUS</code> agent. Default <a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a> → <code>rr_reinfection_inf</code>. - <code>rr_reinfection_asy</code> (σ_A): of a mono <code>ASYMPTOMATIC</code> agent. Default 0. - <code>rr_reinfection_sym</code> (σ_Y): of a mono <code>SYMPTOMATIC</code> agent. Default 0. - <code>p_multi</code>: prob. both strains co-progress at <code>→ASYMPTOMATIC</code> (1 = no bottleneck). Default 1. - <code>rr_prog_super</code> (ψ): progression-rate multiplier for multi-strain agents. Default 1. - <code>rr_clear_super</code> (ω): natural-clearance multiplier for multi-strain agents. Default 1. - <code>p_rand</code>: de-novo resistance <code>{drug: prob}</code> per not-yet-resistant drug at each <code>INFECTION→NON_INFECTIOUS</code> and <code>INFECTION→ASYMPTOMATIC</code> progression; each carried strain mutates independently. Default none (off). - <code>prog_resist_mode</code>: de-novo mechanism, <code>'mixed'</code> (→ superinfection) or <code>'replacement'</code>. Default <code>'mixed'</code>. - <code>prog_select</code>: strain selected when one progresses under the bottleneck, <code>'random'</code> or <code>'fitness'</code>. Default <code>'random'</code>. - <code>init_strains</code>: probability vector over strain ids for seeded infections (default all on id 0, pan-susceptible).</p>
+<p>Resistance parameters (<code>pars</code>): - <code>rr_reinfection_inf</code> (σ_L): susceptibility of an <code>INFECTION</code> agent to a 2nd strain. Default <a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a> → <code>rr_reinfection_rec</code> (the spec’s coupling; set to 1.0 for the ODE null). - <code>rr_reinfection_non</code> (σ_N): of a <code>NON_INFECTIOUS</code> agent. Default <a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a> → <code>rr_reinfection_inf</code>. - <code>rr_reinfection_asy</code> (σ_A): of a mono <code>ASYMPTOMATIC</code> agent. Default 0. - <code>rr_reinfection_sym</code> (σ_Y): of a mono <code>SYMPTOMATIC</code> agent. Default 0. - <code>p_multi</code>: prob. both strains co-progress at <code>→ASYMPTOMATIC</code> (1 = no bottleneck). Default 1. - <code>rr_prog_super</code> (ψ): progression-rate multiplier for multi-strain agents. Default 1. - <code>rr_clear_super</code> (ω): natural-clearance multiplier for multi-strain agents. Default 1. - <code>p_rand</code>: de-novo resistance <code>{drug: prob}</code> per not-yet-resistant drug at each <code>INFECTION→NON_INFECTIOUS</code> and <code>INFECTION→ASYMPTOMATIC</code> progression; each carried strain mutates independently. Default none (off). - <code>prog_resist_mode</code>: de-novo mechanism, <code>'mixed'</code> (→ superinfection) or <code>'replacement'</code>. Default <code>'mixed'</code>. - <code>prog_select</code>: strain selected when one progresses under the bottleneck, <code>'random'</code> or <code>'fitness'</code>. Default <code>'random'</code>. - <code>init_strains</code>: probability vector over strain ids for seeded infections (default all on id 0, pan-susceptible).</p>
 </section>
 <section id="methods" class="level4">
 <h4 class="anchored" data-anchor-id="methods">Methods</h4>
@@ -717,9 +717,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td>pars</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
+<td><a href="https://docs.python.org/3/builtins/stdtypes.html#dict">dict</a></td>
 <td>extra parameter overrides merged over the agnostic defaults.</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a></td>
 </tr>
 <tr class="even">
 <td>**kwargs</td>
@@ -737,7 +737,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h5 class="anchored" data-anchor-id="tbsim.resistance.tb_resistant.TBResistant.set_prognoses">set_prognoses</h5>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>resistance.tb_resistant.TBResistant.set_prognoses(uids, sources<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Assign strains to newly infected / superinfected agents.</p>
-<p>Seeds (<code>sources</code> is <a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a> or a scalar) draw a single strain from <code>init_strains</code> and start it at count 1. Transmission events (<code>sources</code> is a UID array, one per target) draw the transmitted strain from the source’s carried strains ∝ <code>count × fitness</code>. A target already carrying the drawn strain is <strong>superinfected with an identical strain</strong> — its count for that strain is incremented (spec §1; previously this was blocked). Otherwise the strain is added (entering <code>INFECTION</code> from a susceptible state, or keeping the current state for a superinfection) at count 1, regardless of how many copies the source carried.</p>
+<p>Seeds (<code>sources</code> is <a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a> or a scalar) draw a single strain from <code>init_strains</code> and start it at count 1. Transmission events (<code>sources</code> is a UID array, one per target) draw the transmitted strain from the source’s carried strains ∝ <code>count × fitness</code>. A target already carrying the drawn strain is <strong>superinfected with an identical strain</strong> — its count for that strain is incremented (spec §1; previously this was blocked). Otherwise the strain is added (entering <code>INFECTION</code> from a susceptible state, or keeping the current state for a superinfection) at count 1, regardless of how many copies the source carried.</p>
 </section>
 <section id="tbsim.resistance.tb_resistant.TBResistant.step" class="level5">
 <h5 class="anchored" data-anchor-id="tbsim.resistance.tb_resistant.TBResistant.step">step</h5>
@@ -1204,7 +1204,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       &nbsp;
     </div>   
     <div class="nav-footer-center">
-<p>Docs built for TBsim v0.10.3 (2026-08-29).<br>© 2023–2026, Gates Foundation and collaborators. All rights reserved. <a href="https://www.gatesfoundation.org/Privacy-and-Cookies-Notice">Privacy and Cookies Notice</a> | <a href="https://www.gatesfoundation.org/Terms-of-Use">Terms of Use</a></p>
+<p>Docs built for TBsim v0.10.4 (2026-11-01).<br>© 2023–2026, Gates Foundation and collaborators. All rights reserved. <a href="https://www.gatesfoundation.org/Privacy-and-Cookies-Notice">Privacy and Cookies Notice</a> | <a href="https://www.gatesfoundation.org/Terms-of-Use">Terms of Use</a></p>
 <div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/starsimhub/tbsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div>
     <div class="nav-footer-right">
       <ul class="footer-items list-unstyled">
