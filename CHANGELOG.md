@@ -2,6 +2,9 @@
 
 All notable changes to the codebase are documented in this file.
 
+## Version 0.10.4 (2026-11-01)
+- Require Starsim below 4 (`starsim<4`), since this version does not run on Starsim 4.
+
 ## Version 0.10.3 (2026-08-29)
 - Updated for Starsim 3.6.0, which makes `float()` on an `ss.TimePar` raise a `TypeError` (it silently discarded the unit) and records `new_infections` inside `ss.Infection.set_prognoses()` rather than inferring them from `ti_infected` afterwards.
 - **Fixed `DxDelivery(result_validity=...)`**: `step_expire_results` converted the validity window with `float(self.result_validity)`, which now raises. It divides by the module's own `dt` instead (`self.result_validity / self.t.dt`), matching `DSTDelivery._expire_stale`.
