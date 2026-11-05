@@ -2,6 +2,11 @@
 
 All notable changes to the codebase are documented in this file.
 
+## Version 0.10.5 (2026-11-04)
+- **Fixed care-seeking multipliers having no effect (#397)**: `DxDelivery(care_seeking_multiplier=...)` (after a false-negative result) and `TxDelivery(reseek_multiplier=...)` (after a treatment failure) wrote to a per-agent multiplier that `HealthSeekingBehavior` never read. The multiplier now lives on `HealthSeekingBehavior` as `care_seeking_multiplier`; `DxDelivery` and `TxDelivery` write to it, and `HealthSeekingBehavior` scales each agent's rate by it before converting to a per-timestep probability. **Regression:** results change for any sim that uses `HealthSeekingBehavior` with `TxDelivery`, since the default `reseek_multiplier=2.0` now takes effect (in a 5,000-agent, 10-year cascade, treatment failures rose from 25.8 to 28.8 on average over 5 seeds).
+- Removed the unused rate-to-probability conversion in `HealthSeekingBehavior.__init__` (it ran before the timestep was set; `step` already converted correctly), and added `HealthSeekingBehavior.shrink()`.
+- Added tests for the per-timestep care-seeking probability at daily and weekly timesteps, for the multiplier, and for the diagnosis/treatment cascade.
+
 ## Version 0.10.4 (2026-11-01)
 - Require Starsim below 4 (`starsim<4`), since this version does not run on Starsim 4.
 

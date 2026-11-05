@@ -134,7 +134,7 @@ class TxDelivery(ss.Intervention):
     Args:
         product: A Tx product instance.
         eligibility: Callable (sim) -> uids. Default: diagnosed & active TB & alive.
-        reseek_multiplier: Care-seeking multiplier applied after treatment failure. Default 2.0.
+        reseek_multiplier: Multiplier on the care-seeking rate after treatment failure, applied via HealthSeekingBehavior. Default 2.0.
         reset_flags: Whether to reset diagnosed/tested flags after failure. Default True.
     """
     def __init__(self, product, eligibility=None, reseek_multiplier=2.0,
@@ -318,11 +318,10 @@ class TxDelivery(ss.Intervention):
             self._dx.diagnosed[failure_uids] = False
             self._dx.tested[failure_uids] = False
 
-        # Trigger renewed care-seeking
+        # Trigger renewed, faster care-seeking
         if hsb := self.sim.get_hsb():
             hsb.sought_care[failure_uids] = False
-        if self._dx is not None:
-            self._dx.care_seeking_multiplier[failure_uids] *= self.reseek_multiplier
+            hsb.care_seeking_multiplier[failure_uids] *= self.reseek_multiplier
         return
 
     def step_relapses(self):
