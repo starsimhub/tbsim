@@ -6,8 +6,8 @@ A product acts on the transitions of `tbsim.TB` for the people who hold it (see
 `ss.vaccinate()` and `ss.treat()`, e.g.::
 
     tb = tbsim.TB()
-    bcg = ss.vaccinate(tbsim.BCG(), where=ss.ppl.age < 1, coverage=0.9)
-    tpt = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.3, interval=ss.years(1))
+    bcg = ss.vaccinate(tbsim.BCG(), where=ss.person.age < 1, coverage=0.9)
+    tpt = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.3, every=ss.years(1))
 
 With drug resistance, TPT protects only against the strains its drugs act on: see `TPT(drugs=...)`.
 """
@@ -62,7 +62,7 @@ class TPT(ss.Treatment):
     Example::
 
         tb = tbsim.TB(drugs=['RIF', 'INH'])
-        tpt = ss.treat(tbsim.TPT(tb=tb, drugs=['INH']), where=tb.infection, coverage=0.3, interval=ss.years(1))
+        tpt = ss.treat(tbsim.TPT(tb=tb, drugs=['INH']), where=tb.infection, coverage=0.3, every=ss.years(1))
     """
     def __init__(self, efficacy=0.6, activation=0.4, dur=ss.years(2), tb=None, drugs=None, **kwargs):
         eff = efficacy*(1 - activation)
@@ -76,7 +76,7 @@ class TPT(ss.Treatment):
         else:
             latent = {'infection', 'infection_remote'}
             active = {'non_infectious', 'asymptomatic', 'symptomatic'}
-            keys = [name for name,tr in tb.graph.transitions.items() if set(s.name for s in tr.src) <= latent and any(s.name in active for s in tr.dst)]
+            keys = [name for name,tr in tb.graph.transitions.items() if set(s.name for s in tr.source) <= latent and any(s.name in active for s in tr.dest)]
         if drugs is not None: # The share of the strains people carry that the regimen covers, at each level of resistance
             resistant(tb, drugs) # Checks that the model has these drugs
             drugs = {drugs} if isinstance(drugs, str) else set(drugs)

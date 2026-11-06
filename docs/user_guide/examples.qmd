@@ -27,8 +27,8 @@ import starsim as ss
 import tbsim
 
 tb = tbsim.TB().stratify(age=[0, 5])
-bcg = ss.vaccinate(tbsim.BCG(), where=ss.ppl.age < 5, coverage=0.8, start='1980')
-tpt = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.3, interval=ss.years(1), start='1990')
+bcg = ss.vaccinate(tbsim.BCG(), where=ss.person.age < 5, coverage=0.8, start='1980')
+tpt = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.3, every=ss.years(1), start='1990')
 
 sim = tbsim.Sim(tb=tb, interventions=[bcg, tpt], start=1975, stop=2030, verbose=0)
 sim.run()

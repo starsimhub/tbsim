@@ -125,7 +125,7 @@ def test_interventions():
     weekly = sc.mergedicts(pars, dict(dt=ss.weeks(1)))
     tb = make()
     dst = ss.Diagnostic(detects=tb.resistance != 'DS', name='dst')
-    screen = ss.screen(dst, where=tb.symptomatic, coverage=0.5, interval=ss.years(1), name='screen')
+    screen = ss.screen(dst, where=tb.symptomatic, coverage=0.5, every=ss.years(1), name='screen')
     sim = tbsim.Sim(tb=tb, interventions=[tbsim.care(tb, test=tbsim.Xpert(by_age=False)), screen], **weekly).run()
     base = tbsim.Sim(tb=make(), **weekly).run()
     assert sim.results.tb.active[-1] < 0.8*base.results.tb.active[-1]

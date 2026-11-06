@@ -44,7 +44,7 @@ def build_sim(name, migration=None, tpt=False):
     """ Build a tbsim.Sim for a migration scenario """
     tb = tbsim.TB(beta=3, init=dict(infection=0.2, symptomatic=0.005), **sc.mergedicts(migration))
     households = ssl.HouseholdNet(dhs_data=make_households(sim_pars['n_agents'], sim_pars['rand_seed']), dynamic=False)
-    interventions = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.5, interval=ss.years(1), name='tpt_rounds') if tpt else None
+    interventions = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.5, every=ss.years(1), name='tpt_rounds') if tpt else None
     return tbsim.Sim(tb=tb, networks=households, interventions=interventions, label=name, **sim_pars)
 
 

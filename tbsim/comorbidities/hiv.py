@@ -64,13 +64,13 @@ class HIV(ss.Disease):
             infected       = acute + latent + aids,
             hiv_prevalence = (acute + latent + aids)/(atrisk + acute + latent + aids),
             init           = dict(acute=init_prev),
-            first          = 'atrisk',
+            default_state  = 'atrisk',
             name           = name,
         )
         starts = isinstance(kwargs.get('art_start'), ss.par) or p.art_start.raw.value > 0 # Given to be fitted, or not zero
         slow = [1.0, p.art_progression.raw]
         start_art = dict(start_art=ss.transfer(art=True, rate=p.art_start)) if starts else {}
-        self.stratify(art=[False, True], states=['acute', 'latent', 'aids'], split=[1 - init_onart, init_onart], adjust=dict(to_latent=slow, to_aids=slow), **start_art)
+        self.stratify(art=[False, True], states=['acute', 'latent', 'aids'], fractions=[1 - init_onart, init_onart], adjust=dict(to_latent=slow, to_aids=slow), **start_art)
         return
 
 
