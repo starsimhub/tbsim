@@ -124,7 +124,7 @@ class LSHTMResistant(ss.Disease):
         # Demography: births replace every death
         self.define_transitions(
             births  = ss.birth(self.susceptible, rate=p.mu),
-            replace = ss.null >> self.susceptible @ p.sym_dead*self.symptomatic.n, # Births that replace TB deaths
+            replace = ss.unborn >> self.susceptible @ p.sym_dead*self.symptomatic.n, # Births that replace TB deaths
             deaths  = ss.death(rate=p.mu),
         )
 
