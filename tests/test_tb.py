@@ -81,9 +81,9 @@ def test_waning():
 def test_sim():
     """ tbsim.Sim takes TB parameters directly, runs as an ODE without a network, and as agents with one """
     sim = tbsim.Sim(beta=12, verbose=0).run()
-    assert sim.solver == 'ode' and sim.get_tb().pars.beta.raw == ss.peryear(12)
+    assert isinstance(sim.solver, ss.solvers.ode) and sim.get_tb().pars.beta.raw == ss.peryear(12)
     sim = tbsim.Sim(networks=ss.RandomNet(n_contacts=5), beta=2, n_agents=2000, verbose=0).run()
-    assert sim.solver == 'abm'
+    assert isinstance(sim.solver, ss.solvers.abm)
     sim = tbsim.demo(plot=False, verbose=0)
     assert isinstance(sim, tbsim.Sim)
     return sim

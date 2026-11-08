@@ -97,7 +97,7 @@ def regimen(kind='dots', **kwargs):
     return dict(delta=success/years, phi=(1 - success)/years, p_relapse=r['relapse'])
 
 
-def care(tb, test=None, seeking=ss.perday(0.1), where=None, every=ss.weeks(1), treat=1.0, dst=None, retreatment=None, start=None, stop=None, name='care'):
+def care(tb, test=None, seeking=ss.perday(0.1), who=None, every=ss.weeks(1), treat=1.0, dst=None, retreatment=None, start=None, stop=None, name='care'):
     """
     The care cascade: people with symptomatic TB seek care, are tested, and those who test positive start treatment
 
@@ -114,7 +114,7 @@ def care(tb, test=None, seeking=ss.perday(0.1), where=None, every=ss.weeks(1), t
         tb (`tbsim.TB`): the TB model
         test (`ss.Diagnostic`): the test (default: `tbsim.Xpert()`, by age if the model is stratified by age at 15)
         seeking (rate): the rate at which eligible people seek care (or a number: the chance of seeking care in each round)
-        where (Cond): who seeks care (default: people with symptomatic TB)
+        who (Cond): who seeks care (default: people with symptomatic TB)
         every (dur): how often the rounds are; shorter is closer to seeking care at any time
         treat (float): the share of those who test positive who start treatment
         dst (`ss.Diagnostic`): a test for resistance (see `tbsim.DST()`), for a model with a second-line regimen
@@ -128,13 +128,13 @@ def care(tb, test=None, seeking=ss.perday(0.1), where=None, every=ss.weeks(1), t
     if test is None:
         by_age = 'age' in tb.strats and list(tb.strats.age.edges) == [0, 15]
         test = Xpert(by_age=by_age)
-    screen = ss.screen(test, where=sc.ifelse(where, tb.symptomatic), coverage=seeking, every=every, start=start, stop=stop, name=name) # A rate of seeking care is a chance in each round
+    screen = ss.screen(test, who=sc.ifelse(who, tb.symptomatic), coverage=seeking, when=ss.schedule(every=every), start=start, stop=stop, name=name) # A rate of seeking care is a chance in each round
     return [screen, *start_treatment(tb, screen.positive, treat, dst, retreatment, name=name)]
 
 
 def treated_within(tb, within):
     """
-    Whether people started treatment (first- or second-line) within some time before: a condition, for `where=` or `detects=` (agents only)
+    Whether people started treatment (first- or second-line) within some time before: a condition, for `who=` or `detects=` (agents only)
 
     Args:
         tb (`tbsim.TB`): the TB model
@@ -166,7 +166,7 @@ def start_treatment(tb, who, treat=1.0, dst=None, retreatment=None, name='care')
     Returns:
         A list of deliveries: an `ss.treat`, or with `dst`, an `ss.screen` and the treatments that follow it
     """
-    first_line = lambda who: ss.treat(ss.Treatment(moves='diagnosis', name=f'{name}_tx'), on=who, coverage=treat, name=f'{name}_positive')
+    first_line = lambda who: ss.treat(ss.Treatment(moves='diagnosis', name=f'{name}_tx'), when=who, coverage=treat, name=f'{name}_positive')
     if dst is None:
         if retreatment is not None:
             errormsg = 'retreatment= says who is tested for resistance: give dst= as well'
@@ -176,13 +176,13 @@ def start_treatment(tb, who, treat=1.0, dst=None, retreatment=None, name='care')
         errormsg = f'dst= sends people found resistant to the second-line regimen, which "{tb.name}" does not have: give it second_line='
         raise ValueError(errormsg)
     def resistance(who):
-        screen = ss.screen(dst, on=who, name=f'{name}_dst')
-        second_line = ss.treat(ss.Treatment(moves='diagnosis_second_line', name=f'{name}_tx_second_line'), on=screen.positive, coverage=treat, name=f'{name}_dst_positive')
-        first = ss.treat(ss.Treatment(moves='diagnosis', name=f'{name}_tx_dst_negative'), on=screen.negative, coverage=treat, name=f'{name}_dst_negative')
+        screen = ss.screen(dst, when=who, name=f'{name}_dst')
+        second_line = ss.treat(ss.Treatment(moves='diagnosis_second_line', name=f'{name}_tx_second_line'), when=screen.positive, coverage=treat, name=f'{name}_dst_positive')
+        first = ss.treat(ss.Treatment(moves='diagnosis', name=f'{name}_tx_dst_negative'), when=screen.negative, coverage=treat, name=f'{name}_dst_negative')
         return [screen, second_line, first]
     if retreatment is None:
         return resistance(who)
-    history = ss.screen(ss.Diagnostic(detects=treated_within(tb, retreatment), name=f'{name}_records'), on=who, name=f'{name}_history')
+    history = ss.screen(ss.Diagnostic(detects=treated_within(tb, retreatment), name=f'{name}_records'), when=who, name=f'{name}_history')
     return [history, *resistance(history.positive), first_line(history.negative)]
 
 
@@ -210,12 +210,12 @@ def monitoring(tb, dst=None, every=ss.months(2), coverage=1.0, switch=1.0, start
         errormsg = f'Monitoring switches people found resistant to the second-line regimen, which "{tb.name}" does not have: give it second_line='
         raise ValueError(errormsg)
     dst = sc.ifelse(dst, DST(tb, name=f'{name}_dst'))
-    screen = ss.screen(dst, where=tb.treatment, coverage=coverage, every=every, start=start, stop=stop, name=name)
-    switching = ss.treat(ss.Treatment(moves='switch_second_line', name=f'{name}_tx'), on=screen.positive, coverage=switch, name=f'{name}_positive')
+    screen = ss.screen(dst, who=tb.treatment, coverage=coverage, when=ss.schedule(every=every), start=start, stop=stop, name=name)
+    switching = ss.treat(ss.Treatment(moves='switch_second_line', name=f'{name}_tx'), when=screen.positive, coverage=switch, name=f'{name}_positive')
     return [screen, switching]
 
 
-def contact_tracing(tb, network='householdnet', test=None, tpt=None, coverage=1.0, treat=1.0, dst=None, on=None, name='tracing'):
+def contact_tracing(tb, network='householdnet', test=None, tpt=None, coverage=1.0, treat=1.0, dst=None, when=None, name='tracing'):
     """
     Household contact tracing: the contacts of people who start treatment are tested; those who test positive start treatment, and those with a latent infection who test negative receive TPT
 
@@ -230,7 +230,7 @@ def contact_tracing(tb, network='householdnet', test=None, tpt=None, coverage=1.
         coverage (float): the share of contacts who are traced and tested
         treat (float): the share of those who test positive who start treatment
         dst (`ss.Diagnostic`): a test for resistance for those who test positive, as for `tbsim.care()`
-        on (Transition/Cond): whose contacts are traced (default: people starting treatment)
+        when (Transition/Cond): whose contacts are traced: the event that triggers tracing (default: people starting treatment)
         name (str): the name of the delivery
 
     Example::
@@ -241,12 +241,12 @@ def contact_tracing(tb, network='householdnet', test=None, tpt=None, coverage=1.
         sim = ss.Sim(tb, networks=household, interventions=interventions, solver='abm')
     """
     second = 'second_line' in tb.states
-    if on is None:
-        on = tb.diagnosis | tb.diagnosis_second_line if second else tb.diagnosis
+    if when is None:
+        when = tb.diagnosis | tb.diagnosis_second_line if second else tb.diagnosis
     test = sc.ifelse(test, Xpert(by_age=False, name=f'{name}_xpert'))
     tpt = TPT(tb=tb, name=f'{name}_tpt') if tpt is None else tpt
     on_treatment = tb.treatment | tb.second_line if second else tb.treatment
     latent = tb.infection | tb.infection_remote if 'infection_remote' in tb.states else tb.infection
-    screen = ss.screen(test, on=on, trace=network, coverage=coverage, where=~on_treatment, name=name)
-    prevent = [ss.treat(tpt, on=screen.negative, where=latent, name=f'{name}_prevention')] if tpt else []
+    screen = ss.screen(test, when=when, trace=network, coverage=coverage, who=~on_treatment, name=name)
+    prevent = [ss.treat(tpt, when=screen.negative, who=latent, name=f'{name}_prevention')] if tpt else []
     return [screen, *start_treatment(tb, screen.positive, treat, dst, name=name), *prevent]

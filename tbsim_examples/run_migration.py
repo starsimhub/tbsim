@@ -44,7 +44,7 @@ def build_sim(name, migration=None, tpt=False):
     """ Build a tbsim.Sim for a migration scenario """
     tb = tbsim.TB(beta=3, init=dict(infection=0.2, symptomatic=0.005), **sc.mergedicts(migration))
     households = ssl.HouseholdNet(dhs_data=make_households(sim_pars['n_agents'], sim_pars['rand_seed']), dynamic=False)
-    interventions = ss.treat(tbsim.TPT(), where=tb.infection, coverage=0.5, every=ss.years(1), name='tpt_rounds') if tpt else None
+    interventions = ss.treat(tbsim.TPT(), who=tb.infection, coverage=0.5, when=ss.schedule(every=ss.years(1)), name='tpt_rounds') if tpt else None
     return tbsim.Sim(tb=tb, networks=households, interventions=interventions, label=name, **sim_pars)
 
 
@@ -81,8 +81,7 @@ scenarios = {
 def run_scenarios(do_plot=False, savefig=False, fig_path='results/migration_multisim.png'):
     """ Run the migration scenarios, and optionally plot them """
     sims = [build_sim(name, **kwargs) for name,kwargs in scenarios.items()]
-    msim = ss.MultiSim(sims)
-    msim.run(parallel=False)
+    msim = ss.parallel(sims, workers=1)
 
     summary = pd.DataFrame([summarize(sim) for sim in msim.sims]).round(1)
     print('\nMigration scenario summary\n--------------------------')

@@ -25,7 +25,7 @@ The model tracks, for each agent:
 | `micro` | Micronutrient status, between 0 and 1 |
 | `receiving_macro`, `receiving_micro` | Whether the agent receives macronutrient or micronutrient supplements |
 
-Percentiles become weights and heights through the LMS (lambda-mu-sigma) method, using reference growth curves by age and sex up to age 20: `mn.weight(uids)` and `mn.height(uids)` give them in kg and cm. Since these depend on age, the sims below set `use_aging=True` so that agents age.
+Percentiles become weights and heights through the LMS (lambda-mu-sigma) method, using reference growth curves by age and sex up to age 20: `mn.weight(uids)` and `mn.height(uids)` give them in kg and cm. Since these depend on age, the sims below set `aging=True` so that agents age.
 
 ## Effects of nutrition on TB
 
@@ -64,7 +64,7 @@ def make_sim(nutrition=True, label=None):
         diseases = tbsim.Malnutrition(),
         connectors = effects,
         solver = 'abm',
-        use_aging = True,
+        aging = True,
         n_agents = 3000,
         start = '1980-01-01',
         stop = '2000-01-01',

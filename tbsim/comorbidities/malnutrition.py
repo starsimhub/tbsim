@@ -61,7 +61,7 @@ class Malnutrition(ss.Disease):
             ss.FloatArr('weight_percentile', default=ss.uniform(0.0, 1.0)),
             ss.FloatArr('micro', default=ss.uniform(0.0, 1.0)),
         )
-        self.dweight = ss.normal(loc=0, scale=self.dweight_scale)
+        self.dweight = ss.normal(mean=0, std=self.dweight_scale)
         return
 
     @staticmethod

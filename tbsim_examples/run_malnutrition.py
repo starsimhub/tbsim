@@ -21,7 +21,7 @@ def make_sim(nutrition=True, label=None):
         diseases = tbsim.Malnutrition(),
         connectors = effects,
         solver = 'abm',
-        use_aging = True, # Agents age, so that their height and weight follow the growth curves
+        aging = True, # Agents age, so that their height and weight follow the growth curves
         n_agents = 2000,
         start = '1980-01-01',
         stop = '2000-01-01',

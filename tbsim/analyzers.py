@@ -627,16 +627,16 @@ class HouseholdStats(ss.Analyzer):
     def init_results(self):
         super().init_results()
         results = [
-            ss.Result('mean_hh_size'),
-            ss.Result('median_hh_size'),
-            ss.Result('max_hh_size'),
+            ss.Result('mean_hh_size', kind='ratio'),
+            ss.Result('median_hh_size', kind='ratio'),
+            ss.Result('max_hh_size', kind='ratio'),
             ss.Result('n_households'),
-            ss.Result('mean_hh_age'),
-            ss.Result('median_hh_age'),
-            ss.Result('mean_age'),
+            ss.Result('mean_hh_age', kind='ratio'),
+            ss.Result('median_hh_age', kind='ratio'),
+            ss.Result('mean_age', kind='ratio'),
         ]
         for lo, hi in zip(self.age_bins[:-1], self.age_bins[1:]):
-            results.append(ss.Result(f'age_{lo}_{hi}'))
+            results.append(ss.Result(f'age_{lo}_{hi}', kind='stock')) # The number of people in each age group
         self.define_results(*results)
         return
 

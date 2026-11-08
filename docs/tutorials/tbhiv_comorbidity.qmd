@@ -35,7 +35,7 @@ Incidence can vary in time with `ss.timeseries()`, which holds each value until 
 People start ART in one of two ways:
 
 - **All the time**, at the rate `art_start`, e.g. `tbsim.HIV(art_start=0.2)`.
-- **By a delivery**, at given times: `ss.Delivery(move=...)` moves a share of the eligible people to a level of a dimension, e.g. `ss.Delivery(move=dict(art=True), coverage=0.5, at=[2005], where=hiv.acute | hiv.latent | hiv.aids)`, passed to the sim in `interventions`.
+- **By a delivery**, at given times: `ss.Delivery(dict(art=True), ...)` moves a share of the eligible people to a level of a dimension, e.g. `ss.Delivery(dict(art=True), coverage=0.5, when=2005, who=hiv.acute | hiv.latent | hiv.aids)`, passed to the sim in `interventions`.
 
 People on ART stay on it.
 
@@ -85,7 +85,7 @@ def make_sim():
         2010: ss.peryear(0.005),
     })
     hiv = tbsim.HIV(incidence=incidence)
-    art = ss.Delivery(move=dict(art=True), coverage=0.5, at=[2005, 2010, 2015, 2020], where=hiv.acute | hiv.latent | hiv.aids)
+    art = ss.Delivery(dict(art=True), coverage=0.5, when=[2005, 2010, 2015, 2020], who=hiv.acute | hiv.latent | hiv.aids)
     sim = tbsim.Sim(
         tb = tb,
         diseases = hiv,

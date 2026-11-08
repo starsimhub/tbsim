@@ -59,7 +59,7 @@ Interventions in [tbsim/interventions/](tbsim/interventions/) are Starsim v4 pro
 
 - **Products** define *what*: tests (`tbsim.Xpert()`, `OralSwab()`, `FujiLAM()`, `CAD()`, `tbsim.test()`), `tbsim.BCG()`, and `tbsim.TPT()`
 - **Deliveries** define *how* (eligibility, coverage, timing): `ss.screen()`, `ss.vaccinate()`, `ss.treat()`, and `tbsim.care(tb)` (the care cascade: seeking care, testing, and starting treatment)
-- `tbsim.regimen('dots')` gives the model's treatment parameters for a regimen; `ss.change()` changes a parameter at given times
+- `tbsim.regimen('dots')` gives the model's treatment parameters for a regimen; `ss.modify(tb.pars.beta, multiply=ss.timeseries(...))` changes a parameter at given times
 
 ### Comorbidities
 

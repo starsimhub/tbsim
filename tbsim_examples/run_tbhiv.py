@@ -4,7 +4,7 @@ TB-HIV coinfection: TB with and without HIV
 HIV acts on TB through modifiers (`tbsim.hiv_effects()`) that speed progression from
 latent infection to active TB, by HIV state. People are infected with HIV at a given
 incidence from 2000 onwards, and half of the people with HIV are put on ART in 2010 and
-again in 2020 (`ss.Delivery(move=...)`). With no network, the sim runs as an ODE, with TB and HIV
+again in 2020 (`ss.Delivery(dict(art=True), ...)`). With no network, the sim runs as an ODE, with TB and HIV
 tracked jointly; for agents, use `solver='abm'`.
 """
 
@@ -17,7 +17,7 @@ def make_sim(hiv_incidence=0, label=None):
     tb = tbsim.TB(init=dict(infection=0.25))
     incidence = ss.timeseries({1980: ss.peryear(0.0), 2000: ss.peryear(hiv_incidence)})
     hiv = tbsim.HIV(incidence=incidence)
-    art = ss.Delivery(move=dict(art=True), coverage=0.5, at=[2010, 2020], where=hiv.acute | hiv.latent | hiv.aids)
+    art = ss.Delivery(dict(art=True), coverage=0.5, when=[2010, 2020], who=hiv.acute | hiv.latent | hiv.aids)
     sim = tbsim.Sim(
         tb = tb,
         diseases = hiv,

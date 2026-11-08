@@ -14,7 +14,7 @@ def hiv_pars():
         incidence       = ss.par(ss.peryear(0.0), bounds=[0, 0.2], doc='New HIV infections per person at risk per year'),
         acute_to_latent = ss.peryear(52/12),     # ACUTE -> LATENT (12 weeks)
         latent_to_aids  = ss.peryear(1/8),      # LATENT -> AIDS (8 years)
-        art_start       = ss.peryear(0.0),      # The rate at which people with HIV start ART (0: none, or by a delivery, e.g. ss.Delivery(move=dict(art=True), coverage=0.8, at=[2010]))
+        art_start       = ss.peryear(0.0),      # The rate at which people with HIV start ART (0: none, or by a delivery, e.g. ss.Delivery(dict(art=True), coverage=0.8, when=2010))
         art_progression = 0.1,                  # The multiplier on progression for people on ART
     )
 
@@ -27,7 +27,7 @@ class HIV(ss.Disease):
     to chronic infection (`latent`) and advanced disease (`aids`). People with HIV are
     stratified by `art`, whether they are on ART, which slows progression; new infections
     start off ART. People start ART at the rate `art_start`, or by a delivery,
-    e.g. `ss.Delivery(move=dict(art=True), coverage=0.8, at=[2010])`.
+    e.g. `ss.Delivery(dict(art=True), coverage=0.8, when=2010)`.
 
     Results, besides those of every state and transition: `infected` (people with HIV)
     and `hiv_prevalence` (as a share of everyone). The number on ART is
@@ -49,13 +49,14 @@ class HIV(ss.Disease):
     def __init__(self, pars=None, init_prev=0.0, init_onart=0.0, name='hiv', **kwargs):
         kwargs = sc.mergedicts(pars, kwargs)
         p = ss.pars(hiv_pars(), **kwargs)
-        atrisk = ss.State('atrisk', label='At risk')
-        acute  = ss.State('acute', label='Acute HIV')
-        latent = ss.State('latent', label='Chronic HIV')
-        aids   = ss.State('aids', label='AIDS')
+        atrisk = ss.State('At risk')
+        acute  = ss.State('Acute HIV')
+        latent = ss.State('Chronic HIV')
+        aids   = ss.State('AIDS')
         infection = ss.Transition(atrisk, acute, rate=p.incidence, move=dict(art=False), name='infection')
-        to_latent = ss.Transition(acute, latent, rate=p.acute_to_latent, name='to_latent')
-        to_aids   = ss.Transition(latent, aids, rate=p.latent_to_aids, name='to_aids')
+        slow = ss.by(art=[1.0, p.art_progression.raw]) # Slower progression on ART
+        to_latent = ss.Transition(acute, latent, rate=p.acute_to_latent*slow, name='to_latent')
+        to_aids   = ss.Transition(latent, aids, rate=p.latent_to_aids*slow, name='to_aids')
         super().__init__(
             atrisk, acute, latent, aids,
             infection      = infection,
@@ -68,9 +69,8 @@ class HIV(ss.Disease):
             name           = name,
         )
         starts = isinstance(kwargs.get('art_start'), ss.par) or p.art_start.raw.value > 0 # Given to be fitted, or not zero
-        slow = [1.0, p.art_progression.raw]
-        start_art = dict(start_art=ss.transfer(art=True, rate=p.art_start)) if starts else {}
-        self.stratify(art=[False, True], states=['acute', 'latent', 'aids'], fractions=[1 - init_onart, init_onart], adjust=dict(to_latent=slow, to_aids=slow), **start_art)
+        start_art = dict(start_art=ss.transfer(dict(art=True), rate=p.art_start)) if starts else {}
+        self.stratify(art=ss.levels({False: 1 - init_onart, True: init_onart}, states=['acute', 'latent', 'aids']), **start_art)
         return
 
 
@@ -95,5 +95,5 @@ def hiv_effects(tb, hiv, acute=1.2202, latent=1.9001, aids=2.5955):
     out = []
     for state,mult in dict(acute=acute, latent=latent, aids=aids).items():
         for tr in [tb.latent_asy, tb.latent_non]:
-            out.append(ss.modify(tr, multiply=mult, where=getattr(hiv, state), name=f'hiv_{state}_{tr.name}'))
+            out.append(ss.modify(tr, multiply=mult, who=getattr(hiv, state), name=f'hiv_{state}_{tr.name}'))
     return out

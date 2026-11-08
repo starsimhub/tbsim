@@ -221,7 +221,7 @@ A test for resistance is an `ss.Diagnostic` that detects carrying a resistant st
 tb = tbsim.TB(drugs=['RIF'], strains=dict(DS=0.8, RIF=0.2), init=init, **tbsim.regimen('dots'))
 care = tbsim.care(tb, test=tbsim.Xpert(by_age=False))
 dst = ss.Diagnostic(detects=tb.resistance != 'DS', sensitivity=0.95, specificity=0.98, name='dst')
-screen = ss.screen(dst, where=tb.symptomatic, coverage=0.5, every=ss.years(1), name='screen')
+screen = ss.screen(dst, who=tb.symptomatic, coverage=0.5, when=ss.schedule(every=ss.years(1)), name='screen')
 sim = tbsim.Sim(tb=tb, interventions=[care, screen], start=2000, stop=2020, verbose=0).run()
 print(f'Tested for resistance: {sim.results.screen.delivered.sum():,.0f}')
 print(f'Found resistant: {sim.results.screen.positive.sum():,.0f}')
@@ -252,7 +252,7 @@ People already on first-line treatment can be tested again, and switched to the 
 
 ```{python}
 tb = tbsim.TB(drugs=['RIF', 'INH'], init=init, strains={'DS':0.8, 'INH':0.2})
-tpt = ss.treat(tbsim.TPT(tb=tb, drugs=['INH']), where=tb.infection, coverage=0.5, every=ss.years(1), name='tpt_delivery')
+tpt = ss.treat(tbsim.TPT(tb=tb, drugs=['INH']), who=tb.infection, coverage=0.5, when=ss.schedule(every=ss.years(1)), name='tpt_delivery')
 sim = tbsim.Sim(tb=tb, interventions=tpt, start=2000, stop=2020, verbose=0).run()
 ```
 
@@ -260,7 +260,7 @@ TPT can also act on the infection itself, which the model declares with `tpt=` (
 
 ```{python}
 tb = tbsim.TB(drugs=['RIF', 'INH'], init=init, strains={'DS':0.8, 'INH':0.2}, tpt=dict(drugs=['INH'], clearance=2.0, acquisition=0.05))
-tpt = ss.treat(tbsim.TPT(tb=tb), where=tb.infection | tb.asymptomatic, coverage=0.5, every=ss.years(1), name='tpt_delivery')
+tpt = ss.treat(tbsim.TPT(tb=tb), who=tb.infection | tb.asymptomatic, coverage=0.5, when=ss.schedule(every=ss.years(1)), name='tpt_delivery')
 sim = tbsim.Sim(tb=tb, interventions=tpt, start=2000, stop=2020, verbose=0).run()
 print(f'Cleared by TPT: {sim.results.tb.tpt_clearance.sum():,.0f}')
 ```
@@ -289,7 +289,7 @@ Once resistance is established, transmission usually dominates; resistance acqui
 
 ## Running as agents, or stochastically
 
-The model runs under every solver. With no network, `tbsim.Sim` runs it as an ODE; `solver='abm'` (or a network, such as `ss.RandomNet()`) runs it as agents, and `solver='binomial'` as a stochastic compartmental model (a chain binomial). The stochastic runs vary from run to run around the ODE, and since this epidemic is close to its threshold, they vary a lot: over 24 seeds, people with active TB in the last year have a standard deviation of about 25% (agents ranged from 126 to 469, against 299 as an ODE), so compare means over several runs (`sim.run(n_runs=...)`) rather than one. The chain binomial is also biased by its step: at this monthly step it runs about 10% high (334 with noise removed), and 3% high with `substeps=12`:
+The model runs under every solver. With no network, `tbsim.Sim` runs it as an ODE; `solver='abm'` (or a network, such as `ss.RandomNet()`) runs it as agents, and `solver='binomial'` as a stochastic compartmental model (a chain binomial). The stochastic runs vary from run to run around the ODE, and since this epidemic is close to its threshold, they vary a lot: over 24 seeds, people with active TB in the last year have a standard deviation of about 25% (agents ranged from 126 to 469, against 299 as an ODE), so compare means over several runs (`ss.parallel(sim, n_runs=...)`) rather than one. The chain binomial is also biased by its step: at this monthly step it runs about 10% high (334 with noise removed), and 3% high with `solver=ss.solvers.binomial(substeps=12)`:
 
 ```{python}
 kw = dict(drugs=['RIF'], strains=dict(DS=0.9, RIF=0.1), beta=15, theta=0.3, rr_cure=0.25, init=init)

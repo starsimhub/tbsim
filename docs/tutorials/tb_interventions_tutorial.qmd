@@ -67,15 +67,15 @@ Each intervention needs the TB model it acts on (e.g. to be eligible for TPT, pe
 ```{python}
 def bcg(tb, coverage=0.8, start='1980', stop='2020', max_age=5):
     """ BCG vaccination: each child under max_age is offered it once """
-    return ss.vaccinate(tbsim.BCG(), where=ss.person.age < max_age, coverage=coverage, start=start, stop=stop, name='bcg_vx')
+    return ss.vaccinate(tbsim.BCG(), who=ss.person.age < max_age, coverage=coverage, start=start, stop=stop, name='bcg_vx')
 
 def tpt(tb, coverage=0.7, start='1990', stop='2025', min_age=15):
     """ TB preventive therapy: yearly rounds for adults with a latent infection """
-    return ss.treat(tbsim.TPT(), where=tb.infection & (ss.person.age >= min_age), coverage=coverage, every=ss.years(1), start=start, stop=stop, name='tpt_tx')
+    return ss.treat(tbsim.TPT(), who=tb.infection & (ss.person.age >= min_age), coverage=coverage, when=ss.schedule(every=ss.years(1), start=start, stop=stop), name='tpt_tx')
 
 def beta_change(tb, years=('1990', '2000'), by=(0.5, 1.4)):
     """ Transmission multiplied by each value from each year on """
-    return ss.change(tb.pars.beta, at=list(years), by=list(by), name='beta_change')
+    return ss.modify(tb.pars.beta, multiply=ss.timeseries(dict(zip(years, by))), name='beta_change')
 
 def care(tb, seeking=ss.peryear(1), start='1990'):
     """ The care cascade: people with symptomatic TB seek care, are tested with Xpert, and start treatment """
@@ -178,7 +178,7 @@ plt.show()
 
 ## Running multiple scenarios
 
-Now let's run several scenarios and compare them. `ss.MultiSim` runs a list of sims (here one after another, with `parallel=False`) and plots them together:
+Now let's run several scenarios and compare them. `ss.parallel()` runs a list of sims (here one after another, with `workers=1`), and the MultiSim it returns plots them together:
 
 ```{python}
 def run_scenarios(scenario_names=None, plot=True):
@@ -186,8 +186,7 @@ def run_scenarios(scenario_names=None, plot=True):
     all_scenarios = get_scenarios()
     scenario_names = sc.ifelse(scenario_names, list(all_scenarios.keys()))
     sims = [build_sim(sc.mergedicts(all_scenarios[name], dict(name=name))) for name in scenario_names]
-    msim = ss.MultiSim(sims)
-    msim.run(parallel=False)
+    msim = ss.parallel(sims, workers=1)
     if plot:
         msim.plot(key=['tb_infectious', 'tb_prevalence_active', 'tb_transmission', 'tb_tb_death'])
         plt.show()
@@ -268,13 +267,13 @@ plt.show()
 
 ## The care cascade, step by step
 
-`tbsim.care()` is one test followed by treatment. A cascade with more steps is built from the same pieces: here people with symptomatic TB who seek care are screened with computer-aided detection of chest X-rays (CAD), those who screen positive are confirmed with Xpert, and 90% of those confirmed start treatment (the TB model's `diagnosis` transition). Each step after the first is given the people an earlier step found (`on=screen.positive`), and every step goes in the interventions:
+`tbsim.care()` is one test followed by treatment. A cascade with more steps is built from the same pieces: here people with symptomatic TB who seek care are screened with computer-aided detection of chest X-rays (CAD), those who screen positive are confirmed with Xpert, and 90% of those confirmed start treatment (the TB model's `diagnosis` transition). Each step after the first is given the people an earlier step found (`when=screen.positive`), and every step goes in the interventions:
 
 ```{python}
 tb = tbsim.TB(**tb_pars).stratify(age=[0, 15])
-screen = ss.screen(tbsim.CAD(), where=tb.symptomatic, coverage=0.1, every=ss.months(1), start='1990', name='screen')
-confirm = ss.screen(tbsim.Xpert(), on=screen.positive, coverage=0.8, name='confirm')
-start_tx = ss.treat(ss.Treatment(moves='diagnosis'), on=confirm.positive, coverage=0.9, name='start_tx')
+screen = ss.screen(tbsim.CAD(), who=tb.symptomatic, coverage=0.1, when=ss.schedule(every=ss.months(1), start='1990'), name='screen')
+confirm = ss.screen(tbsim.Xpert(), when=screen.positive, coverage=0.8, name='confirm')
+start_tx = ss.treat(ss.Treatment(moves='diagnosis'), when=confirm.positive, coverage=0.9, name='start_tx')
 cascade_sim = tbsim.Sim(tb=tb, interventions=[screen, confirm, start_tx], **sim_pars).run()
 
 r = cascade_sim.results
@@ -300,7 +299,7 @@ print(f'Contacts tested:    {r.tracing.delivered.sum():,.0f}, of whom {r.tracing
 print(f'Contacts given TPT: {r.tracing_prevention.delivered.sum():,.0f}')
 ```
 
-Contact tracing is `ss.screen(..., on=tb.diagnosis, trace='householdnet')`: `trace=` delivers to the contacts, in a network, of the people `on=` selects, so any network can be traced, and any product delivered to the contacts.
+Contact tracing is `ss.screen(..., when=tb.diagnosis, trace='householdnet')`: `trace=` delivers to the contacts, in a network, of the people `when=` selects, so any network can be traced, and any product delivered to the contacts.
 
 ## Summary and key takeaways
 
@@ -310,7 +309,7 @@ In this tutorial, we've learned how to:
 2. **Define different intervention types**:
    - **BCG vaccination** (`tbsim.BCG()` with `ss.vaccinate()`): slows progression to active TB, speeds recovery, and lowers TB mortality for those who respond
    - **TPT** (`tbsim.TPT()` with `ss.treat()`): slows progression from latent infection to active TB while it protects
-   - **Changes in transmission** (`ss.change()`): multiply the transmission rate from given years on
+   - **Changes in transmission** (`ss.modify()` with an `ss.timeseries`): multiply the transmission rate from given years on
    - **The care cascade** (`tbsim.care()`, or tests chained with `ss.screen()`): finds and treats people with TB
    - **Household contact tracing** (`tbsim.contact_tracing()`): tests the contacts of people starting treatment, and treats them or gives them TPT
 3. **Run multiple scenarios** with `ss.MultiSim` and compare their impacts

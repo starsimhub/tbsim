@@ -134,7 +134,7 @@ class TestHIV:
         """ART started by a delivery, with no ART otherwise"""
         tb = tbsim.TB()
         hiv = tbsim.HIV(incidence=0.01, init_prev=0.1)
-        arts = ss.Delivery(move=dict(art=True), coverage=0.5, at=[2005], where=hiv.acute | hiv.latent | hiv.aids)
+        arts = ss.Delivery(dict(art=True), coverage=0.5, when=2005, who=hiv.acute | hiv.latent | hiv.aids)
         sim = ss.Sim(tb, diseases=hiv, connectors=tbsim.hiv_effects(tb, hiv), interventions=arts, start=2000, stop=2010, verbose=0).run()
         on_art = sim.results.hiv.infected.by('art').values[:, 1]
         assert on_art[5] == 0 and on_art[6] > 0 # Nobody on ART until the round in 2005, which is between the numbers at 2005 and 2006

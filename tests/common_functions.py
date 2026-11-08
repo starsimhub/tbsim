@@ -41,7 +41,7 @@ def make_net(pars = None):
     # Define network parameters
     if pars is None: 
         pars = dict(
-            n_contacts=ss.poisson(lam=5),  # Number of contacts per agent
+            n_contacts=ss.poisson(mean=5),  # Number of contacts per agent
             dur=0,  # Duration of contacts
             # Add any other default parameters here
         )

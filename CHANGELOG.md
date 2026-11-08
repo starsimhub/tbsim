@@ -21,7 +21,7 @@ All notable changes to the codebase are documented in this file.
 - The docs, tutorials, and examples use the new API.
 - `DwellTime`'s Kaplan-Meier plot computes the curve itself, so `lifelines` is no longer a dependency.
 - Raised minimum Starsim dependency to `>=4.0`.
-- `tbsim.care()` takes `where=` (who seeks care) in place of `eligible=`, as Starsim's deliveries do. `Malnutrition` no longer takes `beta` and `init_prev`, which it never used, nor records `people_alive` (the sim's `alive` does).
+- `tbsim.care()` takes `who=` (who seeks care) in place of `eligible=`, as Starsim's deliveries do; likewise `tbsim.contact_tracing(when=)` (was `on=`). `Malnutrition` no longer takes `beta` and `init_prev`, which it never used, nor records `people_alive` (the sim's `alive` does).
 
 ## Version 0.10.3 (2026-08-29)
 - Updated for Starsim 3.6.0, which makes `float()` on an `ss.TimePar` raise a `TypeError` (it silently discarded the unit) and records `new_infections` inside `ss.Infection.set_prognoses()` rather than inferring them from `ti_infected` afterwards.

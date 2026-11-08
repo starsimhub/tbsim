@@ -49,7 +49,7 @@ fertility_rates = pd.read_csv(Path(__file__).parents[1] / "tbsim" / "data" / "ni
 pregnancy = ss.Pregnancy(fertility_rate=fertility_rates)
 
 death_rates = pd.read_csv(Path(__file__).parents[1] / "tbsim" / "data" / "nigeria_deaths.csv")
-deaths = ss.Deaths(death_rate=death_rates, rate_units=1)
+deaths = ss.Deaths(death_rate=death_rates, rate_per=1)
 
 disease = ss.SIS(beta=0.1, dur_inf=10)
 

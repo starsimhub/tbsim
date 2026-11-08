@@ -39,7 +39,7 @@ With no network, people mix homogeneously and the sim runs as an ODE; `solver='a
 
 ## Comorbidities
 
-- **HIV**: `tbsim.HIV()`, with HIV infection at a given (possibly time-varying) incidence and ART started at a rate or by a delivery (`ss.Delivery(move=dict(art=True), ...)`), and `tbsim.hiv_effects(tb, hiv)`, modifiers that raise progression to active TB by HIV state (as an ODE or as agents).
+- **HIV**: `tbsim.HIV()`, with HIV infection at a given (possibly time-varying) incidence and ART started at a rate or by a delivery (`ss.Delivery(dict(art=True), ...)`), and `tbsim.hiv_effects(tb, hiv)`, modifiers that raise progression to active TB by HIV state (as an ODE or as agents).
 - **Malnutrition**: `tbsim.Malnutrition()` with `tbsim.nutrition_effects(tb)`, modifiers on susceptibility, progression, and clearance, and `tbsim.supplementation_rr()` for nutritional supplements.
 
 ## Drug resistance
@@ -50,6 +50,6 @@ With no network, people mix homogeneously and the sim runs as an ODE; `solver='a
 
 - **Dwell times**: `tbsim.DwellTime` records how long agents spend in each state, with histograms, Kaplan-Meier curves, and state-transition networks (`analyzer.plot('kaplan_meier')`).
 - **Households**: `tbsim.HouseholdStats` summarizes transmission within households.
-- **Fitting**: every parameter is an `ss.par`, so `sim.calibrate()` can fit those with bounds to data.
+- **Fitting**: every parameter is an `ss.par`, so `sim.fit()` can fit those with bounds to data.
 
 For examples and tutorials, see the [examples](examples.qmd) and [tutorials](../tutorials/index.md).

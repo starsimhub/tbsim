@@ -69,7 +69,7 @@ class TB(ss.Disease):
     `p_relapse > 0`: treated people who will relapse).
 
     The transitions are named so that interventions and other conditions can act on them
-    (e.g. `ss.modify(tb.latent_asy, mult=0.5, where=...)`): `transmission` and `reinfect_*`;
+    (e.g. `ss.modify(tb.latent_asy, multiply=0.5, who=...)`): `transmission` and `reinfect_*`;
     `clearance`, `latent_non`, and `latent_asy` (from latent infection); `recovery` and
     `worsening` (from non-infectious TB); `improvement` and `symptoms` (from asymptomatic TB);
     `remission` and `tb_death` (from symptomatic TB); `diagnosis` (into
@@ -158,22 +158,22 @@ class TB(ss.Disease):
 
         # The states
         self.define_states(
-            ss.State('susceptible',    label='Susceptible'),
-            ss.State('infection',      label='Latent infection'),
-            ss.State('cleared',        label='Cleared (from latent)'),
-            ss.State('recovered',      label='Recovered (from non-infectious)'),
-            ss.State('non_infectious', label='Non-infectious TB'),
-            ss.State('asymptomatic',   label='Asymptomatic TB'),
-            ss.State('symptomatic',    label='Symptomatic TB'),
-            ss.State('treatment',      label='On treatment'),
-            ss.State('treated',        label='Completed treatment'),
+            susceptible    = ss.State('Susceptible'),
+            infection      = ss.State('Latent infection'),
+            cleared        = ss.State('Cleared (from latent)'),
+            recovered      = ss.State('Recovered (from non-infectious)'),
+            non_infectious = ss.State('Non-infectious TB'),
+            asymptomatic   = ss.State('Asymptomatic TB'),
+            symptomatic    = ss.State('Symptomatic TB'),
+            treatment      = ss.State('On treatment'),
+            treated        = ss.State('Completed treatment'),
         )
         if front:
-            self.define_states(ss.State('infection_remote', label='Remote latent infection'))
+            self.define_states(infection_remote=ss.State('Remote latent infection'))
         if second:
-            self.define_states(ss.State('second_line', label='On second-line treatment'))
+            self.define_states(second_line=ss.State('On second-line treatment'))
         if relapse:
-            self.define_states(ss.State('relapsing', label='Treated, will relapse'))
+            self.define_states(relapsing=ss.State('Treated, will relapse'))
 
         # Infection, and reinfection of those no longer infected, at a relative risk that depends on how they stopped being infected
         foi = p.beta*(p.trans_asymp*self.asymptomatic + self.symptomatic) # Exposure to asymptomatic and symptomatic TB (through networks, as agents)
@@ -214,10 +214,9 @@ class TB(ss.Disease):
         active = [self.non_infectious, self.asymptomatic, self.symptomatic]
         self.define_transitions(diagnosis=ss.Transition(active, self.treatment, rate=p.theta))
         if not drugs:
-            completed = [self.treated, self.relapsing] if relapse else self.treated
             self.define_transitions(
                 failure    = self.treatment >> self.symptomatic @ p.phi,
-                completion = ss.Transition(self.treatment, completed, rate=p.delta, p=[None, p.p_relapse] if relapse else None),
+                completion = ss.Transition(self.treatment, {self.treated: None, self.relapsing: p.p_relapse} if relapse else self.treated, rate=p.delta),
             )
         if second: # As treatment, at its own rates; both are driven by deliveries (tbsim.care(dst=...), tbsim.monitoring())
             self.define_transitions(
@@ -229,7 +228,7 @@ class TB(ss.Disease):
         if tpt and not drugs:
             for src in latent:
                 name_ = 'tpt_clearance' + ('' if src == 'infection' else '_remote')
-                self.define_transitions(ss.Transition(getattr(self, src), self.cleared, rate=tpt.clearance, where=on_tpt, name=name_))
+                self.define_transitions(ss.Transition(getattr(self, src), self.cleared, rate=tpt.clearance, who=on_tpt, name=name_))
 
         # Relapse after treatment
         if relapse:
@@ -254,7 +253,7 @@ class TB(ss.Disease):
             immigrants = sc.ifelse(immigrants, dict(susceptible=1.0))
             total = sum(immigrants.values())
             for key,share in immigrants.items():
-                self.define_transitions(ss.immigration(getattr(self, key), rate=p.immigration*(share/total), name=f'immigrants_{key}'))
+                self.define_transitions(ss.immigration(getattr(self, key), n=p.immigration*(share/total), name=f'immigrants_{key}'))
         elif immigrants is not None:
             errormsg = 'immigrants= gives the states that people arrive in: give immigration= as well'
             raise ValueError(errormsg)

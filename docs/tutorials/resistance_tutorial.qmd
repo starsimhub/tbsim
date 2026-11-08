@@ -159,7 +159,7 @@ A test for resistance (such as a drug-susceptibility test, or Xpert MTB/RIF) is 
 tb = tbsim.TB(drugs=['RIF'], strains=dict(DS=0.8, RIF=0.2), init=init, **tbsim.regimen('dots'))
 care = tbsim.care(tb, test=tbsim.Xpert(by_age=False))
 dst = ss.Diagnostic(detects=tb.resistance != 'DS', name='dst')
-screen = ss.screen(dst, where=tb.symptomatic, coverage=0.5, every=ss.years(1), name='screen')
+screen = ss.screen(dst, who=tb.symptomatic, coverage=0.5, when=ss.schedule(every=ss.years(1)), name='screen')
 sim = tbsim.Sim(tb=tb, interventions=[care, screen], start=2000, stop=2040, dt=ss.weeks(1), verbose=0).run()
 
 res = sim.results.screen

@@ -66,7 +66,7 @@ def test_network():
     tb = tbsim.TB(beta=10, mu=0, init=dict(infection=0.1, symptomatic=0.01))
     sim = tbsim.Sim(tb=tb, networks=ss.RandomNet(n_contacts=5), demographics=[ss.Births(birth_rate=20), ss.Deaths(death_rate=15)], n_agents=2000, verbose=0)
     sim.run()
-    assert sim.solver == 'abm'
+    assert isinstance(sim.solver, ss.solvers.abm)
     assert sim.results.tb.transmission.values.sum() > 0
     assert sim.results.tb.active.values[-1] > 0
     return sim

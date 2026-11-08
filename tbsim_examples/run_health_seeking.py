@@ -34,8 +34,7 @@ scenarios = {
 
 if __name__ == '__main__':
     sims = [build_sim(label, seeking) for label,seeking in scenarios.items()]
-    msim = ss.MultiSim(sims)
-    msim.run(parallel=False)
+    msim = ss.parallel(sims, workers=1)
 
     for sim in msim.sims:
         res = sim.results

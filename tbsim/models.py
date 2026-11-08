@@ -70,16 +70,16 @@ class LSHTMResistant(ss.Disease):
 
         # The states
         self.define_states(
-            ss.State('susceptible',    label='Susceptible'),
-            ss.State('cleared',        label='Cleared (from latent)'),
-            ss.State('recovered',      label='Recovered (from non-infectious)'),
-            ss.State('treated',        label='Completed treatment'),
-            ss.State('infection',      label='Latent infection'),
-            ss.State('non_infectious', label='Non-infectious TB'),
-            ss.State('asymptomatic',   label='Asymptomatic TB'),
-            ss.State('symptomatic',    label='Symptomatic TB'),
-            ss.State('treat_asy',      label='On treatment, from asymptomatic'),
-            ss.State('treat_sym',      label='On treatment, from symptomatic'),
+            susceptible    = ss.State('Susceptible'),
+            cleared        = ss.State('Cleared (from latent)'),
+            recovered      = ss.State('Recovered (from non-infectious)'),
+            treated        = ss.State('Completed treatment'),
+            infection      = ss.State('Latent infection'),
+            non_infectious = ss.State('Non-infectious TB'),
+            asymptomatic   = ss.State('Asymptomatic TB'),
+            symptomatic    = ss.State('Symptomatic TB'),
+            treat_asy      = ss.State('On treatment, from asymptomatic'),
+            treat_sym      = ss.State('On treatment, from symptomatic'),
         )
 
         # Infection, and reinfection at a relative risk that depends on how people stopped being infected

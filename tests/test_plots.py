@@ -13,12 +13,12 @@ def make_msim():
     sims = [
         ss.Sim(label=label, n_agents=300,
                diseases=tbsim.TB(beta=1.0, init=dict(infection=0.2)),
-               networks=ss.RandomNet(pars=dict(n_contacts=ss.poisson(lam=5), dur=30)),
+               networks=ss.RandomNet(pars=dict(n_contacts=ss.poisson(mean=5), dur=30)),
                pars=pars)
         for label in ('Scenario A', 'Scenario B', 'Scenario C')
     ]
     msim = ss.MultiSim(sims=sims)
-    msim.run(parallel=False)
+    msim.run(workers=1)
     return msim
 
 

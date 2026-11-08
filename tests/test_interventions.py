@@ -59,8 +59,8 @@ def test_prevention():
         res = run(tb, intv).results.tb
         return (res.latent_asy + res.latent_non).sum()
     base = latent_progression(None)
-    tpt = latent_progression(ss.treat(tbsim.TPT(efficacy=1.0, activation=0.0), coverage=1.0, where=None, at=[2000]))
-    bcg = latent_progression(ss.vaccinate(tbsim.BCG(take=1.0, activation=0.5), coverage=1.0, at=[2000]))
+    tpt = latent_progression(ss.treat(tbsim.TPT(efficacy=1.0, activation=0.0), coverage=1.0, when=2000))
+    bcg = latent_progression(ss.vaccinate(tbsim.BCG(take=1.0, activation=0.5), coverage=1.0, when=2000))
     print(f'Progression from latent infection: {base:.0f} without, {tpt:.0f} with TPT, {bcg:.0f} with BCG')
     assert tpt < 0.7*base and bcg < 0.9*base
     return base, tpt, bcg

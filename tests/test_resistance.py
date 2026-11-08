@@ -125,7 +125,7 @@ def test_interventions():
     weekly = sc.mergedicts(pars, dict(dt=ss.weeks(1)))
     tb = make()
     dst = ss.Diagnostic(detects=tb.resistance != 'DS', name='dst')
-    screen = ss.screen(dst, where=tb.symptomatic, coverage=0.5, every=ss.years(1), name='screen')
+    screen = ss.screen(dst, who=tb.symptomatic, coverage=0.5, when=ss.schedule(every=ss.years(1)), name='screen')
     sim = tbsim.Sim(tb=tb, interventions=[tbsim.care(tb, test=tbsim.Xpert(by_age=False)), screen], **weekly).run()
     base = tbsim.Sim(tb=make(), **weekly).run()
     assert sim.results.tb.active[-1] < 0.8*base.results.tb.active[-1]
@@ -164,7 +164,7 @@ def test_tpt_strains():
     sc.heading('TPT protects only against the strains its drugs act on')
     def progression(drugs):
         tb = tbsim.TB(beta=0, drugs=['RIF', 'INH'], init=dict(infection=0.5), strains={'DS':0.5, 'INH':0.25, 'DS+INH':0.25})
-        tpt = ss.treat(tbsim.TPT(efficacy=1.0, activation=0.0, dur=None, tb=tb, drugs=drugs), where=tb.infection, at=[2000], name='tpt_delivery')
+        tpt = ss.treat(tbsim.TPT(efficacy=1.0, activation=0.0, dur=None, tb=tb, drugs=drugs), who=tb.infection, when=2000, name='tpt_delivery')
         sim = tbsim.Sim(tb=tb, interventions=tpt, **sc.mergedicts(pars, dict(stop=2003, dt=ss.weeks(1)))).run()
         return {key:round(val) for key,val in by_strain(sim, 'non_infectious').items() if key in ['DS', 'INH', 'DS+INH']}
     none = progression(['RIF'])
@@ -198,7 +198,7 @@ def test_tpt_infection():
     out = sc.objdict()
     for solver in ['ode', 'abm']:
         tb = tbsim.TB(beta=0, drugs=['RIF', 'INH'], init=dict(infection=0.4, symptomatic=0.05), strains={'DS':0.5, 'INH':0.25, 'DS+INH':0.25}, tpt=dict(drugs=['INH'], clearance=4.0, acquisition=0.5))
-        tpt = ss.treat(tbsim.TPT(tb=tb, dur=ss.years(100)), where=tb.infection | tb.symptomatic, at=[2000], name='tpt_delivery') # Held for the whole run
+        tpt = ss.treat(tbsim.TPT(tb=tb, dur=ss.years(100)), who=tb.infection | tb.symptomatic, when=2000, name='tpt_delivery') # Held for the whole run
         agents = dict(n_agents=40_000) if solver == 'abm' else {}
         sim = tbsim.Sim(tb=tb, interventions=tpt, solver=solver, **sc.mergedicts(pars, dict(stop=2002, dt=ss.weeks(1)), agents)).run()
         res = sim.results.tb

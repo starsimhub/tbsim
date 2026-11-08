@@ -15,10 +15,10 @@ The model is `two_strain_ode.R` (in `tbsim/compartmental`), generalized to any n
 - Superinfection: people with a latent infection or TB who are infected with a strain they do not
   carry carry it as well (at a rate relative to the force of infection, by state).
 - Progression: of someone who carries several strains, all progress to asymptomatic TB with
-  probability `p_multi`, and otherwise one of them (`single_strain=True`); resistance can be acquired on
+  probability `p_multi`, and otherwise one of them (`per_strain='first'`); resistance can be acquired on
   progression from a latent infection with one strain (`q_prog`), added to the strain
   (`prog_resist_mix=True`) or replacing it.
-- Treatment: each strain carried is cured independently (`per_strain=True`), with the chance of
+- Treatment: each strain carried is cured independently (`per_strain='each'`), with the chance of
   curing a drug-susceptible strain times `rr_cure` for each drug it is resistant to; people with
   every strain cured complete treatment, and the others fail, with the strains not cured, which
   can acquire resistance to each drug (`q_treat`; for people with several strains left, all of
@@ -173,7 +173,7 @@ def add_resistance(dis, strains, foi, superinfect=None, bottleneck=None, symptom
     def scale(name, func):
         """ Replace a transition with one whose rate is times a value by level """
         tr = getattr(dis, name)
-        dis.define_transitions(ss.Transition(tr.source, tr.dest, rate=tr.rate*by(func), name=name, where=tr.where), overwrite=True)
+        dis.define_transitions(ss.Transition(tr.source, tr.dest, rate=tr.rate*by(func), name=name, who=tr.where), overwrite=True)
 
     names_used = (bottleneck or []) + (denovo or [])
     base = {name:getattr(dis, name) for name in names_used} # The transitions as given, before their rates are changed by level
@@ -196,7 +196,7 @@ def add_resistance(dis, strains, foi, superinfect=None, bottleneck=None, symptom
             w = strains.values[f'{name}_one']
             tr = base[name]
             rate = tr.rate*ps*(1 - pars.p_multi)*by(lambda s: 1/sum(w[j] for j in s) if several(s) else 0)
-            dis.define_transitions(ss.Transition(tr.source, tr.dest, rate=rate, per_strain=True, single_strain=True, name=f'{name}_one'))
+            dis.define_transitions(ss.Transition(tr.source, tr.dest, rate=rate, per_strain='first', name=f'{name}_one'))
     for name in symptoms or []:
         scale(name, lambda s: ps if several(s) else 1)
     for name in clear or []:
@@ -225,7 +225,7 @@ def add_resistance(dis, strains, foi, superinfect=None, bottleneck=None, symptom
         for src in tpt.latent:
             name = 'tpt_clearance' + ('' if src == 'infection' else '_remote')
             state = getattr(dis, src)
-            dis.define_transitions(ss.Transition(state, [dis.cleared, state], rate=tpt.clearance, p='tpt_cure', per_strain=True, where=tpt.on, name=name))
+            dis.define_transitions(ss.Transition(state, {dis.cleared: 'tpt_cure', state: None}, rate=tpt.clearance, per_strain='each', who=tpt.on, name=name))
         tpt_drugs = tpt.drugs or drugs
         acquisition = tpt.acquisition if isinstance(tpt.acquisition, dict) else {d:tpt.acquisition for d in tpt_drugs}
         acq = per_drug(drugs, acquisition, 'acquisition')
@@ -238,7 +238,7 @@ def add_resistance(dis, strains, foi, superinfect=None, bottleneck=None, symptom
                         after = index[h | gained]
                         name = f'tpt_acquisition_{src}_{names[j]}_to_{names[after]}'
                         state_ = getattr(dis, src)
-                        dis.define_transitions(ss.Transition(state_, state_, rate=ss.peryear(rr*prob), move=strains[j] >> strains[after], where=tpt.on, name=name))
+                        dis.define_transitions(ss.Transition(state_, state_, rate=ss.peryear(rr*prob), move=strains[j] >> strains[after], who=tpt.on, name=name))
     return
 
 
@@ -253,16 +253,16 @@ def add_regimen(dis, reg, strains, have, names, sets, by, drugs, pars):
 
     # No resistance acquired: each strain is cured or not, by itself
     if none > 0:
-        dis.define_transitions(ss.Transition(src, [cured, failed], rate=rate*none*(1 - p_relapse), p=cure, per_strain=True, name=name))
+        dis.define_transitions(ss.Transition(src, {cured: cure, failed: None}, rate=rate*none*(1 - p_relapse), per_strain='each', name=name))
         if p_relapse: # Some of those cured will relapse
-            dis.define_transitions(ss.Transition(src, [dis.relapsing, failed], rate=rate*none*p_relapse, p=cure, per_strain=True, name=f'{name}_relapse'))
+            dis.define_transitions(ss.Transition(src, {dis.relapsing: cure, failed: None}, rate=rate*none*p_relapse, per_strain='each', name=f'{name}_relapse'))
     if none == 1:
         return
 
     # Resistance acquired to some drugs by every strain not cured: as a change from each set carried to each set after
     all_cured = by(lambda s: np.prod(c[list(s)])) # Nothing left to acquire resistance
     if p_relapse:
-        dis.define_transitions(ss.Transition(src, [cured, dis.relapsing], rate=rate*(1 - none)*all_cured, p=[None, p_relapse], name=f'{name}_acquired_cured'))
+        dis.define_transitions(ss.Transition(src, {cured: None, dis.relapsing: p_relapse}, rate=rate*(1 - none)*all_cured, name=f'{name}_acquired_cured'))
     else:
         dis.define_transitions(ss.Transition(src, cured, rate=rate*(1 - none)*all_cured, name=f'{name}_acquired_cured'))
     outcomes = {} # {(set before, set after): chance}
@@ -281,13 +281,13 @@ def add_regimen(dis, reg, strains, have, names, sets, by, drugs, pars):
         if before == after or prob == 0:
             continue
         key = f'{name}_acquired_{"+".join(names[j] for j in sorted(before))}_to_{"+".join(names[j] for j in sorted(after))}'
-        move = strains.move(tuple(strains[j] for j in sorted(before)), tuple(strains[j] for j in sorted(after)))
+        move = strains.change(tuple(strains[j] for j in sorted(before)), tuple(strains[j] for j in sorted(after)))
         dis.define_transitions(ss.Transition(src, failed, rate=rate*(1 - none)*prob*by(lambda s: float(s == before)), move=move, name=key))
     return
 
 
 def resistant(tb, drugs=None):
-    """ The people who carry a strain resistant to any of some drugs (default: any), as a condition, e.g. `where=tbsim.resistant(tb, 'RIF')` """
+    """ The people who carry a strain resistant to any of some drugs (default: any), as a condition, e.g. `who=tbsim.resistant(tb, 'RIF')` """
     if getattr(tb, 'strains', None) is None:
         errormsg = f'The TB model "{tb.name}" has no drug resistance: give it drugs='
         raise ValueError(errormsg)
