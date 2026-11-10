@@ -12,7 +12,7 @@ The HIV module is a lightweight comorbidity: rather than modeling HIV transmissi
 - `tbsim.HIV`: the HIV disease model, which tracks HIV state and ART.
 - `tbsim.hiv_effects()`: modifiers that act on the TB model, speeding progression from latent infection to active TB according to HIV state.
 
-Like the TB model, the HIV model is declared as states and transitions, so a TB-HIV sim runs under any solver. With no network, it runs as an ODE (the default), and TB and HIV are tracked jointly: each TB state is split by HIV state and ART (see `ss.Crossing`). To run it as agents instead, use `solver='abm'`.
+Like the TB model, the HIV model is declared as states and transitions, so a TB-HIV sim runs under any solver. With no network, it runs as an ODE (the default), and TB and HIV are tracked jointly: each TB state is split by HIV state and ART (see `ss.solvers.JointStates`). To run it as agents instead, use `solver='abm'`.
 
 ## HIV model
 

@@ -79,7 +79,7 @@ def hiv_effects(tb, hiv, acute=1.2202, latent=1.9001, aids=2.5955):
     The effect of HIV on TB: a multiplier on progression from latent infection to active TB, by HIV state
 
     Returns modifiers, to pass to the sim as `connectors`. In a compartmental run, the states
-    of TB and HIV are then tracked jointly (see `ss.Crossing`).
+    of TB and HIV are then tracked jointly (see `ss.solvers.JointStates`).
 
     Args:
         tb (`tbsim.TB`): the TB model
