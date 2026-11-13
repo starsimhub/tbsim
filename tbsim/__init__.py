@@ -1,4 +1,4 @@
-# Last verified on: Starsim 4.0.0rc4 (34266c4c4)
+# Last verified on: Starsim 4.0.0rc4 (009927777)
 
 import os
 DATADIR = os.path.join(os.path.dirname(__file__), 'data')
