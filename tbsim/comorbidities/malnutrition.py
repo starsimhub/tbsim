@@ -55,8 +55,8 @@ class Malnutrition(ss.Disease):
         self.LMS_data = pd.read_csv(anthro_path).set_index('Sex')
 
         self.define_states(
-            ss.BoolArr('receiving_macro', default=False),
-            ss.BoolArr('receiving_micro', default=False),
+            ss.BoolArr('receiving_macro', default=False, result=False),
+            ss.BoolArr('receiving_micro', default=False, result=False),
             ss.FloatArr('height_percentile', default=ss.uniform(0.0, 1.0)),
             ss.FloatArr('weight_percentile', default=ss.uniform(0.0, 1.0)),
             ss.FloatArr('micro', default=ss.uniform(0.0, 1.0)),
