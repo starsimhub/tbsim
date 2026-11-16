@@ -55,7 +55,7 @@ def make_births(pars = None):
     # Define births parameters
     if pars is None: 
         pars = dict(
-            birth_rate=15,  # Birth rate
+            birth_rate=0.015,  # Birth rate (15 per 1,000)
             # Add any other default parameters here
         )
     return ss.Births(pars=pars)
@@ -68,7 +68,7 @@ def make_deaths(pars = None):
     # Define deaths parameters
     if pars is None: 
         pars = dict(
-            death_rate=15,  # Death rate
+            death_rate=0.015,  # Death rate (15 per 1,000)
             # Add any other default parameters here
         )
     return ss.Deaths(pars=pars)

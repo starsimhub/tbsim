@@ -173,7 +173,7 @@ def add_resistance(dis, strains, foi, superinfect=None, bottleneck=None, symptom
     def scale(name, func):
         """ Replace a transition with one whose rate is times a value by level """
         tr = getattr(dis, name)
-        dis.define_transitions(ss.Transition(tr.source, tr.dest, rate=tr.rate*by(func), name=name, who=tr.where), overwrite=True)
+        dis.define_transitions(ss.Transition(tr.source, tr.dest, rate=tr.rate*by(func), name=name, who=tr.who, when=tr.when), overwrite=True)
 
     names_used = (bottleneck or []) + (denovo or [])
     base = {name:getattr(dis, name) for name in names_used} # The transitions as given, before their rates are changed by level

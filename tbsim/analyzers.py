@@ -602,7 +602,7 @@ class HouseholdStats(ss.Analyzer):
         analyzer = tbsim.HouseholdStats(network_name='householdnet')
         sim = ss.Sim(
             diseases='sis', networks=net,
-            demographics=[ss.Pregnancy(fertility_rate=20), ss.Deaths(death_rate=10)],
+            demographics=[ss.Pregnancy(fertility_rate=0.02), ss.Deaths(death_rate=0.01)],
             analyzers=analyzer,
         )
         sim.run()

@@ -64,7 +64,7 @@ def test_agents():
 def test_network():
     """ As agents, the model runs over a network, with births and deaths from demographics modules (mu=0) """
     tb = tbsim.TB(beta=10, mu=0, init=dict(infection=0.1, symptomatic=0.01))
-    sim = tbsim.Sim(tb=tb, networks=ss.RandomNet(n_contacts=5), demographics=[ss.Births(birth_rate=20), ss.Deaths(death_rate=15)], n_agents=2000, verbose=0)
+    sim = tbsim.Sim(tb=tb, networks=ss.RandomNet(n_contacts=5), demographics=[ss.Births(birth_rate=0.02), ss.Deaths(death_rate=0.015)], n_agents=2000, verbose=0)
     sim.run()
     assert isinstance(sim.solver, ss.solvers.abm)
     assert sim.results.tb.transmission.values.sum() > 0

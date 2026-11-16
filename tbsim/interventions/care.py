@@ -128,7 +128,8 @@ def care(tb, test=None, seeking=ss.perday(0.1), who=None, every=ss.weeks(1), tre
     if test is None:
         by_age = 'age' in tb.strats and list(tb.strats.age.edges) == [0, 15]
         test = Xpert(by_age=by_age)
-    screen = ss.screen(test, who=sc.ifelse(who, tb.symptomatic), coverage=seeking, when=ss.schedule(every=every), start=start, stop=stop, name=name) # A rate of seeking care is a chance in each round
+    reach = dict(rate=seeking) if isinstance(seeking, ss.TimePar) else dict(coverage=seeking) # A rate of seeking care accrues over each round; a number is the chance in each round
+    screen = ss.screen(test, who=sc.ifelse(who, tb.symptomatic), when=ss.schedule(every=every), start=start, stop=stop, name=name, **reach)
     return [screen, *start_treatment(tb, screen.positive, treat, dst, retreatment, name=name)]
 
 
