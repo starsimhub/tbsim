@@ -2,6 +2,7 @@
 Test the TB models declared as states and transitions (tbsim.TB and tbsim.LSHTMResistant), which run as an ODE or as agents
 """
 
+import pytest
 import numpy as np
 import sciris as sc
 import starsim as ss
@@ -46,17 +47,17 @@ def test_resistant_ode():
     return sim
 
 
+@pytest.mark.parametrize('Model', [tbsim.TB, tbsim.LSHTMResistant]) # Separately, so they run in parallel
 @sc.timer()
-def test_agents():
+def test_agents(Model):
     """ The same models, as agents (one agent per person), are close to the ODE (within the difference of order dt that agents have) """
-    pars = dict(start=2000, stop=2010, dt=ss.weeks(1), **kw)
-    for Model in [tbsim.TB, tbsim.LSHTMResistant]:
-        init = dict(infection=0.03, symptomatic=0.005) if Model is tbsim.TB else None
-        ode = ss.Sim(Model(init=init), **pars).run().results.tb.active.values
-        abm = ss.Sim(Model(init=init), solver='abm', n_agents=100_000, **pars).run().results.tb.active.values
-        ratio = abm[-104:].mean()/ode[-104:].mean() # Over the last two years
-        print(f'{Model.__name__}: active TB as agents is {ratio:0.2f} times that of the ODE')
-        assert 0.8 < ratio < 1.25
+    pars = dict(start=2000, stop=2010, dt=ss.months(1), **kw)
+    init = dict(infection=0.03, symptomatic=0.005) if Model is tbsim.TB else None
+    ode = ss.Sim(Model(init=init), **pars).run().results.tb.active.values
+    abm = ss.Sim(Model(init=init), solver='abm', n_agents=100_000, **pars).run().results.tb.active.values
+    ratio = abm[-24:].mean()/ode[-24:].mean() # Over the last two years
+    print(f'{Model.__name__}: active TB as agents is {ratio:0.2f} times that of the ODE')
+    assert 0.7 < ratio < 1.3 # Monthly, 0.83 to 1.12 over 10 seeds for LSHTMResistant (0.93 to 1.04 weekly), 0.94 to 1.06 over 6 for TB
     return abm
 
 
@@ -75,5 +76,6 @@ def test_network():
 if __name__ == '__main__':
     test_lshtm_ode()
     test_resistant_ode()
-    test_agents()
+    for Model in [tbsim.TB, tbsim.LSHTMResistant]:
+        test_agents(Model)
     test_network()

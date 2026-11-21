@@ -34,10 +34,11 @@ def test_natural_history():
 def test_solvers_agree():
     """ As agents, the model is close to the ODE """
     tb = lambda: tbsim.TB(init=dict(infection=0.03, symptomatic=0.005))
-    ode = run(tb()).infectious[-104:].mean()
-    abm = run(tb(), solver='abm', n_agents=100_000).infectious[-104:].mean()
+    monthly = dict(dt=ss.months(1)) # Agents differ from the ODE by order dt, but at this dt that is small next to the noise between seeds
+    ode = run(tb(), **monthly).infectious[-24:].mean() # Over the last two years
+    abm = run(tb(), solver='abm', n_agents=100_000, **monthly).infectious[-24:].mean()
     print(f'Infectious TB over the last two years: {ode:.0f} as an ODE, {abm:.0f} as agents')
-    assert 0.8 < abm/ode < 1.25
+    assert 0.8 < abm/ode < 1.25 # 0.91 to 1.13 over 10 seeds (0.88 to 1.02 weekly)
     return ode, abm
 
 
